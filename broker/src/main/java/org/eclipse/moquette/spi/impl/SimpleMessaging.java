@@ -26,7 +26,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.moquette.spi.IMessaging;
-import org.eclipse.moquette.spi.ISessionsStore;
 import org.eclipse.moquette.spi.IMessagesStore;
 import org.eclipse.moquette.spi.impl.events.*;
 import org.eclipse.moquette.spi.impl.subscriptions.SubscriptionsStore;
@@ -56,7 +55,6 @@ public class SimpleMessaging implements IMessaging, EventHandler<ValueEvent> {
     private RingBuffer<ValueEvent> m_ringBuffer;
 
     private IMessagesStore m_storageService;
-    private ISessionsStore m_sessionsStore;
 
     private ExecutorService m_executor;
     private Disruptor<ValueEvent> m_disruptor;
@@ -81,7 +79,7 @@ public class SimpleMessaging implements IMessaging, EventHandler<ValueEvent> {
     public void init(Properties configProps) {
         subscriptions = new SubscriptionsStore();
         m_executor = Executors.newFixedThreadPool(1);
-        m_disruptor = new Disruptor<ValueEvent>(ValueEvent.EVENT_FACTORY, 1024 * 32, m_executor);
+        m_disruptor = new Disruptor<>(ValueEvent.EVENT_FACTORY, 1024 * 32, m_executor);
         /*Disruptor<ValueEvent> m_disruptor = new Disruptor<ValueEvent>(ValueEvent.EVENT_FACTORY, 1024 * 32, m_executor,
                 ProducerType.MULTI, new BusySpinWaitStrategy());*/
         m_disruptor.handleEventsWith(this);
@@ -160,13 +158,12 @@ public class SimpleMessaging implements IMessaging, EventHandler<ValueEvent> {
         //TODO use a property to select the storage path
         MapDBPersistentStore mapStorage = new MapDBPersistentStore();
         m_storageService = mapStorage;
-        m_sessionsStore = mapStorage;
 
         m_storageService.initStore();
         
         //List<Subscription> storedSubscriptions = m_sessionsStore.listAllSubscriptions();
         //subscriptions.init(storedSubscriptions);
-        subscriptions.init(m_sessionsStore);
+        subscriptions.init(mapStorage);
         
         String passwdPath = props.getProperty("password_file", "");
         String configPath = System.getProperty("moquette.path", null);
@@ -177,7 +174,7 @@ public class SimpleMessaging implements IMessaging, EventHandler<ValueEvent> {
             authenticator = new FileAuthenticator(configPath, passwdPath);
         }
         
-        m_processor.init(subscriptions, m_storageService, m_sessionsStore, authenticator);
+        m_processor.init(subscriptions, m_storageService, mapStorage, authenticator);
     }
 
 

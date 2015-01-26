@@ -46,13 +46,13 @@ public class SubscriptionsStoreTest {
     
     @Test
     public void testParseTopic() throws ParseException {
-        List tokens = store.parseTopic("finance/stock/ibm");
+        List<Token> tokens = SubscriptionsStore.parseTopic("finance/stock/ibm");
         assertEqualsSeq(asArray("finance", "stock", "ibm"), tokens);
 
-        tokens = store.parseTopic("/finance/stock/ibm");
+        tokens = SubscriptionsStore.parseTopic("/finance/stock/ibm");
         assertEqualsSeq(asArray(Token.EMPTY, "finance", "stock", "ibm"), tokens);
 
-        tokens = store.parseTopic("/");
+        tokens = SubscriptionsStore.parseTopic("/");
         assertEqualsSeq(asArray(Token.EMPTY, Token.EMPTY), tokens);
     }
 
@@ -63,38 +63,38 @@ public class SubscriptionsStoreTest {
 
     @Test
     public void testParseTopicMultiValid() throws ParseException {
-        List tokens = store.parseTopic("finance/stock/#");
+        List<Token> tokens = SubscriptionsStore.parseTopic("finance/stock/#");
         assertEqualsSeq(asArray("finance", "stock", Token.MULTI), tokens);
 
-        tokens = store.parseTopic("#");
+        tokens = SubscriptionsStore.parseTopic("#");
         assertEqualsSeq(asArray(Token.MULTI), tokens);
     }
 
     @Test(expected = ParseException.class)
     public void testParseTopicMultiInTheMiddleNotValid() throws ParseException {
-        store.parseTopic("finance/#/closingprice");
+        SubscriptionsStore.parseTopic("finance/#/closingprice");
     }
 
     @Test(expected = ParseException.class)
     public void testParseTopicMultiNotAferSeparatorNotValid() throws ParseException {
-        store.parseTopic("finance#");
+        SubscriptionsStore.parseTopic("finance#");
     }
 
     @Test
     public void testParseTopicSingleValid() throws ParseException {
-        List tokens = store.parseTopic("finance/stock/+");
+        List<Token> tokens = SubscriptionsStore.parseTopic("finance/stock/+");
         assertEqualsSeq(asArray("finance", "stock", Token.SINGLE), tokens);
 
-        tokens = store.parseTopic("+");
+        tokens = SubscriptionsStore.parseTopic("+");
         assertEqualsSeq(asArray(Token.SINGLE), tokens);
 
-        tokens = store.parseTopic("finance/+/ibm");
+        tokens = SubscriptionsStore.parseTopic("finance/+/ibm");
         assertEqualsSeq(asArray("finance", Token.SINGLE, "ibm"), tokens);
     }
 
     @Test(expected = ParseException.class)
     public void testParseTopicSingleNotAferSeparatorNotValid() throws ParseException {
-        store.parseTopic("finance+");
+        SubscriptionsStore.parseTopic("finance+");
     }
 
     @Test
