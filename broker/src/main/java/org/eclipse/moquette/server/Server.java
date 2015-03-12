@@ -19,29 +19,40 @@ import java.io.File;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.Properties;
-import org.eclipse.moquette.spi.impl.SimpleMessaging;
+
 import org.eclipse.moquette.server.netty.NettyAcceptor;
+import org.eclipse.moquette.spi.impl.SimpleMessaging;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 /**
- * Launch a  configured version of the server.
+ * Launch a configured version of the server.
+ *
  * @author andrea
  */
 public class Server {
-    
+
     private static final Logger LOG = LoggerFactory.getLogger(Server.class);
-    
-    public static final String STORAGE_FILE_PATH = System.getProperty("user.home") +
-            File.separator + "moquette_store.mapdb";
+
+    public static final String STORAGE_FILE_PATH = getMoquettePath() + File.separator + "moquette_store.mapdb";
 
     private ServerAcceptor m_acceptor;
     SimpleMessaging messaging;
-    
+
+    private static String getMoquettePath() {
+        final String moquettePath = System.getProperty("moquette.path");
+        if (moquettePath != null) {
+            return moquettePath;
+        } else {
+            return System.getProperty("user.home");
+        }
+    }
+
     public static void main(String[] args) throws IOException {
         final Server server = new Server();
         server.startServer();
         System.out.println("Server started, version 0.7-SNAPSHOT");
-        //Bind  a shutdown hook
+        // Bind a shutdown hook
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
@@ -49,14 +60,13 @@ public class Server {
             }
         });
     }
-    
+
     /**
-     * Starts Moquette bringing the configuration from the file 
+     * Starts Moquette bringing the configuration from the file
      * located at config/moquette.conf
      */
     public void startServer() throws IOException {
-        String configPath = System.getProperty("moquette.path", null);
-        startServer(new File(configPath, "config/moquette.conf"));
+        startServer(new File(getMoquettePath(), "config/moquette.conf"));
     }
 
     /**
@@ -75,24 +85,24 @@ public class Server {
         Properties configProps = confParser.getProperties();
         startServer(configProps);
     }
-    
+
     /**
      * Starts the server with the given properties.
-     * 
+     *
      * Its need at least the following properties:
      * <ul>
-     *  <li>port</li>
-     *  <li>password_file</li>
+     * <li>port</li>
+     * <li>password_file</li>
      * </ul>
      */
     public void startServer(Properties configProps) throws IOException {
         messaging = SimpleMessaging.getInstance();
         messaging.init(configProps);
-        
+
         m_acceptor = new NettyAcceptor();
         m_acceptor.initialize(messaging, configProps);
     }
-    
+
     public void stopServer() {
         System.out.println("Server stopping...");
         messaging.stop();
