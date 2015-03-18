@@ -25,6 +25,7 @@ import java.text.ParseException;
 import java.util.Map.Entry;
 import java.util.Properties;
 
+import org.apache.commons.lang3.text.StrSubstitutor;
 import org.eclipse.moquette.commons.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,8 +120,9 @@ class ConfigurationParser {
                     
                     //split till the first space
                     int deilimiterIdx = line.indexOf(' ');
-                    String key = line.substring(0, deilimiterIdx).trim();
-                    String value = line.substring(deilimiterIdx).trim();
+                    final String key = line.substring(0, deilimiterIdx).trim();
+                    final String valueRaw = line.substring(deilimiterIdx).trim();
+                    final String value = StrSubstitutor.replaceSystemProperties(valueRaw);
                     
                     m_properties.put(key, value);
                 }
