@@ -67,8 +67,6 @@ public class SimpleMessaging implements IMessaging, EventHandler<ValueEvent> {
     private ExecutorService m_executor;
     private Disruptor<ValueEvent> m_disruptor;
 
-    private static SimpleMessaging INSTANCE;
-    
     private final ProtocolProcessor m_processor = new ProtocolProcessor();
     private final AnnotationSupport annotationSupport = new AnnotationSupport();
     private boolean benchmarkEnabled = false;
@@ -77,14 +75,7 @@ public class SimpleMessaging implements IMessaging, EventHandler<ValueEvent> {
 
     Histogram histogram = new Histogram(5);
     
-    private SimpleMessaging() {
-    }
-
-    public static SimpleMessaging getInstance() {
-        if (INSTANCE == null) {
-            INSTANCE = new SimpleMessaging();
-        }
-        return INSTANCE;
+    public SimpleMessaging() {
     }
 
     public void init(Properties configProps) {

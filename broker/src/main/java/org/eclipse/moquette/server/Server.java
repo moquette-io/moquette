@@ -89,7 +89,7 @@ public class Server {
     	ConfigurationParser confParser = new ConfigurationParser(configProps);
     	m_properties = confParser.getProperties();
         LOG.info("Persistent store file: " + m_properties.get(PERSISTENT_STORE_PROPERTY_NAME));
-        messaging = SimpleMessaging.getInstance();
+        messaging = new SimpleMessaging();
         messaging.init(m_properties);
         
         m_acceptor = new NettyAcceptor();
