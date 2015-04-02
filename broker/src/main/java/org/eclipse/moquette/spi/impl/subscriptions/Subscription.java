@@ -16,6 +16,7 @@
 package org.eclipse.moquette.spi.impl.subscriptions;
 
 import java.io.Serializable;
+
 import org.eclipse.moquette.proto.messages.AbstractMessage.QOSType;
 
 /**
@@ -25,6 +26,7 @@ import org.eclipse.moquette.proto.messages.AbstractMessage.QOSType;
  * 
  * @author andrea
  */
+@SuppressWarnings("serial")
 public class Subscription implements Serializable {
     
     QOSType requestedQos; //max QoS acceptable

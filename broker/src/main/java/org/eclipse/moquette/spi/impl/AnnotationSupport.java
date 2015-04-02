@@ -31,19 +31,19 @@ import org.eclipse.moquette.server.ServerChannel;
  */
 class AnnotationSupport {
     
-    private final Map<Class, Method> messageClassToMethod = new HashMap<Class, Method>();
+    private final Map<Class<?>, Method> messageClassToMethod = new HashMap<Class<?>, Method>();
     private Object targetInstance;
 
     void processAnnotations(Object instance) {
         targetInstance = instance;
-        Class instanceCls = instance.getClass();
+        Class<?> instanceCls = instance.getClass();
         Method[] allMethods = instanceCls.getDeclaredMethods();
         for (Method m : allMethods) {
             MQTTMessage annotation = m.getAnnotation(MQTTMessage.class);
             if (annotation == null) {
                 continue;
             }
-            Class mqttMessageClass = annotation.message();
+            Class<?> mqttMessageClass = annotation.message();
             messageClassToMethod.put(mqttMessageClass, m);
         }
     }
