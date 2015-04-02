@@ -17,6 +17,7 @@ package org.eclipse.moquette.spi;
 
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+
 import org.eclipse.moquette.spi.impl.events.PublishEvent;
 import org.eclipse.moquette.proto.messages.AbstractMessage;
 
@@ -28,7 +29,8 @@ import java.util.List;
  */
 public interface IMessagesStore {
 
-    public static class StoredMessage implements Serializable {
+    @SuppressWarnings("serial")
+	public static class StoredMessage implements Serializable {
         final AbstractMessage.QOSType m_qos;
         final byte[] m_payload;
         final String m_topic;
@@ -51,11 +53,6 @@ public interface IMessagesStore {
             return m_topic;
         }
     }
-
-    /**
-     * Used to initialize all persistent store structures
-     * */
-    void initStore();
 
     /**
      * Persist the message. 

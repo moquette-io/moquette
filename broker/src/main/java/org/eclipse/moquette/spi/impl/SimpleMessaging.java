@@ -15,13 +15,15 @@
  */
 package org.eclipse.moquette.spi.impl;
 
-import com.lmax.disruptor.EventHandler;
-import com.lmax.disruptor.RingBuffer;
-import com.lmax.disruptor.dsl.Disruptor;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
 import org.HdrHistogram.Histogram;
 import org.eclipse.moquette.proto.messages.AbstractMessage;
-import org.eclipse.moquette.server.IAuthenticator;
 import org.eclipse.moquette.server.ServerChannel;
+import org.eclipse.moquette.spi.IAuthenticator;
 import org.eclipse.moquette.spi.IMessagesStore;
 import org.eclipse.moquette.spi.IMessaging;
 import org.eclipse.moquette.spi.ISessionsStore;
@@ -30,18 +32,12 @@ import org.eclipse.moquette.spi.impl.events.MessagingEvent;
 import org.eclipse.moquette.spi.impl.events.ProtocolEvent;
 import org.eclipse.moquette.spi.impl.events.StopEvent;
 import org.eclipse.moquette.spi.impl.subscriptions.SubscriptionsStore;
-import org.eclipse.moquette.spi.persistence.MapDBPersistentStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Properties;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-
-import static org.eclipse.moquette.commons.Constants.PASSWORD_FILE_PROPERTY_NAME;
-import static org.eclipse.moquette.commons.Constants.PERSISTENT_STORE_PROPERTY_NAME;
+import com.lmax.disruptor.EventHandler;
+import com.lmax.disruptor.RingBuffer;
+import com.lmax.disruptor.dsl.Disruptor;
 
 /**
  *
@@ -57,7 +53,7 @@ public class SimpleMessaging implements IMessaging, EventHandler<ValueEvent> {
 
     private static final Logger LOG = LoggerFactory.getLogger(SimpleMessaging.class);
     
-    private SubscriptionsStore subscriptions;
+    private SubscriptionsStore m_subscriptions;
     
     private RingBuffer<ValueEvent> m_ringBuffer;
 
@@ -67,41 +63,32 @@ public class SimpleMessaging implements IMessaging, EventHandler<ValueEvent> {
     private ExecutorService m_executor;
     private Disruptor<ValueEvent> m_disruptor;
 
-    private static SimpleMessaging INSTANCE;
-    
     private final ProtocolProcessor m_processor = new ProtocolProcessor();
-    private final AnnotationSupport annotationSupport = new AnnotationSupport();
-    private boolean benchmarkEnabled = false;
+    private final AnnotationSupport m_annotationSupport = new AnnotationSupport();
+    private boolean m_benchmarkEnabled = false;
     
-    CountDownLatch m_stopLatch;
+    private CountDownLatch m_stopLatch;
 
-    Histogram histogram = new Histogram(5);
+    private Histogram m_histogram = new Histogram(5);
     
-    private SimpleMessaging() {
-    }
-
-    public static SimpleMessaging getInstance() {
-        if (INSTANCE == null) {
-            INSTANCE = new SimpleMessaging();
-        }
-        return INSTANCE;
-    }
-
-    public void init(Properties configProps) {
-        subscriptions = new SubscriptionsStore();
+    public SimpleMessaging(int ringBufferSize, boolean benchmarkEnabled, IMessagesStore storageService, ISessionsStore sessionsStore, IAuthenticator authenticator) {
         m_executor = Executors.newFixedThreadPool(1);
-        m_disruptor = new Disruptor<>(ValueEvent.EVENT_FACTORY, 1024 * 32, m_executor);
-        /*Disruptor<ValueEvent> m_disruptor = new Disruptor<ValueEvent>(ValueEvent.EVENT_FACTORY, 1024 * 32, m_executor,
-                ProducerType.MULTI, new BusySpinWaitStrategy());*/
+        m_disruptor = new Disruptor<>(ValueEvent.EVENT_FACTORY, ringBufferSize, m_executor);
         m_disruptor.handleEventsWith(this);
         m_disruptor.start();
 
-        // Get the ring buffer from the Disruptor to be used for publishing.
         m_ringBuffer = m_disruptor.getRingBuffer();
 
-        annotationSupport.processAnnotations(m_processor);
-        processInit(configProps);
-//        disruptorPublish(new InitEvent(configProps));
+        m_annotationSupport.processAnnotations(m_processor);
+        m_benchmarkEnabled = benchmarkEnabled;
+		
+		m_storageService = storageService;
+		m_sessionsStore = sessionsStore;
+		
+		m_subscriptions = new SubscriptionsStore();
+		m_subscriptions.init(m_sessionsStore);
+		
+		m_processor.init(m_subscriptions, m_storageService, m_sessionsStore, authenticator);
     }
 
     
@@ -163,10 +150,10 @@ public class SimpleMessaging implements IMessaging, EventHandler<ValueEvent> {
             AbstractMessage message = ((ProtocolEvent) evt).getMessage();
             try {
                 long startTime = System.nanoTime();
-                annotationSupport.dispatch(session, message);
-                if (benchmarkEnabled) {
+                m_annotationSupport.dispatch(session, message);
+                if (m_benchmarkEnabled) {
                     long delay = System.nanoTime() - startTime;
-                    histogram.recordValue(delay);
+                    m_histogram.recordValue(delay);
                 }
             } catch (Throwable th) {
                 LOG.error("Grave error processing the message {} for {}", message, session, th);
@@ -174,46 +161,19 @@ public class SimpleMessaging implements IMessaging, EventHandler<ValueEvent> {
         }
     }
 
-    private void processInit(Properties props) {
-        benchmarkEnabled = Boolean.parseBoolean(System.getProperty("moquette.processor.benchmark", "false"));
-
-        //TODO use a property to select the storage path
-        MapDBPersistentStore mapStorage = new MapDBPersistentStore(props.getProperty(PERSISTENT_STORE_PROPERTY_NAME, ""));
-        m_storageService = mapStorage;
-        m_sessionsStore = mapStorage;
-
-        m_storageService.initStore();
-        
-        //List<Subscription> storedSubscriptions = m_sessionsStore.listAllSubscriptions();
-        //subscriptions.init(storedSubscriptions);
-        subscriptions.init(m_sessionsStore);
-        
-        String passwdPath = props.getProperty(PASSWORD_FILE_PROPERTY_NAME, "");
-        String configPath = System.getProperty("moquette.path", null);
-        IAuthenticator authenticator;
-        if (passwdPath.isEmpty()) {
-            authenticator = new AcceptAllAuthenticator();
-        } else {
-            authenticator = new FileAuthenticator(configPath, passwdPath);
-        }
-        
-        m_processor.init(subscriptions, m_storageService, m_sessionsStore, authenticator);
-    }
-
-
     private void processStop() {
         LOG.debug("processStop invoked");
         m_storageService.close();
-        LOG.debug("subscription tree {}", subscriptions.dumpTree());
+        LOG.debug("subscription tree {}", m_subscriptions.dumpTree());
 //        m_eventProcessor.halt();
 //        m_executor.shutdown();
         
-        subscriptions = null;
+        m_subscriptions = null;
         m_stopLatch.countDown();
 
-        if (benchmarkEnabled) {
+        if (m_benchmarkEnabled) {
             //log metrics
-            histogram.outputPercentileDistribution(System.out, 1000.0);
+            m_histogram.outputPercentileDistribution(System.out, 1000.0);
         }
     }
 }

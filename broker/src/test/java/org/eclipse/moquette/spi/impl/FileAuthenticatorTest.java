@@ -15,8 +15,9 @@
  */
 package org.eclipse.moquette.spi.impl;
 
-import org.eclipse.moquette.server.IAuthenticator;
+import org.eclipse.moquette.spi.IAuthenticator;
 import org.junit.Test;
+
 import static org.junit.Assert.*;
 
 /**

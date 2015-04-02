@@ -17,6 +17,7 @@ package org.eclipse.moquette.spi.impl.storage;
 
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+
 import org.eclipse.moquette.spi.impl.events.PublishEvent;
 import org.eclipse.moquette.proto.messages.AbstractMessage.QOSType;
 
@@ -25,6 +26,7 @@ import org.eclipse.moquette.proto.messages.AbstractMessage.QOSType;
  * 
  * @author andrea
  */
+@SuppressWarnings("serial")
 public class StoredPublishEvent implements Serializable {
     String m_topic;
     QOSType m_qos;

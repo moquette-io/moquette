@@ -14,7 +14,7 @@
  * You may elect to redistribute this code under either of these licenses.
  */
 
-package org.eclipse.moquette.spi.persistence;
+package org.eclipse.moquette.spi.impl.persistence;
 
 import org.eclipse.moquette.proto.MQTTException;
 import org.eclipse.moquette.spi.IMatchingCondition;
@@ -64,15 +64,11 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
      */
     
     public MapDBPersistentStore() {
-    	this.m_storePath = "";
+    	this("");
     }
     
     public MapDBPersistentStore(String storePath) {
         this.m_storePath = storePath;
-    }
-    
-    @Override
-    public void initStore() {
     	if (m_storePath == null || m_storePath.isEmpty()) {
     		m_db = DBMaker.newMemoryDB().make();
     	} else {

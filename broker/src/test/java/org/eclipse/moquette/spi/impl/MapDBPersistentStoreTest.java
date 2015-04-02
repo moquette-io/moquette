@@ -16,8 +16,8 @@
 package org.eclipse.moquette.spi.impl;
 
 import org.eclipse.moquette.proto.messages.AbstractMessage;
+import org.eclipse.moquette.spi.impl.persistence.MapDBPersistentStore;
 import org.eclipse.moquette.spi.impl.subscriptions.Subscription;
-import org.eclipse.moquette.spi.persistence.MapDBPersistentStore;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,7 +43,6 @@ public class MapDBPersistentStoreTest {
         assertFalse(String.format("The DB storagefile %s already exists", DEFAULT_PERSISTENT_PATH), dbFile.exists());
         
         m_storageService = new MapDBPersistentStore(DEFAULT_PERSISTENT_PATH);
-        m_storageService.initStore();
     }
 
     @After

@@ -16,7 +16,8 @@
 package org.eclipse.moquette.spi.impl;
 
 import java.util.Map;
-import org.eclipse.moquette.server.IAuthenticator;
+
+import org.eclipse.moquette.spi.IAuthenticator;
 
 /**
  * Test utility to implements authenticator instance.

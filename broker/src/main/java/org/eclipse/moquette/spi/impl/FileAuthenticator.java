@@ -24,7 +24,8 @@ import java.io.Reader;
 import java.text.ParseException;
 import java.util.HashMap;
 import java.util.Map;
-import org.eclipse.moquette.server.IAuthenticator;
+
+import org.eclipse.moquette.spi.IAuthenticator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +39,7 @@ public class FileAuthenticator implements IAuthenticator {
     
     private Map<String, String> m_identities = new HashMap<String, String>();
     
-    FileAuthenticator(String parent, String filePath) {
+    public FileAuthenticator(String parent, String filePath) {
         File file = new File(parent, filePath);
         LOG.info("Loading password file: " + file);
         if (file.isDirectory()) {
