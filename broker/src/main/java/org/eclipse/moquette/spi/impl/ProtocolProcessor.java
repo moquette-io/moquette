@@ -18,20 +18,24 @@ package org.eclipse.moquette.spi.impl;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
+
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.eclipse.moquette.server.netty.NettyChannel;
+import org.eclipse.moquette.spi.IAuthenticator;
 import org.eclipse.moquette.spi.IMatchingCondition;
 import org.eclipse.moquette.spi.IMessagesStore;
 import org.eclipse.moquette.spi.ISessionsStore;
 import org.eclipse.moquette.spi.impl.events.*;
 import org.eclipse.moquette.spi.impl.subscriptions.Subscription;
 import org.eclipse.moquette.spi.impl.subscriptions.SubscriptionsStore;
+
 import static org.eclipse.moquette.parser.netty.Utils.VERSION_3_1;
 import static org.eclipse.moquette.parser.netty.Utils.VERSION_3_1_1;
+
 import org.eclipse.moquette.proto.messages.AbstractMessage;
 import org.eclipse.moquette.proto.messages.AbstractMessage.QOSType;
 import org.eclipse.moquette.proto.messages.ConnAckMessage;
@@ -47,7 +51,6 @@ import org.eclipse.moquette.proto.messages.SubscribeMessage;
 import org.eclipse.moquette.proto.messages.UnsubAckMessage;
 import org.eclipse.moquette.proto.messages.UnsubscribeMessage;
 import org.eclipse.moquette.server.ConnectionDescriptor;
-import org.eclipse.moquette.server.IAuthenticator;
 import org.eclipse.moquette.server.ServerChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -15,9 +15,6 @@
  */
 package org.eclipse.moquette.spi.impl;
 
-import static org.eclipse.moquette.commons.Constants.PASSWORD_FILE_PROPERTY_NAME;
-
-import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -25,8 +22,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.HdrHistogram.Histogram;
 import org.eclipse.moquette.proto.messages.AbstractMessage;
-import org.eclipse.moquette.server.IAuthenticator;
 import org.eclipse.moquette.server.ServerChannel;
+import org.eclipse.moquette.spi.IAuthenticator;
 import org.eclipse.moquette.spi.IMessagesStore;
 import org.eclipse.moquette.spi.IMessaging;
 import org.eclipse.moquette.spi.ISessionsStore;

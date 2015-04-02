@@ -24,7 +24,8 @@ import java.io.Reader;
 import java.text.ParseException;
 import java.util.HashMap;
 import java.util.Map;
-import org.eclipse.moquette.server.IAuthenticator;
+
+import org.eclipse.moquette.spi.IAuthenticator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
