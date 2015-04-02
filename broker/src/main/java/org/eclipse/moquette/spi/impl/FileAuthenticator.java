@@ -38,7 +38,7 @@ public class FileAuthenticator implements IAuthenticator {
     
     private Map<String, String> m_identities = new HashMap<String, String>();
     
-    FileAuthenticator(String parent, String filePath) {
+    public FileAuthenticator(String parent, String filePath) {
         File file = new File(parent, filePath);
         LOG.info("Loading password file: " + file);
         if (file.isDirectory()) {

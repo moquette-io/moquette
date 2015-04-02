@@ -43,7 +43,6 @@ public class MapDBPersistentStoreTest {
         assertFalse(String.format("The DB storagefile %s already exists", DEFAULT_PERSISTENT_PATH), dbFile.exists());
         
         m_storageService = new MapDBPersistentStore(DEFAULT_PERSISTENT_PATH);
-        m_storageService.initStore();
     }
 
     @After

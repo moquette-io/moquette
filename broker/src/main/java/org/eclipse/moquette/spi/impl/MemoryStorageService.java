@@ -44,9 +44,6 @@ public class MemoryStorageService implements IMessagesStore, ISessionsStore {
     
     private static final Logger LOG = LoggerFactory.getLogger(MemoryStorageService.class);
     
-    public void initStore() {
-    }
-    
     @Override
     public void cleanRetained(String topic) {
         m_retainedStore.remove(topic);

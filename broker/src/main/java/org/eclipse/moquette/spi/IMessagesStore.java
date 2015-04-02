@@ -53,11 +53,6 @@ public interface IMessagesStore {
     }
 
     /**
-     * Used to initialize all persistent store structures
-     * */
-    void initStore();
-
-    /**
      * Persist the message. 
      * If the message is empty then the topic is cleaned, else it's stored.
      */

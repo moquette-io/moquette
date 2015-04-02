@@ -64,15 +64,11 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
      */
     
     public MapDBPersistentStore() {
-    	this.m_storePath = "";
+    	this("");
     }
     
     public MapDBPersistentStore(String storePath) {
         this.m_storePath = storePath;
-    }
-    
-    @Override
-    public void initStore() {
     	if (m_storePath == null || m_storePath.isEmpty()) {
     		m_db = DBMaker.newMemoryDB().make();
     	} else {
