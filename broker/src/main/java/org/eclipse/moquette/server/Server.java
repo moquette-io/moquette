@@ -28,7 +28,7 @@ import org.eclipse.moquette.spi.IAuthenticator;
 import org.eclipse.moquette.spi.impl.AcceptAllAuthenticator;
 import org.eclipse.moquette.spi.impl.FileAuthenticator;
 import org.eclipse.moquette.spi.impl.SimpleMessaging;
-import org.eclipse.moquette.spi.persistence.MapDBPersistentStore;
+import org.eclipse.moquette.spi.impl.persistence.MapDBPersistentStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 /**

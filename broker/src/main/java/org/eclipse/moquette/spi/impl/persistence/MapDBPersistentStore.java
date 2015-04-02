@@ -14,7 +14,7 @@
  * You may elect to redistribute this code under either of these licenses.
  */
 
-package org.eclipse.moquette.spi.persistence;
+package org.eclipse.moquette.spi.impl.persistence;
 
 import org.eclipse.moquette.proto.MQTTException;
 import org.eclipse.moquette.spi.IMatchingCondition;

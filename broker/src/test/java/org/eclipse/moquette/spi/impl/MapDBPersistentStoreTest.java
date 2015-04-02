@@ -16,8 +16,8 @@
 package org.eclipse.moquette.spi.impl;
 
 import org.eclipse.moquette.proto.messages.AbstractMessage;
+import org.eclipse.moquette.spi.impl.persistence.MapDBPersistentStore;
 import org.eclipse.moquette.spi.impl.subscriptions.Subscription;
-import org.eclipse.moquette.spi.persistence.MapDBPersistentStore;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
