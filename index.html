@@ -1,1 +1,241 @@
-My Page
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Moquette MQTT project site</title>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <meta content="Moquette MQTT is a lightweight MQTT Java broker." name="description">
+    <!-- Latest compiled and minified CSS -->
+  <!--link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap-theme.min.css">
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script-->
+  
+  <link href="css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/bootstrap-theme.min.css">
+  
+  <!-- IE 6-8 support of HTML 5 elements -->
+  <!--[if lt IE 9]>
+  <script src="http://static.jboss.org/theme/js/libs/html5/pre3.6/html5.min.js"></script>
+  <![endif]-->
+  <link href="http://fonts.googleapis.com/css?family=Ubuntu:400,500,700,400italic" rel="stylesheet" type="text/css">
+</head>
+<body>
+
+<a id="skippy" class="sr-only sr-only-focusable" href="#content"><div class="container"><span class="skiplink-text">Skip to main content</span></div></a>
+
+<header class="navbar navbar-default navbar-static-top" id="top" role="banner">
+  <div class="container">
+    <div class="navbar-header">
+      <button class="navbar-toggle collapsed" type="button" data-toggle="collapse" data-target="#vertx-navbar-collapse">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <!--a href="/" class="navbar-brand"><img alt="Brand" src="/assets/logo-sm.png"></a-->
+    </div>
+    <nav class="collapse navbar-collapse" id="vertx-navbar-collapse">
+      <ul class="nav navbar-nav navbar-right">
+        <!--<li class=""><a href="vertx-home.html">HOME</a></li>-->
+        <li><a href="https://bintray.com/andsel/generic/moquette-broker-all">Download</a></li>
+        <li><a href="https://github.com/andsel/moquette">Sources</a></li>
+        <li><a href="https://groups.google.com/forum/#!forum/moquette-mqtt">Google group</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+
+  <div class="page-header" id="content">
+    <div class="container">
+      <div class="row">
+        <div class="col-sm-12">
+          <h1>Moquette documentation</h1>
+        </div>
+      </div>
+    </div>
+  </div>
+
+		<div id="content">
+		  <div class="container docs-content">
+		    <div class="row">
+		      <div class="col-sm-12 col-md-push-9 col-md-3 hidden-xs hidden-sm">
+		        <div id="sidebar" data-spy="affix">
+		          <ul class="sectlevel1">
+						<li><a href="#_ssl_configuration">SSL Configuration</a>
+							<ul class="sectlevel2">
+								<li><a href="#_create_the_key_store">Create the keystore</a></li>
+								<li><a href="#_export_the_server_certificate">Export the server certificate</a></li>
+								<li><a href="#_import_the_certificate_into_client_keystore">Import the certificate into the client's keystore</a></li>
+								<li><a href="#_client_source_code">Client source code</a></li>
+							</ul>
+						</li>
+					</ul>
+		        </div>
+		      </div>
+		      <div class="col-sm-12 col-md-pull-3 col-md-9">
+		        <div class="toc hidden-md hidden-lg">
+		          <h2>Table of Contents</h2>
+		          <ul class="sectlevel1">
+						<li><a href="#_ssl_configuration">SSL Configuration</a>
+							<ul class="sectlevel2">
+								<li><a href="#_create_the_key_store">Create the keystore</a></li>
+								<li><a href="#_export_the_server_certificate">Export the server certificate</a></li>
+								<li><a href="#_import_the_certificate_into_client_keystore">Import the certificate into the client's keystore</a></li>
+								<li><a href="#_client_source_code">Client source code</a></li>
+							</ul>
+						</li>
+		        </div>
+		        
+		        
+		        
+	<div id="preamble">
+		<div class="sectionbody">
+			<div class="paragraph">
+				<p></p>
+			</div>
+		</div>
+	</div>
+	
+	<div class="sect1">
+		<h2 id="_ssl_configuration">SSL Configuration</h2>
+		<div class="sectionbody">
+			<div class="paragraph">
+			<p>To accept SSL connection in Moquette broker, first you have to set up the key store in the broker. Then you need
+				to esport a certificate from the broker&#8217;s keystore and improt in the client&#8217;s one. The last thing is to write a simple
+				client that connect to the server using the SSL.</p>
+			</div>
+		<div class="paragraph">
+			<p>So how do you get create a keystore? We suppose to use the crypto tools provided by the JDK.</p>
+		</div>
+		<div class="paragraph" id="_create_the_key_store">
+			<p>First create server&#8217;s key store, answering the questions presented to you. The first password the keytool asks to you is the keystore's one. Then after
+			questions (you could skip almost all but your first name and the confirmation of data (type in yes). Then you need to fill the password for alias 
+			you are creating(testserver in our case).</p>
+		</div>
+		<div class="listingblock">
+		<div class="content">
+		<pre class="prettyprint highlight"><code class="language-java" data-lang="java">keytool -keystore serverkeystore.jks -alias testserver -genkey -keyalg RSA</code></pre>
+		</div>
+		</div>
+		<div class="paragraph">
+		<p>Now go to your broker config file (<MOQUETTE_HOME>/config/moquette.conf) and provide the path to you just created keystore (jks_path) and the passwords
+		you have just filled (key_store_password is the password of your keystore and key_manager_password is the one of the alias)  </p>
+		</div>
+		
+		<div class="sect2">
+			<h3 id="_export_the_server_certificate">Export the server certificate</h3>
+			<div class="paragraph">
+				<p>The next step is to export the certificate, so you need to:</p>
+			</div>
+			<div class="listingblock">
+				<div class="content">
+					<pre class="prettyprint highlight"><code class="language-java" data-lang="java">keytool -export -alias testserver -keystore serverkeystore.jks -file testserver.crt</code></pre>
+				</div>
+			</div>
+			<div class="paragraph">
+			<p>This command generate the certificate file that you need to import into your client&#8217;s keystore.</p>
+			</div>
+		</div>
+		
+		<div class="sect2">
+			<h3 id="_import_the_certificate_into_client_keystore">Import the certificate into the client&#8217;s keystore</h3>
+			<div class="paragraph">
+				<p>In this step you need to import the server&#8217;s certificate into the client&#8217;s keystore.</p>
+			</div>
+			<div class="paragraph">
+				<p>To create the client key store, if not yet done
+			issue this:</p>
+			</div>
+			<div class="listingblock">
+				<div class="content">
+					<pre class="prettyprint highlight"><code class="language-java" data-lang="java">keytool -keystore clientkeystore.jks -genkey -keyalg RSA</code></pre>
+				</div>
+			</div>			
+			
+			<div class="paragraph">
+				<p>Once created the key store, import the certificate with:</p>
+			</div>
+			<div class="listingblock">
+				<div class="content">
+					<pre class="prettyprint highlight"><code class="language-java" data-lang="java">keytool -keystore clientkeystore.jks -import -alias testserver -file testserver.crt -trustcacerts</code></pre>
+				</div>
+			</div>	
+			<div class="paragraph">
+			<p>It will ask you if the certificate is trusted, answer yes, because this certificate is not produced by a certifcation authority (you&#8217;ve created it ;-))</p>
+			</div>
+		</div>
+		
+		<div class="sect2">
+			<h3 id="_client_source_code">Client source code</h3>
+			<div class="paragraph">
+				<p>At the end, after created the keystores, exprted and imported the certificate into the client, we are ready to see our client&#8217;s code:</p>
+			</div>
+			<div class="listingblock">
+				<div class="content">
+					<pre class="prettyprint highlight"><code class="language-java" data-lang="java">
+public SSLSocketFactory configureSSLSocketFactory() {
+    KeyStore ks = KeyStore.getInstance("JKS");
+    InputStream jksInputStream = new FileInputStream("clientkeystore.jks")
+    ks.load(jksInputStream, "passw0rdcli".toCharArray());
+
+    KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+    kmf.init(ks, "passw0rd".toCharArray());
+
+    TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+    tmf.init(ks);
+
+    SSLContext sc = SSLContext.getInstance("TLS");
+    TrustManager[] trustManagers = tmf.getTrustManagers();
+    sc.init(kmf.getKeyManagers(), trustManagers, null);
+
+    SSLSocketFactory ssf = sc.getSocketFactory();
+    return ssf;
+}
+
+String tmpDir = System.getProperty("java.io.tmpdir");
+MqttDefaultFilePersistence dataStore = new MqttDefaultFilePersistence(tmpDir);
+
+MqttClient client = new MqttClient("ssl://localhost:8883", "SSLClientTest", dataStore);
+SSLSocketFactory ssf = configureSSLSocketFactory();
+MqttConnectOptions options = new MqttConnectOptions();
+options.setSocketFactory(ssf);
+client.connect(options);		
+					</code></code></pre>
+				</div>
+			</div>
+			<div class="paragraph">
+				<p>You could find it at <a href="https://github.com/andsel/moquette/blob/master/tools_scripts/integration/sslSimplePublisher.groovy">sslSimplePublisher.groovy</a></p>
+			</div>	
+			
+	</div>
+	</div>
+       
+          <div id="footer">
+            <div id="footer-text">
+                Last updated 2015-05-3
+            </div>
+          </div>
+        
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-xs-12 col-sm-6 col-lg-offset-2 col-md-6 copyright">
+        <p>Moquette MQTT broker is 100% open source. Licensed under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache License 2.0</a>.</p>
+        <p>This website is licensed under the <a href="http://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0 License</a>.<br>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="http://static.jboss.org/theme/js/libs/jquery/jquery-1.9.1.min.js"></script>
+<script src="js/bootstrap.min.js"></script>
+</body>
+</html>
+
