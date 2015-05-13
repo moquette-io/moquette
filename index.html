@@ -63,6 +63,13 @@
 		      <div class="col-sm-12 col-md-push-9 col-md-3 hidden-xs hidden-sm">
 		        <div id="sidebar" data-spy="affix">
 		          <ul class="sectlevel1">
+						<li><a href="#_password_file">Passwords file</a>
+							<ul class="sectlevel2">
+								<li><a href="#_password_conf_file">Password file location</a></li>
+								<li><a href="#_hash_your_password">Hash your passwords</a></li>
+							</ul>
+						</li>		          	
+		          	
 						<li><a href="#_ssl_configuration">SSL Configuration</a>
 							<ul class="sectlevel2">
 								<li><a href="#_create_the_key_store">Create the keystore</a></li>
@@ -78,6 +85,13 @@
 		        <div class="toc hidden-md hidden-lg">
 		          <h2>Table of Contents</h2>
 		          <ul class="sectlevel1">
+						<li><a href="#_password_file">Passwords file</a>
+							<ul class="sectlevel2">
+								<li><a href="#_password_conf_file">Password file location</a></li>
+								<li><a href="#_hash_your_password">Hash your passwords</a></li>
+							</ul>
+						</li>			          
+		          
 						<li><a href="#_ssl_configuration">SSL Configuration</a>
 							<ul class="sectlevel2">
 								<li><a href="#_create_the_key_store">Create the keystore</a></li>
@@ -96,9 +110,42 @@
 				<p></p>
 			</div>
 		</div>
-	</div>
+	</div>	
 	
 	<div class="sect1">
+		<h2 id="_password_file">Passwords file</h2>
+		<div class="sectionbody">
+			<div class="paragraph">
+			<p>If you have a broker that's open to public network probably you would protect the access of your users with some kind of credentials. Moquette, in its
+			configuration file (conf/moquette.conf) has a key name "password_file" that point to a specific file used to store users's login and password. The name and format
+			are borrowed from Mosquitto config, so this file contains one credential for line. The format f each line is:
+			</p>
+			</div>
+			<div class="listingblock" id="_password_conf_file">
+				<div class="content">
+					<pre class="prettyprint highlight"><code class="language-java" data-lang="java">username:sha512(yourpassword)</code></pre>
+				</div>
+			</div>
+			<div class="paragraph">
+				<p>For example for an hypothetical user "testuser" with "passwd"</p>
+			</div>	
+			<div class="listingblock">
+				<div class="content">
+					<pre class="prettyprint highlight"><code class="language-java" data-lang="java">testuser:0d6be69b264717f2dd33652e212b173104b4a647b7c11ae72e9885f11cd312fb</code></pre>
+				</div>
+			</div>	
+			<div class="paragraph" id="_hash_your_password">
+				<p>If you are on a Linux box you can easy generate the hashing for your password with sha256sum utility, but remember to use the -n switch in echo else
+				a newline char will be added at the of you password.</p>
+			</div>
+			<div class="listingblock">
+				<div class="content">
+					<pre class="prettyprint highlight"><code class="language-java" data-lang="bash">echo -n "yourpassword" | sha256sum</code></pre>
+				</div>
+			</div>	
+		</div>
+		
+		
 		<h2 id="_ssl_configuration">SSL Configuration</h2>
 		<div class="sectionbody">
 			<div class="paragraph">
