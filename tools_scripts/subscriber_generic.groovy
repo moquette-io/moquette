@@ -57,7 +57,7 @@ String topicSubscription = args[1]
 String tmpDir = System.getProperty("java.io.tmpdir")
 MqttDefaultFilePersistence dataStore = new MqttDefaultFilePersistence(tmpDir)
 
-MqttClient client = new MqttClient("tcp://${host}:1883", "SubscriberClient", dataStore)
+MqttClient client = new MqttClient("tcp://${host}:31883", "SubscriberClient", dataStore)
 def callback = new SubscriberCallback()
 client.callback = callback
 client.connect()

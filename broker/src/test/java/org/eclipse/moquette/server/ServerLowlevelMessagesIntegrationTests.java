@@ -57,7 +57,7 @@ public class ServerLowlevelMessagesIntegrationTests {
         startServer();
         m_client = new Client("localhost");
         m_subscriberDef = new MQTT();
-        m_subscriberDef.setHost("localhost", 1883);
+        m_subscriberDef.setHost("localhost", 31883);
         m_subscriberDef.setClientId("Subscriber");
     }
 

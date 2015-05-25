@@ -5,9 +5,9 @@ import org.eclipse.moquette.server.Server
 
 println "Starting broker in embedded mode"
 Server server = new Server()
-//Properties props = [port: 1883, host: "0.0.0.0", 'password_file': '../broker/config/password_file.conf'] as Properties
+//Properties props = [port: 31883, host: "0.0.0.0", 'password_file': '../broker/config/password_file.conf'] as Properties
 Properties props = new Properties()
-props.setProperty('port', '1883')
+props.setProperty('port', '31883')
 props.setProperty('host', "0.0.0.0")
 props.setProperty('password_file', '../broker/config/password_file.conf')
 println "starting proprs $props"

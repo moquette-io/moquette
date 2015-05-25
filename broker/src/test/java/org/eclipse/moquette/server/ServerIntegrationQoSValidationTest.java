@@ -67,12 +67,12 @@ public class ServerIntegrationQoSValidationTest {
     public void setUp() throws Exception {
         startServer();
 
-        m_subscriber = new MqttClient("tcp://localhost:1883", "Subscriber", s_subDataStore);
+        m_subscriber = new MqttClient("tcp://localhost:31883", "Subscriber", s_subDataStore);
         m_callback = new TestCallback();
         m_subscriber.setCallback(m_callback);
         m_subscriber.connect();
         
-        m_publisher = new MqttClient("tcp://localhost:1883", "Publisher", s_pubDataStore);
+        m_publisher = new MqttClient("tcp://localhost:31883", "Publisher", s_pubDataStore);
 //        m_callback = new TestCallback();
 //        m_subscriber.setCallback(m_callback);
         m_publisher.connect();

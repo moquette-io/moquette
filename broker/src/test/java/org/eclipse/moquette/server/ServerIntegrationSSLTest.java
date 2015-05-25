@@ -64,7 +64,7 @@ public class ServerIntegrationSSLTest {
         m_server = new Server();
 
         Properties sslProps = new Properties();
-        sslProps.put(SSL_PORT_PROPERTY_NAME, "8883");
+        sslProps.put(SSL_PORT_PROPERTY_NAME, "38883");
         sslProps.put(JKS_PATH_PROPERTY_NAME, "serverkeystore.jks");
         sslProps.put(KEY_STORE_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
         sslProps.put(KEY_MANAGER_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
@@ -80,8 +80,8 @@ public class ServerIntegrationSSLTest {
 
         startServer();
 
-        m_client = new MqttClient("ssl://localhost:8883", "TestClient", s_dataStore);
-//        m_client = new MqttClient("ssl://test.mosquitto.org:8883", "TestClient", s_dataStore);
+        m_client = new MqttClient("ssl://localhost:38883", "TestClient", s_dataStore);
+//        m_client = new MqttClient("ssl://test.mosquitto.org:38883", "TestClient", s_dataStore);
         
         m_callback = new TestCallback();
         m_client.setCallback(m_callback);

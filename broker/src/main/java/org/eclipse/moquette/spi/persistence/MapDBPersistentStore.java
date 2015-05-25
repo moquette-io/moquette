@@ -75,6 +75,7 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
     public void initStore() {
     	if (m_storePath == null || m_storePath.isEmpty()) {
     		m_db = DBMaker.newMemoryDB().make();
+
     	} else {
 	        File tmpFile;
 	        try {
@@ -84,7 +85,13 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
 	            LOG.error(null, ex);
 	            throw new MQTTException("Can't create temp file for subscriptions storage [" + m_storePath + "]", ex);
 	        }
-	        m_db = DBMaker.newFileDB(tmpFile).make();
+	        //m_db = DBMaker.newFileDB(tmpFile).make();
+	        
+	        m_db = DBMaker.newFileDB(tmpFile)
+	        		//.asyncWriteDisable()
+	        		//.cacheDisable()
+	        		//.writeAheadLogDisable()
+	        		.closeOnJvmShutdown().make();
     	}
         m_retainedStore = m_db.getHashMap("retained");
         m_persistentMessageStore = m_db.getHashMap("persistedMessages");

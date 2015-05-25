@@ -55,7 +55,7 @@ public class ServerRestartIntegrationTest {
 
         m_mqtt = new MQTT();
 
-        m_mqtt.setHost("localhost", 1883);
+        m_mqtt.setHost("localhost", 31883);
         m_mqtt.setCleanSession(false);
     }
 
@@ -105,7 +105,7 @@ public class ServerRestartIntegrationTest {
         
         //should be just one registration so a publisher receive one notification
         MQTT mqtt = new MQTT();
-        mqtt.setHost("localhost", 1883); 
+        mqtt.setHost("localhost", 31883); 
         mqtt.setClientId("Publisher");
         m_publisher = mqtt.blockingConnection();
         m_publisher.connect();
@@ -133,7 +133,7 @@ public class ServerRestartIntegrationTest {
         m_server.startServer(IntegrationUtils.prepareTestPropeties());
 
         MQTT mqtt = new MQTT();
-        mqtt.setHost("localhost", 1883);
+        mqtt.setHost("localhost", 31883);
         mqtt.setClientId("Publisher");
         m_publisher = mqtt.blockingConnection();
         m_publisher.connect();

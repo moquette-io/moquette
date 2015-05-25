@@ -11,12 +11,12 @@ import org.fusesource.mqtt.client.Topic
 String host = args.size() > 0 ? args[0] : 'localhost'
 
 MQTT mqttPub = new MQTT()
-mqttPub.setHost(host, 1883)
+mqttPub.setHost(host, 31883)
 mqttPub.setCleanSession(false)
 mqttPub.setClientId("PublisherClient")
 
 MQTT mqttSub = new MQTT()
-mqttSub.setHost(host, 1883)
+mqttSub.setHost(host, 31883)
 mqttSub.setCleanSession(false)
 mqttSub.setClientId("FlapSubscriberClient")
 

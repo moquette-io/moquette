@@ -63,7 +63,7 @@ String tmpDir = System.getProperty("java.io.tmpdir")
 MqttDefaultFilePersistence dataStore = new MqttDefaultFilePersistence(tmpDir)
 
 int rnd = (Math.random() * 100) as int
-MqttClient client = new MqttClient("tcp://${host}:1883", "SubscriberClient${rnd}", dataStore)
+MqttClient client = new MqttClient("tcp://${host}:31883", "SubscriberClient${rnd}", dataStore)
 def callback = new SubscriberCallback()
 client.callback = callback
 //Only for Apollo ---

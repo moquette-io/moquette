@@ -105,8 +105,8 @@ public class MQTTWebSocket {
 }
 
 
-String destUri = "ws://localhost:8080/mqtt"
-//String destUri = "ws://test.mosquitto.org:8080/"
+String destUri = "ws://localhost:38080/mqtt"
+//String destUri = "ws://test.mosquitto.org:38080/"
 WebSocketClient client = new WebSocketClient()
 MQTTWebSocket socket = new MQTTWebSocket();
 client.start();

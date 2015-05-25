@@ -21,8 +21,8 @@ import java.io.File;
  * Contains some useful constants.
  */
 public class Constants {
-    public static final int PORT = 1883;
-    public static final int WEBSOCKET_PORT = 8080;
+    public static final int PORT = 31883;
+    public static final int WEBSOCKET_PORT = 38080;
     public static final String HOST = "0.0.0.0";
     public static final int DEFAULT_CONNECT_TIMEOUT = 10;
     public static final String DEFAULT_MOQUETTE_STORE_MAP_DB_FILENAME = "moquette_store.mapdb";

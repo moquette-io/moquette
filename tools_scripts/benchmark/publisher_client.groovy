@@ -18,7 +18,7 @@ int numToSend = args[1] as int
 String tmpDir = System.getProperty("java.io.tmpdir")
 MqttDefaultFilePersistence dataStore = new MqttDefaultFilePersistence(tmpDir)
 
-MqttClient client = new MqttClient("tcp://${host}:1883", "PublisherClient", dataStore)
+MqttClient client = new MqttClient("tcp://${host}:31883", "PublisherClient", dataStore)
 //Only for Apollo ---
 //MqttConnectOptions connOptions = new MqttConnectOptions()
 //connOptions.userName ='admin'

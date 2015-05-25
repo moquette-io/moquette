@@ -8,7 +8,7 @@ import org.fusesource.mqtt.client.Topic
 
 String host = args[0]
 MQTT mqtt = new MQTT()
-mqtt.setHost(host, 1883)
+mqtt.setHost(host, 31883)
 mqtt.setCleanSession(true)
 mqtt.setClientId("SubscriberClient")
 
@@ -22,7 +22,7 @@ println "Subscribed to ${topics}"
 
 //start a publisher
 MQTT mqtt2 = new MQTT()
-mqtt2.setHost(host, 1883)
+mqtt2.setHost(host, 31883)
 BlockingConnection publisher = mqtt2.blockingConnection()
 publisher.connect()
 publisher.publish("/topic", 'Hello world!!'.bytes, QoS.AT_MOST_ONCE, false)

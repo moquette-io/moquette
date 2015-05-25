@@ -9,8 +9,8 @@ import org.fusesource.mqtt.client.QoS
 
 
 MQTT mqtt = new MQTT()
-//mqtt.setHost("test.mosquitto.org", 1883);
-mqtt.setHost("localhost", 1883)
+//mqtt.setHost("test.mosquitto.org", 31883);
+mqtt.setHost("localhost", 31883)
 
 BlockingConnection connection = mqtt.blockingConnection()
 connection.connect()

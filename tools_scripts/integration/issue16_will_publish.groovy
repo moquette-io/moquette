@@ -11,7 +11,7 @@ import org.fusesource.mqtt.client.Topic
 String host = args.size() == 1 ? args[0] : "localhost"
 
 MQTT mqttWill = new MQTT()
-mqttWill.setHost(host, 1883)
+mqttWill.setHost(host, 31883)
 mqttWill.setClientId("WillClient")
 mqttWill.setWillTopic("/willtopic")
 mqttWill.setWillMessage("Will message testment")
@@ -26,10 +26,10 @@ println "Will Client connected"
 
 println "Connect a subscriber to the topic"
 MQTT mqtt = new MQTT()
-//mqtt.setHost("test.mosquitto.org", 1883);
-mqtt.setHost(host, 1883)
+//mqtt.setHost("test.mosquitto.org", 31883);
+mqtt.setHost(host, 31883)
 mqtt.setCleanSession(true)
-mqtt.setHost(host, 1883)
+mqtt.setHost(host, 31883)
 
 mqtt.setClientId("SubscriberClient")
 BlockingConnection connection = mqtt.blockingConnection()

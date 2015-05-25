@@ -17,10 +17,10 @@ if (args.size() != 1) {
 
 String host = args[0]
 MQTT mqtt = new MQTT()
-//mqtt.setHost("test.mosquitto.org", 1883);
-mqtt.setHost(host, 1883)
+//mqtt.setHost("test.mosquitto.org", 31883);
+mqtt.setHost(host, 31883)
 mqtt.setCleanSession(true)
-mqtt.setHost(host, 1883)
+mqtt.setHost(host, 31883)
 
 mqtt.setClientId("SubscriberClient")
 BlockingConnection connection = mqtt.blockingConnection()

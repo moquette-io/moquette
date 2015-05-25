@@ -24,10 +24,10 @@ String host = args[0]
 String dialog_id = args.size() > 1 ? args[1] : ""
 
 MQTT mqtt = new MQTT()
-//mqtt.setHost("test.mosquitto.org", 1883);
-mqtt.setHost(host, 1883)
+//mqtt.setHost("test.mosquitto.org", 31883);
+mqtt.setHost(host, 31883)
 mqtt.setCleanSession(true)
-mqtt.setHost(host, 1883)
+mqtt.setHost(host, 31883)
 mqtt.setClientId("SubscriberClient${dialog_id}")
 
 int numReceived = 0

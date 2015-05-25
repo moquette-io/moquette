@@ -11,14 +11,14 @@ String host = args[0]
 
 String tmpDir = System.getProperty("java.io.tmpdir")
 MqttDefaultFilePersistence dataStore1 = new MqttDefaultFilePersistence(tmpDir + "/client1")
-MqttClient client1 = new MqttClient("tcp://${host}:1883", "ConnectedClient", dataStore1)
+MqttClient client1 = new MqttClient("tcp://${host}:31883", "ConnectedClient", dataStore1)
 client1.connect()
 println "Client1 connected"
 sleep(3000)
 
 //now connect a second client but with the same ID
 MqttDefaultFilePersistence dataStore2 = new MqttDefaultFilePersistence(tmpDir + "/client2")
-MqttClient client2 = new MqttClient("tcp://${host}:1883", "ConnectedClient", dataStore2)
+MqttClient client2 = new MqttClient("tcp://${host}:31883", "ConnectedClient", dataStore2)
 client2.connect()
 println "Client2 connected"
 try {
@@ -31,7 +31,7 @@ sleep(3000)
 
 //now connect a second client but with the same ID
 MqttDefaultFilePersistence dataStorePublisher = new MqttDefaultFilePersistence(tmpDir + "/publisher")
-MqttClient publisher = new MqttClient("tcp://${host}:1883", "Publisher", dataStorePublisher)
+MqttClient publisher = new MqttClient("tcp://${host}:31883", "Publisher", dataStorePublisher)
 publisher.connect()
 println "publisher connected"
 client2.subscribe("topic", 2)

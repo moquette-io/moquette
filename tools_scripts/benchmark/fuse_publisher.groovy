@@ -15,8 +15,8 @@ String host = args[0]
 int numToSend = args[1] as int
 
 MQTT mqtt = new MQTT()
-//mqtt.setHost("test.mosquitto.org", 1883);
-mqtt.setHost(host, 1883)
+//mqtt.setHost("test.mosquitto.org", 31883);
+mqtt.setHost(host, 31883)
 BlockingConnection connection = mqtt.blockingConnection()
 connection.connect()
 

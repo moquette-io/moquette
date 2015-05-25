@@ -17,7 +17,7 @@ and into [WSO2 Messge broker] (http://techexplosives-pamod.blogspot.it/2014/05/m
 
 ## 1 minute set up
 Start play with it, download the self distribution tar from [BinTray](http://dl.bintray.com/andsel/generic/distribution-0.6-bundle-tar.tar.gz) ,
-the un untar and start the broker listening on 1883 port and enjoy! 
+the un untar and start the broker listening on 31883 port and enjoy! 
 ```
 tar zxf distribution-0.6-bundle-tar.tar.gz
 cd bin

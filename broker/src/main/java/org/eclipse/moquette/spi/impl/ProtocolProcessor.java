@@ -15,23 +15,17 @@
  */
 package org.eclipse.moquette.spi.impl;
 
-import com.lmax.disruptor.EventHandler;
-import com.lmax.disruptor.RingBuffer;
-import com.lmax.disruptor.dsl.Disruptor;
+import static org.eclipse.moquette.parser.netty.Utils.VERSION_3_1;
+import static org.eclipse.moquette.parser.netty.Utils.VERSION_3_1_1;
+
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import org.eclipse.moquette.server.netty.NettyChannel;
-import org.eclipse.moquette.spi.IMatchingCondition;
-import org.eclipse.moquette.spi.IMessagesStore;
-import org.eclipse.moquette.spi.ISessionsStore;
-import org.eclipse.moquette.spi.impl.events.*;
-import org.eclipse.moquette.spi.impl.subscriptions.Subscription;
-import org.eclipse.moquette.spi.impl.subscriptions.SubscriptionsStore;
-import static org.eclipse.moquette.parser.netty.Utils.VERSION_3_1;
-import static org.eclipse.moquette.parser.netty.Utils.VERSION_3_1_1;
 import org.eclipse.moquette.proto.messages.AbstractMessage;
 import org.eclipse.moquette.proto.messages.AbstractMessage.QOSType;
 import org.eclipse.moquette.proto.messages.ConnAckMessage;
@@ -49,8 +43,23 @@ import org.eclipse.moquette.proto.messages.UnsubscribeMessage;
 import org.eclipse.moquette.server.ConnectionDescriptor;
 import org.eclipse.moquette.server.IAuthenticator;
 import org.eclipse.moquette.server.ServerChannel;
+import org.eclipse.moquette.server.netty.NettyChannel;
+import org.eclipse.moquette.spi.IMatchingCondition;
+import org.eclipse.moquette.spi.IMessagesStore;
+import org.eclipse.moquette.spi.ISessionsStore;
+import org.eclipse.moquette.spi.impl.events.LostConnectionEvent;
+import org.eclipse.moquette.spi.impl.events.MessagingEvent;
+import org.eclipse.moquette.spi.impl.events.OutputMessagingEvent;
+import org.eclipse.moquette.spi.impl.events.PubAckEvent;
+import org.eclipse.moquette.spi.impl.events.PublishEvent;
+import org.eclipse.moquette.spi.impl.subscriptions.Subscription;
+import org.eclipse.moquette.spi.impl.subscriptions.SubscriptionsStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.lmax.disruptor.EventHandler;
+import com.lmax.disruptor.RingBuffer;
+import com.lmax.disruptor.dsl.Disruptor;
 
 /**
  * Class responsible to handle the logic of MQTT protocol it's the director of
@@ -121,7 +130,9 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
             IAuthenticator authenticator) {
         //m_clientIDs = clientIDs;
         this.subscriptions = subscriptions;
-        LOG.debug("subscription tree on init {}", subscriptions.dumpTree());
+        if(LOG.isDebugEnabled()){
+            LOG.debug("subscription tree on init {}", subscriptions.dumpTree());
+        }
         m_authenticator = authenticator;
         m_messagesStore = storageService;
         m_sessionsStore = sessionsStore;
@@ -195,17 +206,13 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
         }
 
         //handle user authentication
-        if (msg.isUserFlag()) {
-            String pwd = null;
-            if (msg.isPasswordFlag()) {
-                pwd = msg.getPassword();
-            }
-            if (!m_authenticator.checkValid(msg.getUsername(), pwd)) {
-                ConnAckMessage okResp = new ConnAckMessage();
-                okResp.setReturnCode(ConnAckMessage.BAD_USERNAME_OR_PASSWORD);
-                session.write(okResp);
-                return;
-            }
+        //by sun.mt 强制用户认证
+        if (!msg.isUserFlag() || !msg.isPasswordFlag() || 
+        		!m_authenticator.checkValid(msg.getUsername(), msg.getPassword())) {
+            ConnAckMessage okResp = new ConnAckMessage();
+            okResp.setReturnCode(ConnAckMessage.BAD_USERNAME_OR_PASSWORD);
+            session.write(okResp);
+            return;
         }
 
         subscriptions.activate(msg.getClientID());
@@ -341,8 +348,8 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
      * */
     private void forward2Subscribers(String topic, AbstractMessage.QOSType qos, ByteBuffer origMessage,
                                      boolean retain, Integer messageID) {
-        LOG.debug("forward2Subscribers republishing to existing subscribers that matches the topic {}", topic);
         if (LOG.isDebugEnabled()) {
+            LOG.debug("forward2Subscribers republishing to existing subscribers that matches the topic {}", topic);
             LOG.debug("content <{}>", DebugUtils.payload2Str(origMessage));
             LOG.debug("subscription tree {}", subscriptions.dumpTree());
         }

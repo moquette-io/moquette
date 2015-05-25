@@ -14,7 +14,7 @@ class Reciever {
     
     public void connectAndSubscribe(boolean cleanSession) {
         mqtt.setCleanSession(cleanSession)
-        mqtt.setHost("localhost", 1883)
+        mqtt.setHost("localhost", 31883)
 
         mqtt.setClientId("reciever")
         connection = mqtt.blockingConnection()

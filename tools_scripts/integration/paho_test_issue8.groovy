@@ -9,7 +9,7 @@ import org.eclipse.paho.client.mqttv3.MqttDefaultFilePersistence
 String tmpDir = System.getProperty("java.io.tmpdir")
 MqttDefaultFilePersistence dataStore = new MqttDefaultFilePersistence(tmpDir)
 
-MqttClient client = new MqttClient("tcp://localhost:1883", "SampleClient", dataStore)
+MqttClient client = new MqttClient("tcp://localhost:31883", "SampleClient", dataStore)
 client.connect()
 MqttMessage message = new MqttMessage('Hello world!!'.bytes)
 message.setQos(2)

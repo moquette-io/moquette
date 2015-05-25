@@ -60,11 +60,11 @@ public class ServerIntegrationPahoTest {
     public void setUp() throws Exception {
         String dbPath = IntegrationUtils.localMapDBPath();
         File dbFile = new File(dbPath);
-        assertFalse(String.format("The DB storagefile %s already exists", dbPath), dbFile.exists());
+        //assertFalse(String.format("The DB storagefile %s already exists", dbPath), dbFile.exists());
     	
         startServer();
 
-        m_client = new MqttClient("tcp://localhost:1883", "TestClient", s_dataStore);
+        m_client = new MqttClient("tcp://localhost:31883", "TestClient", s_dataStore);
         m_callback = new TestCallback();
         m_client.setCallback(m_callback);
     }
@@ -95,8 +95,12 @@ public class ServerIntegrationPahoTest {
 
         MqttMessage message = new MqttMessage("Hello world!!".getBytes());
         message.setQos(0);
-        message.setRetained(false);
+        message.setRetained(true);
         m_client.publish("/topic", message);
+        
+        MqttMessage msg = m_callback.getMessage(false);
+
+        LOG.info("isRetained:" + msg.isRetained() + ",Payload:" + new String(msg.getPayload()));
 
         assertEquals("/topic", m_callback.getTopic());
     }
@@ -112,7 +116,7 @@ public class ServerIntegrationPahoTest {
         m_client.disconnect();
 
         //reconnect and publish
-        MqttClient anotherClient = new MqttClient("tcp://localhost:1883", "TestClient", s_dataStore);
+        MqttClient anotherClient = new MqttClient("tcp://localhost:31883", "TestClient", s_dataStore);
         m_callback = new TestCallback();
         anotherClient.setCallback(m_callback);
         anotherClient.connect(options);
@@ -285,7 +289,7 @@ public class ServerIntegrationPahoTest {
     }
  
     private void publishFromAnotherClient(String topic, byte[] payload, int qos) throws Exception {
-        IMqttClient anotherClient = new MqttClient("tcp://localhost:1883", "TestClientPUB", s_pubDataStore);
+        IMqttClient anotherClient = new MqttClient("tcp://localhost:31883", "TestClientPUB", s_pubDataStore);
         anotherClient.connect();
         anotherClient.publish(topic, payload, qos, false);
         anotherClient.disconnect();

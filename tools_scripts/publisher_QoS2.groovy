@@ -11,7 +11,7 @@ String host = args[0]
 String tmpDir = System.getProperty("java.io.tmpdir")
 MqttDefaultFilePersistence dataStore = new MqttDefaultFilePersistence(tmpDir)
 
-MqttClient client = new MqttClient("tcp://${host}:1883", "PublisherClient", dataStore)
+MqttClient client = new MqttClient("tcp://${host}:31883", "PublisherClient", dataStore)
 client.connect()
 MqttMessage message = new MqttMessage('Hello world!!'.bytes)
 message.setQos(0)

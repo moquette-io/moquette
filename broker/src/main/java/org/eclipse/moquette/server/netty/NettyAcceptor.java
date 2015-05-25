@@ -231,6 +231,7 @@ public class NettyAcceptor implements ServerAcceptor {
 
                 SSLEngine engine = serverContext.createSSLEngine();
                 engine.setUseClientMode(false);
+                //engine.setNeedClientAuth(need);
                 final SslHandler sslHandler = new SslHandler(engine);
 
                 pipeline.addLast("ssl", sslHandler);

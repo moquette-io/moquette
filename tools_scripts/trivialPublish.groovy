@@ -10,7 +10,7 @@ import org.fusesource.mqtt.client.Topic
 String host = args[0]
 //start a publisher
 MQTT mqtt2 = new MQTT()
-mqtt2.setHost(host, 1883)
+mqtt2.setHost(host, 31883)
 BlockingConnection publisher = mqtt2.blockingConnection()
 publisher.connect()
 println "publisher connected"

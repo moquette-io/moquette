@@ -91,7 +91,7 @@ String tmpDir = System.getProperty("java.io.tmpdir")
 MqttDefaultFilePersistence dataStore = new MqttDefaultFilePersistence(tmpDir)
 
 int rnd = (Math.random() * 100) as int
-MqttAsyncClient client = new MqttAsyncClient("tcp://${host}:1883", "SubscriberClient${rnd}", dataStore)
+MqttAsyncClient client = new MqttAsyncClient("tcp://${host}:31883", "SubscriberClient${rnd}", dataStore)
 def callback = new SubscriberCallback()
 client.callback = callback
 client.connect().waitForCompletion(1000);

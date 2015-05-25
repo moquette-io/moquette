@@ -12,9 +12,9 @@
         var client;
         function doConnect() {
                 console.log("connect invoked");
-                client = new Paho.MQTT.Client("127.0.0.1", Number(8080), "", "clientId");
-                //client = new Paho.MQTT.Client("test.mosquitto.org", Number(8080), "", "clientId");
-                //client = new Paho.MQTT.Client("ws://whistler1.hursley.ibm.com", Number(1883), "ClientId");
+                client = new Paho.MQTT.Client("127.0.0.1", Number(38080), "", "clientId");
+                //client = new Paho.MQTT.Client("test.mosquitto.org", Number(38080), "", "clientId");
+                //client = new Paho.MQTT.Client("ws://whistler1.hursley.ibm.com", Number(31883), "ClientId");
 
                 client.startTrace();
                 // set callback handlers

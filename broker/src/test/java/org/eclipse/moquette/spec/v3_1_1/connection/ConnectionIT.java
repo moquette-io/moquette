@@ -51,7 +51,7 @@ public class ConnectionIT {
 
     @Test(timeout = 3000)
     public void testConnectThenClose() throws Exception {
-        RawClient.connect("127.0.0.1", 1883).isConnected()
+        RawClient.connect("127.0.0.1", 31883).isConnected()
         //CONNECT
         .write(0x10) //MQTT Control Packet type(1)
         .write(0x13)            // Remaining Length
@@ -92,7 +92,7 @@ public class ConnectionIT {
 
     @Test(timeout = 3000)
     public void testConnectWithInvalidWillQoS() throws Exception {
-        RawClient.connect("127.0.0.1", 1883).isConnected()
+        RawClient.connect("127.0.0.1", 31883).isConnected()
             //CONNECT
             .write(0x10) //MQTT Control Packet type(1)
             .write(0x13)            // Remaining Length
@@ -121,7 +121,7 @@ public class ConnectionIT {
     @Ignore("Need to validate the test case.")
     @Test(timeout = 15000)
     public void testConnectWithWillFlagSetToZeroButWillQoSFlagSetToNonZero() throws Exception {
-        RawClient.connect("127.0.0.1", 1883).isConnected()
+        RawClient.connect("127.0.0.1", 31883).isConnected()
         // CONNECT
         .write(0x10) // MQTT Control Packet type(1)
         .write(0x12) // Remaining Length

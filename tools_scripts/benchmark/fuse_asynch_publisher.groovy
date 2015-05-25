@@ -34,7 +34,7 @@ long pauseMicroseconds = (1 / messagesPerSecond) * 1000 * 1000
 println "Pause over the each message sent ${pauseMicroseconds} microsecs"
 
 MQTT mqtt = new MQTT()
-mqtt.setHost(host, 1883)
+mqtt.setHost(host, 31883)
 mqtt.setCleanSession(true)
 mqtt.setClientId("PublisherClient${dialog_id}")
 
