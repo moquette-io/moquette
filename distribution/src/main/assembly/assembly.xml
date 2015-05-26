@@ -20,6 +20,26 @@
             <source>src/main/scripts/moquette.bat</source>
             <outputDirectory>bin</outputDirectory>
         </file>
+
+        <file>
+            <source>src/main/scripts/start.sh</source>
+            <outputDirectory>bin</outputDirectory>
+        </file>
+
+        <file>
+            <source>src/main/scripts/stop.sh</source>
+            <outputDirectory>bin</outputDirectory>
+        </file>
+
+        <file>
+            <source>src/main/scripts/moquette-start.sh</source>
+            <outputDirectory>bin</outputDirectory>
+        </file>
+
+        <file>
+            <source>src/main/scripts/moquette-stop.sh</source>
+            <outputDirectory>bin</outputDirectory>
+        </file>
         
         <file>
             <source>src/main/resources/log4j.properties</source>
