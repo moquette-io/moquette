@@ -67,6 +67,15 @@
 							<ul class="sectlevel2">
 								<li><a href="#_password_conf_file">Password file location</a></li>
 								<li><a href="#_hash_your_password">Hash your passwords</a></li>
+								<li><a href="#_pattern_acl">Pattern ACL</a></li>
+							</ul>
+						</li>		
+						
+						<li><a href="#_acl_file">ACL file</a>
+							<ul class="sectlevel2">
+								<li><a href="#_simple_topic_acl">Simple topic ACL</a></li>
+								<li><a href="#_user_specific_acl">User specific ACL</a></li>
+								<li><a href="#_pattern_acl">Pattern ACL</a></li>
 							</ul>
 						</li>		          	
 		          	
@@ -89,6 +98,13 @@
 							<ul class="sectlevel2">
 								<li><a href="#_password_conf_file">Password file location</a></li>
 								<li><a href="#_hash_your_password">Hash your passwords</a></li>
+							</ul>
+						</li>		
+						
+						<li><a href="#_acl_file">ACL file</a>
+							<ul class="sectlevel2">
+								<li><a href="#_simple_topic_acl">Simple topic ACL</a></li>
+								<li><a href="#_user_specific_acl">User specific ACL</a></li>
 							</ul>
 						</li>			          
 		          
@@ -117,7 +133,7 @@
 		<div class="sectionbody">
 			<div class="paragraph">
 			<p>If you have a broker that's open to public network probably you would protect the access of your users with some kind of credentials. Moquette, in its
-			configuration file (conf/moquette.conf) has a key name "password_file" that point to a specific file used to store users's login and password. The name and format
+			configuration file (<code>conf/moquette.conf</code>) has a key name <code>password_file</code> that point to a specific file used to store users's login and password. The name and format
 			are borrowed from Mosquitto config, so this file contains one credential for line. The format f each line is:
 			</p>
 			</div>
@@ -145,6 +161,68 @@
 			</div>	
 		</div>
 		
+		<h2 id="_acl_file">ACL file</h2>
+		<div class="sectionbody">
+			<div class="paragraph">
+			<p>Once you have defined the authentication part for you users yuo should want also to define various ACL policies to access topics.
+			This is quite easy, you just need to create an ACL file (with the synthax defined later) and expose the <code>acl_file</code> property in 
+			the Moquette configuration file (<code>conf/moquette.conf</code>) file.
+			</p>
+			</div>
+			
+			<div class="sect2">
+				<h3 id="_simple_topic_acl">Simple topic ACL</h3>
+				<div class="paragraph">
+					<p>In this file each line is a single ACL definition, except when used the keyword <code>user</code>. In the simple form an ACL is defined as follow:</p>
+				</div>
+				<div class="listingblock">
+					<div class="content">
+						<pre class="prettyprint highlight"><code class="language-java" data-lang="java">topic [read|write|readwrite] &lt;/topic/to/&gt;</code></pre>
+					</div>
+				</div>
+				<div class="paragraph">
+					<p>The keyword <code>topic</code> is mandatory followed by the access right (that is optional under some circumstances), and at the end there is the topic 
+					interested in the ACL definition. If you don't specify any access right it's assumed that is <code>readwrite</code> unless the topic path contains any space
+					character, so in that case you are constrained to explicitly define the rights.
+					</p>
+				</div>
+			</div>	
+		</div>
+		<div class="sect2">
+			<h3 id="_user_specific_acl">User specific ACL</h3>
+			<div class="paragraph">
+				<p>In some circumstances you should able to define some ACL only for defined users. In this case you should only define the user interested by the ACLs and 
+				make it followed by a list of ACLs.</p>
+			</div>
+			<div class="listingblock">
+					<div class="content">
+						<pre class="prettyprint highlight"><code class="language-java" data-lang="java">user johndoe
+topic [read|write|readwrite] &lt;/topic-1/to/&gt;
+...
+topic [read|write|readwrite] &lt;/topic-N/to/&gt;
+</code></pre>
+					</div>
+				</div>
+				<div class="paragraph">
+					<p>This snapshot means that the user <code>johndoe</code> is subjected to ACLs from 1 to N.</p>
+				</div>	
+		</div>
+		
+		<div class="sect2">
+			<h3 id="_pattern_acl">Pattern ACL</h3>
+			<div class="paragraph">
+				<p>The third type of ACL is the pattern ones, and applies to all users like the simple ACLs. Has the concept of matching a topic doing some
+				pattern substitusions. The placeholders admitted are one for the clientID (<code>%c</code>) and the other for the user name (<code>%u</code>).
+				The <code>pattern</code> keyword is what distingueshes this kind of ACL from the other two. This type of ACL is usefull if you want to grant
+				access to topics that cant' be predetermined, you can't know upfront all the clientID, nor you want to create the same ACL for each single user 
+				you grant access</p>
+			</div>
+			<div class="listingblock">
+			  <div class="content">
+				<pre class="prettyprint highlight"><code class="language-java" data-lang="java">pattern [read|write|readwrite] &lt;/topic/%c/%u&gt;</code></pre>
+				</div>
+			</div>
+		</div>
 		
 		<h2 id="_ssl_configuration">SSL Configuration</h2>
 		<div class="sectionbody">
