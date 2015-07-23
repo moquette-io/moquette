@@ -87,6 +87,13 @@
 								<li><a href="#_client_source_code">Client source code</a></li>
 							</ul>
 						</li>
+						
+						<li><a href="#_acl_customization">ACL customization</a>
+							<ul class="sectlevel2">
+								<li><a href="#_customize_authenticator">Customize authenticator</a></li>
+								<li><a href="#_customize_authorizator">Customize authorizator</a></li>
+							</ul>
+						</li>
 					</ul>
 		        </div>
 		      </div>
@@ -116,8 +123,14 @@
 								<li><a href="#_client_source_code">Client source code</a></li>
 							</ul>
 						</li>
+						
+				      <li><a href="#_acl_customization">ACL customization</a>
+							<ul class="sectlevel2">
+								<li><a href="#_customize_authenticator">Customize authenticator</a></li>
+								<li><a href="#_customize_authorizator">Customize authorizator</a></li>
+							</ul>
+						</li>
 		        </div>
-		        
 		        
 		        
 	<div id="preamble">
@@ -231,19 +244,19 @@ topic [read|write|readwrite] &lt;/topic-N/to/&gt;
 				to esport a certificate from the broker&#8217;s keystore and improt in the client&#8217;s one. The last thing is to write a simple
 				client that connect to the server using the SSL.</p>
 			</div>
-		<div class="paragraph">
+			<div class="paragraph">
 			<p>So how do you get create a keystore? We suppose to use the crypto tools provided by the JDK.</p>
-		</div>
-		<div class="paragraph" id="_create_the_key_store">
+			</div>
+			<div class="paragraph" id="_create_the_key_store">
 			<p>First create server&#8217;s key store, answering the questions presented to you. The first password the keytool asks to you is the keystore's one. Then after
 			questions (you could skip almost all but your first name and the confirmation of data (type in yes). Then you need to fill the password for alias 
 			you are creating(testserver in our case).</p>
-		</div>
-		<div class="listingblock">
-		<div class="content">
-		<pre class="prettyprint highlight"><code class="language-java" data-lang="java">keytool -keystore serverkeystore.jks -alias testserver -genkey -keyalg RSA</code></pre>
-		</div>
-		</div>
+			</div>
+			<div class="listingblock">
+				<div class="content">
+					<pre class="prettyprint highlight"><code class="language-java" data-lang="java">keytool -keystore serverkeystore.jks -alias testserver -genkey -keyalg RSA</code></pre>
+				</div>
+			</div>
 		<div class="paragraph">
 		<p>Now go to your broker config file (<MOQUETTE_HOME>/config/moquette.conf) and provide the path to you just created keystore (jks_path) and the passwords
 		you have just filled (key_store_password is the password of your keystore and key_manager_password is the one of the alias)  </p>
@@ -336,7 +349,67 @@ client.connect(options);
 			
 	</div>
 	</div>
+          
        
+      <h2 id="_acl_customization">ACL customization</h2>
+		<div class="sectionbody">
+			<div class="paragraph">
+			<p>The broker has pluggable authorization and authentication interfaces. By default starts with implementations that use the <code>password.conf</code> and <code>acl.conf files</code>
+				as specified above.</p>
+			</div>
+			
+			<div class="sect2">
+				<h3 id="_customize_authenticator">Customize authenticator</h3>
+				<div class="paragraph">
+					<p>To create your custom authenticator you need to extend the class <code>org.eclipse.moquette.spi.impl.security.IAuthenticator</code>:</p>
+				</div>
+				<div class="listingblock">
+					<div class="content">
+						<pre class="prettyprint highlight"><code class="language-java" data-lang="java">
+public interface IAuthenticator {
+    boolean checkValid(String username, String password);
+}
+						</code></pre>
+					</div>
+				</div>
+				<div class="paragraph">
+				<p>This method must return true if the username and password matches a valid registered user. To use a custom implementation remember to define the
+				variable <code>authenticator_class</code>, also take care that the class need a no-argument constructor to be correctly instantiated or defined a static no arg
+				instantiation method named <code>getInstance</code></p>
+				</div>
+			</div>
+			
+			<div class="sect2">
+				<h3 id="_customize_authorizator">Customize authorizator</h3>
+				<div class="paragraph">
+					<p>To create your custom authorizator you need to extend the class <code>org.eclipse.moquette.spi.impl.security.IAuthorizator</code>:</p>
+				</div>
+				<div class="listingblock">
+					<div class="content">
+						<pre class="prettyprint highlight"><code class="language-java" data-lang="java">
+public interface IAuthorizator {
+
+    boolean canWrite(String topic, String user, String client);
+
+    boolean canRead(String topic, String user, String client);
+}
+						</code></pre>
+					</div>
+				</div>
+				<div class="paragraph">
+				<p>The method <code>canWrite</code> must return true if the user has write access to given topic (the user can publish on topic), the <code>canRead</code> do the same checking, 
+				user can receive publishes on subscribed topic; this mean that the check is done during publishing checking if a subscription could receive the message,
+				it's not applied during the subscription make the subscription failing.
+				 To use a custom implementation remember to define the
+				variable <code>authorizator_class</code>, also take care that the class need a no-argument constructor to be correctly instantiated or defined a static no arg
+				instantiation method named <code>getInstance</code></p>
+				</div>
+			</div>
+		</div>	 
+		
+		
+		
+		
           <div id="footer">
             <div id="footer-text">
                 Last updated 2015-05-3
