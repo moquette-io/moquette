@@ -15,9 +15,12 @@
  */
 package org.eclipse.moquette.spi.impl;
 
+import com.google.inject.Guice;
+import com.google.inject.Injector;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
+
 import org.HdrHistogram.Histogram;
 import org.eclipse.moquette.proto.messages.AbstractMessage;
 import org.eclipse.moquette.spi.impl.security.*;
@@ -31,6 +34,8 @@ import org.eclipse.moquette.spi.impl.events.ProtocolEvent;
 import org.eclipse.moquette.spi.impl.events.StopEvent;
 import org.eclipse.moquette.spi.impl.subscriptions.SubscriptionsStore;
 import org.eclipse.moquette.spi.persistence.MapDBPersistentStore;
+import org.moquette.configurationmanager.plugins.DependencyModules;
+import org.moquette.configurationmanager.plugins.PluginConfigurationParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,7 +80,15 @@ public class SimpleMessaging implements IMessaging, EventHandler<ValueEvent> {
 
     private static SimpleMessaging INSTANCE;
     
-    private final ProtocolProcessor m_processor = new ProtocolProcessor();
+ // William Start
+ 	private final ProtocolProcessor m_processor;
+ 	private final PluginConfigurationParser pluginConfigurationParse;
+ 	private final Injector injector;
+ 	// William End
+    
+ // William has deleted this line because I will do an alternative option
+ 	// above
+    //private final ProtocolProcessor m_processor = new ProtocolProcessor();
     private final AnnotationSupport annotationSupport = new AnnotationSupport();
     private boolean benchmarkEnabled = false;
     
@@ -84,6 +97,13 @@ public class SimpleMessaging implements IMessaging, EventHandler<ValueEvent> {
     Histogram histogram = new Histogram(5);
     
     private SimpleMessaging() {
+    	// William Start
+    			pluginConfigurationParse = new PluginConfigurationParser();
+    			pluginConfigurationParse.parse();
+    			injector = Guice.createInjector(new DependencyModules(
+    					pluginConfigurationParse.plugins_configurations));
+    			m_processor = injector.getInstance(ProtocolProcessor.class);
+    			// William End
     }
 
     public static SimpleMessaging getInstance() {

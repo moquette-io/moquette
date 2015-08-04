@@ -1,99 +1,109 @@
 
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-    <parent>
-        <relativePath>../</relativePath>
-        <!--<relativePath>../pom.xml</relativePath>-->
-        <artifactId>moquette-parent</artifactId>
-        <groupId>org.eclipse.moquette</groupId>
-        <version>0.7</version>
-    </parent>
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<relativePath>../</relativePath>
+		<!--<relativePath>../pom.xml</relativePath> -->
+		<artifactId>moquette-parent</artifactId>
+		<groupId>org.eclipse.moquette</groupId>
+		<version>0.7</version>
+	</parent>
 
-    <artifactId>moquette-netty-parser</artifactId>
-    <packaging>jar</packaging>
-    <!--<version>${moquette-version}</version>-->
-    <name>Moquette - Netty Parser</name>
+	<artifactId>moquette-netty-parser</artifactId>
+	<packaging>jar</packaging>
+	<!--<version>${moquette-version}</version> -->
+	<name>Moquette - Netty Parser</name>
 
-    <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <bintray.package>org.dna.mqtt.moquette-netty-parser</bintray.package>
-    </properties>
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<bintray.package>org.dna.mqtt.moquette-netty-parser</bintray.package>
+	</properties>
 
-    <dependencies>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>moquette-parser-commons</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-common</artifactId>
-            <version>${netty.version}</version>
-        </dependency>
-        
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-buffer</artifactId>
-            <version>${netty.version}</version>
-        </dependency>
-        
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-transport</artifactId>
-            <version>${netty.version}</version>
-        </dependency>
-        
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-handler</artifactId>
-            <version>${netty.version}</version>
-        </dependency>
-        
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
-            <version>1.6.4</version>
-        </dependency>
-        
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.8.2</version>
-            <scope>test</scope>
-        </dependency>
-        
-        <!-- needs extra dependencies: objenesis & hamcrest -->
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>  
-            <version>1.9.0</version> 
-            <scope>test</scope>
-        </dependency>
+	<dependencies>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>moquette-parser-commons</artifactId>
+			<version>${project.version}</version>
+		</dependency>
 
-    </dependencies>
-    
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <configuration>
-                    <excludes>
-                        <exclude>org/eclipse/moquette/parser/netty/TestUtils.java</exclude>
-                        <exclude>org/eclipse/moquette/parser/netty/TestUtils$*</exclude>
-                    </excludes>
-                </configuration>
-            </plugin>
+		<dependency>
+			<groupId>io.netty</groupId>
+			<artifactId>netty-common</artifactId>
+			<version>${netty.version}</version>
+		</dependency>
 
-        </plugins>
-    </build>
-    
-    <distributionManagement>
-        <repository>
-            <id>bintray</id>
-            <url>https://api.bintray.com/maven/${bintray.repo}/${bintray.package}</url>
-        </repository>
-    </distributionManagement>
+		<dependency>
+			<groupId>io.netty</groupId>
+			<artifactId>netty-buffer</artifactId>
+			<version>${netty.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>io.netty</groupId>
+			<artifactId>netty-transport</artifactId>
+			<version>${netty.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>io.netty</groupId>
+			<artifactId>netty-handler</artifactId>
+			<version>${netty.version}</version>
+		</dependency>
+		<!-- William: deleted this because of versions conflict. I added two slf4j 
+			dependencies below <dependency> <groupId>org.slf4j</groupId> <artifactId>slf4j-log4j12</artifactId> 
+			<version>1.6.4</version> </dependency> -->
+
+		<!-- William added this -->
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-simple</artifactId>
+			<version>1.7.12</version>
+		</dependency>
+		<!-- William added this -->
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>1.7.12</version>
+		</dependency>
+
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<version>4.8.2</version>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- needs extra dependencies: objenesis & hamcrest -->
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-core</artifactId>
+			<version>1.9.0</version>
+			<scope>test</scope>
+		</dependency>
+
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<excludes>
+						<exclude>org/eclipse/moquette/parser/netty/TestUtils.java</exclude>
+						<exclude>org/eclipse/moquette/parser/netty/TestUtils$*</exclude>
+					</excludes>
+				</configuration>
+			</plugin>
+
+		</plugins>
+	</build>
+
+	<distributionManagement>
+		<repository>
+			<id>bintray</id>
+			<url>https://api.bintray.com/maven/${bintray.repo}/${bintray.package}</url>
+		</repository>
+	</distributionManagement>
 </project>
