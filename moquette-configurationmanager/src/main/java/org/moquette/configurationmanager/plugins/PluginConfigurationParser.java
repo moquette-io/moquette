@@ -22,7 +22,7 @@ public class PluginConfigurationParser {
 	private static final Logger LOG = LoggerFactory
 			.getLogger(PluginConfigurationParser.class);
 
-	public Properties plugins_configurations = new Properties();
+	public static Properties plugins_configurations = new Properties();
 
 	public PluginConfigurationParser() {
 
@@ -102,8 +102,11 @@ public class PluginConfigurationParser {
 	}
 
 	private void createDefaults() {
-		plugins_configurations.put(
-				PluginConfigurationTypes.ICustomPublishingNeedsService,
-				"org.moquette.configurationmanager.examples.DefaulPublishingNeesd");
+		plugins_configurations
+				.put(PluginConfigurationTypes.ICustomPublishingNeedsService,
+						"org.moquette.configurationmanager.examples.DefaulPublishingNeesd");
+		plugins_configurations
+				.put(PluginConfigurationTypes.IConDisService,
+						"org.moquette.configurationmanager.examples.condisplugins.DefaultConDisPlugin");
 	}
 }

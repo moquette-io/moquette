@@ -6,11 +6,11 @@ import org.moquette.configurationmanager.plugins.AbstractCustomPublishingNeeds;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SendEmailPublishingNeeds extends AbstractCustomPublishingNeeds{
+public class SendEmailPublishingNeeds extends AbstractCustomPublishingNeeds {
 
 	private static final Logger LOG = LoggerFactory
 			.getLogger(SendEmailPublishingNeeds.class);
-	
+
 	@Override
 	public boolean isThereAditionalChecksBeforePublishing(String topic,
 			String user, String clientID) {
@@ -20,13 +20,15 @@ public class SendEmailPublishingNeeds extends AbstractCustomPublishingNeeds{
 	@Override
 	public Map<String, String> doAdditinalWorkBeforePublishing(String topic,
 			String user, String clientID, String msg) {
-		
-		LOG.info("------------------");
-		LOG.info("Sending and email to someone...");
-		// TODO Send an email
-		LOG.info("Done, sent successfully !");
-		LOG.info("------------------");
-		return super.doAdditinalWorkBeforePublishing(topic, user, clientID, msg);
+		if (LOG.isDebugEnabled()) {
+			LOG.debug("------------------");
+			LOG.debug("Sending and email to someone...");
+			// TODO Send an email
+			LOG.debug("Done, sent successfully !");
+			LOG.debug("------------------");
+		}
+		return super
+				.doAdditinalWorkBeforePublishing(topic, user, clientID, msg);
 	}
 
 	@Override

@@ -10,4 +10,5 @@ public enum PluginConfigurationTypes {
 	ICustomPublishingNeedsService,
 	ICustomAuthenticationService,
 	ICustomAuthorizationService,
+	IConDisService,
 }
