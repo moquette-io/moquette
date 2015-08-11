@@ -47,7 +47,7 @@ public class Server {
 		 * @author williamkinaan To call the pluging manager when the server
 		 *         starts and loads the pluging configurations
 		 */
-		new PluginConfigurationParser().parse();
+		PluginConfigurationParser.parse();
 		server.startServer();
 		System.out.println("Server started, version 0.7");
 		// Bind a shutdown hook

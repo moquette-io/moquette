@@ -53,191 +53,202 @@ import static org.eclipse.moquette.commons.Constants.ACL_FILE_PROPERTY_NAME;
  *
  * Singleton class that orchestrate the execution of the protocol.
  *
- * Uses the LMAX Disruptor to serialize the incoming, requests, because it work in a evented fashion;
- * the requests income from front Netty connectors and are dispatched to the 
- * ProtocolProcessor.
+ * Uses the LMAX Disruptor to serialize the incoming, requests, because it work
+ * in a evented fashion; the requests income from front Netty connectors and are
+ * dispatched to the ProtocolProcessor.
  *
  * @author andrea
  */
 public class SimpleMessaging implements IMessaging, EventHandler<ValueEvent> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(SimpleMessaging.class);
-    
-    private SubscriptionsStore subscriptions;
-    
-    private RingBuffer<ValueEvent> m_ringBuffer;
+	private static final Logger LOG = LoggerFactory
+			.getLogger(SimpleMessaging.class);
 
-    private IMessagesStore m_storageService;
-    private ISessionsStore m_sessionsStore;
+	private SubscriptionsStore subscriptions;
 
-    private ExecutorService m_executor;
-    private Disruptor<ValueEvent> m_disruptor;
+	private RingBuffer<ValueEvent> m_ringBuffer;
 
-    private static SimpleMessaging INSTANCE;
-    
-    private final ProtocolProcessor m_processor = new ProtocolProcessor();
-    private final AnnotationSupport annotationSupport = new AnnotationSupport();
-    private boolean benchmarkEnabled = false;
-    
-    CountDownLatch m_stopLatch;
+	private IMessagesStore m_storageService;
+	private ISessionsStore m_sessionsStore;
 
-    Histogram histogram = new Histogram(5);
-    
-    private SimpleMessaging() {
-    }
+	private ExecutorService m_executor;
+	private Disruptor<ValueEvent> m_disruptor;
 
-    public static SimpleMessaging getInstance() {
-        if (INSTANCE == null) {
-            INSTANCE = new SimpleMessaging();
-        }
-        return INSTANCE;
-    }
+	private static SimpleMessaging INSTANCE;
 
-    public void init(Properties configProps) {
-        subscriptions = new SubscriptionsStore();
-        m_executor = Executors.newFixedThreadPool(1);
-        m_disruptor = new Disruptor<>(ValueEvent.EVENT_FACTORY, 1024 * 32, m_executor);
-        /*Disruptor<ValueEvent> m_disruptor = new Disruptor<ValueEvent>(ValueEvent.EVENT_FACTORY, 1024 * 32, m_executor,
-                ProducerType.MULTI, new BusySpinWaitStrategy());*/
-        m_disruptor.handleEventsWith(this);
-        m_disruptor.start();
+	private final ProtocolProcessor m_processor = new ProtocolProcessor();
+	private final AnnotationSupport annotationSupport = new AnnotationSupport();
+	private boolean benchmarkEnabled = false;
 
-        // Get the ring buffer from the Disruptor to be used for publishing.
-        m_ringBuffer = m_disruptor.getRingBuffer();
+	CountDownLatch m_stopLatch;
 
-        annotationSupport.processAnnotations(m_processor);
-        processInit(configProps);
-//        disruptorPublish(new InitEvent(configProps));
-    }
+	Histogram histogram = new Histogram(5);
 
-    
-    private void disruptorPublish(MessagingEvent msgEvent) {
-        LOG.debug("disruptorPublish publishing event {}", msgEvent);
-        long sequence = m_ringBuffer.next();
-        ValueEvent event = m_ringBuffer.get(sequence);
+	private SimpleMessaging() {
+	}
 
-        event.setEvent(msgEvent);
-        
-        m_ringBuffer.publish(sequence); 
-    }
-    
-    @Override
-    public void lostConnection(String clientID) {
-        disruptorPublish(new LostConnectionEvent(clientID));
-    }
+	public static SimpleMessaging getInstance() {
+		if (INSTANCE == null) {
+			INSTANCE = new SimpleMessaging();
+		}
+		return INSTANCE;
+	}
 
-    @Override
-    public void handleProtocolMessage(ServerChannel session, AbstractMessage msg) {
-        disruptorPublish(new ProtocolEvent(session, msg));
-    }
+	public void init(Properties configProps) {
+		subscriptions = new SubscriptionsStore();
+		m_executor = Executors.newFixedThreadPool(1);
+		m_disruptor = new Disruptor<>(ValueEvent.EVENT_FACTORY, 1024 * 32,
+				m_executor);
+		/*
+		 * Disruptor<ValueEvent> m_disruptor = new
+		 * Disruptor<ValueEvent>(ValueEvent.EVENT_FACTORY, 1024 * 32,
+		 * m_executor, ProducerType.MULTI, new BusySpinWaitStrategy());
+		 */
+		m_disruptor.handleEventsWith(this);
+		m_disruptor.start();
 
-    @Override
-    public void stop() {
-        m_stopLatch = new CountDownLatch(1);
-        disruptorPublish(new StopEvent());
-        try {
-            //wait the callback notification from the protocol processor thread
-            LOG.debug("waiting 10 sec to m_stopLatch");
-            boolean elapsed = !m_stopLatch.await(10, TimeUnit.SECONDS);
-            LOG.debug("after m_stopLatch");
-            m_executor.shutdown();
-            m_disruptor.shutdown();
-            if (elapsed) {
-                LOG.error("Can't stop the server in 10 seconds");
-            }
-        } catch (InterruptedException ex) {
-            LOG.error(null, ex);
-        }
-    }
-    
-    @Override
-    public void onEvent(ValueEvent t, long l, boolean bln) throws Exception {
-        MessagingEvent evt = t.getEvent();
-        t.setEvent(null); //free the reference to all Netty stuff
-        LOG.info("onEvent processing messaging event from input ringbuffer {}", evt);
-        if (evt instanceof StopEvent) {
-            processStop();
-            return;
-        } 
-        if (evt instanceof LostConnectionEvent) {
-            LostConnectionEvent lostEvt = (LostConnectionEvent) evt;
-            m_processor.processConnectionLost(lostEvt);
-            return;
-        }
-        
-        if (evt instanceof ProtocolEvent) {
-            ServerChannel session = ((ProtocolEvent) evt).getSession();
-            AbstractMessage message = ((ProtocolEvent) evt).getMessage();
-            try {
-                long startTime = System.nanoTime();
-                annotationSupport.dispatch(session, message);
-                if (benchmarkEnabled) {
-                    long delay = System.nanoTime() - startTime;
-                    histogram.recordValue(delay);
-                }
-            } catch (Throwable th) {
-                LOG.error("Serious error processing the message {} for {}", message, session, th);
-            }
-        }
-    }
+		// Get the ring buffer from the Disruptor to be used for publishing.
+		m_ringBuffer = m_disruptor.getRingBuffer();
 
-    private void processInit(Properties props) {
-        benchmarkEnabled = Boolean.parseBoolean(System.getProperty("moquette.processor.benchmark", "false"));
+		annotationSupport.processAnnotations(m_processor);
+		processInit(configProps);
+		// disruptorPublish(new InitEvent(configProps));
+	}
 
-        //TODO use a property to select the storage path
-        MapDBPersistentStore mapStorage = new MapDBPersistentStore(props.getProperty(PERSISTENT_STORE_PROPERTY_NAME, ""));
-        m_storageService = mapStorage;
-        m_sessionsStore = mapStorage;
+	private void disruptorPublish(MessagingEvent msgEvent) {
+		LOG.debug("disruptorPublish publishing event {}", msgEvent);
+		long sequence = m_ringBuffer.next();
+		ValueEvent event = m_ringBuffer.get(sequence);
 
-        m_storageService.initStore();
-        
-        //List<Subscription> storedSubscriptions = m_sessionsStore.listAllSubscriptions();
-        //subscriptions.init(storedSubscriptions);
-        subscriptions.init(m_sessionsStore);
+		event.setEvent(msgEvent);
 
-        String passwdPath = props.getProperty(PASSWORD_FILE_PROPERTY_NAME, "");
-        String configPath = System.getProperty("moquette.path", null);
-        IAuthenticator authenticator;
-        if (passwdPath.isEmpty()) {
-            authenticator = new AcceptAllAuthenticator();
-        } else {
-            authenticator = new FileAuthenticator(configPath, passwdPath);
-        }
+		m_ringBuffer.publish(sequence);
+	}
 
-        String aclFilePath = props.getProperty(ACL_FILE_PROPERTY_NAME, "");
-        IAuthorizator authorizator;
-        if (aclFilePath != null && !aclFilePath.isEmpty()) {
-            authorizator = new DenyAllAuthorizator();
-            File aclFile = new File(configPath, aclFilePath);
-            try {
-                authorizator = ACLFileParser.parse(aclFile);
-            } catch (ParseException pex) {
-                LOG.error(String.format("Format error in parsing acl file %s", aclFile), pex);
-            }
-            LOG.info("Using acl file defined at path {}", aclFilePath);
-        } else {
-            authorizator = new PermitAllAuthorizator();
-            LOG.info("Starting without ACL definition");
-        }
+	@Override
+	public void lostConnection(String clientID) {
+		disruptorPublish(new LostConnectionEvent(clientID));
+	}
 
-        boolean allowAnonymous = Boolean.parseBoolean(props.getProperty(ALLOW_ANONYMOUS_PROPERTY_NAME, "true"));
-        m_processor.init(subscriptions, m_storageService, m_sessionsStore, authenticator, allowAnonymous, authorizator);
-    }
+	@Override
+	public void handleProtocolMessage(ServerChannel session, AbstractMessage msg) {
+		disruptorPublish(new ProtocolEvent(session, msg));
+	}
 
+	@Override
+	public void stop() {
+		m_stopLatch = new CountDownLatch(1);
+		disruptorPublish(new StopEvent());
+		try {
+			// wait the callback notification from the protocol processor thread
+			LOG.debug("waiting 10 sec to m_stopLatch");
+			boolean elapsed = !m_stopLatch.await(10, TimeUnit.SECONDS);
+			LOG.debug("after m_stopLatch");
+			m_executor.shutdown();
+			m_disruptor.shutdown();
+			if (elapsed) {
+				LOG.error("Can't stop the server in 10 seconds");
+			}
+		} catch (InterruptedException ex) {
+			LOG.error(null, ex);
+		}
+	}
 
-    private void processStop() {
-        LOG.debug("processStop invoked");
-        m_storageService.close();
-        LOG.debug("subscription tree {}", subscriptions.dumpTree());
-//        m_eventProcessor.halt();
-//        m_executor.shutdown();
-        
-        subscriptions = null;
-        m_stopLatch.countDown();
+	@Override
+	public void onEvent(ValueEvent t, long l, boolean bln) throws Exception {
+		MessagingEvent evt = t.getEvent();
+		t.setEvent(null); // free the reference to all Netty stuff
+		LOG.info("onEvent processing messaging event from input ringbuffer {}",
+				evt);
+		if (evt instanceof StopEvent) {
+			processStop();
+			return;
+		}
+		if (evt instanceof LostConnectionEvent) {
+			LostConnectionEvent lostEvt = (LostConnectionEvent) evt;
+			m_processor.processConnectionLost(lostEvt);
+			return;
+		}
 
-        if (benchmarkEnabled) {
-            //log metrics
-            histogram.outputPercentileDistribution(System.out, 1000.0);
-        }
-    }
+		if (evt instanceof ProtocolEvent) {
+			ServerChannel session = ((ProtocolEvent) evt).getSession();
+			AbstractMessage message = ((ProtocolEvent) evt).getMessage();
+			try {
+				long startTime = System.nanoTime();
+				annotationSupport.dispatch(session, message);
+				if (benchmarkEnabled) {
+					long delay = System.nanoTime() - startTime;
+					histogram.recordValue(delay);
+				}
+			} catch (Throwable th) {
+				LOG.error("Serious error processing the message {} for {}",
+						message, session, th);
+			}
+		}
+	}
+
+	private void processInit(Properties props) {
+		benchmarkEnabled = Boolean.parseBoolean(System.getProperty(
+				"moquette.processor.benchmark", "false"));
+
+		// TODO use a property to select the storage path
+		MapDBPersistentStore mapStorage = new MapDBPersistentStore(
+				props.getProperty(PERSISTENT_STORE_PROPERTY_NAME, ""));
+		m_storageService = mapStorage;
+		m_sessionsStore = mapStorage;
+
+		m_storageService.initStore();
+
+		// List<Subscription> storedSubscriptions =
+		// m_sessionsStore.listAllSubscriptions();
+		// subscriptions.init(storedSubscriptions);
+		subscriptions.init(m_sessionsStore);
+
+		String passwdPath = props.getProperty(PASSWORD_FILE_PROPERTY_NAME, "");
+		String configPath = System.getProperty("moquette.path", null);
+		IAuthenticator authenticator;
+		if (passwdPath.isEmpty()) {
+			authenticator = new AcceptAllAuthenticator();
+		} else {
+			authenticator = new FileAuthenticator(configPath, passwdPath);
+		}
+
+		String aclFilePath = props.getProperty(ACL_FILE_PROPERTY_NAME, "");
+		IAuthorizator authorizator;
+		if (aclFilePath != null && !aclFilePath.isEmpty()) {
+			authorizator = new DenyAllAuthorizator();
+			File aclFile = new File(configPath, aclFilePath);
+			try {
+				authorizator = ACLFileParser.parse(aclFile);
+			} catch (ParseException pex) {
+				LOG.error(String.format("Format error in parsing acl file %s",
+						aclFile), pex);
+			}
+			LOG.info("Using acl file defined at path {}", aclFilePath);
+		} else {
+			authorizator = new PermitAllAuthorizator();
+			LOG.info("Starting without ACL definition");
+		}
+
+		boolean allowAnonymous = Boolean.parseBoolean(props.getProperty(
+				ALLOW_ANONYMOUS_PROPERTY_NAME, "true"));
+		m_processor.init(subscriptions, m_storageService, m_sessionsStore,
+				authenticator, allowAnonymous, authorizator);
+	}
+
+	private void processStop() {
+		LOG.debug("processStop invoked");
+		m_storageService.close();
+		LOG.debug("subscription tree {}", subscriptions.dumpTree());
+		// m_eventProcessor.halt();
+		// m_executor.shutdown();
+
+		subscriptions = null;
+		m_stopLatch.countDown();
+
+		if (benchmarkEnabled) {
+			// log metrics
+			histogram.outputPercentileDistribution(System.out, 1000.0);
+		}
+	}
 }

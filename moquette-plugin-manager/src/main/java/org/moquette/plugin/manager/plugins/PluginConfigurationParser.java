@@ -28,10 +28,10 @@ public class PluginConfigurationParser {
 	public static Properties plugins_configurations = new Properties();
 
 	public PluginConfigurationParser() {
-
+		
 	}
 
-	public void parse() {
+	public static void parse() {
 		createDefaults();
 		ClassLoader classLoader = new PluginConfigurationParser().getClass()
 				.getClassLoader();
@@ -70,7 +70,7 @@ public class PluginConfigurationParser {
 	 * @throws ParseException
 	 *             when the file is not well formatted
 	 */
-	void parse(Reader reader) throws ParseException {
+	static void  parse(Reader reader) throws ParseException {
 		if (reader == null) {
 			LOG.warn("parsing NULL reader, so fallback on default plugins configurations!");
 			createDefaults();
@@ -125,7 +125,7 @@ public class PluginConfigurationParser {
 
 	}
 
-	private boolean validatePlugin(PluginTypes type, String value)
+	private static boolean  validatePlugin(PluginTypes type, String value)
 			throws PluginNotFoundException, PluginNotCompatibleException {
 		Class myClass;
 		try {
@@ -152,10 +152,10 @@ public class PluginConfigurationParser {
 
 	}
 
-	private void createDefaults() {
+	private static void createDefaults() {
 		plugins_configurations
 				.put(PluginTypes.ICustomPublishingNeedsService.toString(),
-						"org.moquette.configurationmanager.examples.DefaulPublishingNeesd");
+						"org.moquette.plugin.manager.plugins.examples.DefaultPublishingNeeds");
 	}
 
 	public static void setPlugin(PluginTypes pluginType,
