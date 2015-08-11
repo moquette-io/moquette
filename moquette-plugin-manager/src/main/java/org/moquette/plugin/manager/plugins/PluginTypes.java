@@ -3,6 +3,7 @@
  */
 package org.moquette.plugin.manager.plugins;
 
+
 import org.moquette.plugin.manager.exception.WrongPluginTypeException;
 import org.moquette.plugin.manager.plugins.custompublishingneeds.ICustomPublishingNeeds;
 
@@ -24,6 +25,8 @@ public enum PluginTypes {
 		return this.iPlugin;
 	}
 
+
+	
 	/**
 	 * 
 	 * @param value

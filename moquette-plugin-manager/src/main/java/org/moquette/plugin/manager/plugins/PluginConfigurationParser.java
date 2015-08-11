@@ -32,6 +32,7 @@ public class PluginConfigurationParser {
 	}
 
 	public void parse() {
+		createDefaults();
 		ClassLoader classLoader = new PluginConfigurationParser().getClass()
 				.getClassLoader();
 
@@ -153,7 +154,13 @@ public class PluginConfigurationParser {
 
 	private void createDefaults() {
 		plugins_configurations
-				.put(PluginTypes.ICustomPublishingNeedsService,
+				.put(PluginTypes.ICustomPublishingNeedsService.toString(),
 						"org.moquette.configurationmanager.examples.DefaulPublishingNeesd");
+	}
+
+	public static void setPlugin(PluginTypes pluginType,
+			Class<? extends IPlugin> iPluginImpl) {
+		plugins_configurations
+				.put(pluginType.toString(), iPluginImpl.getName());
 	}
 }
