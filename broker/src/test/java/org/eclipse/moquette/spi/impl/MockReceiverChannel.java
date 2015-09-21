@@ -43,6 +43,10 @@ class MockReceiverChannel implements ServerChannel {
     public void close(boolean immediately) {
     }
 
+    public boolean isClosed() {
+        return false;
+    }
+
     public AbstractMessage getMessage() {
         return this.m_receivedMessage;
     }
