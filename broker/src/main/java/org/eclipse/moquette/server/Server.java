@@ -93,15 +93,23 @@ public class Server {
             config.setProperty("intercept.handler", handlerProp);
         }
         LOG.info("Persistent store file: " + config.getProperty(PERSISTENT_STORE_PROPERTY_NAME));
-        messaging = SimpleMessaging.getInstance();
+        messaging = createSimpleMessaging();
         messaging.init(config);
 
-        m_acceptor = new NettyAcceptor();
+        m_acceptor = createNettyAcceptor();
         m_acceptor.initialize(messaging, config);
+    }
+
+    protected SimpleMessaging createSimpleMessaging() {
+        return SimpleMessaging.getInstance();
+    }
+
+    protected NettyAcceptor createNettyAcceptor() {
+        return new NettyAcceptor();
     }
     
     public void stopServer() {
-    	LOG.info("Server stopping...");
+        LOG.info("Server stopping...");
         m_acceptor.close();
         messaging.stop();
         LOG.info("Server stopped");
