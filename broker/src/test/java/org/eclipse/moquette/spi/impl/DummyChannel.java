@@ -52,7 +52,7 @@ public class DummyChannel implements ServerChannel {
         m_channelClosed = true;
     }
 
-    boolean isClosed() {
+    public boolean isClosed() {
         return this.m_channelClosed;
     }
 

@@ -80,7 +80,8 @@ public class SimpleMessaging implements IMessaging, EventHandler<ValueEvent> {
 
     private static SimpleMessaging INSTANCE;
     
-    private final ProtocolProcessor m_processor = new ProtocolProcessor();
+    private final ProtocolProcessor m_processor = createProtocolProcessor();
+
     private final AnnotationSupport annotationSupport = new AnnotationSupport();
     private boolean benchmarkEnabled = false;
     
@@ -88,7 +89,7 @@ public class SimpleMessaging implements IMessaging, EventHandler<ValueEvent> {
 
     Histogram histogram = new Histogram(5);
     
-    private SimpleMessaging() {
+    SimpleMessaging() {
     }
 
     public static SimpleMessaging getInstance() {
@@ -112,6 +113,10 @@ public class SimpleMessaging implements IMessaging, EventHandler<ValueEvent> {
 
         annotationSupport.processAnnotations(m_processor);
         processInit(configProps);
+    }
+
+    protected ProtocolProcessor createProtocolProcessor() {
+        return new ProtocolProcessor();
     }
 
     private void disruptorPublish(MessagingEvent msgEvent) {
@@ -195,6 +200,7 @@ public class SimpleMessaging implements IMessaging, EventHandler<ValueEvent> {
         m_storageService.initStore();
 
         List<InterceptHandler> observers = new ArrayList<>();
+        initDefaultObservers(observers);
         String interceptorClassName = props.getProperty("intercept.handler");
         if (interceptorClassName != null && !interceptorClassName.isEmpty()) {
             try {
@@ -257,6 +263,9 @@ public class SimpleMessaging implements IMessaging, EventHandler<ValueEvent> {
         m_processor.init(subscriptions, m_storageService, m_sessionsStore, authenticator, allowAnonymous, authorizator, m_interceptor);
     }
     
+    protected void initDefaultObservers(List<InterceptHandler> observers) {
+    }
+
     private Object loadClass(String className, Class<?> cls) {
         Object instance = null;
         try {

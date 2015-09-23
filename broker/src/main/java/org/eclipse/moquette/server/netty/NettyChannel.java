@@ -70,6 +70,10 @@ public class NettyChannel implements ServerChannel {
         m_channel.writeAndFlush(value);
     }
 
+    public boolean isClosed() {
+        return !m_channel.channel().isActive();
+    }
+
     @Override
     public String toString() {
         String clientID = (String) getAttribute(ATTR_KEY_CLIENTID);

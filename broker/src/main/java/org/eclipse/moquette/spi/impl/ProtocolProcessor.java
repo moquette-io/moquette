@@ -158,6 +158,14 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
     @MQTTMessage(message = ConnectMessage.class)
     void processConnect(ServerChannel session, ConnectMessage msg) {
         LOG.debug("CONNECT for client <{}>", msg.getClientID());
+
+        if (session.isClosed()) {
+            LOG.warn("channel was closed. client <{}>", msg.getClientID());
+            session.close(false);
+            return;
+        }
+
+
         if (msg.getProtocolVersion() != VERSION_3_1 && msg.getProtocolVersion() != VERSION_3_1_1) {
             ConnAckMessage badProto = new ConnAckMessage();
             badProto.setReturnCode(ConnAckMessage.UNNACEPTABLE_PROTOCOL_VERSION);
