@@ -13,7 +13,7 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
-package org.eclipse.moquette.spi.impl;
+package org.eclipse.moquette.spi.persistence;
 
 import org.eclipse.moquette.proto.messages.AbstractMessage;
 import org.eclipse.moquette.spi.impl.subscriptions.Subscription;
@@ -96,10 +96,18 @@ public class MapDBPersistentStoreTest {
         assertEquals(1, packetId);
 
         //release the ID
-        m_storageService.cleanInFlight("CLIENT", packetId);
+        m_storageService.cleanTemporaryPublish("CLIENT", packetId);
 
         //request a second packetID, counter restarts from 0
         packetId = m_storageService.nextPacketID("CLIENT");
         assertEquals(1, packetId);
+    }
+
+    @Test
+    public void testCloseShutdownCommitTask() {
+        m_storageService.close();
+
+        //verify the executor is shutdown
+        assertTrue(m_storageService.m_scheduler.isTerminated());
     }
 }

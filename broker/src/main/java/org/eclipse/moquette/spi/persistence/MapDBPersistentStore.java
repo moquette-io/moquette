@@ -59,7 +59,7 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
     private DB m_db;
     private String m_storePath;
 
-    private final ScheduledExecutorService m_scheduler = Executors.newScheduledThreadPool(1);
+    protected final ScheduledExecutorService m_scheduler = Executors.newScheduledThreadPool(1);
 
     /*
      * The default constructor will create an in memory store as no file path was specified
@@ -81,7 +81,10 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
 	        File tmpFile;
 	        try {
 	            tmpFile = new File(m_storePath);
-	            tmpFile.createNewFile();
+	            boolean fileNewlyCreated = tmpFile.createNewFile();
+                if (!fileNewlyCreated) {
+                    LOG.warn("File [{}] already exists", m_storePath);
+                }
 	        } catch (IOException ex) {
 	            LOG.error(null, ex);
 	            throw new MQTTException("Can't create temp file for subscriptions storage [" + m_storePath + "]", ex);
@@ -124,7 +127,7 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
     public Collection<StoredMessage> searchMatching(IMatchingCondition condition) {
         LOG.debug("searchMatching scanning all retained messages, presents are {}", m_retainedStore.size());
 
-        List<StoredMessage> results = new ArrayList<StoredMessage>();
+        List<StoredMessage> results = new ArrayList<>();
 
         for (Map.Entry<String, StoredMessage> entry : m_retainedStore.entrySet()) {
             StoredMessage storedMsg = entry.getValue();
@@ -174,7 +177,7 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
                 //was a qos0 message (no ID)
                 toRemoveEvt = evt;
             }
-            if (evt.getMessageID() == messageID) {
+            if (evt.getMessageID().equals(messageID)) {
                 toRemoveEvt = evt;
             }
         }
@@ -188,7 +191,7 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
 
     //----------------- In flight methods -----------------
     @Override
-    public void cleanInFlight(String clientID, int packetID) {
+    public void cleanTemporaryPublish(String clientID, int packetID) {
         String publishKey = String.format("%s%d", clientID, packetID);
         m_inflightStore.remove(publishKey);
         Set<Integer> inFlightForClient = this.m_inFlightIds.get(clientID);
@@ -198,7 +201,7 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
     }
 
     @Override
-    public void addInFlight(PublishEvent evt, String clientID, int packetID) {
+    public void storeTemporaryPublish(PublishEvent evt, String clientID, int packetID) {
         String publishKey = String.format("%s%d", clientID, packetID);
         StoredPublishEvent storedEvt = convertToStored(evt);
         m_inflightStore.put(publishKey, storedEvt);
@@ -308,6 +311,10 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
     }
 
     public void close() {
+        if (this.m_db.isClosed()) {
+            LOG.debug("already closed");
+            return;
+        }
         this.m_db.commit();
         LOG.debug("persisted subscriptions {}", m_persistentSubscriptions);
         this.m_db.close();
@@ -333,16 +340,14 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
     }
 
     private StoredPublishEvent convertToStored(PublishEvent evt) {
-        StoredPublishEvent storedEvt = new StoredPublishEvent(evt);
-        return storedEvt;
+        return new StoredPublishEvent(evt);
     }
 
     private PublishEvent convertFromStored(StoredPublishEvent evt) {
         byte[] message = evt.getMessage();
         ByteBuffer bbmessage = ByteBuffer.wrap(message);
         //bbmessage.flip();
-        PublishEvent liveEvt = new PublishEvent(evt.getTopic(), evt.getQos(),
+        return new PublishEvent(evt.getTopic(), evt.getQos(),
                 bbmessage, evt.isRetain(), evt.getClientID(), evt.getMessageID());
-        return liveEvt;
     }
 }
