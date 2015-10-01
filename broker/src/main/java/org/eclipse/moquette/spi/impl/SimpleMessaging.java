@@ -181,6 +181,16 @@ public class SimpleMessaging {
     }
 
     public void shutdown() {
-        this.m_storageService.close();
+        LOG.debug("shutdown invoked");
+        m_processor.stop();
+
+        if (m_interceptor != null) {
+            this.m_interceptor.stop();
+            LOG.debug("interceptor firer stopped");
+        }
+        m_storageService.close();
+        LOG.debug("subscription tree {}", subscriptions.dumpTree());
+
+        subscriptions = null;
     }
 }
