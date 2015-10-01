@@ -189,8 +189,9 @@ public class SimpleMessaging {
             LOG.debug("interceptor firer stopped");
         }
         m_storageService.close();
-        LOG.debug("subscription tree {}", subscriptions.dumpTree());
-
-        subscriptions = null;
+        if(subscriptions != null) {
+            LOG.debug("subscription tree {}", subscriptions.dumpTree());
+            subscriptions = null;
+        }
     }
 }
