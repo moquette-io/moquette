@@ -39,7 +39,15 @@ public class Subscription implements Serializable {
         this.topicFilter = topicFilter;
         this.cleanSession = cleanSession;
     }
-    
+
+    public Subscription(Subscription orig) {
+        this.requestedQos = orig.requestedQos;
+        this.clientId = orig.clientId;
+        this.topicFilter = orig.topicFilter;
+        this.cleanSession = orig.cleanSession;
+        this.active = orig.active;
+    }
+
     /**
      * Factory method for empty subscriptions
      */
@@ -95,13 +103,6 @@ public class Subscription implements Serializable {
         return result;
     }
 
-    /**
-     * Trivial match method
-     */
-    boolean match(String topic) {
-        return this.topicFilter.equals(topic);
-    }
-    
     @Override
     public String toString() {
         return String.format("[filter:%s, cliID: %s, qos: %s, active: %s]", this.topicFilter, this.clientId, this.requestedQos, this.active);
