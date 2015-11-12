@@ -36,7 +36,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.*;
-import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.*;
 
 /**
  * MapDB main persistence implementation
@@ -58,6 +58,8 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
     private ConcurrentMap<String, Set<Subscription>> m_persistentSubscriptions;
     private DB m_db;
     private String m_storePath;
+
+    private final ScheduledExecutorService m_scheduler = Executors.newScheduledThreadPool(1);
 
     /*
      * The default constructor will create an in memory store as no file path was specified
@@ -84,7 +86,7 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
 	            LOG.error(null, ex);
 	            throw new MQTTException("Can't create temp file for subscriptions storage [" + m_storePath + "]", ex);
 	        }
-	        m_db = DBMaker.newFileDB(tmpFile).make();
+	        m_db = DBMaker.newFileDB(tmpFile).closeOnJvmShutdown().make();
     	}
         m_retainedStore = m_db.getHashMap("retained");
         m_persistentMessageStore = m_db.getHashMap("persistedMessages");
@@ -92,6 +94,12 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
         m_inFlightIds = m_db.getHashMap("inflightPacketIDs");
         m_persistentSubscriptions = m_db.getHashMap("subscriptions");
         m_qos2Store = m_db.getHashMap("qos2Store");
+        m_scheduler.scheduleWithFixedDelay(new Runnable() {
+            @Override
+            public void run() {
+                m_db.commit();
+            }
+        }, 30, 30, TimeUnit.SECONDS);
     }
 
     @Override
@@ -110,7 +118,6 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
             message.get(raw);
             m_retainedStore.put(topic, new StoredMessage(raw, qos, topic));
         }
-        m_db.commit();
     }
 
     @Override
@@ -140,7 +147,6 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
         }
         storedEvents.add(convertToStored(evt));
         m_persistentMessageStore.put(clientID, storedEvents);
-        m_db.commit();
         //NB rewind the evt message content
         LOG.debug("Stored published message for client <{}> on topic <{}>", clientID, evt.getTopic());
     }
@@ -174,12 +180,10 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
         }
         events.remove(toRemoveEvt);
         m_persistentMessageStore.put(clientID, events);
-        m_db.commit();
     }
 
     public void dropMessagesInSession(String clientID) {
         m_persistentMessageStore.remove(clientID);
-        m_db.commit();
     }
 
     //----------------- In flight methods -----------------
@@ -191,7 +195,6 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
         if (inFlightForClient != null) {
             inFlightForClient.remove(packetID);
         }
-        m_db.commit();
     }
 
     @Override
@@ -199,7 +202,6 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
         String publishKey = String.format("%s%d", clientID, packetID);
         StoredPublishEvent storedEvt = convertToStored(evt);
         m_inflightStore.put(publishKey, storedEvt);
-        m_db.commit();
     }
 
     /**
@@ -241,7 +243,6 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
             clientSubscriptions.remove(toBeRemoved);
         }
         m_persistentSubscriptions.put(clientID, clientSubscriptions);
-        m_db.commit();
     }
 
     public void addNewSubscription(Subscription newSubscription) {
@@ -270,22 +271,19 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
             m_persistentSubscriptions.put(clientID, subs);
             LOG.debug("clientID {} subscriptions set now is {}", clientID, subs);
         }
-        m_db.commit();
     }
 
     public void wipeSubscriptions(String clientID) {
         m_persistentSubscriptions.remove(clientID);
-        m_db.commit();
     }
 
     @Override
     public void updateSubscriptions(String clientID, Set<Subscription> subscriptions) {
         m_persistentSubscriptions.put(clientID, subscriptions);
-        m_db.commit();
     }
 
     public List<Subscription> listAllSubscriptions() {
-        List<Subscription> allSubscriptions = new ArrayList<Subscription>();
+        List<Subscription> allSubscriptions = new ArrayList<>();
         for (Map.Entry<String, Set<Subscription>> entry : m_persistentSubscriptions.entrySet()) {
             allSubscriptions.addAll(entry.getValue());
         }
@@ -296,6 +294,17 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
     @Override
     public boolean contains(String clientID) {
         return m_persistentSubscriptions.containsKey(clientID);
+    }
+
+    @Override
+    public void createNewSession(String clientID) {
+        LOG.debug("createNewSession for client <{}>", clientID);
+        if (m_persistentSubscriptions.containsKey(clientID)) {
+            LOG.error("already exists a session for client <{}>", clientID);
+            return;
+        }
+        LOG.debug("clientID {} is a newcome, creating it's empty subscriptions set", clientID);
+        m_persistentSubscriptions.put(clientID, new HashSet<Subscription>());
     }
 
     public void close() {

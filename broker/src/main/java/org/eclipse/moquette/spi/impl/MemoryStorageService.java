@@ -104,6 +104,9 @@ public class MemoryStorageService implements IMessagesStore, ISessionsStore {
     @Override
     public void removeMessageInSession(String clientID, Integer messageID) {
         List<PublishEvent> events = m_persistentMessageStore.get(clientID);
+        if (events == null) {
+            return;
+        }
         PublishEvent toRemoveEvt = null;
         for (PublishEvent evt : events) {
             if (evt.getMessageID() == null && messageID == null) {
@@ -206,6 +209,15 @@ public class MemoryStorageService implements IMessagesStore, ISessionsStore {
     @Override
     public boolean contains(String clientID) {
         return m_persistentSubscriptions.containsKey(clientID);
+    }
+
+    @Override
+    public void createNewSession(String clientID) {
+        if (m_persistentSubscriptions.containsKey(clientID)) {
+            LOG.error("already exists a session for client <{}>", clientID);
+            return;
+        }
+        m_persistentSubscriptions.put(clientID, new HashSet<Subscription>());
     }
 
     @Override

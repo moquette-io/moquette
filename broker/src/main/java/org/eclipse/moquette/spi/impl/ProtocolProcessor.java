@@ -177,7 +177,7 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
 
         //handle user authentication
         if (msg.isUserFlag()) {
-            String pwd = null;
+            byte[] pwd = null;
             if (msg.isPasswordFlag()) {
                 pwd = msg.getPassword();
             } else if (!this.allowAnonymous) {
@@ -225,7 +225,7 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
         //Handle will flag
         if (msg.isWillFlag()) {
             AbstractMessage.QOSType willQos = AbstractMessage.QOSType.values()[msg.getWillQos()];
-            byte[] willPayload = msg.getWillMessage().getBytes();
+            byte[] willPayload = msg.getWillMessage();
             ByteBuffer bb = (ByteBuffer) ByteBuffer.allocate(willPayload.length).put(willPayload).flip();
             //save the will testament in the clientID store
             WillMessage will = new WillMessage(msg.getWillTopic(), bb, msg.isWillRetain(),willQos );
@@ -243,14 +243,17 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
 
         ConnAckMessage okResp = new ConnAckMessage();
         okResp.setReturnCode(ConnAckMessage.CONNECTION_ACCEPTED);
-        if (!msg.isCleanSession() && m_sessionsStore.contains(msg.getClientID())) {
+        boolean isSessionAlreadyStored = m_sessionsStore.contains(msg.getClientID());
+        if (!msg.isCleanSession() && isSessionAlreadyStored) {
             okResp.setSessionPresent(true);
         }
         session.write(okResp);
         m_interceptor.notifyClientConnected(msg);
 
-        LOG.info("Create persistent session for clientID <{}>", msg.getClientID());
-        m_sessionsStore.addNewSubscription(Subscription.createEmptySubscription(msg.getClientID(), true)); //null means EmptySubscription
+        if (!isSessionAlreadyStored) {
+            LOG.info("Create persistent session for clientID <{}>", msg.getClientID());
+            m_sessionsStore.createNewSession(msg.getClientID());
+        }
         LOG.info("Connected client ID <{}> with clean session {}", msg.getClientID(), msg.isCleanSession());
         if (!msg.isCleanSession()) {
             //force the republish of stored QoS1 and QoS2
