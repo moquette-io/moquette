@@ -18,9 +18,11 @@ package org.eclipse.moquette.spi.impl;
 import java.nio.ByteBuffer;
 import java.util.*;
 
+import org.eclipse.moquette.spi.ClientSession;
 import org.eclipse.moquette.spi.IMatchingCondition;
 import org.eclipse.moquette.spi.IMessagesStore;
 import org.eclipse.moquette.spi.impl.events.PublishEvent;
+import org.eclipse.moquette.spi.persistence.MemorySessionStore;
 import org.eclipse.moquette.spi.impl.subscriptions.Subscription;
 import org.eclipse.moquette.proto.messages.AbstractMessage;
 
@@ -34,17 +36,18 @@ import static org.eclipse.moquette.spi.impl.Utils.defaultGet;
  */
 public class MemoryStorageService implements IMessagesStore, ISessionsStore {
     
-    private Map<String, Set<Subscription>> m_persistentSubscriptions = new HashMap<>();
     private Map<String, StoredMessage> m_retainedStore = new HashMap<>();
     //TODO move in a multimap because only Qos1 and QoS2 are stored here and they have messageID(key of secondary map)
     private Map<String, List<PublishEvent>> m_persistentMessageStore = new HashMap<>();
     private Map<String, PublishEvent> m_inflightStore = new HashMap<>();
     private Map<String, Set<Integer>> m_inflightIDs = new HashMap<>();
     private Map<String, PublishEvent> m_qos2Store = new HashMap<>();
+    private MemorySessionStore m_sessionsStore;
     
     private static final Logger LOG = LoggerFactory.getLogger(MemoryStorageService.class);
-    
+
     public void initStore() {
+        m_sessionsStore = new MemorySessionStore(this);
     }
     
     @Override
@@ -69,7 +72,7 @@ public class MemoryStorageService implements IMessagesStore, ISessionsStore {
     public Collection<StoredMessage> searchMatching(IMatchingCondition condition) {
         LOG.debug("searchMatching scanning all retained messages, presents are {}", m_retainedStore.size());
 
-        List<StoredMessage> results = new ArrayList<StoredMessage>();
+        List<StoredMessage> results = new ArrayList<>();
 
         for (Map.Entry<String, StoredMessage> entry : m_retainedStore.entrySet()) {
             StoredMessage storedMsg = entry.getValue();
@@ -84,13 +87,7 @@ public class MemoryStorageService implements IMessagesStore, ISessionsStore {
     @Override
     public void storePublishForFuture(PublishEvent evt) {
         LOG.debug("storePublishForFuture store evt {}", evt);
-//        List<PublishEvent> storedEvents;
         String clientID = evt.getClientID();
-//        if (!m_persistentMessageStore.containsKey(clientID)) {
-//            storedEvents = new ArrayList<PublishEvent>();
-//        } else {
-//            storedEvents = m_persistentMessageStore.get(clientID);
-//        }
         List<PublishEvent> storedEvents = defaultGet(m_persistentMessageStore, clientID, new ArrayList<PublishEvent>());
         storedEvents.add(evt);
         m_persistentMessageStore.put(clientID, storedEvents);
@@ -127,7 +124,7 @@ public class MemoryStorageService implements IMessagesStore, ISessionsStore {
     }
 
     @Override
-    public void cleanInFlight(String clientID, int packetID) {
+    public void cleanTemporaryPublish(String clientID, int packetID) {
         String publishKey = String.format("%s%d", clientID, packetID);
         m_inflightStore.remove(publishKey);
         Set<Integer> inFlightForClient = m_inflightIDs.get(clientID);
@@ -137,13 +134,13 @@ public class MemoryStorageService implements IMessagesStore, ISessionsStore {
     }
 
     @Override
-    public void addInFlight(PublishEvent evt, String clientID, int packetID) {
+    public void storeTemporaryPublish(PublishEvent evt, String clientID, int packetID) {
         String publishKey = String.format("%s%d", clientID, packetID);
         m_inflightStore.put(publishKey, evt);
     }
 
     /**
-     * Return the next valid packetIdentifer for the given client session.
+     * Return the next valid packetIdentifier for the given client session.
      * */
     @Override
     public int nextPacketID(String clientID) {
@@ -161,73 +158,6 @@ public class MemoryStorageService implements IMessagesStore, ISessionsStore {
         return nextPacketId;
     }
 
-    @Override
-    public void removeSubscription(String topic, String clientID) {
-        LOG.debug("removeSubscription topic filter: {} for clientID: {}", topic, clientID);
-        if (!m_persistentSubscriptions.containsKey(clientID)) {
-            return;
-        }
-        Set<Subscription> clientSubscriptions = m_persistentSubscriptions.get(clientID);
-        //search for the subscription to remove
-        Subscription toBeRemoved = null;
-        for (Subscription sub : clientSubscriptions) {
-            if (sub.getTopicFilter().equals(topic)) {
-                toBeRemoved = sub;
-                break;
-            }
-        }
-
-        if (toBeRemoved != null) {
-            clientSubscriptions.remove(toBeRemoved);
-        }
-    }
-
-    @Override
-    public void addNewSubscription(Subscription newSubscription) {
-        final String clientID = newSubscription.getClientId();
-        if (!m_persistentSubscriptions.containsKey(clientID)) {
-            m_persistentSubscriptions.put(clientID, new HashSet<Subscription>());
-        }
-
-        Set<Subscription> subs = m_persistentSubscriptions.get(clientID);
-        if (!subs.contains(newSubscription)) {
-            subs.add(newSubscription);
-            m_persistentSubscriptions.put(clientID, subs);
-        }
-    }
-
-    @Override
-    public void wipeSubscriptions(String clientID) {
-        m_persistentSubscriptions.remove(clientID);
-    }
-
-    @Override
-    public void updateSubscriptions(String clientID, Set<Subscription> subscriptions) {
-        m_persistentSubscriptions.put(clientID, subscriptions);
-    }
-
-    @Override
-    public boolean contains(String clientID) {
-        return m_persistentSubscriptions.containsKey(clientID);
-    }
-
-    @Override
-    public void createNewSession(String clientID) {
-        if (m_persistentSubscriptions.containsKey(clientID)) {
-            LOG.error("already exists a session for client <{}>", clientID);
-            return;
-        }
-        m_persistentSubscriptions.put(clientID, new HashSet<Subscription>());
-    }
-
-    @Override
-    public List<Subscription> listAllSubscriptions() {
-        List<Subscription> allSubscriptions = new ArrayList<Subscription>();
-        for (Map.Entry<String, Set<Subscription>> entry : m_persistentSubscriptions.entrySet()) {
-            allSubscriptions.addAll(entry.getValue());
-        }
-        return allSubscriptions;
-    }
 
     @Override
     public void close() {
@@ -248,5 +178,55 @@ public class MemoryStorageService implements IMessagesStore, ISessionsStore {
     @Override
     public PublishEvent retrieveQoS2Message(String publishKey) {
         return m_qos2Store.get(publishKey);
+    }
+
+    @Override
+    public void addNewSubscription(Subscription newSubscription) {
+        m_sessionsStore.addNewSubscription(newSubscription);
+    }
+
+    @Override
+    public void removeSubscription(String topic, String clientID) {
+        m_sessionsStore.removeSubscription(topic, clientID);
+    }
+
+    @Override
+    public void wipeSubscriptions(String sessionID) {
+        m_sessionsStore.wipeSubscriptions(sessionID);
+    }
+
+    @Override
+    public void updateSubscriptions(String clientID, Set<Subscription> subscriptions) {
+        m_sessionsStore.updateSubscriptions(clientID, subscriptions);
+    }
+
+    @Override
+    public List<Subscription> listAllSubscriptions() {
+        return m_sessionsStore.listAllSubscriptions();
+    }
+
+    @Override
+    public boolean contains(String clientID) {
+        return m_sessionsStore.contains(clientID);
+    }
+
+    @Override
+    public ClientSession createNewSession(String clientID, boolean cleanSession) {
+        return m_sessionsStore.createNewSession(clientID, cleanSession);
+    }
+
+    @Override
+    public ClientSession sessionForClient(String clientID) {
+        return m_sessionsStore.sessionForClient(clientID);
+    }
+
+    @Override
+    public void activate(String clientID) {
+        m_sessionsStore.activate(clientID);
+    }
+
+    @Override
+    public void deactivate(String clientID) {
+        m_sessionsStore.deactivate(clientID);
     }
 }

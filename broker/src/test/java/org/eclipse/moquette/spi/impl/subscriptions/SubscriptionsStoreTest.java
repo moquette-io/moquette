@@ -41,7 +41,9 @@ public class SubscriptionsStoreTest {
     @Before
     public void setUp() throws IOException {
         store = new SubscriptionsStore();
-        store.init(new MemoryStorageService());
+        MemoryStorageService storageService = new MemoryStorageService();
+        storageService.initStore();
+        store.init(storageService);
     }
     
     @Test
@@ -55,11 +57,6 @@ public class SubscriptionsStoreTest {
         tokens = store.parseTopic("/");
         assertEqualsSeq(asArray(Token.EMPTY, Token.EMPTY), tokens);
     }
-
-//    @Test(expected = ParseException.class)
-//    public void testSplitTopicTwinsSlashAvoided() throws ParseException {
-//        store.parseTopic("/finance//stock/ibm");
-//    }
 
     @Test
     public void testParseTopicMultiValid() throws ParseException {
@@ -76,7 +73,7 @@ public class SubscriptionsStoreTest {
     }
 
     @Test(expected = ParseException.class)
-    public void testParseTopicMultiNotAferSeparatorNotValid() throws ParseException {
+    public void testParseTopicMultiNotAfterSeparatorNotValid() throws ParseException {
         store.parseTopic("finance#");
     }
 
@@ -236,7 +233,9 @@ public class SubscriptionsStoreTest {
     
     private void assertMatch(String subscription, String topic) {
         store = new SubscriptionsStore();
-        store.init(new MemoryStorageService());
+        MemoryStorageService memStore = new MemoryStorageService();
+        memStore.initStore();
+        store.init(memStore);
         Subscription sub = new Subscription("FAKE_CLI_ID_1", subscription, AbstractMessage.QOSType.MOST_ONE, false);
         store.add(sub);
         assertFalse(store.matches(topic).isEmpty());
@@ -244,7 +243,9 @@ public class SubscriptionsStoreTest {
     
     private void assertNotMatch(String subscription, String topic) {
         store = new SubscriptionsStore();
-        store.init(new MemoryStorageService());
+        MemoryStorageService memStore = new MemoryStorageService();
+        memStore.initStore();
+        store.init(memStore);
         Subscription sub = new Subscription("FAKE_CLI_ID_1", subscription, AbstractMessage.QOSType.MOST_ONE, false);
         store.add(sub);
         assertTrue(store.matches(topic).isEmpty());
@@ -343,12 +344,14 @@ public class SubscriptionsStoreTest {
     @Test
     public void removeSubscription_withDifferentClients_subscribedSameTopic() {
         SubscriptionsStore aStore = new SubscriptionsStore();
-        aStore.init(new MemoryStorageService());
+        MemoryStorageService memStore = new MemoryStorageService();
+        memStore.initStore();
+        aStore.init(memStore);
         //subscribe a not active clientID1 to /topic
         Subscription slashSub = new Subscription("FAKE_CLI_ID_1", "/topic", AbstractMessage.QOSType.MOST_ONE, false);
         aStore.add(slashSub);
-        aStore.deactivate(slashSub.getClientId());
-        
+        memStore.createNewSession("FAKE_CLI_ID_1", true).deactivate();
+
         //subscribe an active clientID2 to /topic
         Subscription slashSub2 = new Subscription("FAKE_CLI_ID_2", "/topic", AbstractMessage.QOSType.MOST_ONE, false);
         aStore.add(slashSub2);
@@ -395,6 +398,32 @@ public class SubscriptionsStoreTest {
         assertTrue(subscriptions.contains(client1SubQoS2));
         assertTrue(subscriptions.contains(client2Sub));
         assertFalse(subscriptions.contains(client1SubQoS0)); //client1SubQoS2 should override client1SubQoS0
+    }
+
+    @Test
+    public void testRecreatePath_emptyRoot() {
+        TreeNode oldRoot = new TreeNode(null);
+        final SubscriptionsStore.NodeCouple resp = store.recreatePath("/finance", oldRoot);
+
+        //Verify
+        assertNotNull(resp.root);
+        assertNull(resp.root.m_token);
+        assertEquals(1, resp.root.m_children.size());
+        assertEquals(resp.createdNode, resp.root.m_children.get(0).m_children.get(0));
+    }
+
+    @Test
+    public void testRecreatePath_1layer_tree() {
+        TreeNode oldRoot = new TreeNode(null);
+        final SubscriptionsStore.NodeCouple respFinance = store.recreatePath("/finance", oldRoot);
+        final SubscriptionsStore.NodeCouple respPlus = store.recreatePath("/+", respFinance.root);
+
+        //Verify
+        assertNotNull(respPlus.root);
+        assertNull(respPlus.root.m_token);
+        assertEquals(1, respPlus.root.m_children.size());
+        assertTrue(respPlus.root.m_children.get(0).m_children.contains(respPlus.createdNode));
+        assertTrue(respPlus.root.m_children.get(0).m_children.contains(respFinance.createdNode));
     }
 
     private static Token[] asArray(Object... l) {

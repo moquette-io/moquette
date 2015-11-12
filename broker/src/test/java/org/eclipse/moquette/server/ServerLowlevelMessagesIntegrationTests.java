@@ -73,10 +73,7 @@ public class ServerLowlevelMessagesIntegrationTests {
         Thread.sleep(300); //to let the close event pass before server stop event
         m_server.stopServer();
         LOG.debug("After asked server to stop");
-        File dbFile = new File(m_config.getProperty(PERSISTENT_STORE_PROPERTY_NAME));
-        if (dbFile.exists()) {
-            dbFile.delete();
-        }
+        IntegrationUtils.cleanPersistenceFile(m_config);
     }
     
     @Test
@@ -113,7 +110,7 @@ public class ServerLowlevelMessagesIntegrationTests {
         connectMessage.setWillFlag(true);
         connectMessage.setWillMessage(willTestamentMsg.getBytes());
         connectMessage.setWillTopic(willTestamentTopic);
-        connectMessage.setWillQos((byte) QOSType.MOST_ONE.ordinal());
+        connectMessage.setWillQos(QOSType.MOST_ONE.byteValue());
         
         //Execute
         m_client.sendMessage(connectMessage);
@@ -155,7 +152,7 @@ public class ServerLowlevelMessagesIntegrationTests {
         connectMessage.setClientID("");
         connectMessage.setKeepAlive(keepAlive);
         connectMessage.setWillFlag(false);
-        connectMessage.setWillQos((byte) QOSType.MOST_ONE.ordinal());
+        connectMessage.setWillQos(QOSType.MOST_ONE.byteValue());
         
         //Execute
         m_client.sendMessage(connectMessage);

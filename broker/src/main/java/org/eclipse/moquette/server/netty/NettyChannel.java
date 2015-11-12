@@ -31,11 +31,13 @@ public class NettyChannel implements ServerChannel {
     private ChannelHandlerContext m_channel;
 
     public static final String ATTR_USERNAME = "username";
+    public static final String ATTR_SESSION_STOLEN = "sessionStolen";
 
     public static final AttributeKey<Object> ATTR_KEY_KEEPALIVE = AttributeKey.valueOf(Constants.KEEP_ALIVE);
     public static final AttributeKey<Object> ATTR_KEY_CLEANSESSION = AttributeKey.valueOf(Constants.CLEAN_SESSION);
     public static final AttributeKey<Object> ATTR_KEY_CLIENTID = AttributeKey.valueOf(Constants.ATTR_CLIENTID);
     public static final AttributeKey<Object> ATTR_KEY_USERNAME = AttributeKey.valueOf(ATTR_USERNAME);
+    public static final AttributeKey<Object> ATTR_KEY_SESSION_STOLEN = AttributeKey.valueOf(ATTR_SESSION_STOLEN);
 
     NettyChannel(ChannelHandlerContext ctx) {
         m_channel = ctx;
@@ -55,11 +57,7 @@ public class NettyChannel implements ServerChannel {
         if (m_channel.pipeline().names().contains("idleStateHandler")) {
             m_channel.pipeline().remove("idleStateHandler");
         }
-        if (m_channel.pipeline().names().contains("idleEventHandler")) {
-            m_channel.pipeline().remove("idleEventHandler");
-        }
         m_channel.pipeline().addFirst("idleStateHandler", new IdleStateHandler(0, 0, idleTime));
-        m_channel.pipeline().addAfter("idleStateHandler", "idleEventHandler", new MoquetteIdleTimoutHandler());
     }
 
     public void close(boolean immediately) {
@@ -73,6 +71,6 @@ public class NettyChannel implements ServerChannel {
     @Override
     public String toString() {
         String clientID = (String) getAttribute(ATTR_KEY_CLIENTID);
-        return "session [clientID: "+ clientID +"]" + super.toString();
+        return "session [clientID: "+ clientID +"]";
     }
 }

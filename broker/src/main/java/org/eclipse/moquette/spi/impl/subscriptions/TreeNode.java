@@ -65,8 +65,20 @@ class TreeNode {
         m_children.add(child);
     }
 
-    boolean isLeaf() {
-        return m_children.isEmpty();
+    /**
+     * Creates a shallow copy of the current node.
+     * Copy the token and the children.
+     * */
+    TreeNode copy() {
+        final TreeNode copy = new TreeNode(this);
+        copy.m_parent = m_parent;
+        copy.m_children = new ArrayList<>(m_children);
+        copy.m_subscriptions = new ArrayList<>(m_subscriptions.size());
+        for (Subscription sub : m_subscriptions) {
+            copy.m_subscriptions.add(new Subscription(sub));
+        }
+        copy.m_token = m_token;
+        return copy;
     }
 
     /**
@@ -81,6 +93,11 @@ class TreeNode {
         }
 
         return null;
+    }
+
+    void updateChild(TreeNode oldChild, TreeNode newChild) {
+        m_children.remove(oldChild);
+        m_children.add(newChild);
     }
 
     List<Subscription> subscriptions() {
@@ -130,55 +147,30 @@ class TreeNode {
         return res;
     }
 
-    void removeClientSubscriptions(String clientID) {
+    /**
+     * Create a copied subtree rooted on this node but purged of clientID's subscriptions.
+     * */
+    TreeNode removeClientSubscriptions(String clientID) {
         //collect what to delete and then delete to avoid ConcurrentModification
+        TreeNode newSubRoot = this.copy();
         List<Subscription> subsToRemove = new ArrayList<>();
-        for (Subscription s : m_subscriptions) {
+        for (Subscription s : newSubRoot.m_subscriptions) {
             if (s.clientId.equals(clientID)) {
                 subsToRemove.add(s);
             }
         }
 
         for (Subscription s : subsToRemove) {
-            m_subscriptions.remove(s);
+            newSubRoot.m_subscriptions.remove(s);
         }
 
         //go deep
-        for (TreeNode child : m_children) {
-            child.removeClientSubscriptions(clientID);
+        List<TreeNode> newChildren = new ArrayList<>(newSubRoot.m_children.size());
+        for (TreeNode child : newSubRoot.m_children) {
+            newChildren.add(child.removeClientSubscriptions(clientID));
         }
-    }
-
-    /**
-     * Deactivate all topic subscriptions for the given clientID.
-     * */
-    void deactivate(String clientID) {
-        for (Subscription s : m_subscriptions) {
-            if (s.clientId.equals(clientID)) {
-                s.setActive(false);
-            }
-        }
-
-        //go deep
-        for (TreeNode child : m_children) {
-            child.deactivate(clientID);
-        }
-    }
-
-    /**
-     * Activate all topic subscriptions for the given clientID.
-     * */
-    public void activate(String clientID) {
-        for (Subscription s : m_subscriptions) {
-            if (s.clientId.equals(clientID)) {
-                s.setActive(true);
-            }
-        }
-
-        //go deep
-        for (TreeNode child : m_children) {
-            child.activate(clientID);
-        }
+        newSubRoot.m_children = newChildren;
+        return newSubRoot;
     }
 
     /**

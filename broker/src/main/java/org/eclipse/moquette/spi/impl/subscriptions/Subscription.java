@@ -39,12 +39,13 @@ public class Subscription implements Serializable {
         this.topicFilter = topicFilter;
         this.cleanSession = cleanSession;
     }
-    
-    /**
-     * Factory method for empty subscriptions
-     */
-    public static final Subscription createEmptySubscription(String clientId, boolean cleanSession) {
-        return new Subscription(clientId, "", QOSType.MOST_ONE, cleanSession);
+
+    public Subscription(Subscription orig) {
+        this.requestedQos = orig.requestedQos;
+        this.clientId = orig.clientId;
+        this.topicFilter = orig.topicFilter;
+        this.cleanSession = orig.cleanSession;
+        this.active = orig.active;
     }
 
     public String getClientId() {
@@ -61,14 +62,6 @@ public class Subscription implements Serializable {
 
     public boolean isCleanSession() {
         return this.cleanSession;
-    }
-
-    public boolean isActive() {
-        return active;
-    }
-
-    public void setActive(boolean active) {
-        this.active = active;
     }
 
     @Override
@@ -95,13 +88,6 @@ public class Subscription implements Serializable {
         return result;
     }
 
-    /**
-     * Trivial match method
-     */
-    boolean match(String topic) {
-        return this.topicFilter.equals(topic);
-    }
-    
     @Override
     public String toString() {
         return String.format("[filter:%s, cliID: %s, qos: %s, active: %s]", this.topicFilter, this.clientId, this.requestedQos, this.active);

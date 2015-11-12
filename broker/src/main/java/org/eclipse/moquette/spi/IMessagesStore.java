@@ -28,7 +28,7 @@ import java.util.List;
  */
 public interface IMessagesStore {
 
-    public static class StoredMessage implements Serializable {
+    class StoredMessage implements Serializable {
         final AbstractMessage.QOSType m_qos;
         final byte[] m_payload;
         final String m_topic;
@@ -81,9 +81,9 @@ public interface IMessagesStore {
 
     void dropMessagesInSession(String clientID);
 
-    void cleanInFlight(String clientID, int packetID);
+    void cleanTemporaryPublish(String clientID, int packetID);
 
-    void addInFlight(PublishEvent evt, String clientID, int packetID);
+    void storeTemporaryPublish(PublishEvent evt, String clientID, int packetID);
 
     /**
      * Return the next valid packetIdentifer for the given client session.
