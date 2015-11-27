@@ -4,19 +4,18 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <relativePath>../</relativePath>
-        <!--<relativePath>../pom.xml</relativePath>-->
         <artifactId>moquette-parent</artifactId>
-        <groupId>org.eclipse.moquette</groupId>
-        <version>0.7-SNAPSHOT</version>
+        <groupId>io.moquette</groupId>
+        <version>0.8-SNAPSHOT</version>
     </parent>
 
     <artifactId>moquette-parser-commons</artifactId>
     <packaging>jar</packaging>
-    <!--<version>${moquette-version}</version>-->
     <name>Moquette - Parser Commons</name>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <bintray.package>org.dna.mqtt.moquette-parser-commons</bintray.package>
     </properties>
 
     <dependencies>
@@ -41,4 +40,11 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <distributionManagement>
+        <repository>
+            <id>bintray</id>
+            <url>https://api.bintray.com/maven/${bintray.repo}/${bintray.package}</url>
+        </repository>
+    </distributionManagement>
 </project>

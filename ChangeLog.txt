@@ -1,3 +1,20 @@
+Version 0.8:
+    Introduced authenticator and authorizator implementations.
+    Fixed bug, doesn't close the channel when connect doesn't contains a valid proto name, issue #65
+    Fixed bug, does not check for zero length topic (filters) in PUBLISH, SUBSCRIBE, and UNSUBSCRIBE, issue #67
+    Fixed issue #69
+    Fixed bug #68, UNSUBSCRIBE has to fail on bad topicFilter names
+    Fixed bug #81, on stop of moquette broker it doesn't shutdown due to no shutdown of ringbuffer used on the back of ProtocolProcessor
+    Moved config to be not only filesystem based, but also classpath and memory (fix issue #73)
+    Switched from commit persistence on every change to time based to fix delay in handling many msgs/sec (fix issue #79)
+    Changed willMessage and password in CONNECT message from String to byte[] (fix issue #94 and #95)
+    Fixed ugly empty session storage, avoid fake NullObject empty subscription subscription
+    Added check to avoid creation of LostConnectionEvents for not yet completed connects (fix issue #88)
+    Removed LMAX ringbuffer to use multi threading with persistent (copy on write) data structures
+    Fixed bug that on connection stolen dropped also the new connection (fix issue #108)
+    Refactored the storage part to be more rational and use ClientSession concept
+    Added config property 'autosave_interval' (issue #97)
+
 Version 0.7:
     Fix issue #38, added aligned to MQTT 3.1.1
     Refactored big event switch to @Annotation dispatcher
@@ -15,6 +32,13 @@ Version 0.7:
     Added ACL file for topic read|write operations.
     Removed cause of leakage of Netty Sessions (fix issue #39)
     Cleaned Netty's stuff reference from Events used in Disruptor (fix issue #40)
+    Bad assignment of PacketID during publish to subscribed QoS0 topics (fix issue #38)
+    Fixed duplicated subscription with different QoS same client and topic (fix issue #49)
+    Fixed UNSUBSCRIBE that missed to remove the subscription from the persistent store (fix issue #50)
+    Fixed issue on multiple publish for overlapping subscription by the same client (fix issue #52).
+    Moved the authorization check before dropping an already connected client with same clientID (fix issue #44).
+    Fixed subscription tree that was unable to update clean session flag on subs with same client, topic and qos (fix issue #55)
+    Fixed overwriting of published qos in forward publish loop (fix issue #56)
 
 Version 0.6:
     Fix issue #42, bad password file path composition

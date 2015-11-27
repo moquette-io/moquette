@@ -1,30 +1,63 @@
-
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <netty.version>4.0.24.Final</netty.version>
+        <netty.version>4.0.30.Final</netty.version>
         <source.version>1.7</source.version>
         <target.version>1.7</target.version>
+        <bintray.repo>andsel/maven</bintray.repo>
+        <bintray.parent.package>org.dna.mqtt.moquette-parent</bintray.parent.package>
     </properties>
-    
-    <groupId>org.eclipse.moquette</groupId>
+
+    <groupId>io.moquette</groupId>
     <artifactId>moquette-parent</artifactId>
 
     <packaging>pom</packaging>
-    <version>0.7-SNAPSHOT</version>
+    <version>0.8-SNAPSHOT</version>
     <name>Moquette MQTT parent</name>
-    <url>http://code.google.com/p/moquette-mqtt/</url>
+    <url>https://github.com/andsel/moquette/</url>
 
+    <developers>
+        <developer>
+            <id>andsel</id>
+            <name>Andrea Selva</name>
+            <roles>
+                <role>architect</role>
+                <role>developer</role>
+                <role>founder</role>
+            </roles>
+            <timezone>+1</timezone>
+        </developer>
+    </developers>
+
+    <contributors>
+        <contributor>
+            <name>Steven Warwick</name>
+            <url>http://stevenwarwick.com</url>
+        </contributor>
+        <contributor>
+            <name>Igor Yova</name>
+            <url>https://github.com/Fameing</url>
+        </contributor>
+        <contributor>
+            <name>Luca Capra</name>
+            <url>https://github.com/muka</url>
+        </contributor>
+        <contributor>
+            <name>Wagner Macedo</name>
+            <url>https://github.com/wagnerluis1982</url>
+        </contributor>
+    </contributors>
 
     <modules>
         <module>parser_commons</module>
         <module>netty_parser</module>
         <module>broker</module>
         <module>distribution</module>
+        <module>embedding_moquette</module>
     </modules>
-    
+
     <reporting>
         <plugins>
             <plugin>
@@ -62,4 +95,11 @@
             <url>https://oss.sonatype.org/content/repositories/snapshots</url>
         </repository>
     </repositories>
+
+    <distributionManagement>
+        <repository>
+            <id>bintray</id>
+            <url>https://api.bintray.com/maven/${bintray.repo}/${bintray.parent.package}</url>
+        </repository>
+    </distributionManagement>
 </project>
