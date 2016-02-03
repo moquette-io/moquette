@@ -53,7 +53,7 @@ public class Server {
     public static void main(String[] args) throws IOException {
         final Server server = new Server();
         server.startServer();
-        System.out.println("Server started, version 0.9-SNAPSHOT");
+        System.out.println("Server started, version 0.8.1");
         //Bind  a shutdown hook
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
