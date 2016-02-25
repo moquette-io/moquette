@@ -162,7 +162,7 @@ public class NettyAcceptor implements ServerAcceptor {
     
     private void initializeWebSocketTransport(final NettyMQTTHandler handler, IConfig props) throws IOException {
         String webSocketPortProp = props.getProperty(BrokerConstants.WEB_SOCKET_PORT_PROPERTY_NAME);
-        if (webSocketPortProp == null) {
+        if (webSocketPortProp == null || "".equals(webSocketPortProp.trim())) {
             //Do nothing no WebSocket configured
             LOG.info("WebSocket is disabled");
             return;
