@@ -63,6 +63,11 @@ public class BrokerInterceptorTest {
         public void onUnsubscribe(InterceptUnsubscribeMessage msg) {
             n.set(80);
         }
+
+		@Override
+		public void onMessageAcknowledged( InterceptAcknowledgedMessage msg ) {
+			n.set(90);
+		}
     }
 
     private static final BrokerInterceptor interceptor = new BrokerInterceptor(Arrays.<InterceptHandler>asList(new MockObserver()));
@@ -92,28 +97,28 @@ public class BrokerInterceptorTest {
 
     @Test
     public void testNotifyClientDisconnected() throws Exception {
-        interceptor.notifyClientDisconnected("cli1234");
+        interceptor.notifyClientDisconnected("cli1234","cli1234");
         interval();
         assertEquals(50, n.get());
     }
 
     @Test
     public void testNotifyTopicPublished() throws Exception {
-        interceptor.notifyTopicPublished(new PublishMessage(), "cli1234");
+        interceptor.notifyTopicPublished(new PublishMessage(), "cli1234", "cli1234");
         interval();
         assertEquals(60, n.get());
     }
 
     @Test
     public void testNotifyTopicSubscribed() throws Exception {
-        interceptor.notifyTopicSubscribed(new Subscription("cli1", "o2", AbstractMessage.QOSType.MOST_ONE));
+        interceptor.notifyTopicSubscribed(new Subscription("cli1", "o2", AbstractMessage.QOSType.MOST_ONE), "cli1234");
         interval();
         assertEquals(70, n.get());
     }
 
     @Test
     public void testNotifyTopicUnsubscribed() throws Exception {
-        interceptor.notifyTopicUnsubscribed("o2", "cli1234");
+        interceptor.notifyTopicUnsubscribed("o2", "cli1234", "cli1234");
         interval();
         assertEquals(80, n.get());
     }

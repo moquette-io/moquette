@@ -25,6 +25,7 @@ import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.ClientSession;
 import io.moquette.spi.IMatchingCondition;
 import io.moquette.spi.IMessagesStore;
+import io.moquette.spi.IMessagesStore.StoredMessage;
 import io.moquette.spi.ISessionsStore;
 import io.moquette.spi.security.IAuthenticator;
 import io.moquette.spi.security.IAuthorizator;
@@ -33,6 +34,7 @@ import io.moquette.spi.impl.subscriptions.Subscription;
 
 import static io.moquette.parser.netty.Utils.VERSION_3_1;
 import static io.moquette.parser.netty.Utils.VERSION_3_1_1;
+import io.moquette.interception.messages.InterceptAcknowledgedMessage;
 import io.moquette.parser.proto.messages.AbstractMessage;
 import io.moquette.parser.proto.messages.AbstractMessage.QOSType;
 import io.moquette.parser.proto.messages.ConnAckMessage;
@@ -278,10 +280,17 @@ public class ProtocolProcessor {
     public void processPubAck(Channel session, PubAckMessage msg) {
         String clientID = NettyUtils.clientID(session);
         int messageID = msg.getMessageID();
+        String username = NettyUtils.userName(session);
+        StoredMessage inflightMsg = m_sessionsStore.getInflightMessage(clientID, messageID);  
+        
         //Remove the message from message store
         ClientSession targetSession = m_sessionsStore.sessionForClient(clientID);
         verifyToActivate(clientID, targetSession);
         targetSession.inFlightAcknowledged(messageID);
+        
+        String topic = inflightMsg.getTopic();
+
+        m_interceptor.notifyMessageAcknowledged(new InterceptAcknowledgedMessage(inflightMsg, topic, username));
     }
 
     private void verifyToActivate(String clientID, ClientSession targetSession) {
@@ -308,8 +317,8 @@ public class ProtocolProcessor {
         String clientID = NettyUtils.clientID(session);
         final String topic = msg.getTopicName();
         //check if the topic can be wrote
-        String user = NettyUtils.userName(session);
-        if (!m_authorizator.canWrite(topic, user, clientID)) {
+        String username = NettyUtils.userName(session);
+        if (!m_authorizator.canWrite(topic, username, clientID)) {
             LOG.debug("topic {} doesn't have write credentials", topic);
             return;
         }
@@ -349,7 +358,7 @@ public class ProtocolProcessor {
                 }
             }
         }
-        m_interceptor.notifyTopicPublished(msg, clientID);
+        m_interceptor.notifyTopicPublished(msg, clientID, username);
     }
 
     /**
@@ -572,14 +581,19 @@ public class ProtocolProcessor {
     public void processPubComp(Channel channel, PubCompMessage msg) {
         String clientID = NettyUtils.clientID(channel);
         int messageID = msg.getMessageID();
+        StoredMessage inflightMsg = m_sessionsStore.getInflightMessage( clientID, messageID ); 
+        
         LOG.debug("\t\tSRV <--PUBCOMP-- SUB processPubComp invoked for clientID {} ad messageID {}", clientID, messageID);
         //once received the PUBCOMP then remove the message from the temp memory
         ClientSession targetSession = m_sessionsStore.sessionForClient(clientID);
         verifyToActivate(clientID, targetSession);
         targetSession.secondPhaseAcknowledged(messageID);
+        String username = NettyUtils.userName(channel);
+        String topic = inflightMsg.getTopic();
+        m_interceptor.notifyMessageAcknowledged( new InterceptAcknowledgedMessage(inflightMsg, topic, username) );
     }
     
-    public void processDisconnect(Channel channel) throws InterruptedException {
+    public void processDisconnect(Channel channel) {
         String clientID = NettyUtils.clientID(channel);
         boolean cleanSession = NettyUtils.cleanSession(channel);
         LOG.info("DISCONNECT client <{}> with clean session {}", clientID, cleanSession);
@@ -592,7 +606,8 @@ public class ProtocolProcessor {
         //cleanup the will store
         m_willStore.remove(clientID);
         
-        m_interceptor.notifyClientDisconnected(clientID);
+        String username = NettyUtils.userName(channel);
+        m_interceptor.notifyClientDisconnected(clientID, username);
         LOG.info("DISCONNECT client <{}> finished", clientID, cleanSession);
     }
 
@@ -638,7 +653,8 @@ public class ProtocolProcessor {
 
             subscriptions.removeSubscription(topic, clientID);
             clientSession.unsubscribeFrom(topic);
-            m_interceptor.notifyTopicUnsubscribed(topic, clientID);
+            String username = NettyUtils.userName(channel);
+            m_interceptor.notifyTopicUnsubscribed(topic, clientID, username);
         }
 
         //ack the client
@@ -659,10 +675,10 @@ public class ProtocolProcessor {
         SubAckMessage ackMessage = new SubAckMessage();
         ackMessage.setMessageID(msg.getMessageID());
 
-        String user = NettyUtils.userName(channel);
+        String username = NettyUtils.userName(channel);
         List<Subscription> newSubscriptions = new ArrayList<>();
         for (SubscribeMessage.Couple req : msg.subscriptions()) {
-            if (!m_authorizator.canRead(req.topicFilter, user, clientSession.clientID)) {
+            if (!m_authorizator.canRead(req.topicFilter, username, clientSession.clientID)) {
                 //send SUBACK with 0x80, the user hasn't credentials to read the topic
                 LOG.debug("topic {} doesn't have read credentials", req.topicFilter);
                 ackMessage.addType( AbstractMessage.QOSType.FAILURE);
@@ -687,17 +703,18 @@ public class ProtocolProcessor {
 
         //fire the publish
         for(Subscription subscription : newSubscriptions) {
-            subscribeSingleTopic(subscription);
+            subscribeSingleTopic(subscription, username);
         }
     }
     
-    private boolean subscribeSingleTopic(final Subscription newSubscription) {
+    private boolean subscribeSingleTopic(final Subscription newSubscription, String username) {
         subscriptions.add(newSubscription.asClientTopicCouple());
 
         //scans retained messages to be published to the new subscription
         //TODO this is ugly, it does a linear scan on potential big dataset
         Collection<IMessagesStore.StoredMessage> messages = m_messagesStore.searchMatching(new IMatchingCondition() {
-            public boolean match(String key) {
+            @Override
+			public boolean match(String key) {
                 return SubscriptionsStore.matchTopics(key, newSubscription.getTopicFilter());
             }
         });
@@ -714,7 +731,7 @@ public class ProtocolProcessor {
         }
 
         //notify the Observables
-        m_interceptor.notifyTopicSubscribed(newSubscription);
+        m_interceptor.notifyTopicSubscribed(newSubscription, username);
         return true;
     }
 }
