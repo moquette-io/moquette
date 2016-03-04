@@ -25,6 +25,7 @@ import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.ClientSession;
 import io.moquette.spi.IMatchingCondition;
 import io.moquette.spi.IMessagesStore;
+import io.moquette.spi.IMessagesStore.StoredMessage;
 import io.moquette.spi.ISessionsStore;
 import io.moquette.spi.security.IAuthenticator;
 import io.moquette.spi.security.IAuthorizator;
@@ -33,6 +34,7 @@ import io.moquette.spi.impl.subscriptions.Subscription;
 
 import static io.moquette.parser.netty.Utils.VERSION_3_1;
 import static io.moquette.parser.netty.Utils.VERSION_3_1_1;
+import io.moquette.interception.messages.InterceptConsumedMessage;
 import io.moquette.parser.proto.messages.AbstractMessage;
 import io.moquette.parser.proto.messages.AbstractMessage.QOSType;
 import io.moquette.parser.proto.messages.ConnAckMessage;
@@ -278,10 +280,14 @@ public class ProtocolProcessor {
     public void processPubAck(Channel session, PubAckMessage msg) {
         String clientID = NettyUtils.clientID(session);
         int messageID = msg.getMessageID();
+        StoredMessage inflightMsg = m_sessionsStore.getInflightMessage(clientID, messageID);  
+        
         //Remove the message from message store
         ClientSession targetSession = m_sessionsStore.sessionForClient(clientID);
         verifyToActivate(clientID, targetSession);
         targetSession.inFlightAcknowledged(messageID);
+
+        m_interceptor.notifyMessageConsumed(new InterceptConsumedMessage(inflightMsg));
     }
 
     private void verifyToActivate(String clientID, ClientSession targetSession) {
@@ -572,11 +578,15 @@ public class ProtocolProcessor {
     public void processPubComp(Channel channel, PubCompMessage msg) {
         String clientID = NettyUtils.clientID(channel);
         int messageID = msg.getMessageID();
+        StoredMessage inflightMsg = m_sessionsStore.getInflightMessage( clientID, messageID ); 
+        
         LOG.debug("\t\tSRV <--PUBCOMP-- SUB processPubComp invoked for clientID {} ad messageID {}", clientID, messageID);
         //once received the PUBCOMP then remove the message from the temp memory
         ClientSession targetSession = m_sessionsStore.sessionForClient(clientID);
         verifyToActivate(clientID, targetSession);
         targetSession.secondPhaseAcknowledged(messageID);
+        
+        m_interceptor.notifyMessageConsumed( new InterceptConsumedMessage(inflightMsg) );
     }
     
     public void processDisconnect(Channel channel) throws InterruptedException {
