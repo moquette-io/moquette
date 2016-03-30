@@ -27,6 +27,7 @@ import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.ClientSession;
 import io.moquette.spi.IMatchingCondition;
 import io.moquette.spi.IMessagesStore;
+import io.moquette.spi.IMessagesStore.StoredMessage;
 import io.moquette.spi.ISessionsStore;
 import io.moquette.spi.security.IAuthenticator;
 import io.moquette.spi.security.IAuthorizator;
@@ -35,6 +36,7 @@ import io.moquette.spi.impl.subscriptions.Subscription;
 
 import static io.moquette.parser.netty.Utils.VERSION_3_1;
 import static io.moquette.parser.netty.Utils.VERSION_3_1_1;
+import io.moquette.interception.messages.InterceptAcknowledgedMessage;
 import io.moquette.parser.proto.messages.AbstractMessage;
 import io.moquette.parser.proto.messages.AbstractMessage.QOSType;
 import io.moquette.parser.proto.messages.ConnAckMessage;
@@ -57,9 +59,9 @@ import org.slf4j.LoggerFactory;
 /**
  * Class responsible to handle the logic of MQTT protocol it's the director of
  * the protocol execution. 
- * 
+ *
  * Used by the front facing class SimpleMessaging.
- * 
+ *
  * @author andrea
  */
 public class ProtocolProcessor {
@@ -92,11 +94,11 @@ public class ProtocolProcessor {
         public QOSType getQos() {
             return qos;
         }
-        
+
     }
-    
+
     private static final Logger LOG = LoggerFactory.getLogger(ProtocolProcessor.class);
-    
+
     protected ConcurrentMap<String, ConnectionDescriptor> m_clientIDs;
     private SubscriptionsStore subscriptions;
     private boolean allowAnonymous;
@@ -108,7 +110,7 @@ public class ProtocolProcessor {
 
     //maps clientID to Will testament, if specified on CONNECT
     private ConcurrentMap<String, WillMessage> m_willStore = new ConcurrentHashMap<>();
-    
+
     ProtocolProcessor() {}
 
     /**
@@ -288,14 +290,21 @@ public class ProtocolProcessor {
             clientSession.removeEnqueued(pubEvt.getGuid());
         }
     }
-    
+
     public void processPubAck(Channel channel, PubAckMessage msg) {
         String clientID = NettyUtils.clientID(channel);
         int messageID = msg.getMessageID();
+        String username = NettyUtils.userName(channel);
+        StoredMessage inflightMsg = m_sessionsStore.getInflightMessage(clientID, messageID);
+
         //Remove the message from message store
         ClientSession targetSession = m_sessionsStore.sessionForClient(clientID);
         verifyToActivate(clientID, targetSession);
         targetSession.inFlightAcknowledged(messageID);
+
+        String topic = inflightMsg.getTopic();
+
+        m_interceptor.notifyMessageAcknowledged(new InterceptAcknowledgedMessage(inflightMsg, topic, username));
     }
 
     private void verifyToActivate(String clientID, ClientSession targetSession) {
@@ -316,14 +325,14 @@ public class ProtocolProcessor {
         pub.setRetained(will.isRetained());
         return pub;
     }
-    
+
     public void processPublish(Channel channel, PublishMessage msg) {
         LOG.trace("PUB --PUBLISH--> SRV executePublish invoked with {}", msg);
         String clientID = NettyUtils.clientID(channel);
         final String topic = msg.getTopicName();
         //check if the topic can be wrote
-        String user = NettyUtils.userName(channel);
-        if (!m_authorizator.canWrite(topic, user, clientID)) {
+        String username = NettyUtils.userName(channel);
+        if (!m_authorizator.canWrite(topic, username, clientID)) {
             LOG.debug("topic {} doesn't have write credentials", topic);
             return;
         }
@@ -363,7 +372,7 @@ public class ProtocolProcessor {
                 }
             }
         }
-        m_interceptor.notifyTopicPublished(msg, clientID);
+        m_interceptor.notifyTopicPublished(msg, clientID, username);
     }
 
     /**
@@ -402,7 +411,7 @@ public class ProtocolProcessor {
         }
         m_messagesStore.storeRetained(topic, guid);
     }
-        
+
     /**
      * Specialized version to publish will testament message.
      */
@@ -481,7 +490,7 @@ public class ProtocolProcessor {
         pubMessage.setTopicName(topic);
         pubMessage.setQos(qos);
         pubMessage.setPayload(message);
-        
+
         LOG.info("send publish message to <{}> on topic <{}>", clientId, topic);
         if (LOG.isDebugEnabled()) {
             LOG.debug("content <{}>", DebugUtils.payload2Str(message));
@@ -509,7 +518,6 @@ public class ProtocolProcessor {
         }
         Channel channel = m_clientIDs.get(clientId).channel;
         LOG.trace("Session for clientId {}", clientId);
-//        channel.writeAndFlush(pubMessage);
         if (channel.isWritable()) {
             //if channel is writable don't enqueue
             channel.write(pubMessage);
@@ -518,14 +526,14 @@ public class ProtocolProcessor {
             clientsession.enqueue(pubMessage);
         }
     }
-    
+
     private void sendPubRec(String clientID, int messageID) {
         LOG.trace("PUB <--PUBREC-- SRV sendPubRec invoked for clientID {} with messageID {}", clientID, messageID);
         PubRecMessage pubRecMessage = new PubRecMessage();
         pubRecMessage.setMessageID(messageID);
         m_clientIDs.get(clientID).channel.writeAndFlush(pubRecMessage);
     }
-    
+
     private void sendPubAck(String clientId, int messageID) {
         LOG.trace("sendPubAck invoked");
         PubAckMessage pubAckMessage = new PubAckMessage();
@@ -544,7 +552,7 @@ public class ProtocolProcessor {
             LOG.error(null, t);
         }
     }
-    
+
     /**
      * Second phase of a publish QoS2 protocol, sent by publisher to the broker. Search the stored message and publish
      * to all interested subscribers.
@@ -569,7 +577,7 @@ public class ProtocolProcessor {
 
         sendPubComp(clientID, messageID);
     }
-    
+
     private void sendPubComp(String clientID, int messageID) {
         LOG.debug("PUB <--PUBCOMP-- SRV sendPubComp invoked for clientID {} ad messageID {}", clientID, messageID);
         PubCompMessage pubCompMessage = new PubCompMessage();
@@ -577,7 +585,7 @@ public class ProtocolProcessor {
 
         m_clientIDs.get(clientID).channel.writeAndFlush(pubCompMessage);
     }
-    
+
     public void processPubRec(Channel channel, PubRecMessage msg) {
         String clientID = NettyUtils.clientID(channel);
         int messageID = msg.getMessageID();
@@ -598,13 +606,18 @@ public class ProtocolProcessor {
     public void processPubComp(Channel channel, PubCompMessage msg) {
         String clientID = NettyUtils.clientID(channel);
         int messageID = msg.getMessageID();
+        StoredMessage inflightMsg = m_sessionsStore.getInflightMessage( clientID, messageID );
+
         LOG.debug("\t\tSRV <--PUBCOMP-- SUB processPubComp invoked for clientID {} ad messageID {}", clientID, messageID);
         //once received the PUBCOMP then remove the message from the temp memory
         ClientSession targetSession = m_sessionsStore.sessionForClient(clientID);
         verifyToActivate(clientID, targetSession);
         targetSession.secondPhaseAcknowledged(messageID);
+        String username = NettyUtils.userName(channel);
+        String topic = inflightMsg.getTopic();
+        m_interceptor.notifyMessageAcknowledged( new InterceptAcknowledgedMessage(inflightMsg, topic, username) );
     }
-    
+
     public void processDisconnect(Channel channel) throws InterruptedException {
         channel.flush();
         String clientID = NettyUtils.clientID(channel);
@@ -618,8 +631,9 @@ public class ProtocolProcessor {
 
         //cleanup the will store
         m_willStore.remove(clientID);
-        
-        m_interceptor.notifyClientDisconnected(clientID);
+
+        String username = NettyUtils.userName(channel);
+        m_interceptor.notifyClientDisconnected(clientID, username);
         LOG.info("DISCONNECT client <{}> finished", clientID, cleanSession);
     }
 
@@ -640,7 +654,7 @@ public class ProtocolProcessor {
             m_willStore.remove(clientID);
         }
     }
-    
+
     /**
      * Remove the clientID from topic subscription, if not previously subscribed,
      * doesn't reply any error
@@ -665,7 +679,8 @@ public class ProtocolProcessor {
 
             subscriptions.removeSubscription(topic, clientID);
             clientSession.unsubscribeFrom(topic);
-            m_interceptor.notifyTopicUnsubscribed(topic, clientID);
+            String username = NettyUtils.userName(channel);
+            m_interceptor.notifyTopicUnsubscribed(topic, clientID, username);
         }
 
         //ack the client
@@ -686,10 +701,10 @@ public class ProtocolProcessor {
         SubAckMessage ackMessage = new SubAckMessage();
         ackMessage.setMessageID(msg.getMessageID());
 
-        String user = NettyUtils.userName(channel);
+        String username = NettyUtils.userName(channel);
         List<Subscription> newSubscriptions = new ArrayList<>();
         for (SubscribeMessage.Couple req : msg.subscriptions()) {
-            if (!m_authorizator.canRead(req.topicFilter, user, clientSession.clientID)) {
+            if (!m_authorizator.canRead(req.topicFilter, username, clientSession.clientID)) {
                 //send SUBACK with 0x80, the user hasn't credentials to read the topic
                 LOG.debug("topic {} doesn't have read credentials", req.topicFilter);
                 ackMessage.addType( AbstractMessage.QOSType.FAILURE);
@@ -714,16 +729,17 @@ public class ProtocolProcessor {
 
         //fire the publish
         for(Subscription subscription : newSubscriptions) {
-            subscribeSingleTopic(subscription);
+            subscribeSingleTopic(subscription, username);
         }
     }
-    
-    private boolean subscribeSingleTopic(final Subscription newSubscription) {
+
+    private boolean subscribeSingleTopic(final Subscription newSubscription, String username) {
         subscriptions.add(newSubscription.asClientTopicCouple());
 
         //scans retained messages to be published to the new subscription
         //TODO this is ugly, it does a linear scan on potential big dataset
         Collection<IMessagesStore.StoredMessage> messages = m_messagesStore.searchMatching(new IMatchingCondition() {
+            @Override
             public boolean match(String key) {
                 return SubscriptionsStore.matchTopics(key, newSubscription.getTopicFilter());
             }
@@ -741,7 +757,7 @@ public class ProtocolProcessor {
         }
 
         //notify the Observables
-        m_interceptor.notifyTopicSubscribed(newSubscription);
+        m_interceptor.notifyTopicSubscribed(newSubscription, username);
         return true;
     }
 
