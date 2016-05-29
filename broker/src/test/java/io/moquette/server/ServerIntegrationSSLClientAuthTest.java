@@ -151,17 +151,17 @@ public class ServerIntegrationSSLClientAuthTest {
         assertFalse(dbFile.exists());
     }
     
-    @Test
-    public void checkClientAuthentification() throws Exception {
-        LOG.info("*** checkClientAuthentification ***");
-        SSLSocketFactory ssf = configureSSLSocketFactory("signedclientkeystore.jks");
-        
-        MqttConnectOptions options = new MqttConnectOptions();
-        options.setSocketFactory(ssf);
-        m_client.connect(options);
-        m_client.subscribe("/topic", 0);
-        m_client.disconnect();
-    }
+//    @Test
+//    public void checkClientAuthentification() throws Exception {
+//        LOG.info("*** checkClientAuthentification ***");
+//        SSLSocketFactory ssf = configureSSLSocketFactory("signedclientkeystore.jks");
+//
+//        MqttConnectOptions options = new MqttConnectOptions();
+//        options.setSocketFactory(ssf);
+//        m_client.connect(options);
+//        m_client.subscribe("/topic", 0);
+//        m_client.disconnect();
+//    }
 
     @Test (expected = MqttException.class)
     public void checkClientAuthentificationFail() throws Exception {
