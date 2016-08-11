@@ -17,11 +17,13 @@ package io.moquette.spi.persistence;
 
 import io.moquette.spi.IMatchingCondition;
 import io.moquette.spi.IMessagesStore;
+
 import org.mapdb.DB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentMap;
 
 /**
@@ -99,8 +101,14 @@ class MapDBMessagesStore implements IMessagesStore {
 
     @Override
     public void dropMessagesInSession(String clientID) {
-        m_db.getHashMap(MapDBSessionsStore.messageId2GuidsMapName(clientID)).clear();
-        m_persistentMessageStore.remove(clientID);
+        ConcurrentMap<Integer, String> messageIdToGuid=m_db.getHashMap(MapDBSessionsStore.messageId2GuidsMapName(clientID));
+        if(messageIdToGuid!=null&&!messageIdToGuid.isEmpty()){
+        	for(Entry<Integer,String> entry:messageIdToGuid.entrySet()){
+            	String guid=entry.getValue();
+            	m_persistentMessageStore.remove(guid);
+            }
+            messageIdToGuid.clear();
+        }
     }
 
     @Override
