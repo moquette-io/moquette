@@ -108,7 +108,7 @@ public class ClientSession {
         //update the selected subscriptions if not present or if has a greater qos
         if (existingSub == null || existingSub.getRequestedQos().byteValue() < newSubscription.getRequestedQos().byteValue()) {
             if (existingSub != null) {
-                subscriptions.remove(newSubscription);
+                subscriptions.remove(existingSub);
             }
             subscriptions.add(newSubscription);
             m_sessionsStore.addNewSubscription(newSubscription);

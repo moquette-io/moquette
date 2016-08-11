@@ -37,7 +37,7 @@ class MapDBMessagesStore implements IMessagesStore {
 
     private DB m_db;
 
-    //maps topic -> guid
+    //maps clientID -> guid
     private ConcurrentMap<String, String> m_retainedStore;
     //maps guid to message, it's message store
     private ConcurrentMap<String, IMessagesStore.StoredMessage> m_persistentMessageStore;
@@ -102,13 +102,11 @@ class MapDBMessagesStore implements IMessagesStore {
     @Override
     public void dropMessagesInSession(String clientID) {
         ConcurrentMap<Integer, String> messageIdToGuid=m_db.getHashMap(MapDBSessionsStore.messageId2GuidsMapName(clientID));
-        if(messageIdToGuid!=null&&!messageIdToGuid.isEmpty()){
-        	for(Entry<Integer,String> entry:messageIdToGuid.entrySet()){
-            	String guid=entry.getValue();
-            	m_persistentMessageStore.remove(guid);
-            }
-            messageIdToGuid.clear();
+        for(Entry<Integer,String> entry:messageIdToGuid.entrySet()){
+        	String guid=entry.getValue();
+        	m_persistentMessageStore.remove(guid);
         }
+        messageIdToGuid.clear();
     }
 
     @Override
