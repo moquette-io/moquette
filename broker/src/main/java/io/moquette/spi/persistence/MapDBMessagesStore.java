@@ -37,7 +37,7 @@ class MapDBMessagesStore implements IMessagesStore {
 
     private DB m_db;
 
-    //maps clientID -> guid
+    //maps topic -> guid
     private ConcurrentMap<String, String> m_retainedStore;
     //maps guid to message, it's message store
     private ConcurrentMap<String, IMessagesStore.StoredMessage> m_persistentMessageStore;
