@@ -41,6 +41,7 @@ import java.util.List;
  * It's main responsibility is bootstrap the ProtocolProcessor.
  *
  * @author andrea
+ * @author mjacoby
  */
 public class ProtocolProcessorBootstrapper {
 
@@ -192,6 +193,15 @@ public class ProtocolProcessorBootstrapper {
     }
 
     public void shutdown() {
+        LOG.debug("shutdown invoked");
+        if (m_interceptor != null) {
+            this.m_interceptor.stop();
+            LOG.debug("interceptor firer stopped");
+        }
         this.m_mapStorage.close();
+        if (subscriptions != null) {
+            LOG.debug("subscription tree {}", subscriptions.dumpTree());
+            subscriptions = null;
+        }
     }
 }
