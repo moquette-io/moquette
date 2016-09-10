@@ -114,7 +114,7 @@ public class ProtocolProcessor {
     //maps clientID to Will testament, if specified on CONNECT
     private ConcurrentMap<String, WillMessage> m_willStore = new ConcurrentHashMap<>();
 
-    ProtocolProcessor() {}
+    public ProtocolProcessor() {}
 
 
     public void init(SubscriptionsStore subscriptions, IMessagesStore storageService,
@@ -132,7 +132,7 @@ public class ProtocolProcessor {
         init(subscriptions,storageService,sessionsStore,authenticator,allowAnonymous, allowZeroByteClientId, authorizator,interceptor,null);
     }
 
-    void init(SubscriptionsStore subscriptions, IMessagesStore storageService,
+    public void init(SubscriptionsStore subscriptions, IMessagesStore storageService,
               ISessionsStore sessionsStore,
               IAuthenticator authenticator,
               boolean allowAnonymous, IAuthorizator authorizator, BrokerInterceptor interceptor, String serverPort) {
@@ -152,7 +152,7 @@ public class ProtocolProcessor {
      * @param interceptor to notify events to an intercept handler
      * @param serverPort
      */
-    void init(SubscriptionsStore subscriptions, IMessagesStore storageService,
+    public void init(SubscriptionsStore subscriptions, IMessagesStore storageService,
               ISessionsStore sessionsStore,
               IAuthenticator authenticator,
               boolean allowAnonymous,
