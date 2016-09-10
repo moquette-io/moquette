@@ -37,7 +37,7 @@ import java.security.cert.CertificateException;
  *
  * Created by andrea on 13/12/15.
  */
-class DefaultMoquetteSslContextCreator implements ISslContextCreator {
+public class DefaultMoquetteSslContextCreator implements ISslContextCreator {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultMoquetteSslContextCreator.class);
 
