@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
 import io.moquette.interception.InterceptHandler;
+import io.moquette.parser.proto.messages.*;
 import io.moquette.server.ConnectionDescriptor;
 import io.moquette.server.netty.AutoFlushHandler;
 import io.moquette.server.netty.NettyUtils;
@@ -35,19 +36,7 @@ import io.moquette.spi.impl.subscriptions.Subscription;
 import static io.moquette.parser.netty.Utils.VERSION_3_1;
 import static io.moquette.parser.netty.Utils.VERSION_3_1_1;
 import io.moquette.interception.messages.InterceptAcknowledgedMessage;
-import io.moquette.parser.proto.messages.AbstractMessage;
 import io.moquette.parser.proto.messages.AbstractMessage.QOSType;
-import io.moquette.parser.proto.messages.ConnAckMessage;
-import io.moquette.parser.proto.messages.ConnectMessage;
-import io.moquette.parser.proto.messages.PubAckMessage;
-import io.moquette.parser.proto.messages.PubCompMessage;
-import io.moquette.parser.proto.messages.PubRecMessage;
-import io.moquette.parser.proto.messages.PubRelMessage;
-import io.moquette.parser.proto.messages.PublishMessage;
-import io.moquette.parser.proto.messages.SubAckMessage;
-import io.moquette.parser.proto.messages.SubscribeMessage;
-import io.moquette.parser.proto.messages.UnsubAckMessage;
-import io.moquette.parser.proto.messages.UnsubscribeMessage;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.timeout.IdleStateHandler;
@@ -251,6 +240,7 @@ public class ProtocolProcessor {
             completeConnect(channel, msg);
         }
 
+
     }
 
     public void forceCloseConnection(Channel oldChannel, Channel newChannel, ConnectMessage msg) {
@@ -322,6 +312,7 @@ public class ProtocolProcessor {
         int flushIntervalMs = 500/*(keepAlive * 1000) / 2*/;
         setupAutoFlusher(channel.pipeline(), flushIntervalMs);
         LOG.info("CONNECT processed");
+        recordReceivedMessageTime(channel);
     }
 
     private void setupAutoFlusher(ChannelPipeline pipeline, int flushIntervalMs) {
@@ -386,6 +377,7 @@ public class ProtocolProcessor {
         String topic = inflightMsg.getTopic();
 
         m_interceptor.notifyMessageAcknowledged(new InterceptAcknowledgedMessage(inflightMsg, topic, username));
+        recordReceivedMessageTime(channel);
     }
 
     private void verifyToActivate(ClientSession targetSession) {
@@ -462,6 +454,7 @@ public class ProtocolProcessor {
             }
         }
         m_interceptor.notifyTopicPublished(msg, clientID, username);
+        recordReceivedMessageTime(channel);
     }
 
     /**
@@ -698,6 +691,7 @@ public class ProtocolProcessor {
         pubRelMessage.setQos(AbstractMessage.QOSType.LEAST_ONE);
 
         channel.writeAndFlush(pubRelMessage);
+        recordReceivedMessageTime(channel);
     }
 
     public void processPubComp(Channel channel, PubCompMessage msg) {
@@ -711,6 +705,7 @@ public class ProtocolProcessor {
         String username = NettyUtils.userName(channel);
         String topic = inflightMsg.getTopic();
         m_interceptor.notifyMessageAcknowledged(new InterceptAcknowledgedMessage(inflightMsg, topic, username));
+        recordReceivedMessageTime(channel);
     }
 
     public void processDisconnect(Channel channel) throws InterruptedException {
@@ -748,6 +743,7 @@ public class ProtocolProcessor {
 //        this.connectionsStatus.remove(clientID, ConnectState.DISCONNECTED);
         this.connectionsStatus.remove(clientID);
         LOG.info("DISCONNECT client <{}> finished", clientID, cleanSession);
+
     }
 
     public void processConnectionLost(String clientID, boolean sessionStolen, Channel channel) {
@@ -769,6 +765,7 @@ public class ProtocolProcessor {
 
         String username = NettyUtils.userName(channel);
         m_interceptor.notifyClientConnectionLost(clientID, username);
+
     }
 
     /**
@@ -805,6 +802,7 @@ public class ProtocolProcessor {
 
         LOG.info("replying with UnsubAck to MSG ID {}", messageID);
         channel.writeAndFlush(ackMessage);
+        recordReceivedMessageTime(channel);
     }
 
     public void processSubscribe(Channel channel, SubscribeMessage msg) {
@@ -851,6 +849,7 @@ public class ProtocolProcessor {
         for (Subscription subscription : newSubscriptions) {
             publishStoredMessagesInSession(subscription, username);
         }
+        recordReceivedMessageTime(channel);
     }
 
     private void subscribeSingleTopic(final Subscription newSubscription) {
@@ -909,5 +908,38 @@ public class ProtocolProcessor {
 
     public boolean removeInterceptHandler(InterceptHandler interceptHandler) {
         return this.m_interceptor.removeInterceptHandler(interceptHandler);
+    }
+
+    public void processPingReq(Channel channel, PingReqMessage msg) {
+        PingRespMessage pingResp = new PingRespMessage();
+        channel.writeAndFlush(pingResp);
+        recordReceivedMessageTime(channel);
+    }
+    private void recordReceivedMessageTime(Channel channel) {
+        String clientID = NettyUtils.clientID(channel);
+        ConnectionDescriptor conDesc = m_clientIDs.get(clientID);
+        if(conDesc != null) {
+            conDesc.mostRecentReceivedMsgTime = new Date();
+        }
+    }
+
+    public Date mostRecentPing(String clientId) {
+        ConnectionDescriptor conDesc = m_clientIDs.get(clientId);
+        if(conDesc == null) return null;
+        return conDesc.mostRecentReceivedMsgTime;
+    }
+
+    public Map<String, Date> getRecentClientPingTimes(long cutoffAgeSeconds) {
+        TreeMap<String,Date> recentPings = new TreeMap<String,Date>();
+        Date now = new Date();
+        long cutoff = now.getTime() - cutoffAgeSeconds * 1000;
+        for( Map.Entry<String, ConnectionDescriptor> entry: m_clientIDs.entrySet()) {
+            if(entry.getValue().mostRecentReceivedMsgTime != null) {
+                if(entry.getValue().mostRecentReceivedMsgTime.getTime() > cutoff) {
+                    recentPings.put(entry.getValue().clientID,entry.getValue().mostRecentReceivedMsgTime);
+                }
+            }
+        }
+        return recentPings;
     }
 }

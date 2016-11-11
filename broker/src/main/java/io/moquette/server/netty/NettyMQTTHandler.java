@@ -76,8 +76,7 @@ public class NettyMQTTHandler extends ChannelInboundHandlerAdapter {
                     m_processor.processPubAck(ctx.channel(), (PubAckMessage) msg);
                     break;
                 case PINGREQ:
-                    PingRespMessage pingResp = new PingRespMessage();
-                    ctx.writeAndFlush(pingResp);
+                    m_processor.processPingReq(ctx.channel(), (PingReqMessage) msg);
                     break;
             }
         } catch (Exception ex) {

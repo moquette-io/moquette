@@ -43,9 +43,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 
 /**
  * Launch a  configured version of the server.
@@ -196,7 +194,15 @@ public class Server {
         }
         m_processor.internalPublish(msg);
     }
-    
+
+    public Date mostRecentPingFor(String clientId) {
+        return m_processor.mostRecentPing(clientId);
+    }
+
+    public Map<String, Date> getRecentClientPingTimes(long cutoffAgeSeconds) {
+        return m_processor.getRecentClientPingTimes(cutoffAgeSeconds);
+    }
+
     public void stopServer() {
     	LOG.info("Server stopping...");
         m_acceptor.close();
