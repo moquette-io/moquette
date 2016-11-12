@@ -17,6 +17,8 @@ package io.moquette.server;
 
 import io.netty.channel.Channel;
 
+import java.util.Date;
+
 /**
  * Value object to maintain the information of single connection, like ClientID, Channel,
  * and clean session flag.
@@ -29,6 +31,7 @@ public class ConnectionDescriptor {
     public final String clientID;
     public final Channel channel;
     public final boolean cleanSession;
+    public Date mostRecentReceivedMsgTime;
     
     public ConnectionDescriptor(String clientID, Channel session, boolean cleanSession) {
         this.clientID = clientID;
