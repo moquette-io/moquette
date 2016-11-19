@@ -28,6 +28,8 @@ import io.netty.handler.codec.CorruptedFrameException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.SocketAddress;
+
 /**
  *
  * @author andrea
@@ -45,7 +47,10 @@ public class NettyMQTTHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object message) {
         AbstractMessage msg = (AbstractMessage) message;
-        LOG.info("Received a message of type {}", Utils.msgType2String(msg.getMessageType()));
+        SocketAddress rmAddr = ctx.channel().remoteAddress();
+        String clientID = NettyUtils.clientID(ctx.channel());
+        LOG.info("Received a message of type {} from {} at {}", Utils.msgType2String(msg.getMessageType()),clientID,rmAddr);
+
         try {
             switch (msg.getMessageType()) {
                 case CONNECT:
