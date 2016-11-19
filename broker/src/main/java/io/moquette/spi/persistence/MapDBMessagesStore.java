@@ -93,7 +93,12 @@ class MapDBMessagesStore implements IMessagesStore {
     public List<StoredMessage> listMessagesInSession(Collection<MessageGUID> guids) {
         List<StoredMessage> ret = new ArrayList<>();
         for (MessageGUID guid : guids) {
-            ret.add(m_persistentMessageStore.get(guid));
+            StoredMessage e = m_persistentMessageStore.get(guid);
+            if(e != null) {
+                ret.add(e);
+            } else {
+                LOG.error("null value for stored message retrieved with on guid={} ",guid);
+            }
         }
         return ret;
     }
@@ -102,12 +107,12 @@ class MapDBMessagesStore implements IMessagesStore {
     public void dropMessagesInSession(String clientID) {
         ConcurrentMap<Integer, MessageGUID> messageIdToGuid = m_db.getHashMap(MapDBSessionsStore.messageId2GuidsMapName(clientID));
         for (MessageGUID guid : messageIdToGuid.values()) {
-            removeStoredMessage(guid);
+            removeStoredMessageIfNotRetainAndRefZero(guid);
         }
         messageIdToGuid.clear();
     }
 
-    void removeStoredMessage(MessageGUID guid) {
+    void removeStoredMessageIfNotRetainAndRefZero(MessageGUID guid) {
         //remove only the not retained and no more referenced
         StoredMessage storedMessage = m_persistentMessageStore.get(guid);
         if (!storedMessage.isRetained() && storedMessage.getReferenceCounter() <= 0) {
@@ -132,14 +137,20 @@ class MapDBMessagesStore implements IMessagesStore {
     @Override
     public void incUsageCounter(MessageGUID guid) {
         IMessagesStore.StoredMessage storedMessage = m_persistentMessageStore.get(guid);
-        storedMessage.incReferenceCounter();
-        m_persistentMessageStore.put(guid, storedMessage);
+        if(storedMessage != null) {
+            storedMessage.incReferenceCounter();
+        } else {
+            LOG.error("attempt to increment ref count on null message {}",guid);
+        }
     }
 
     @Override
     public void decUsageCounter(MessageGUID guid) {
         IMessagesStore.StoredMessage storedMessage = m_persistentMessageStore.get(guid);
-        storedMessage.decReferenceCounter();
-        m_persistentMessageStore.put(guid, storedMessage);
+        if(storedMessage != null) {
+            storedMessage.decReferenceCounter();
+        } else {
+            LOG.error("attempt to decrement ref count on null message {}",guid);
+        }
     }
 }

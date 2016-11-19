@@ -229,7 +229,7 @@ class MapDBSessionsStore implements ISessionsStore {
         m_enqueuedStore.put(clientID, guids);
         m_messagesStore.decUsageCounter(guid);
         //if counter gets to 0 then remove from storage
-        m_messagesStore.removeStoredMessage(guid);
+        m_messagesStore.removeStoredMessageIfNotRetainAndRefZero(guid);
     }
 
     @Override
