@@ -373,10 +373,13 @@ public class ProtocolProcessor {
         verifyToActivate(targetSession);
         StoredMessage inflightMsg = targetSession.getInflightMessage(messageID);
         targetSession.inFlightAcknowledged(messageID);
+        if(inflightMsg == null) {
+            LOG.error("no inflight message found for client:"+clientID+" session:"+targetSession+" message:"+messageID+" therefore cannot not notify message ack");
+        } else {
+            String topic = inflightMsg.getTopic();
+            m_interceptor.notifyMessageAcknowledged(new InterceptAcknowledgedMessage(inflightMsg, topic, username));
+        }
 
-        String topic = inflightMsg.getTopic();
-
-        m_interceptor.notifyMessageAcknowledged(new InterceptAcknowledgedMessage(inflightMsg, topic, username));
         recordReceivedMessageTime(channel);
     }
 
