@@ -16,11 +16,13 @@
 package io.moquette.spi.impl;
 
 import io.moquette.BrokerConstants;
+import io.moquette.server.Server;
 import io.moquette.spi.IMessagesStore;
 import io.moquette.interception.InterceptHandler;
 import io.moquette.server.config.IConfig;
 import io.moquette.spi.ISessionsStore;
 import io.moquette.spi.impl.security.*;
+import io.moquette.spi.impl.subscriptions.Subscription;
 import io.moquette.spi.impl.subscriptions.SubscriptionsStore;
 import io.moquette.spi.persistence.MapDBPersistentStore;
 import io.moquette.spi.security.IAuthenticator;
@@ -29,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.text.ParseException;
@@ -36,35 +39,25 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- *
- * Singleton class that orchestrate the execution of the protocol.
- *
- * It's main responsibility is instantiate the ProtocolProcessor.
+ * It's main responsibility is bootstrap the ProtocolProcessor.
  *
  * @author andrea
  */
-public class SimpleMessaging {
+public class ProtocolProcessorBootstrapper {
 
-    private static final Logger LOG = LoggerFactory.getLogger(SimpleMessaging.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ProtocolProcessorBootstrapper.class);
 
     private SubscriptionsStore subscriptions;
 
     private MapDBPersistentStore m_mapStorage;
+    
+    private ISessionsStore m_sessionsStore;
 
     private BrokerInterceptor m_interceptor;
 
-    private static SimpleMessaging INSTANCE;
-    
     private final ProtocolProcessor m_processor = new ProtocolProcessor();
 
-    private SimpleMessaging() {
-    }
-
-    public static SimpleMessaging getInstance() {
-        if (INSTANCE == null) {
-            INSTANCE = new SimpleMessaging();
-        }
-        return INSTANCE;
+    public ProtocolProcessorBootstrapper() {
     }
 
     /**
@@ -79,19 +72,25 @@ public class SimpleMessaging {
      *                      and fallback on the default one (permit all).
      * */
     public ProtocolProcessor init(IConfig props, List<? extends InterceptHandler> embeddedObservers,
-                                  IAuthenticator authenticator, IAuthorizator authorizator) {
+                                  IAuthenticator authenticator, IAuthorizator authorizator, Server server) {
         subscriptions = new SubscriptionsStore();
 
         m_mapStorage = new MapDBPersistentStore(props);
         m_mapStorage.initStore();
         IMessagesStore messagesStore = m_mapStorage.messagesStore();
-        ISessionsStore sessionsStore = m_mapStorage.sessionsStore(messagesStore);
+        m_sessionsStore = m_mapStorage.sessionsStore();
 
         List<InterceptHandler> observers = new ArrayList<>(embeddedObservers);
-        String interceptorClassName = props.getProperty("intercept.handler");
+        String interceptorClassName = props.getProperty(BrokerConstants.INTERCEPT_HANDLER_PROPERTY_NAME);
         if (interceptorClassName != null && !interceptorClassName.isEmpty()) {
             try {
-                InterceptHandler handler = Class.forName(interceptorClassName).asSubclass(InterceptHandler.class).newInstance();
+                InterceptHandler handler;
+                try {
+                    final Constructor<? extends InterceptHandler> constructor = Class.forName(interceptorClassName).asSubclass(InterceptHandler.class).getConstructor(Server.class);
+                    handler = constructor.newInstance(server);
+                } catch (NoSuchMethodException nsme){
+                    handler = Class.forName(interceptorClassName).asSubclass(InterceptHandler.class).newInstance();
+                }
                 observers.add(handler);
             } catch (Throwable ex) {
                 LOG.error("Can't load the intercept handler {}", ex);
@@ -99,13 +98,13 @@ public class SimpleMessaging {
         }
         m_interceptor = new BrokerInterceptor(observers);
 
-        subscriptions.init(sessionsStore);
+        subscriptions.init(m_sessionsStore);
 
         String configPath = System.getProperty("moquette.path", null);
         String authenticatorClassName = props.getProperty(BrokerConstants.AUTHENTICATOR_CLASS_NAME, "");
 
         if (!authenticatorClassName.isEmpty()) {
-            authenticator = (IAuthenticator)loadClass(authenticatorClassName, IAuthenticator.class);
+            authenticator = (IAuthenticator)loadClass(authenticatorClassName, IAuthenticator.class, props);
             LOG.info("Loaded custom authenticator {}", authenticatorClassName);
         }
 
@@ -120,7 +119,7 @@ public class SimpleMessaging {
 
         String authorizatorClassName = props.getProperty(BrokerConstants.AUTHORIZATOR_CLASS_NAME, "");
         if (!authorizatorClassName.isEmpty()) {
-            authorizator = (IAuthorizator)loadClass(authorizatorClassName, IAuthorizator.class);
+            authorizator = (IAuthorizator)loadClass(authorizatorClassName, IAuthorizator.class, props);
             LOG.info("Loaded custom authorizator {}", authorizatorClassName);
         }
 
@@ -143,11 +142,12 @@ public class SimpleMessaging {
         }
 
         boolean allowAnonymous = Boolean.parseBoolean(props.getProperty(BrokerConstants.ALLOW_ANONYMOUS_PROPERTY_NAME, "true"));
-        m_processor.init(subscriptions, messagesStore, sessionsStore, authenticator, allowAnonymous, authorizator, m_interceptor);
+        boolean allowZeroByteClientId = Boolean.parseBoolean(props.getProperty(BrokerConstants.ALLOW_ZERO_BYTE_CLIENT_ID_PROPERTY_NAME, "false"));
+        m_processor.init(subscriptions, messagesStore, m_sessionsStore, authenticator, allowAnonymous, allowZeroByteClientId, authorizator, m_interceptor, props.getProperty(BrokerConstants.PORT_PROPERTY_NAME));
         return m_processor;
     }
     
-    private Object loadClass(String className, Class<?> cls) {
+    private Object loadClass(String className, Class<?> cls, IConfig props) {
         Object instance = null;
         try {
             Class<?> clazz = Class.forName(className);
@@ -163,13 +163,25 @@ public class SimpleMessaging {
         }
         catch (NoSuchMethodException nsmex) {
             try {
+                // check if constructor with IConfig parameter exists
                 instance = this.getClass().getClassLoader()
                         .loadClass(className)
                         .asSubclass(cls)
-                        .newInstance();
+                        .getConstructor(IConfig.class).newInstance(props);
             } catch (InstantiationException | IllegalAccessException | ClassNotFoundException ex) {
                 LOG.error(null, ex);
                 throw new RuntimeException("Cannot load custom authenticator class " + className, ex);
+            } catch (NoSuchMethodException | InvocationTargetException e) {
+                try {
+                    // fallback to default constructor
+                    instance = this.getClass().getClassLoader()
+                            .loadClass(className)
+                            .asSubclass(cls)
+                            .newInstance();
+                } catch (InstantiationException | IllegalAccessException | ClassNotFoundException ex) {
+                    LOG.error(null, ex);
+                    throw new RuntimeException("Cannot load custom authenticator class " + className, ex);
+                }
             }
         } catch (ClassNotFoundException ex) {
             LOG.error(null, ex);
@@ -180,6 +192,10 @@ public class SimpleMessaging {
         }
 
         return instance;
+    }
+
+    public List<Subscription> getSubscriptions() {
+        return m_sessionsStore.getSubscriptions();
     }
 
     public void shutdown() {

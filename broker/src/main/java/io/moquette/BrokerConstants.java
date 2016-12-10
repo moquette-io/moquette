@@ -21,6 +21,7 @@ import java.io.File;
  * Created by andrea on 08/12/15.
  */
 public class BrokerConstants {
+    public static final String INTERCEPT_HANDLER_PROPERTY_NAME ="intercept.handler";
     public static final String PERSISTENT_STORE_PROPERTY_NAME = "persistent_store";
     public static final String AUTOSAVE_INTERVAL_PROPERTY_NAME = "autosave_interval";
     public static final String PASSWORD_FILE_PROPERTY_NAME = "password_file";
@@ -35,11 +36,18 @@ public class BrokerConstants {
     public static final String KEY_STORE_PASSWORD_PROPERTY_NAME = "key_store_password";
     public static final String KEY_MANAGER_PASSWORD_PROPERTY_NAME = "key_manager_password";
     public static final String ALLOW_ANONYMOUS_PROPERTY_NAME = "allow_anonymous";
+    public static final String ALLOW_ZERO_BYTE_CLIENT_ID_PROPERTY_NAME = "allow_zero_byte_client_id";
     public static final String ACL_FILE_PROPERTY_NAME = "acl_file";
     public static final String AUTHORIZATOR_CLASS_NAME = "authorizator_class";
     public static final String AUTHENTICATOR_CLASS_NAME = "authenticator_class";
+    public static final String DB_AUTHENTICATOR_DRIVER = "authenticator.db.driver";
+    public static final String DB_AUTHENTICATOR_URL = "authenticator.db.url";
+    public static final String DB_AUTHENTICATOR_QUERY = "authenticator.db.query";
+    public static final String DB_AUTHENTICATOR_DIGEST = "authenticator.db.digest";
     public static final int PORT = 1883;
     public static final int WEBSOCKET_PORT = 8080;
+    public static final String DISABLED_PORT_BIND = "disabled";
     public static final String HOST = "0.0.0.0";
     public static final String NEED_CLIENT_AUTH = "need_client_auth";
+    public static final String HAZELCAST_CONFIGURATION = "hazelcast.configuration";
 }

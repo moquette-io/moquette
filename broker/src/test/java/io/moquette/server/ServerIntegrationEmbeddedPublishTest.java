@@ -49,7 +49,7 @@ public class ServerIntegrationEmbeddedPublishTest {
 
     protected void startServer() throws IOException {
         m_server = new Server();
-        final Properties configProps = IntegrationUtils.prepareTestPropeties();
+        final Properties configProps = IntegrationUtils.prepareTestProperties();
         m_config = new MemoryConfig(configProps);
         m_server.startServer(m_config);
     }
@@ -97,6 +97,17 @@ public class ServerIntegrationEmbeddedPublishTest {
         m_server.internalPublish(message);
     }
 
+    private void connectNoCleanSession() throws Exception {
+        MqttConnectOptions opts = new MqttConnectOptions();
+        opts.setCleanSession(false);
+        m_subscriber.connect(opts);
+    }
+
+    private void subscribeToWithQosAndNoCleanSession(String topic, int qos) throws Exception {
+        connectNoCleanSession();
+        m_subscriber.subscribe(topic, qos);
+    }
+
     private void verifyNoMessageIsReceived() throws Exception {
         MqttMessage msg = m_callback.getMessage(false);
         assertNull(msg);
@@ -139,8 +150,6 @@ public class ServerIntegrationEmbeddedPublishTest {
         LOG.info("*** testClientSubscribeBeforeRetainedQoS0IsSent ***");
 
         subscribeToWithQos("/topic", 0);
-        //super ugly but we need the MQTT client lib finish it's job before us
-        Thread.sleep(1000);
 
         //Exercise
         internalPublishToWithQosAndRetained("/topic", QOSType.MOST_ONE, true);
@@ -155,6 +164,7 @@ public class ServerIntegrationEmbeddedPublishTest {
 
         //Exercise
         internalPublishToWithQosAndRetained("/topic", QOSType.MOST_ONE, true);
+        //LOG.info("** post internalPublish **");
         subscribeToWithQos("/topic", 0);
 
         //Verify
@@ -166,8 +176,6 @@ public class ServerIntegrationEmbeddedPublishTest {
         LOG.info("*** testClientSubscribeBeforeNotRetainedQoS1IsSent ***");
 
         subscribeToWithQos("/topic", 1);
-        //super ugly but we need the MQTT client lib finish it's job before us
-        Thread.sleep(1000);
 
         //Exercise
         internalPublishToWithQosAndRetained("/topic", QOSType.LEAST_ONE, false);
@@ -193,8 +201,6 @@ public class ServerIntegrationEmbeddedPublishTest {
         LOG.info("*** testClientSubscribeBeforeRetainedQoS1IsSent ***");
 
         subscribeToWithQos("/topic", 1);
-        //super ugly but we need the MQTT client lib finish it's job before us
-        Thread.sleep(1000);
 
         //Exercise
         internalPublishToWithQosAndRetained("/topic", QOSType.LEAST_ONE, true);
@@ -210,9 +216,11 @@ public class ServerIntegrationEmbeddedPublishTest {
         //Exercise
         internalPublishToWithQosAndRetained("/topic", QOSType.LEAST_ONE, true);
         subscribeToWithQos("/topic", 1);
+        LOG.info("** After subscribe **");
 
         //Verify
         verifyMessageIsReceivedSuccessfully();
+        LOG.info("** Post verify **");
     }
 
     @Test
@@ -220,8 +228,6 @@ public class ServerIntegrationEmbeddedPublishTest {
         LOG.info("*** testClientSubscribeBeforeNotRetainedQoS2IsSent ***");
 
         subscribeToWithQos("/topic", 2);
-        //super ugly but we need the MQTT client lib finish it's job before us
-        Thread.sleep(1000);
 
         //Exercise
         internalPublishToWithQosAndRetained("/topic", QOSType.EXACTLY_ONCE, false);
@@ -247,8 +253,6 @@ public class ServerIntegrationEmbeddedPublishTest {
         LOG.info("*** testClientSubscribeBeforeRetainedQoS2IsSent ***");
 
         subscribeToWithQos("/topic", 2);
-        //super ugly but we need the MQTT client lib finish it's job before us
-        Thread.sleep(1000);
 
         //Exercise
         internalPublishToWithQosAndRetained("/topic", QOSType.EXACTLY_ONCE, true);
@@ -282,5 +286,17 @@ public class ServerIntegrationEmbeddedPublishTest {
         //m_subscriber.receive(2, TimeUnit.MILLISECONDS);
         MqttMessage message = m_callback.getMessage(true);
         assertTrue(message == null);
+    }
+
+    @Test
+    public void testClientSubscribeWithoutCleanSession() throws Exception {
+        LOG.info("*** testClientSubscribeWithoutCleanSession ***");
+        subscribeToWithQosAndNoCleanSession("foo", 1);
+        m_subscriber.disconnect();
+        assertTrue(m_server.getSubscriptions().size() == 1);
+        connectNoCleanSession();
+        assertTrue(m_server.getSubscriptions().size() == 1);
+        internalPublishToWithQosAndRetained("foo", QOSType.MOST_ONE, false);
+        verifyMessageIsReceivedSuccessfully();
     }
 }

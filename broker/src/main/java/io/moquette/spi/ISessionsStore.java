@@ -28,8 +28,6 @@ import io.moquette.spi.impl.subscriptions.Subscription;
  */
 public interface ISessionsStore {
 
-    void updateCleanStatus(String clientID, boolean cleanSession);
-
     class ClientTopicCouple {
         public final String topicFilter;
         public final String clientID;
@@ -69,6 +67,8 @@ public interface ISessionsStore {
 
     void initStore();
 
+    void updateCleanStatus(String clientID, boolean cleanSession);
+
     /**
      * Add a new subscription to the session
      */
@@ -93,6 +93,11 @@ public interface ISessionsStore {
      * @return the subscription stored by clientID and topicFilter, if any else null;
      * */
     Subscription getSubscription(ClientTopicCouple couple);
+    
+    /*
+     * @return all subscriptions stored.
+     */
+    List<Subscription> getSubscriptions();
 
     /**
      * @return true iff there are subscriptions persisted with clientID
@@ -112,7 +117,7 @@ public interface ISessionsStore {
     /**
      * Save the binding messageID, clientID <-> guid
      * */
-    void inFlight(String clientID, int messageID, String guid);
+    void inFlight(String clientID, int messageID, MessageGUID guid);
 
     /**
      * Return the next valid packetIdentifier for the given client session.
@@ -122,23 +127,26 @@ public interface ISessionsStore {
     /**
      * Store the guid to be later published.
      * */
-    void bindToDeliver(String guid, String clientID);
+    void bindToDeliver(MessageGUID guid, String clientID);
 
     /**
      * List the guids for retained messages for the session
      * */
-    Collection<String> enqueued(String clientID);
+    Collection<MessageGUID> enqueued(String clientID);
 
     /**
      * Remove form the queue of stored messages for session.
      * */
-    void removeEnqueued(String clientID, String guid);
+    void removeEnqueued(String clientID, MessageGUID guid);
 
-    void secondPhaseAcknowledged(String clientID, int messageID);
+    void moveInFlightToSecondPhaseAckWaiting(String clientID, int messageID);
 
-    void secondPhaseAckWaiting(String clientID, int messageID);
+    /**
+     * @return the guid of message just acked.
+     * */
+    MessageGUID secondPhaseAcknowledged(String clientID, int messageID);
 
-    String mapToGuid(String clientID, int messageID);
+    MessageGUID mapToGuid(String clientID, int messageID);
     
-    public StoredMessage getInflightMessage(String clientID, int messageID);
+    StoredMessage getInflightMessage(String clientID, int messageID);
 }

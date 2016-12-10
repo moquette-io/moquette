@@ -39,6 +39,8 @@ public interface Interceptor {
 
     void notifyClientDisconnected(String clientID, String username);
 
+    void notifyClientConnectionLost(String clientID, String username);
+
     void notifyTopicPublished(PublishMessage msg, String clientID, final String username);
 
     void notifyTopicSubscribed(Subscription sub, final String username);
@@ -46,4 +48,8 @@ public interface Interceptor {
     void notifyTopicUnsubscribed(String topic, String clientID, final String username);
 
     void notifyMessageAcknowledged(InterceptAcknowledgedMessage msg);
+
+    boolean addInterceptHandler(InterceptHandler interceptHandler);
+
+    boolean removeInterceptHandler(InterceptHandler interceptHandler);
 }

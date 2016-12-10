@@ -19,6 +19,7 @@ import io.moquette.spi.ClientSession;
 import io.moquette.spi.IMessagesStore;
 import io.moquette.spi.IMessagesStore.StoredMessage;
 import io.moquette.spi.ISessionsStore;
+import io.moquette.spi.MessageGUID;
 import io.moquette.spi.impl.Utils;
 import io.moquette.spi.impl.subscriptions.Subscription;
 
@@ -39,17 +40,17 @@ public class MemorySessionStore implements ISessionsStore {
     private Map<String, MapDBPersistentStore.PersistentSession> m_persistentSessions = new HashMap<>();
 
     //maps clientID->[MessageId -> guid]
-    private Map<String, Map<Integer, String>> m_inflightStore = new HashMap<>();
+    private Map<String, Map<Integer, MessageGUID>> m_inflightStore = new HashMap<>();
 //    private Map<String, Set<Integer>> m_inflightIDs = new HashMap<>();
     //maps clientID->[guid*]
-    private Map<String, Set<String>> m_enqueuedStore = new HashMap<>();
-    //maps clientID->[messageID*]
-    private Map<String, Set<Integer>> m_secondPhaseStore = new HashMap<>();
+    private Map<String, Set<MessageGUID>> m_enqueuedStore = new HashMap<>();
+    //maps clientID->[MessageId -> guid]
+    private Map<String, Map<Integer, MessageGUID>> m_secondPhaseStore = new HashMap<>();
 
-    private Map<String, Map<Integer, String>> m_messageToGuids;
+    private Map<String, Map<Integer, MessageGUID>> m_messageToGuids;
     private final IMessagesStore m_messagesStore;
 
-    public MemorySessionStore(IMessagesStore messagesStore, Map<String, Map<Integer, String>> messageToGuids) {
+    public MemorySessionStore(IMessagesStore messagesStore, Map<String, Map<Integer, MessageGUID>> messageToGuids) {
         m_messageToGuids = messageToGuids;
         this.m_messagesStore = messagesStore;
     }
@@ -157,8 +158,17 @@ public class MemorySessionStore implements ISessionsStore {
     }
 
     @Override
+    public List<Subscription> getSubscriptions() {
+        List<Subscription> subscriptions = new ArrayList<>();
+        for (Map.Entry<String, Set<Subscription>> entry : m_persistentSubscriptions.entrySet()) {
+            subscriptions.addAll(entry.getValue());
+        }
+        return subscriptions;
+    }
+
+    @Override
     public void inFlightAck(String clientID, int messageID) {
-        Map<Integer, String> m = this.m_inflightStore.get(clientID);
+        Map<Integer, MessageGUID> m = this.m_inflightStore.get(clientID);
         if (m == null) {
             LOG.error("Can't find the inFlight record for client <{}>", clientID);
             return;
@@ -167,8 +177,8 @@ public class MemorySessionStore implements ISessionsStore {
     }
 
     @Override
-    public void inFlight(String clientID, int messageID, String guid) {
-        Map<Integer, String> m = this.m_inflightStore.get(clientID);
+    public void inFlight(String clientID, int messageID, MessageGUID guid) {
+        Map<Integer, MessageGUID> m = this.m_inflightStore.get(clientID);
         if (m == null) {
             m = new HashMap<>();
         }
@@ -181,7 +191,7 @@ public class MemorySessionStore implements ISessionsStore {
      * */
     @Override
     public int nextPacketID(String clientID) {
-        Map<Integer, String> m = this.m_inflightStore.get(clientID);
+        Map<Integer, MessageGUID> m = this.m_inflightStore.get(clientID);
         if (m == null) {
             m = new HashMap<>();
             int nextPacketId = 1;
@@ -195,42 +205,52 @@ public class MemorySessionStore implements ISessionsStore {
     }
 
     @Override
-    public void bindToDeliver(String guid, String clientID) {
-        Set<String> guids = Utils.defaultGet(m_enqueuedStore, clientID, new HashSet<String>());
+    public void bindToDeliver(MessageGUID guid, String clientID) {
+        Set<MessageGUID> guids = Utils.defaultGet(m_enqueuedStore, clientID, new HashSet<MessageGUID>());
         guids.add(guid);
         m_enqueuedStore.put(clientID, guids);
     }
 
     @Override
-    public Collection<String> enqueued(String clientID) {
-        return Utils.defaultGet(m_enqueuedStore, clientID, new HashSet<String>());
+    public Collection<MessageGUID> enqueued(String clientID) {
+        return Utils.defaultGet(m_enqueuedStore, clientID, new HashSet<MessageGUID>());
     }
 
     @Override
-    public void removeEnqueued(String clientID, String guid) {
-        Set<String> guids = Utils.defaultGet(m_enqueuedStore, clientID, new HashSet<String>());
+    public void removeEnqueued(String clientID, MessageGUID guid) {
+        Set<MessageGUID> guids = Utils.defaultGet(m_enqueuedStore, clientID, new HashSet<MessageGUID>());
         guids.remove(guid);
         m_enqueuedStore.put(clientID, guids);
     }
 
     @Override
-    public void secondPhaseAcknowledged(String clientID, int messageID) {
-        Set<Integer> messageIDs = Utils.defaultGet(m_secondPhaseStore, clientID, new HashSet<Integer>());
-        messageIDs.remove(messageID);
+    public void moveInFlightToSecondPhaseAckWaiting(String clientID, int messageID) {
+        LOG.info("acknowledging inflight clientID <{}> messageID {}", clientID, messageID);
+        Map<Integer, MessageGUID> m = this.m_inflightStore.get(clientID);
+        if (m == null) {
+            LOG.error("Can't find the inFlight record for client <{}>", clientID);
+            return;
+        }
+        MessageGUID guid = m.remove(messageID);
+
+        LOG.info("Moving to second phase store");
+        Map<Integer, MessageGUID> messageIDs = Utils.defaultGet(m_secondPhaseStore, clientID, new HashMap<Integer, MessageGUID>());
+        messageIDs.put(messageID, guid);
         m_secondPhaseStore.put(clientID, messageIDs);
     }
 
     @Override
-    public void secondPhaseAckWaiting(String clientID, int messageID) {
-        Set<Integer> messageIDs = Utils.defaultGet(m_secondPhaseStore, clientID, new HashSet<Integer>());
-        messageIDs.add(messageID);
+    public MessageGUID secondPhaseAcknowledged(String clientID, int messageID) {
+        Map<Integer, MessageGUID> messageIDs = Utils.defaultGet(m_secondPhaseStore, clientID, new HashMap<Integer, MessageGUID>());
+        MessageGUID guid = messageIDs.remove(messageID);
         m_secondPhaseStore.put(clientID, messageIDs);
+        return guid;
     }
 
     @Override
-    public String mapToGuid(String clientID, int messageID) {
-        HashMap<Integer, String> guids = (HashMap<Integer, String>) Utils.defaultGet(m_messageToGuids,
-                clientID, new HashMap<Integer, String>());
+    public MessageGUID mapToGuid(String clientID, int messageID) {
+        HashMap<Integer, MessageGUID> guids = (HashMap<Integer, MessageGUID>) Utils.defaultGet(m_messageToGuids,
+                clientID, new HashMap<Integer, MessageGUID>());
         return guids.get(messageID);
     }
 

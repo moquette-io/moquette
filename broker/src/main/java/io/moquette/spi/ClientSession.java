@@ -61,8 +61,6 @@ public class ClientSession {
 
     private volatile boolean cleanSession;
 
-    private boolean active = false;
-
     private BlockingQueue<AbstractMessage> m_queueToPublish = new ArrayBlockingQueue<>(Constants.MAX_MESSAGE_QUEUE);
 
     public ClientSession(String clientID, IMessagesStore messagesStore, ISessionsStore sessionsStore,
@@ -72,23 +70,20 @@ public class ClientSession {
         this.m_sessionsStore = sessionsStore;
         this.cleanSession = cleanSession;
     }
-    //List of client's subscriptions
-    //list of messages not acknowledged by client
-    //list of in-flight messages
 
     /**
      * @return the list of messages to be delivered for client related to the session.
      * */
     public List<IMessagesStore.StoredMessage> storedMessages() {
         //read all messages from enqueued store
-        Collection<String> guids = this.m_sessionsStore.enqueued(clientID);
+        Collection<MessageGUID> guids = this.m_sessionsStore.enqueued(clientID);
         return messagesStore.listMessagesInSession(guids);
     }
 
     /**
      * Remove the messages stored in a cleanSession false.
      */
-    public void removeEnqueued(String guid) {
+    public void removeEnqueued(MessageGUID guid) {
         this.m_sessionsStore.removeEnqueued(this.clientID, guid);
     }
 
@@ -97,9 +92,9 @@ public class ClientSession {
         return "ClientSession{clientID='" + clientID + '\'' +"}";
     }
 
-    public boolean subscribe(String topicFilter, Subscription newSubscription) {
-        LOG.info("<{}> subscribed to topicFilter <{}> with QoS {}",
-                newSubscription.getClientId(), topicFilter,
+    public boolean subscribe(Subscription newSubscription) {
+        LOG.info("<{}> subscribed to the topic filter <{}> with QoS {}",
+                newSubscription.getClientId(), newSubscription.getTopicFilter(),
                 AbstractMessage.QOSType.formatQoS(newSubscription.getRequestedQos()));
         boolean validTopic = SubscriptionsStore.validate(newSubscription.getTopicFilter());
         if (!validTopic) {
@@ -136,16 +131,16 @@ public class ClientSession {
             cleanSession();
         }
 
-        //deactivate the session
-        deactivate();
     }
 
     public void cleanSession() {
         LOG.info("cleaning old saved subscriptions for client <{}>", this.clientID);
         m_sessionsStore.wipeSubscriptions(this.clientID);
+        LOG.debug("Wiped subscriptions for client <{}>", this.clientID);
 
         //remove also the messages stored of type QoS1/2
         messagesStore.dropMessagesInSession(this.clientID);
+        LOG.debug("Removed messages in session for client <{}>", this.clientID);
     }
 
     public boolean isCleanSession() {
@@ -157,44 +152,31 @@ public class ClientSession {
         this.m_sessionsStore.updateCleanStatus(this.clientID, cleanSession);
     }
 
-    public void activate() {
-        this.active = true;
-    }
-
-    public void deactivate() {
-        this.active = false;
-    }
-
-    public boolean isActive() {
-        return this.active;
-    }
-
     public int nextPacketId() {
         return this.m_sessionsStore.nextPacketID(this.clientID);
     }
 
     public void inFlightAcknowledged(int messageID) {
+        LOG.trace("Acknowledging inflight, clientID <{}> messageID {}", this.clientID, messageID);
         m_sessionsStore.inFlightAck(this.clientID, messageID);
     }
 
-    public void inFlightAckWaiting(String guid, int messageID) {
+    public void inFlightAckWaiting(MessageGUID guid, int messageID) {
+        LOG.trace("Adding to inflight {}, guid <{}>", messageID, guid);
         m_sessionsStore.inFlight(this.clientID, messageID, guid);
     }
 
-    public void secondPhaseAcknowledged(int messageID) {
-        m_sessionsStore.secondPhaseAcknowledged(clientID, messageID);
+    public IMessagesStore.StoredMessage secondPhaseAcknowledged(int messageID) {
+        MessageGUID guid = m_sessionsStore.secondPhaseAcknowledged(clientID, messageID);
+        return messagesStore.getMessageByGuid(guid);
     }
 
-    public void secondPhaseAckWaiting(int messageID) {
-        m_sessionsStore.secondPhaseAckWaiting(clientID, messageID);
-    }
-
-    public void enqueueToDeliver(String guid) {
+    public void enqueueToDeliver(MessageGUID guid) {
         this.m_sessionsStore.bindToDeliver(guid, this.clientID);
     }
 
     public IMessagesStore.StoredMessage storedMessage(int messageID) {
-        final String guid = m_sessionsStore.mapToGuid(clientID, messageID);
+        final MessageGUID guid = m_sessionsStore.mapToGuid(clientID, messageID);
         return messagesStore.getMessageByGuid(guid);
     }
 
@@ -208,5 +190,13 @@ public class ClientSession {
 
     public AbstractMessage dequeue() {
         return m_queueToPublish.poll();
+    }
+
+    public void moveInFlightToSecondPhaseAckWaiting(int messageID) {
+        m_sessionsStore.moveInFlightToSecondPhaseAckWaiting(this.clientID, messageID);
+    }
+
+    public IMessagesStore.StoredMessage getInflightMessage(int messageID) {
+        return m_sessionsStore.getInflightMessage(clientID, messageID);
     }
 }

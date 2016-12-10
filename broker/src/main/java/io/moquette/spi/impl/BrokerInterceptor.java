@@ -23,6 +23,7 @@ import io.moquette.spi.impl.subscriptions.Subscription;
 import io.moquette.parser.proto.messages.PublishMessage;
 
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -36,7 +37,7 @@ final class BrokerInterceptor implements Interceptor {
     private final ExecutorService executor;
 
     BrokerInterceptor(List<InterceptHandler> handlers) {
-        this.handlers = handlers;
+        this.handlers = new CopyOnWriteArrayList<>(handlers);
         executor = Executors.newFixedThreadPool(1);
     }
 
@@ -66,6 +67,18 @@ final class BrokerInterceptor implements Interceptor {
                 @Override
                 public void run() {
                     handler.onDisconnect(new InterceptDisconnectMessage(clientID, username));
+                }
+            });
+        }
+    }
+
+    @Override
+    public void notifyClientConnectionLost(final String clientID, final String username) {
+        for (final InterceptHandler handler : this.handlers) {
+            executor.execute(new Runnable() {
+                @Override
+                public void run() {
+                    handler.onConnectionLost(new InterceptConnectionLostMessage(clientID, username));
                 }
             });
         }
@@ -117,5 +130,15 @@ final class BrokerInterceptor implements Interceptor {
                 }
             });
         }
+    }
+
+    @Override
+    public boolean addInterceptHandler(InterceptHandler interceptHandler) {
+        return this.handlers.add(interceptHandler);
+    }
+
+    @Override
+    public boolean removeInterceptHandler(InterceptHandler interceptHandler) {
+        return this.handlers.remove(interceptHandler);
     }
 }

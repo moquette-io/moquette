@@ -16,6 +16,7 @@
 package io.moquette.server.netty;
 
 import io.moquette.server.Constants;
+import io.moquette.spi.impl.ProtocolProcessor;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.Attribute;
@@ -30,12 +31,14 @@ public class NettyUtils {
 
     public static final String ATTR_USERNAME = "username";
     public static final String ATTR_SESSION_STOLEN = "sessionStolen";
+    public static final String ATTR_CHANNEL_STATUS = "channelStatus";
 
     private static final AttributeKey<Object> ATTR_KEY_KEEPALIVE = AttributeKey.valueOf(Constants.KEEP_ALIVE);
     private static final AttributeKey<Object> ATTR_KEY_CLEANSESSION = AttributeKey.valueOf(Constants.CLEAN_SESSION);
     private static final AttributeKey<Object> ATTR_KEY_CLIENTID = AttributeKey.valueOf(Constants.ATTR_CLIENTID);
     private static final AttributeKey<Object> ATTR_KEY_USERNAME = AttributeKey.valueOf(ATTR_USERNAME);
     private static final AttributeKey<Object> ATTR_KEY_SESSION_STOLEN = AttributeKey.valueOf(ATTR_SESSION_STOLEN);
+    private static final AttributeKey<Object> ATTR_KEY_CHANNEL_STATUS = AttributeKey.valueOf(ATTR_CHANNEL_STATUS);
 
     public static Object getAttribute(ChannelHandlerContext ctx, AttributeKey<Object> key) {
         Attribute<Object> attr = ctx.channel().attr(key);
@@ -70,11 +73,13 @@ public class NettyUtils {
         return (String) channel.attr(NettyUtils.ATTR_KEY_USERNAME).get();
     }
 
+    /*@Deprecated
     public static void sessionStolen(Channel channel, boolean value) {
         channel.attr(NettyUtils.ATTR_KEY_SESSION_STOLEN).set(value);
     }
 
+    @Deprecated
     public static Boolean sessionStolen(Channel channel) {
         return (Boolean) channel.attr(NettyUtils.ATTR_KEY_SESSION_STOLEN).get();
-    }
+    }*/
 }

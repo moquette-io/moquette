@@ -54,7 +54,7 @@ public class ServerIntegrationPahoTest {
 
     protected void startServer() throws IOException {
         m_server = new Server();
-        final Properties configProps = IntegrationUtils.prepareTestPropeties();
+        final Properties configProps = IntegrationUtils.prepareTestProperties();
         m_config = new MemoryConfig(configProps);
         m_server.startServer(m_config);
     }
@@ -193,7 +193,7 @@ public class ServerIntegrationPahoTest {
 
         m_server.stopServer();
 
-        m_server.startServer(IntegrationUtils.prepareTestPropeties());
+        m_server.startServer(IntegrationUtils.prepareTestProperties());
 
         //reconnect and publish
         m_client.connect(options);
@@ -474,13 +474,19 @@ public class ServerIntegrationPahoTest {
         LOG.info("*** testForceClientDisconnection_issue118 ***");
         MessageCollector cbSubscriber1 = new MessageCollector();
         MqttClient clientXA = createClient("subscriber", "X", cbSubscriber1);
+        LOG.info("Connected 'subscriber' first time");
         clientXA.subscribe("topic", 0);
+        LOG.info("Subscribed 'topic' from 'subscriber' first time");
 
         MqttClient clientXB = createClient("publisher", "X");
+        LOG.info("Connected 'publisher' first time");
         clientXB.publish("topic", "Hello".getBytes(), 2, false);
+        LOG.info("Published on 'topic' from 'publisher' first time");
 
+        LOG.info("Creating second new 'subscriber'");
         MessageCollector cbSubscriber2 = new MessageCollector();
         MqttClient clientYA = createClient("subscriber", "Y", cbSubscriber2);
+        LOG.info("Connected 'subscriber' second time");
         clientYA.subscribe("topic", 0);
 
         MqttClient clientYB = createClient("publisher", "Y");

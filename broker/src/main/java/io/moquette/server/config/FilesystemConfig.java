@@ -27,19 +27,20 @@ import java.util.Properties;
  *
  * @author andrea
  */
-public class FilesystemConfig implements IConfig {
+public class FilesystemConfig extends IConfig {
     private static final Logger LOG = LoggerFactory.getLogger(FilesystemConfig.class);
 
-    private final Properties m_properties;
+    private Properties m_properties = new Properties();
 
     public FilesystemConfig(File file) {
         ConfigurationParser confParser = new ConfigurationParser();
+        m_properties = confParser.getProperties();
+        assignDefaults();
         try {
             confParser.parse(file);
         } catch (ParseException pex) {
             LOG.warn("An error occurred in parsing configuration, fallback on default configuration", pex);
         }
-        m_properties = confParser.getProperties();
     }
 
     public FilesystemConfig() {

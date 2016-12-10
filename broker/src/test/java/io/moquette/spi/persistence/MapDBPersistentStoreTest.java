@@ -24,6 +24,7 @@ import io.moquette.spi.IMessagesStore;
 import io.moquette.spi.ISessionsStore;
 import io.moquette.spi.ISessionsStore.ClientTopicCouple;
 import io.moquette.parser.proto.messages.AbstractMessage;
+import io.moquette.spi.MessageGUID;
 import io.moquette.spi.impl.subscriptions.Subscription;
 import org.junit.After;
 import org.junit.Before;
@@ -41,6 +42,7 @@ import static org.junit.Assert.*;
  */
 public class MapDBPersistentStoreTest {
 
+    public static final String TEST_CLIENT = "TestClient";
     MapDBPersistentStore m_storageService;
     ISessionsStore m_sessionsStore;
     IMessagesStore m_messagesStore;
@@ -54,7 +56,7 @@ public class MapDBPersistentStoreTest {
         m_storageService = new MapDBPersistentStore(conf);
         m_storageService.initStore();
         m_messagesStore = m_storageService.messagesStore();
-        m_sessionsStore = m_storageService.sessionsStore(m_messagesStore);
+        m_sessionsStore = m_storageService.sessionsStore();
     }
 
     @After
@@ -68,17 +70,21 @@ public class MapDBPersistentStoreTest {
 
     @Test
     public void overridingSubscriptions() {
-        ClientSession session1 = m_sessionsStore.createNewSession("FAKE_CLI_ID_1", true);
-        Subscription oldSubscription = new Subscription("FAKE_CLI_ID_1", "/topic", AbstractMessage.QOSType.MOST_ONE);
-        session1.subscribe("/topic", oldSubscription);
-        Subscription overrindingSubscription = new Subscription("FAKE_CLI_ID_1", "/topic", AbstractMessage.QOSType.EXACTLY_ONCE);
-        session1.subscribe("/topic", overrindingSubscription);
-        
+        ClientSession session1 = m_sessionsStore.createNewSession("SESSION_ID_1", true);
+
+        // Subscribe on /topic with QOSType.MOST_ONE
+        Subscription oldSubscription = new Subscription(session1.clientID, "/topic", AbstractMessage.QOSType.MOST_ONE);
+        session1.subscribe(oldSubscription);
+
+        // Subscribe on /topic again that overrides the previous subscription.
+        Subscription overridingSubscription = new Subscription(session1.clientID, "/topic", AbstractMessage.QOSType.EXACTLY_ONCE);
+        session1.subscribe(overridingSubscription);
+
         //Verify
         List<ClientTopicCouple> subscriptions = m_sessionsStore.listAllSubscriptions();
         assertEquals(1, subscriptions.size());
         Subscription sub = m_sessionsStore.getSubscription(subscriptions.get(0));
-        assertEquals(overrindingSubscription.getRequestedQos(), sub.getRequestedQos());
+        assertEquals(overridingSubscription.getRequestedQos(), sub.getRequestedQos());
     }
 
     @Test
@@ -103,7 +109,7 @@ public class MapDBPersistentStoreTest {
         //request a first ID
 
         int packetId = m_sessionsStore.nextPacketID("CLIENT");
-        m_sessionsStore.inFlight("CLIENT", packetId, "ABCDE"); //simulate an inflight
+        m_sessionsStore.inFlight("CLIENT", packetId, new MessageGUID("ABCDE")); //simulate an inflight
         assertEquals(1, packetId);
 
         //release the ID
@@ -122,5 +128,41 @@ public class MapDBPersistentStoreTest {
         assertTrue("Storage service scheduler can't be stopped in 3 seconds",
                 m_storageService.m_scheduler.awaitTermination(3, TimeUnit.SECONDS));
         assertTrue(m_storageService.m_scheduler.isTerminated());
+    }
+
+    @Test
+    public void testDropMessagesInSessionCleanAllNotRetainedStoredMessages() {
+        m_sessionsStore.createNewSession("TestClient", true);
+        IMessagesStore.StoredMessage publishToStore = new IMessagesStore.StoredMessage("Hello".getBytes(),
+                AbstractMessage.QOSType.EXACTLY_ONCE, "/topic");
+        publishToStore.setClientID(TEST_CLIENT);
+        publishToStore.setMessageID(1);
+        publishToStore.setRetained(false);
+        MessageGUID guid = m_messagesStore.storePublishForFuture(publishToStore);
+
+        //Exercise
+        m_messagesStore.dropMessagesInSession("TestClient");
+
+        //Verify the message store for session is empty.
+        IMessagesStore.StoredMessage storedPublish = m_messagesStore.getMessageByGuid(guid);
+        assertNull("The stored message must'n be present anymore", storedPublish);
+    }
+
+    @Test
+    public void testDropMessagesInSessionDoesntCleanAnyRetainedStoredMessages() {
+        m_sessionsStore.createNewSession("TestClient", true);
+        IMessagesStore.StoredMessage publishToStore = new IMessagesStore.StoredMessage("Hello".getBytes(),
+                AbstractMessage.QOSType.EXACTLY_ONCE, "/topic");
+        publishToStore.setClientID(TEST_CLIENT);
+        publishToStore.setMessageID(1);
+        publishToStore.setRetained(true);
+        MessageGUID guid = m_messagesStore.storePublishForFuture(publishToStore);
+
+        //Exercise
+        m_messagesStore.dropMessagesInSession("TestClient");
+
+        //Verify the message store for session is empty.
+        IMessagesStore.StoredMessage storedPublish = m_messagesStore.getMessageByGuid(guid);
+        assertNotNull("The stored retained message must be present after client's session drop", storedPublish);
     }
 }

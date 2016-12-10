@@ -16,29 +16,60 @@
 package io.moquette.server;
 
 import io.netty.channel.Channel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Value object to maintain the information of single connection, like ClientID, IoSession,
- * and other clean session fla.
- * 
- * 
+ * Value object to maintain the information of single connection, like ClientID, Channel,
+ * and clean session flag.
+ *
+ *
  * @author andrea
  */
 public class ConnectionDescriptor {
-    
+
+    private static final Logger LOG = LoggerFactory.getLogger(ConnectionDescriptor.class);
+
+    public enum ConnectionState {
+        //Connection states
+        DISCONNECTED, SENDACK, SESSION_CREATED, MESSAGES_REPUBLISHED, ESTABLISHED,
+        //Disconnection states
+        SUBSCRIPTIONS_REMOVED, MESSAGES_DROPPED, INTERCEPTORS_NOTIFIED;
+    }
+
     public final String clientID;
     public final Channel channel;
     public final boolean cleanSession;
-    
+    private final AtomicReference<ConnectionState> channelState = new AtomicReference<>(ConnectionState.DISCONNECTED);
+
     public ConnectionDescriptor(String clientID, Channel session, boolean cleanSession) {
         this.clientID = clientID;
         this.channel = session;
         this.cleanSession = cleanSession;
     }
 
+    public void abort() {
+        LOG.info("closing the channel");
+//        try {
+            //this.channel.disconnect().sync();
+            this.channel.close();//.sync();
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
+    }
+
+    public boolean assignState(ConnectionState expected, ConnectionState newState) {
+        return channelState.compareAndSet(expected, newState);
+    }
+
     @Override
     public String toString() {
-        return "ConnectionDescriptor{" + "clientID=" + clientID + ", cleanSession=" + cleanSession + '}';
+        return "ConnectionDescriptor{" + "clientID=" + clientID +
+                ", cleanSession=" + cleanSession +
+                ", state=" + channelState.get() +
+                '}';
     }
 
     @Override
