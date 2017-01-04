@@ -15,13 +15,13 @@
  */
 package io.moquette.parser.netty;
 
+import io.moquette.parser.proto.messages.AbstractMessage;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.CorruptedFrameException;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeMap;
 import java.io.UnsupportedEncodingException;
-import io.moquette.parser.proto.messages.AbstractMessage;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -29,18 +29,18 @@ import org.slf4j.LoggerFactory;
  * @author andrea
  */
 public class Utils {
-    
+
     public static final int MAX_LENGTH_LIMIT = 268435455;
-    
+
     public static final byte VERSION_3_1 = 3;
     public static final byte VERSION_3_1_1 = 4;
-    
+
     static byte readMessageType(ByteBuf in) {
         byte h1 = in.readByte();
         byte messageType = (byte) ((h1 & 0x00F0) >> 4);
         return messageType;
     }
-    
+
     static boolean checkHeaderAvailability(ByteBuf in) {
         if (in.readableBytes() < 1) {
             return false;
@@ -48,28 +48,38 @@ public class Utils {
         //byte h1 = in.get();
         //byte messageType = (byte) ((h1 & 0x00F0) >> 4);
         in.skipBytes(1); //skip the messageType byte
-        
-        int remainingLength = Utils.decodeRemainingLenght(in);
+
+        int remainingLength = -1;
+
+        try {
+            remainingLength = Utils.decodeRemainingLength(in);
+        } catch (RuntimeException e) {
+            // Do nothing but return false.
+            return false;
+        }
+
         if (remainingLength == -1) {
             return false;
         }
-        
+
         //check remaining length
         if (in.readableBytes() < remainingLength) {
             return false;
         }
-        
+
         //return messageType == type ? MessageDecoderResult.OK : MessageDecoderResult.NOT_OK;
         return true;
     }
-    
+
     /**
-     * Decode the variable remaining length as defined in MQTT v3.1 specification 
+     * Decode the variable remaining length as defined in MQTT v3.1 specification
      * (section 2.1).
-     * 
+     *
+     * @param in {@code ByteBuf} object that contains raw bytes of an incoming packet.
      * @return the decoded length or -1 if needed more data to decode the length field.
+     * @throws RuntimeException if the remaining length is larger than four bytes.
      */
-    static int decodeRemainingLenght(ByteBuf in) {
+    static int decodeRemainingLength(ByteBuf in) throws RuntimeException {
         int multiplier = 1;
         int value = 0;
         byte digit;
@@ -79,15 +89,18 @@ public class Utils {
             }
             digit = in.readByte();
             value += (digit & 0x7F) * multiplier;
+            if (multiplier > 128*128*128) {
+                throw new RuntimeException("Remaining Length is larger than four bytes.");
+            }
             multiplier *= 128;
         } while ((digit & 0x80) != 0);
         return value;
     }
-    
+
     /**
      * Encode the value in the format defined in specification as variable length
      * array.
-     * 
+     *
      * @throws IllegalArgumentException if the value is not in the specification bounds
      *  [0..268435455].
      */
@@ -109,11 +122,11 @@ public class Utils {
         } while (value > 0);
         return encoded;
     }
-    
+
     /**
      * Load a string from the given buffer, reading first the two bytes of len
      * and then the UTF-8 bytes of the string.
-     * 
+     *
      * @return the decoded string or null if NEED_DATA
      */
     static String decodeString(ByteBuf in) throws UnsupportedEncodingException {
@@ -145,7 +158,7 @@ public class Utils {
         byte[] raw;
         try {
             raw = str.getBytes("UTF-8");
-            //NB every Java platform has got UTF-8 encoding by default, so this 
+            //NB every Java platform has got UTF-8 encoding by default, so this
             //exception are never raised.
         } catch (UnsupportedEncodingException ex) {
             LoggerFactory.getLogger(Utils.class).error(null, ex);
@@ -168,13 +181,21 @@ public class Utils {
      * Return the number of bytes to encode the given remaining length value
      */
     static int numBytesToEncode(int len) {
-        if (0 <= len && len <= 127) return 1;
-        if (128 <= len && len <= 16383) return 2;
-        if (16384 <= len && len <= 2097151) return 3;
-        if (2097152 <= len && len <= 268435455) return 4;
+        if (0 <= len && len <= 127) {
+            return 1;
+        }
+        if (128 <= len && len <= 16383) {
+            return 2;
+        }
+        if (16384 <= len && len <= 2097151) {
+            return 3;
+        }
+        if (2097152 <= len && len <= 268435455) {
+            return 4;
+        }
         throw new IllegalArgumentException("value shoul be in the range [0..268435455]");
     }
-    
+
     static byte encodeFlags(AbstractMessage message) {
         byte flags = 0;
         if (message.isDupFlag()) {
@@ -183,17 +204,17 @@ public class Utils {
         if (message.isRetainFlag()) {
             flags |= 0x01;
         }
-        
+
         flags |= ((message.getQos().byteValue() & 0x03) << 1);
         return flags;
     }
-    
+
     static boolean isMQTT3_1_1(AttributeMap attrsMap) {
         Attribute<Integer> versionAttr = attrsMap.attr(MQTTDecoder.PROTOCOL_VERSION);
         Integer protocolVersion = versionAttr.get();
         if (protocolVersion == null) {
             return true;
-        } 
+        }
         return protocolVersion == VERSION_3_1_1;
     }
 }
