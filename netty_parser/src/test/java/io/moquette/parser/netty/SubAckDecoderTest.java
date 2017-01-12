@@ -37,7 +37,7 @@ public class SubAckDecoderTest {
     @Before
     public void setUp() {
         m_msgdec = new SubAckDecoder();
-        m_results = new ArrayList<Object>();
+        m_results = new ArrayList<>();
         m_buff = Unpooled.buffer(7);
     }
     

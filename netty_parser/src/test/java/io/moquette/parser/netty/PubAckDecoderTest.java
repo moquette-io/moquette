@@ -46,7 +46,7 @@ public class PubAckDecoderTest {
         m_buff = Unpooled.buffer(14);
         int messageId = 0xAABB;
         initHeader(m_buff, messageId);
-        List<Object> results = new ArrayList<Object >();
+        List<Object> results = new ArrayList<>();
         
         //Excercise
         m_msgdec.decode(null, m_buff, results);

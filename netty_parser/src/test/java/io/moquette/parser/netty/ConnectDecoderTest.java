@@ -53,7 +53,7 @@ public class ConnectDecoderTest {
     public void testBaseHeader() throws Exception {
         m_buff = Unpooled.buffer(14);
         initBaseHeader(m_buff);
-        List<Object> results = new ArrayList<Object >();
+        List<Object> results = new ArrayList<>();
         
         //Excercise
         m_msgdec.decode(this.attrMap, m_buff, results);
@@ -83,7 +83,7 @@ public class ConnectDecoderTest {
     public void testBaseHeader_311_withFlagsTouched() throws UnsupportedEncodingException {
         m_buff = Unpooled.buffer(12);
         initBaseHeader311_withFixedFlags(m_buff, (byte) 0x01);
-        List<Object> results = new ArrayList<Object>();
+        List<Object> results = new ArrayList<>();
         
         //Excercise
         m_msgdec.decode(this.attrMap, m_buff, results);
@@ -103,7 +103,7 @@ public class ConnectDecoderTest {
         
         m_buff = Unpooled.buffer(12);
         initBaseHeader311(m_buff);
-        List<Object> results = new ArrayList<Object>();
+        List<Object> results = new ArrayList<>();
         
         //Excercise
         m_msgdec.decode(this.attrMap, m_buff, results);
@@ -113,7 +113,7 @@ public class ConnectDecoderTest {
     public void testConnectFlags_311_withNot0Reserved() throws UnsupportedEncodingException {
         m_buff = Unpooled.buffer(12);
         initBaseHeader311_withFixedFlags(m_buff, (byte) 0, (byte) 0xCF); // sets the bit(0) = 1
-        List<Object> results = new ArrayList<Object>();
+        List<Object> results = new ArrayList<>();
         
         //Excercise
         m_msgdec.decode(this.attrMap, m_buff, results);
@@ -132,7 +132,7 @@ public class ConnectDecoderTest {
         encodeString(m_buff, "ABCDEFGH");
         encodeString(m_buff, "Topic");
         encodeString(m_buff, "Message");
-        List<Object> results = new ArrayList<Object >();
+        List<Object> results = new ArrayList<>();
         
         //Excercise
         m_msgdec.decode(this.attrMap, m_buff, results);
@@ -156,7 +156,7 @@ public class ConnectDecoderTest {
         encodeString(m_buff, "Message");
         encodeString(m_buff, "Fakeuser");
         encodeString(m_buff, "pwd");
-        List<Object> results = new ArrayList<Object >();
+        List<Object> results = new ArrayList<>();
         
         //Excercise
         m_msgdec.decode(this.attrMap, m_buff, results);
@@ -185,7 +185,7 @@ public class ConnectDecoderTest {
         m_buff.writeByte(0x4E); //sets user to false and password to true
         //keepAlive
         m_buff.writeByte(0).writeByte(0x0A);
-        List<Object> results = new ArrayList<Object>();
+        List<Object> results = new ArrayList<>();
         
         //Excercise
         m_msgdec.decode(this.attrMap, m_buff, results);

@@ -51,7 +51,7 @@ public class PubRelDecoderTest {
         m_buff.clear().writeByte(AbstractMessage.PUBREL << 4 | 0x02).writeByte(4);
         m_buff.writeShort(MESSAGE_ID);  //fake message_id
         
-        List<Object> results = new ArrayList<Object>();
+        List<Object> results = new ArrayList<>();
         
         //Excercise
         m_msgdec.decode(this.attrMap, m_buff, results);
@@ -67,7 +67,7 @@ public class PubRelDecoderTest {
         m_buff.clear().writeByte(AbstractMessage.PUBREL << 4 | 0x03).writeByte(4);
         m_buff.writeShort(MESSAGE_ID);  //fake message_id
         
-        List<Object> results = new ArrayList<Object>();
+        List<Object> results = new ArrayList<>();
         
         //Excercise
         m_msgdec.decode(this.attrMap, m_buff, results);
