@@ -134,7 +134,7 @@ public class ProtocolDecodingServer {
         System.out.println("Loop server started");
         startClientsTesting();
         //Bind  a shutdown hook
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> server.stop()));
+        Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
     }
 
     private static void startClientsTesting() throws MqttException, InterruptedException {
