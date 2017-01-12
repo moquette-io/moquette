@@ -166,10 +166,10 @@ class MapDBSessionsStore implements ISessionsStore {
         PersistentSession storedSession = m_persistentSessions.get(clientID);
         return new ClientSession(clientID, m_messagesStore, this, storedSession.cleanSession);
     }
-    
+
     @Override
     public Collection<ClientSession> getAllSessions() {
-        Collection<ClientSession> result = new ArrayList<ClientSession>();
+        Collection<ClientSession> result = new ArrayList<>();
         for (Map.Entry<String, PersistentSession> entry : m_persistentSessions.entrySet()) {
             result.add(new ClientSession(entry.getKey(), m_messagesStore, this, entry.getValue().cleanSession));
         }
@@ -270,7 +270,7 @@ class MapDBSessionsStore implements ISessionsStore {
             inFlightForClient.remove(messageID);
         }
 
-        Map<Integer, MessageGUID> messageIDs = Utils.defaultGet(m_secondPhaseStore, clientID, new HashMap<Integer, MessageGUID>());
+        Map<Integer, MessageGUID> messageIDs = Utils.defaultGet(m_secondPhaseStore, clientID, new HashMap<>());
         messageIDs.put(messageID, guid);
         m_secondPhaseStore.put(clientID, messageIDs);
     }
@@ -280,7 +280,7 @@ class MapDBSessionsStore implements ISessionsStore {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Processing second phase ACK. MqttClientId = {}, messageId = {}.", clientID, messageID);
         }
-        Map<Integer, MessageGUID> messageIDs = Utils.defaultGet(m_secondPhaseStore, clientID, new HashMap<Integer, MessageGUID>());
+        Map<Integer, MessageGUID> messageIDs = Utils.defaultGet(m_secondPhaseStore, clientID, new HashMap<>());
         MessageGUID guid = messageIDs.remove(messageID);
         m_secondPhaseStore.put(clientID, messageIDs);
         return guid;
