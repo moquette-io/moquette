@@ -861,12 +861,7 @@ public class ProtocolProcessor {
 
         //scans retained messages to be published to the new subscription
         //TODO this is ugly, it does a linear scan on potential big dataset
-        Collection<IMessagesStore.StoredMessage> messages = m_messagesStore.searchMatching(new IMatchingCondition() {
-            @Override
-            public boolean match(String key) {
-                return SubscriptionsStore.matchTopics(key, newSubscription.getTopicFilter());
-            }
-        });
+        Collection<IMessagesStore.StoredMessage> messages = m_messagesStore.searchMatching(key -> SubscriptionsStore.matchTopics(key, newSubscription.getTopicFilter()));
 
         if (!messages.isEmpty()) {
 			LOG.info("Publishing retained messages. MqttClientId = {}, topics = {}, messagesNo = {}.",

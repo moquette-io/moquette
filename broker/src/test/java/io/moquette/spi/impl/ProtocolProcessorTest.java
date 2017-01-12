@@ -443,11 +443,7 @@ public class ProtocolProcessorTest {
         m_processor.processPublish(m_channel, cleanPubMsg);
         
         //Verify
-        Collection<IMessagesStore.StoredMessage> messages = m_messagesStore.searchMatching(new IMatchingCondition() {
-            public boolean match(String key) {
-                return  SubscriptionsStore.matchTopics(key, FAKE_TOPIC);
-            }
-        });
+        Collection<IMessagesStore.StoredMessage> messages = m_messagesStore.searchMatching(key -> SubscriptionsStore.matchTopics(key, FAKE_TOPIC));
         assertTrue(messages.isEmpty());
     }
 

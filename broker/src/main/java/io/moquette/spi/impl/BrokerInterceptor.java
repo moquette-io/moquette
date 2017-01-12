@@ -64,7 +64,7 @@ final class BrokerInterceptor implements Interceptor {
 		}
 		executor = Executors.newFixedThreadPool(poolSize);
 	}
-	
+
 	/**
 	 * Configures a broker interceptor, with a thread pool of one thread.
 	 * @param handlers
@@ -72,7 +72,7 @@ final class BrokerInterceptor implements Interceptor {
 	public BrokerInterceptor(List<InterceptHandler> handlers) {
 		this(1, handlers);
 	}
-	
+
 	/**
 	 * Configures a broker interceptor using the pool size specified in the
 	 * IConfig argument.
@@ -102,12 +102,7 @@ final class BrokerInterceptor implements Interceptor {
         for (final InterceptHandler handler : this.handlers.get(InterceptConnectMessage.class)) {
             LOG.debug("Sending MQTT CONNECT message to interceptor. MqttClientId = {}, interceptorId = {}.",
                     msg.getClientID(), handler.getID());
-            executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    handler.onConnect(new InterceptConnectMessage(msg));
-                }
-            });
+            executor.execute(() -> handler.onConnect(new InterceptConnectMessage(msg)));
         }
     }
 
@@ -116,12 +111,7 @@ final class BrokerInterceptor implements Interceptor {
         for (final InterceptHandler handler : this.handlers.get(InterceptDisconnectMessage.class)) {
             LOG.debug("Notifying MQTT client disconnection to interceptor. MqttClientId = {}, username = {}, " +
                     "interceptorId = {}.", clientID, username, handler.getID());
-            executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    handler.onDisconnect(new InterceptDisconnectMessage(clientID, username));
-                }
-            });
+            executor.execute(() -> handler.onDisconnect(new InterceptDisconnectMessage(clientID, username)));
         }
     }
 
@@ -130,12 +120,7 @@ final class BrokerInterceptor implements Interceptor {
         for (final InterceptHandler handler : this.handlers.get(InterceptConnectionLostMessage.class)) {
             LOG.debug("Notifying unexpected MQTT client disconnection to interceptor. MqttClientId = {}, " +
                     "username = {}, interceptorId = {}.", clientID, username, handler.getID());
-            executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    handler.onConnectionLost(new InterceptConnectionLostMessage(clientID, username));
-                }
-            });
+            executor.execute(() -> handler.onConnectionLost(new InterceptConnectionLostMessage(clientID, username)));
         }
     }
 
@@ -144,12 +129,7 @@ final class BrokerInterceptor implements Interceptor {
         for (final InterceptHandler handler : this.handlers.get(InterceptPublishMessage.class)) {
             LOG.debug("Notifying MQTT PUBLISH message to interceptor. MqttClientId = {}, messageId = {}, topic = {}, " +
                     "interceptorId = {}.", clientID, msg.getMessageID(), msg.getTopicName(), handler.getID());
-            executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    handler.onPublish(new InterceptPublishMessage(msg, clientID, username));
-                }
-            });
+            executor.execute(() -> handler.onPublish(new InterceptPublishMessage(msg, clientID, username)));
         }
     }
 
@@ -158,12 +138,7 @@ final class BrokerInterceptor implements Interceptor {
         for (final InterceptHandler handler : this.handlers.get(InterceptSubscribeMessage.class)) {
             LOG.debug("Notifying MQTT SUBSCRIBE message to interceptor. MqttClientId = {}, topicFilter = {}, " +
                     "interceptorId = {}.", sub.getClientId(), sub.getTopicFilter(), handler.getID());
-            executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    handler.onSubscribe(new InterceptSubscribeMessage(sub, username));
-                }
-            });
+            executor.execute(() -> handler.onSubscribe(new InterceptSubscribeMessage(sub, username)));
         }
     }
 
@@ -172,12 +147,7 @@ final class BrokerInterceptor implements Interceptor {
         for (final InterceptHandler handler : this.handlers.get(InterceptUnsubscribeMessage.class)) {
             LOG.debug("Notifying MQTT UNSUBSCRIBE message to interceptor. MqttClientId = {}, topic = {}, " +
                     "interceptorId = {}.", clientID, topic, handler.getID());
-            executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    handler.onUnsubscribe(new InterceptUnsubscribeMessage(topic, clientID, username));
-                }
-            });
+            executor.execute(() -> handler.onUnsubscribe(new InterceptUnsubscribeMessage(topic, clientID, username)));
         }
     }
 
@@ -187,12 +157,7 @@ final class BrokerInterceptor implements Interceptor {
             LOG.debug("Notifying MQTT ACK message to interceptor. MqttClientId = {}, messageId = {}, topic = {}, " +
                     "interceptorId = {}.",
                     msg.getMsg().getClientID(), msg.getMsg().getMessageID(), msg.getTopic(), handler.getID());
-            executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    handler.onMessageAcknowledged(msg);
-                }
-            });
+            executor.execute(() -> handler.onMessageAcknowledged(msg));
         }
     }
 

@@ -120,12 +120,9 @@ public class Client {
 
     private void doConnect(ConnectMessage connectMessage) {
         final CountDownLatch latch = new CountDownLatch(1);
-        this.setCallback(new Client.ICallback() {
-
-            public void call(AbstractMessage msg) {
-                receivedMsg = msg;
-                latch.countDown();
-            }
+        this.setCallback(msg -> {
+            receivedMsg = msg;
+            latch.countDown();
         });
 
         this.sendMessage(connectMessage);

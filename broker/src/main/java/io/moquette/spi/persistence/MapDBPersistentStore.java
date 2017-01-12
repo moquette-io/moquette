@@ -79,7 +79,7 @@ public class MapDBPersistentStore {
     public ISessionsStore sessionsStore() {
         return m_sessionsStore;
     }
-    
+
     public void initStore() {
         LOG.info("Initializing MapDB store...");
         if (m_storePath == null || m_storePath.isEmpty()) {
@@ -99,12 +99,9 @@ public class MapDBPersistentStore {
             m_db = DBMaker.newFileDB(tmpFile).make();
         }
         LOG.info("Scheduling MapDB commit task...");
-        m_scheduler.scheduleWithFixedDelay(new Runnable() {
-            @Override
-            public void run() {
-                LOG.debug("Committing to MapDB...");
-                m_db.commit();
-            }
+        m_scheduler.scheduleWithFixedDelay(() -> {
+            LOG.debug("Committing to MapDB...");
+            m_db.commit();
         }, this.m_autosaveInterval, this.m_autosaveInterval, TimeUnit.SECONDS);
 
         //TODO check m_db is valid and
