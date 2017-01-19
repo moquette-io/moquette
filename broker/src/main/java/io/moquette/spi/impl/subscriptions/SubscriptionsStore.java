@@ -50,11 +50,11 @@ public class SubscriptionsStore {
         try {
             parseTopic(topicFilter);
             return true;
-		} catch (ParseException pex) {
-			LOG.warn("The topic filter is malformed. TopicFilter = {}, cause = {}, errorMessage = {}.", topicFilter,
-					pex.getCause(), pex.getMessage());
-			return false;
-		}
+        } catch (ParseException pex) {
+            LOG.warn("The topic filter is malformed. TopicFilter = {}, cause = {}, errorMessage = {}.", topicFilter,
+                    pex.getCause(), pex.getMessage());
+            return false;
+        }
     }
 
     public interface IVisitor<T> {
@@ -121,9 +121,9 @@ public class SubscriptionsStore {
     }
 
     public void add(ClientTopicCouple newSubscription) {
-    	/*
-    	 * The topic filters have already been validated at the ProtocolProcessor. We can assume they are valid.
-    	 */
+        /*
+         * The topic filters have already been validated at the ProtocolProcessor. We can assume they are valid.
+         */
         TreeNode oldRoot;
         NodeCouple couple;
         do {
@@ -142,9 +142,9 @@ public class SubscriptionsStore {
             tokens = parseTopic(topic);
         } catch (ParseException ex) {
             //TODO handle the parse exception
-			LOG.error("The topic is malformed. Topic = {}, cause = {}, errorMessage = {}.", topic, ex.getCause(),
-					ex.getMessage());
-			throw new IllegalArgumentException(ex.getMessage());
+            LOG.error("The topic is malformed. Topic = {}, cause = {}, errorMessage = {}.", topic, ex.getCause(),
+                    ex.getMessage());
+            throw new IllegalArgumentException(ex.getMessage());
         }
 
         final TreeNode newRoot = oldRoot.copy();
@@ -172,9 +172,9 @@ public class SubscriptionsStore {
     }
 
     public void removeSubscription(String topic, String clientID) {
-    	/*
-    	 * The topic filters have already been validated at the ProtocolProcessor. We can assume they are valid.
-    	 */
+        /*
+         * The topic filters have already been validated at the ProtocolProcessor. We can assume they are valid.
+         */
         TreeNode oldRoot;
         NodeCouple couple;
         do {
@@ -300,10 +300,10 @@ public class SubscriptionsStore {
 //            }
             return i == msgTokens.size();
         } catch (ParseException ex) {
-			LOG.error(
-					"The message topic, the subscription topic or both are malformed. MsgTopic = {}, subscriptionTopic = {}, cause = {}, errorMessage = {}.",
-					msgTopic, subscriptionTopic, ex.getCause(), ex.getMessage());
-			throw new IllegalStateException(ex.getMessage());
+            LOG.error(
+                    "The message topic, the subscription topic or both are malformed. MsgTopic = {}, subscriptionTopic = {}, cause = {}, errorMessage = {}.",
+                    msgTopic, subscriptionTopic, ex.getCause(), ex.getMessage());
+            throw new IllegalStateException(ex.getMessage());
         }
     }
 
