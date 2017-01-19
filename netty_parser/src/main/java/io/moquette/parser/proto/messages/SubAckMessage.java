@@ -24,7 +24,7 @@ import java.util.List;
  */
 public class SubAckMessage extends MessageIDMessage {
 
-    List<QOSType> m_types = new ArrayList<QOSType>();
+    List<QOSType> m_types = new ArrayList<>();
     
     public SubAckMessage() {
         m_messageType = SUBACK;

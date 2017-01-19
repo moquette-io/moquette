@@ -23,7 +23,7 @@ import java.util.List;
  * @author andrea
  */
 public class UnsubscribeMessage extends MessageIDMessage {
-    List<String> m_types = new ArrayList<String>();
+    List<String> m_types = new ArrayList<>();
     
     public UnsubscribeMessage() {
         m_messageType = UNSUBSCRIBE;

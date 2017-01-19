@@ -89,7 +89,7 @@ public class MemorySessionStore implements ISessionsStore {
     public void addNewSubscription(Subscription newSubscription) {
         final String clientID = newSubscription.getClientId();
         if (!m_persistentSubscriptions.containsKey(clientID)) {
-            m_persistentSubscriptions.put(clientID, new HashSet<Subscription>());
+            m_persistentSubscriptions.put(clientID, new HashSet<>());
         }
 
         Set<Subscription> subs = m_persistentSubscriptions.get(clientID);
@@ -116,7 +116,7 @@ public class MemorySessionStore implements ISessionsStore {
             throw new IllegalArgumentException("Can't create a session with the ID of an already existing" + clientID);
         }
         LOG.debug("clientID {} is a newcome, creating it's empty subscriptions set", clientID);
-        m_persistentSubscriptions.put(clientID, new HashSet<Subscription>());
+        m_persistentSubscriptions.put(clientID, new HashSet<>());
         m_persistentSessions.put(clientID, new MapDBPersistentStore.PersistentSession(cleanSession));
         return new ClientSession(clientID, m_messagesStore, this, cleanSession);
     }
@@ -219,7 +219,7 @@ public class MemorySessionStore implements ISessionsStore {
 
     @Override
     public BlockingQueue<StoredMessage> queue(String clientID) {
-        return Utils.defaultGet(queues, clientID, new ArrayBlockingQueue<StoredMessage>(Constants.MAX_MESSAGE_QUEUE));
+        return Utils.defaultGet(queues, clientID, new ArrayBlockingQueue<>(Constants.MAX_MESSAGE_QUEUE));
     }
 
     @Override
@@ -238,14 +238,14 @@ public class MemorySessionStore implements ISessionsStore {
         MessageGUID guid = m.remove(messageID);
 
         LOG.info("Moving to second phase store");
-        Map<Integer, MessageGUID> messageIDs = Utils.defaultGet(m_secondPhaseStore, clientID, new HashMap<Integer, MessageGUID>());
+        Map<Integer, MessageGUID> messageIDs = Utils.defaultGet(m_secondPhaseStore, clientID, new HashMap<>());
         messageIDs.put(messageID, guid);
         m_secondPhaseStore.put(clientID, messageIDs);
     }
 
     @Override
     public MessageGUID secondPhaseAcknowledged(String clientID, int messageID) {
-        Map<Integer, MessageGUID> messageIDs = Utils.defaultGet(m_secondPhaseStore, clientID, new HashMap<Integer, MessageGUID>());
+        Map<Integer, MessageGUID> messageIDs = Utils.defaultGet(m_secondPhaseStore, clientID, new HashMap<>());
         MessageGUID guid = messageIDs.remove(messageID);
         m_secondPhaseStore.put(clientID, messageIDs);
         return guid;
@@ -254,7 +254,7 @@ public class MemorySessionStore implements ISessionsStore {
     @Override
     public MessageGUID mapToGuid(String clientID, int messageID) {
         HashMap<Integer, MessageGUID> guids = (HashMap<Integer, MessageGUID>) Utils.defaultGet(m_messageToGuids,
-                clientID, new HashMap<Integer, MessageGUID>());
+                clientID, new HashMap<>());
         return guids.get(messageID);
     }
 

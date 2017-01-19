@@ -44,7 +44,7 @@ public class ConnAckDecoderTest {
     public void testHeader() throws Exception {
         m_buff = Unpooled.buffer(14);
         initHeader(m_buff);
-        List<Object> results = new ArrayList<Object >();
+        List<Object> results = new ArrayList<>();
         
         //Excercise
         m_msgdec.decode(null, m_buff, results);
