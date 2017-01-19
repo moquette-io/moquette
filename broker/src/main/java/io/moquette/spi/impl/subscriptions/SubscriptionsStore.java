@@ -59,12 +59,12 @@ public class SubscriptionsStore {
 
     public interface IVisitor<T> {
         void visit(TreeNode node, int deep);
-        
+
         T getResult();
     }
-    
+
     private class DumpTreeVisitor implements IVisitor<String> {
-        
+
         String s = "";
 
         @Override
@@ -92,7 +92,7 @@ public class SubscriptionsStore {
             return s;
         }
     }
-    
+
     private AtomicReference<TreeNode> subscriptions = new AtomicReference<>(new TreeNode());
     private static final Logger LOG = LoggerFactory.getLogger(SubscriptionsStore.class);
     private volatile ISessionsStore m_sessionsStore;
@@ -185,7 +185,7 @@ public class SubscriptionsStore {
             //spin lock repeating till we can, swap root, if can't swap just re-do the operation
         } while(!subscriptions.compareAndSet(oldRoot, couple.root));
     }
-    
+
     /**
      * Visit the topics tree to remove matching subscriptions with clientID.
      * It's a mutating structure operation so create a new subscription tree (partial or total).
@@ -247,13 +247,13 @@ public class SubscriptionsStore {
     public int size() {
         return subscriptions.get().size();
     }
-    
+
     public String dumpTree() {
         DumpTreeVisitor visitor = new DumpTreeVisitor();
         bfsVisit(subscriptions.get(), visitor, 0);
         return visitor.getResult();
     }
-    
+
     private void bfsVisit(TreeNode node, IVisitor<?> visitor, int deep) {
         if (node == null) {
             return;
@@ -263,7 +263,7 @@ public class SubscriptionsStore {
             bfsVisit(child, visitor, ++deep);
         }
     }
-    
+
     /**
      * Verify if the 2 topics matching respecting the rules of MQTT Appendix A
      * @param msgTopic the topic to match from the message
@@ -307,7 +307,7 @@ public class SubscriptionsStore {
 			throw new IllegalStateException(ex.getMessage());
         }
     }
-    
+
     protected static List<Token> parseTopic(String topic) throws ParseException {
         List<Token> res = new ArrayList<>();
         String[] splitted = topic.split("/");
@@ -315,15 +315,15 @@ public class SubscriptionsStore {
         if (splitted.length == 0) {
             res.add(Token.EMPTY);
         }
-        
+
         if (topic.endsWith("/")) {
-            //Add a fictious space 
+            //Add a fictious space
             String[] newSplitted = new String[splitted.length + 1];
-            System.arraycopy(splitted, 0, newSplitted, 0, splitted.length); 
+            System.arraycopy(splitted, 0, newSplitted, 0, splitted.length);
             newSplitted[splitted.length] = "";
             splitted = newSplitted;
         }
-        
+
         for (int i = 0; i < splitted.length; i++) {
             String s = splitted[i];
             if (s.isEmpty()) {
