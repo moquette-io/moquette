@@ -220,8 +220,7 @@ public class SubscriptionsStore {
             return Collections.emptyList();
         }
 
-        List<ClientTopicCouple> matchingSubs = new ArrayList<>();
-        subscriptions.get().matches(0, tokens, matchingSubs);
+        List<ClientTopicCouple> matchingSubs = subscriptions.get().matches(0, tokens);
 
         //remove the overlapping subscriptions, selecting ones with greatest qos
         Map<String, Subscription> subsForClient = new HashMap<>();

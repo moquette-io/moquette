@@ -84,11 +84,10 @@ class TreeNode {
         m_subscriptions.remove(clientTopicCouple);
     }
 
-    //TODO smell a query method that return the result modifing the parameter (matchingSubs)
-    void matches(int pos, List<Token> tokens, List<ClientTopicCouple> matchingSubs) {
+    List<ClientTopicCouple> matches(int pos, List<Token> tokens) {
         //check if all tokens are checked
         if (pos >= tokens.size()) {
-            matchingSubs.addAll(m_subscriptions);
+            List<ClientTopicCouple> matchingSubs = new ArrayList<>(m_subscriptions);
             //check if it has got a MULTI child and add its subscriptions
             for (TreeNode n : m_children) {
                 if (n.getToken() == Token.MULTI || n.getToken() == Token.SINGLE) {
@@ -96,21 +95,23 @@ class TreeNode {
                 }
             }
 
-            return;
+            return matchingSubs;
         }
 
         //we are on MULTI, than add subscriptions and return
         if (m_token == Token.MULTI) {
-            matchingSubs.addAll(m_subscriptions);
-            return;
+            return new ArrayList<>(m_subscriptions);
         }
 
         int next = pos + 1;
+        List<ClientTopicCouple> matchingSubs = new ArrayList<>();
         for (TreeNode n : m_children) {
             if (n.getToken().match(tokens.get(pos))) {
-                n.matches(next, tokens, matchingSubs);
+                matchingSubs.addAll(n.matches(next, tokens));
             }
         }
+
+        return matchingSubs;
     }
 
     /**
