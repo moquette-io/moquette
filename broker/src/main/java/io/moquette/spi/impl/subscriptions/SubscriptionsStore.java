@@ -274,9 +274,8 @@ public class SubscriptionsStore {
             Iterator<Token> msgTokens = SubscriptionsStore.parseTopic(msgTopic).iterator();
             List<Token> subscriptionTokens = SubscriptionsStore.parseTopic(subscriptionTopic);
             for (Token subToken : subscriptionTokens) {
-
                 if (!msgTokens.hasNext())
-                    return false;
+                    return subToken == Token.MULTI;
 
                 Token msgToken = msgTokens.next();
 
