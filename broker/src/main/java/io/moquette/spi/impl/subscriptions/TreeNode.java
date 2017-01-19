@@ -18,7 +18,6 @@ package io.moquette.spi.impl.subscriptions;
 
 import io.moquette.spi.ISubscriptionsStore.ClientTopicCouple;
 import java.util.*;
-import java.util.concurrent.LinkedBlockingQueue;
 
 class TreeNode {
 
@@ -116,7 +115,7 @@ class TreeNode {
             if (n.getToken().match(t)) {
                 // Create a copy of token, else if navigate 2 sibling it
                 // consumes 2 elements on the queue instead of one
-                n.matches(new LinkedBlockingQueue<>(tokens), matchingSubs);
+                n.matches(new ArrayDeque<>(tokens), matchingSubs);
                 // TODO don't create a copy n.matches(tokens, matchingSubs);
             }
         }

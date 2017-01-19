@@ -21,7 +21,6 @@ import io.moquette.spi.ISubscriptionsStore.ClientTopicCouple;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.*;
-import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -198,7 +197,7 @@ public class SubscriptionsDirectory implements ISubscriptionsDirectory {
      */
     @Override
     public List<Subscription> matches(Topic topic) {
-        Queue<Token> tokenQueue = new LinkedBlockingDeque<>(topic.getTokens());
+        Queue<Token> tokenQueue = new ArrayDeque<>(topic.getTokens());
         List<ClientTopicCouple> matchingSubs = new ArrayList<>();
         subscriptions.get().matches(tokenQueue, matchingSubs);
 
