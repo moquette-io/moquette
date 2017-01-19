@@ -17,7 +17,6 @@ package io.moquette.spi.impl.subscriptions;
 
 import java.text.ParseException;
 import java.util.*;
-import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.moquette.spi.ISessionsStore;
@@ -221,9 +220,8 @@ public class SubscriptionsStore {
             return Collections.emptyList();
         }
 
-        Queue<Token> tokenQueue = new LinkedBlockingDeque<>(tokens);
         List<ClientTopicCouple> matchingSubs = new ArrayList<>();
-        subscriptions.get().matches(tokenQueue, matchingSubs);
+        subscriptions.get().matches(0, tokens, matchingSubs);
 
         //remove the overlapping subscriptions, selecting ones with greatest qos
         Map<String, Subscription> subsForClient = new HashMap<>();
