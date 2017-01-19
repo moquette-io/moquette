@@ -280,16 +280,13 @@ public class SubscriptionsStore {
 
                 Token msgToken = msgTokens.next();
 
-                if (subToken != Token.MULTI && subToken != Token.SINGLE) {
+                if (subToken == Token.MULTI) {
+                    return true;
+                } else if (subToken == Token.SINGLE) {
+                    //skip a step forward
+                } else {
                     if (!msgToken.equals(subToken)) {
                         return false;
-                    }
-                } else {
-                    if (subToken == Token.MULTI) {
-                        return true;
-                    }
-                    if (subToken == Token.SINGLE) {
-                        //skip a step forward
                     }
                 }
             }
