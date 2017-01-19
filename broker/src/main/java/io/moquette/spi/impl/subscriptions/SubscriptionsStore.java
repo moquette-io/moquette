@@ -269,19 +269,18 @@ public class SubscriptionsStore {
      * @param subscriptionTopic the topic filter of the subscription
      * @return true if the two topics match.
      */
-    //TODO reimplement with iterators or with queues
     public static boolean matchTopics(String msgTopic, String subscriptionTopic) {
         try {
-            List<Token> msgTokens = SubscriptionsStore.parseTopic(msgTopic);
+            Iterator<Token> msgTokens = SubscriptionsStore.parseTopic(msgTopic).iterator();
             List<Token> subscriptionTokens = SubscriptionsStore.parseTopic(subscriptionTopic);
-            int i = 0;
-            for (; i< subscriptionTokens.size(); i++) {
-                Token subToken = subscriptionTokens.get(i);
+            for (Token subToken : subscriptionTokens) {
+
+                if (!msgTokens.hasNext())
+                    return false;
+
+                Token msgToken = msgTokens.next();
+
                 if (subToken != Token.MULTI && subToken != Token.SINGLE) {
-                    if (i >= msgTokens.size()) {
-                        return false;
-                    }
-                    Token msgToken = msgTokens.get(i);
                     if (!msgToken.equals(subToken)) {
                         return false;
                     }
@@ -294,11 +293,7 @@ public class SubscriptionsStore {
                     }
                 }
             }
-            //if last token was a SINGLE then treat it as an empty
-//            if (subToken == Token.SINGLE && (i - msgTokens.size() == 1)) {
-//               i--;
-//            }
-            return i == msgTokens.size();
+            return !msgTokens.hasNext();
         } catch (ParseException ex) {
             LOG.error(
                     "The message topic, the subscription topic or both are malformed. MsgTopic = {}, subscriptionTopic = {}, cause = {}, errorMessage = {}.",
