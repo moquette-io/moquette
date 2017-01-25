@@ -613,7 +613,7 @@ public class ProtocolProcessor {
         final String topic = msg.variableHeader().topicName();
         LOG.info("Sending PUBLISH message. Topic = {}, qos = {}.", topic, qos);
 
-        MessageGUID guid = null;
+        UUID guid = null;
         IMessagesStore.StoredMessage toStoreMsg = asStoredMessage(msg);
         if (clientId == null || clientId.isEmpty()) {
             toStoreMsg.setClientID("BROKER_SELF");
