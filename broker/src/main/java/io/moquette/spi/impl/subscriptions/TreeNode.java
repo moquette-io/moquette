@@ -18,7 +18,6 @@ package io.moquette.spi.impl.subscriptions;
 import io.moquette.spi.ISessionsStore.ClientTopicCouple;
 
 import java.util.*;
-import java.util.concurrent.LinkedBlockingQueue;
 
 class TreeNode {
 
@@ -85,13 +84,10 @@ class TreeNode {
         m_subscriptions.remove(clientTopicCouple);
     }
 
-    //TODO smell a query method that return the result modifing the parameter (matchingSubs)
-    void matches(Queue<Token> tokens, List<ClientTopicCouple> matchingSubs) {
-        Token t = tokens.poll();
-
-        //check if t is null <=> tokens finished
-        if (t == null) {
-            matchingSubs.addAll(m_subscriptions);
+    List<ClientTopicCouple> matches(int pos, List<Token> tokens) {
+        //check if all tokens are checked
+        if (pos >= tokens.size()) {
+            List<ClientTopicCouple> matchingSubs = new ArrayList<>(m_subscriptions);
             //check if it has got a MULTI child and add its subscriptions
             for (TreeNode n : m_children) {
                 if (n.getToken() == Token.MULTI || n.getToken() == Token.SINGLE) {
@@ -99,23 +95,23 @@ class TreeNode {
                 }
             }
 
-            return;
+            return matchingSubs;
         }
 
         //we are on MULTI, than add subscriptions and return
         if (m_token == Token.MULTI) {
-            matchingSubs.addAll(m_subscriptions);
-            return;
+            return new ArrayList<>(m_subscriptions);
         }
 
+        int next = pos + 1;
+        List<ClientTopicCouple> matchingSubs = new ArrayList<>();
         for (TreeNode n : m_children) {
-            if (n.getToken().match(t)) {
-                //Create a copy of token, else if navigate 2 sibling it
-                //consumes 2 elements on the queue instead of one
-                n.matches(new LinkedBlockingQueue<>(tokens), matchingSubs);
-                //TODO don't create a copy n.matches(tokens, matchingSubs);
+            if (n.getToken().match(tokens.get(pos))) {
+                matchingSubs.addAll(n.matches(next, tokens));
             }
         }
+
+        return matchingSubs;
     }
 
     /**

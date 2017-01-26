@@ -17,7 +17,6 @@ package io.moquette.spi.impl.subscriptions;
 
 import java.text.ParseException;
 import java.util.*;
-import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.moquette.spi.ISessionsStore;
@@ -51,21 +50,21 @@ public class SubscriptionsStore {
         try {
             parseTopic(topicFilter);
             return true;
-		} catch (ParseException pex) {
-			LOG.warn("The topic filter is malformed. TopicFilter = {}, cause = {}, errorMessage = {}.", topicFilter,
-					pex.getCause(), pex.getMessage());
-			return false;
-		}
+        } catch (ParseException pex) {
+            LOG.warn("The topic filter is malformed. TopicFilter = {}, cause = {}, errorMessage = {}.", topicFilter,
+                    pex.getCause(), pex.getMessage());
+            return false;
+        }
     }
 
     public interface IVisitor<T> {
         void visit(TreeNode node, int deep);
-        
+
         T getResult();
     }
-    
+
     private class DumpTreeVisitor implements IVisitor<String> {
-        
+
         String s = "";
 
         @Override
@@ -93,7 +92,7 @@ public class SubscriptionsStore {
             return s;
         }
     }
-    
+
     private AtomicReference<TreeNode> subscriptions = new AtomicReference<>(new TreeNode());
     private static final Logger LOG = LoggerFactory.getLogger(SubscriptionsStore.class);
     private volatile ISessionsStore m_sessionsStore;
@@ -122,9 +121,9 @@ public class SubscriptionsStore {
     }
 
     public void add(ClientTopicCouple newSubscription) {
-    	/*
-    	 * The topic filters have already been validated at the ProtocolProcessor. We can assume they are valid.
-    	 */
+        /*
+         * The topic filters have already been validated at the ProtocolProcessor. We can assume they are valid.
+         */
         TreeNode oldRoot;
         NodeCouple couple;
         do {
@@ -143,9 +142,9 @@ public class SubscriptionsStore {
             tokens = parseTopic(topic);
         } catch (ParseException ex) {
             //TODO handle the parse exception
-			LOG.error("The topic is malformed. Topic = {}, cause = {}, errorMessage = {}.", topic, ex.getCause(),
-					ex.getMessage());
-			throw new IllegalArgumentException(ex.getMessage());
+            LOG.error("The topic is malformed. Topic = {}, cause = {}, errorMessage = {}.", topic, ex.getCause(),
+                    ex.getMessage());
+            throw new IllegalArgumentException(ex.getMessage());
         }
 
         final TreeNode newRoot = oldRoot.copy();
@@ -173,9 +172,9 @@ public class SubscriptionsStore {
     }
 
     public void removeSubscription(String topic, String clientID) {
-    	/*
-    	 * The topic filters have already been validated at the ProtocolProcessor. We can assume they are valid.
-    	 */
+        /*
+         * The topic filters have already been validated at the ProtocolProcessor. We can assume they are valid.
+         */
         TreeNode oldRoot;
         NodeCouple couple;
         do {
@@ -186,7 +185,7 @@ public class SubscriptionsStore {
             //spin lock repeating till we can, swap root, if can't swap just re-do the operation
         } while(!subscriptions.compareAndSet(oldRoot, couple.root));
     }
-    
+
     /**
      * Visit the topics tree to remove matching subscriptions with clientID.
      * It's a mutating structure operation so create a new subscription tree (partial or total).
@@ -221,9 +220,7 @@ public class SubscriptionsStore {
             return Collections.emptyList();
         }
 
-        Queue<Token> tokenQueue = new LinkedBlockingDeque<>(tokens);
-        List<ClientTopicCouple> matchingSubs = new ArrayList<>();
-        subscriptions.get().matches(tokenQueue, matchingSubs);
+        List<ClientTopicCouple> matchingSubs = subscriptions.get().matches(0, tokens);
 
         //remove the overlapping subscriptions, selecting ones with greatest qos
         Map<String, Subscription> subsForClient = new HashMap<>();
@@ -249,13 +246,13 @@ public class SubscriptionsStore {
     public int size() {
         return subscriptions.get().size();
     }
-    
+
     public String dumpTree() {
         DumpTreeVisitor visitor = new DumpTreeVisitor();
         bfsVisit(subscriptions.get(), visitor, 0);
         return visitor.getResult();
     }
-    
+
     private void bfsVisit(TreeNode node, IVisitor<?> visitor, int deep) {
         if (node == null) {
             return;
@@ -265,51 +262,42 @@ public class SubscriptionsStore {
             bfsVisit(child, visitor, ++deep);
         }
     }
-    
+
     /**
      * Verify if the 2 topics matching respecting the rules of MQTT Appendix A
      * @param msgTopic the topic to match from the message
      * @param subscriptionTopic the topic filter of the subscription
      * @return true if the two topics match.
      */
-    //TODO reimplement with iterators or with queues
     public static boolean matchTopics(String msgTopic, String subscriptionTopic) {
         try {
-            List<Token> msgTokens = SubscriptionsStore.parseTopic(msgTopic);
+            Iterator<Token> msgTokens = SubscriptionsStore.parseTopic(msgTopic).iterator();
             List<Token> subscriptionTokens = SubscriptionsStore.parseTopic(subscriptionTopic);
-            int i = 0;
-            for (; i< subscriptionTokens.size(); i++) {
-                Token subToken = subscriptionTokens.get(i);
-                if (subToken != Token.MULTI && subToken != Token.SINGLE) {
-                    if (i >= msgTokens.size()) {
-                        return false;
-                    }
-                    Token msgToken = msgTokens.get(i);
+            for (Token subToken : subscriptionTokens) {
+                if (!msgTokens.hasNext())
+                    return subToken == Token.MULTI;
+
+                Token msgToken = msgTokens.next();
+
+                if (subToken == Token.MULTI) {
+                    return true;
+                } else if (subToken == Token.SINGLE) {
+                    //skip a step forward
+                } else {
                     if (!msgToken.equals(subToken)) {
                         return false;
                     }
-                } else {
-                    if (subToken == Token.MULTI) {
-                        return true;
-                    }
-                    if (subToken == Token.SINGLE) {
-                        //skip a step forward
-                    }
                 }
             }
-            //if last token was a SINGLE then treat it as an empty
-//            if (subToken == Token.SINGLE && (i - msgTokens.size() == 1)) {
-//               i--;
-//            }
-            return i == msgTokens.size();
+            return !msgTokens.hasNext();
         } catch (ParseException ex) {
-			LOG.error(
-					"The message topic, the subscription topic or both are malformed. MsgTopic = {}, subscriptionTopic = {}, cause = {}, errorMessage = {}.",
-					msgTopic, subscriptionTopic, ex.getCause(), ex.getMessage());
-			throw new IllegalStateException(ex.getMessage());
+            LOG.error(
+                    "The message topic, the subscription topic or both are malformed. MsgTopic = {}, subscriptionTopic = {}, cause = {}, errorMessage = {}.",
+                    msgTopic, subscriptionTopic, ex.getCause(), ex.getMessage());
+            throw new IllegalStateException(ex.getMessage());
         }
     }
-    
+
     protected static List<Token> parseTopic(String topic) throws ParseException {
         List<Token> res = new ArrayList<>();
         String[] splitted = topic.split("/");
@@ -317,15 +305,15 @@ public class SubscriptionsStore {
         if (splitted.length == 0) {
             res.add(Token.EMPTY);
         }
-        
+
         if (topic.endsWith("/")) {
-            //Add a fictious space 
+            //Add a fictious space
             String[] newSplitted = new String[splitted.length + 1];
-            System.arraycopy(splitted, 0, newSplitted, 0, splitted.length); 
+            System.arraycopy(splitted, 0, newSplitted, 0, splitted.length);
             newSplitted[splitted.length] = "";
             splitted = newSplitted;
         }
-        
+
         for (int i = 0; i < splitted.length; i++) {
             String s = splitted[i];
             if (s.isEmpty()) {
