@@ -22,7 +22,7 @@ import static io.moquette.parser.proto.messages.AbstractMessage.*;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-
+import io.netty.util.internal.ConcurrentSet;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,9 +37,17 @@ public class NettyMQTTHandler extends ChannelInboundHandlerAdapter {
     
     private static final Logger LOG = LoggerFactory.getLogger(NettyMQTTHandler.class);
     private final ProtocolProcessor m_processor;
+    private final ConcurrentSet<ChannelHandlerContext> channelHandlerContexts;
 
     public NettyMQTTHandler(ProtocolProcessor processor) {
         m_processor = processor;
+        channelHandlerContexts = new ConcurrentSet<ChannelHandlerContext>();
+    }
+    
+    @Override
+    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+    	super.channelActive(ctx);
+    	channelHandlerContexts.add(ctx);
     }
 
     @Override
@@ -98,6 +106,7 @@ public class NettyMQTTHandler extends ChannelInboundHandlerAdapter {
 			LOG.info("Notifying connection lost event. MqttClientId = {}.", clientID);
             m_processor.processConnectionLost(clientID, ctx.channel());
         }
+        channelHandlerContexts.remove(ctx);
         ctx.close();
     }
 
@@ -115,6 +124,10 @@ public class NettyMQTTHandler extends ChannelInboundHandlerAdapter {
             m_processor.notifyChannelWritable(ctx.channel());
         }
         ctx.fireChannelWritabilityChanged();
+    }
+    
+    public int getConnectionsNo() {
+    	return this.channelHandlerContexts.size();
     }
 
 }

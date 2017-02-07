@@ -57,7 +57,7 @@ import java.util.concurrent.TimeUnit;
 public class NettyAcceptor implements ServerAcceptor {
     
     private static final String MQTT_SUBPROTOCOL_CSV_LIST = "mqtt, mqttv3.1, mqttv3.1.1";
-
+    
     static class WebSocketFrameToByteBufDecoder extends MessageToMessageDecoder<BinaryWebSocketFrame> {
 
         @Override
@@ -99,6 +99,7 @@ public class NettyAcceptor implements ServerAcceptor {
     private boolean nettyTcpNodelay;
     private boolean nettySoKeepalive;
     private int nettyChannelTimeoutSeconds;
+    private NettyMQTTHandler handler;
 
     @Override
     public void initialize(ProtocolProcessor processor, IConfig props, ISslContextCreator sslCtxCreator) throws IOException {
@@ -113,10 +114,10 @@ public class NettyAcceptor implements ServerAcceptor {
         
         m_bossGroup = new NioEventLoopGroup();
         m_workerGroup = new NioEventLoopGroup();
-        final NettyMQTTHandler handler = new NettyMQTTHandler(processor);
+        handler = new NettyMQTTHandler(processor);
         
-        initializePlainTCPTransport(handler, props);
-        initializeWebSocketTransport(handler, props);
+        initializePlainTCPTransport(props);
+        initializeWebSocketTransport(props);
         String sslTcpPortProp = props.getProperty(BrokerConstants.SSL_PORT_PROPERTY_NAME);
         String wssPortProp = props.getProperty(BrokerConstants.WSS_PORT_PROPERTY_NAME);
         if (sslTcpPortProp != null || wssPortProp != null) {
@@ -125,8 +126,8 @@ public class NettyAcceptor implements ServerAcceptor {
                 LOG.error("Can't initialize SSLHandler layer! Exiting, check your configuration of jks");
                 return;
             }
-            initializeSSLTCPTransport(handler, props, sslContext);
-            initializeWSSTransport(handler, props, sslContext);
+            initializeSSLTCPTransport(props, sslContext);
+            initializeWSSTransport(props, sslContext);
         }
     }
 
@@ -162,7 +163,7 @@ public class NettyAcceptor implements ServerAcceptor {
         }
     }
     
-    private void initializePlainTCPTransport(final NettyMQTTHandler handler, IConfig props) throws IOException {
+    private void initializePlainTCPTransport(IConfig props) throws IOException {
     	LOG.info("Configuring TCP MQTT transport...");
         final MoquetteIdleTimeoutHandler timeoutHandler = new MoquetteIdleTimeoutHandler();
         String host = props.getProperty(BrokerConstants.HOST_PROPERTY_NAME);
@@ -188,7 +189,7 @@ public class NettyAcceptor implements ServerAcceptor {
         });
     }
     
-    private void initializeWebSocketTransport(final NettyMQTTHandler handler, IConfig props) throws IOException {
+    private void initializeWebSocketTransport(IConfig props) throws IOException {
     	LOG.info("Configuring Websocket MQTT transport...");
         String webSocketPortProp = props.getProperty(WEB_SOCKET_PORT_PROPERTY_NAME, DISABLED_PORT_BIND);
         if (DISABLED_PORT_BIND.equals(webSocketPortProp)) {
@@ -222,7 +223,7 @@ public class NettyAcceptor implements ServerAcceptor {
         });
     }
     
-    private void initializeSSLTCPTransport(final NettyMQTTHandler handler, IConfig props, final SSLContext sslContext) throws IOException {
+    private void initializeSSLTCPTransport(IConfig props, final SSLContext sslContext) throws IOException {
     	LOG.info("Configuring SSL MQTT transport...");
     	String sslPortProp = props.getProperty(SSL_PORT_PROPERTY_NAME, DISABLED_PORT_BIND);
         if (DISABLED_PORT_BIND.equals(sslPortProp)) {
@@ -256,7 +257,7 @@ public class NettyAcceptor implements ServerAcceptor {
         });
     }
 
-    private void initializeWSSTransport(final NettyMQTTHandler handler, IConfig props, final SSLContext sslContext) throws IOException {
+    private void initializeWSSTransport(IConfig props, final SSLContext sslContext) throws IOException {
     	LOG.info("Configuring secure websocket MQTT transport...");
     	String sslPortProp = props.getProperty(WSS_PORT_PROPERTY_NAME, DISABLED_PORT_BIND);
         if (DISABLED_PORT_BIND.equals(sslPortProp)) {
@@ -342,4 +343,11 @@ public class NettyAcceptor implements ServerAcceptor {
         }
         return new SslHandler(sslEngine);
     }
+    
+	public int getActiveConnectionsNo() {
+		if (handler == null)
+			return 0;
+		else
+			return handler.getConnectionsNo();
+	}
 }

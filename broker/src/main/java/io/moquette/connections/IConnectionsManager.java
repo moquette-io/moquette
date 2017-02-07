@@ -10,12 +10,6 @@ import java.util.Collection;
  *
  */
 public interface IConnectionsManager {
-	/**
-	 * Returns the number of physical connections
-	 * 
-	 * @return
-	 */
-	public int getActiveConnectionsNo();
 
 	/**
 	 * Determines wether a MQTT client is connected to the broker.

@@ -97,11 +97,6 @@ public class ConnectionDescriptorStore implements IConnectionsManager {
     }
 
     @Override
-    public int getActiveConnectionsNo() {
-        return connectionDescriptors.size();
-    }
-
-    @Override
     public Collection<String> getConnectedClientIds() {
         return connectionDescriptors.keySet();
     }
