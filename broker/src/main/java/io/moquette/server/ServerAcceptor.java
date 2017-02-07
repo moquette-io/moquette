@@ -30,4 +30,6 @@ public interface ServerAcceptor {
     void initialize(ProtocolProcessor processor, IConfig props, ISslContextCreator sslCtxCreator) throws IOException;
     
     void close();
+    
+	int getActiveConnectionsNo();
 }

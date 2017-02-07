@@ -304,5 +304,12 @@ public class Server {
     public IConnectionsManager getConnectionsManager() {
         return m_processorBootstrapper.getConnectionDescriptors();
     }
+    
+    public int getActiveConnectionsNo() {
+    	if (m_acceptor == null)
+    		return 0;
+    	else
+    		return m_acceptor.getActiveConnectionsNo();
+    }
 
 }

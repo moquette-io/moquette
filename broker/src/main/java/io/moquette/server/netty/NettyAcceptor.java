@@ -344,6 +344,7 @@ public class NettyAcceptor implements ServerAcceptor {
         return new SslHandler(sslEngine);
     }
     
+    @Override
 	public int getActiveConnectionsNo() {
 		if (handler == null)
 			return 0;
