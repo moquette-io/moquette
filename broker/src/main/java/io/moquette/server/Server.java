@@ -71,6 +71,8 @@ public class Server {
 
     private ScheduledExecutorService scheduler;
 
+    private IConfig config;
+
     public static void main(String[] args) throws IOException {
         final Server server = new Server();
         server.startServer();
@@ -164,6 +166,9 @@ public class Server {
 
     public void startServer(IConfig config, List<? extends InterceptHandler> handlers, ISslContextCreator sslCtxCreator,
             IAuthenticator authenticator, IAuthorizator authorizator) throws IOException {
+
+        this.config = config;
+
         if (handlers == null) {
             handlers = Collections.emptyList();
         }
@@ -331,5 +336,9 @@ public class Server {
 
     public ScheduledExecutorService getScheduler() {
         return scheduler;
+    }
+
+    public IConfig getConfig() {
+        return config;
     }
 }
