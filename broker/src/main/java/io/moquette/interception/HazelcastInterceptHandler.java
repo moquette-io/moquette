@@ -29,17 +29,19 @@ public class HazelcastInterceptHandler extends AbstractInterceptHandler {
     private static final Logger LOG = LoggerFactory.getLogger(HazelcastInterceptHandler.class);
     private final HazelcastInstance hz;
     private final ITopic<HazelcastMsg> topic;
+    private final String id;
 
     public HazelcastInterceptHandler(Server server) {
         this.hz = server.getHazelcastInstance();
         String topicName = server.getConfig().getProperty(BrokerConstants.HAZELCAST_TOPIC_NAME) == null
                 ? "moquette": server.getConfig().getProperty(BrokerConstants.HAZELCAST_TOPIC_NAME);
         topic = hz.getTopic(topicName);
+        id = HazelcastInterceptHandler.class.getName() + "@" + hz.getName();
     }
 
     @Override
     public String getID() {
-        return HazelcastInterceptHandler.class.getName() + "@" + hz.getName();
+        return id;
     }
 
     @Override
