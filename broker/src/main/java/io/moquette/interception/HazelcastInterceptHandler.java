@@ -18,6 +18,7 @@ package io.moquette.interception;
 
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ITopic;
+import io.moquette.BrokerConstants;
 import io.moquette.interception.messages.InterceptPublishMessage;
 import io.moquette.server.Server;
 import io.netty.buffer.ByteBuf;
@@ -29,9 +30,12 @@ public class HazelcastInterceptHandler extends AbstractInterceptHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(HazelcastInterceptHandler.class);
     private final HazelcastInstance hz;
+    private final String topicName;
 
     public HazelcastInterceptHandler(Server server) {
         this.hz = server.getHazelcastInstance();
+        topicName = server.getConfig().getProperty(BrokerConstants.HAZELCAST_TOPIC_NAME) == null
+                ? "moquette": server.getConfig().getProperty(BrokerConstants.HAZELCAST_TOPIC_NAME);
     }
 
     @Override
@@ -46,7 +50,7 @@ public class HazelcastInterceptHandler extends AbstractInterceptHandler {
         byte[] payloadContent = readBytesAndRewind(payload);
 
         LOG.info("{} publish on {} message: {}", msg.getClientID(), msg.getTopicName(), new String(payloadContent));
-        ITopic<HazelcastMsg> topic = hz.getTopic("moquette");
+        ITopic<HazelcastMsg> topic = hz.getTopic(topicName);
         HazelcastMsg hazelcastMsg = new HazelcastMsg(msg);
         topic.publish(hazelcastMsg);
     }

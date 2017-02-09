@@ -224,9 +224,12 @@ public class Server {
     }
 
     private void listenOnHazelCastMsg() {
-        LOG.info("Subscribing to Hazelcast topic. TopicName={}", "moquette");
+        String topicName = config.getProperty(BrokerConstants.HAZELCAST_TOPIC_NAME) == null
+                ? "moquette": config.getProperty(BrokerConstants.HAZELCAST_TOPIC_NAME);
+
+        LOG.info("Subscribing to Hazelcast topic. TopicName={}", topicName);
         HazelcastInstance hz = getHazelcastInstance();
-        ITopic<HazelcastMsg> topic = hz.getTopic("moquette");
+        ITopic<HazelcastMsg> topic = hz.getTopic(topicName);
         topic.addMessageListener(new HazelcastListener(this));
     }
 
