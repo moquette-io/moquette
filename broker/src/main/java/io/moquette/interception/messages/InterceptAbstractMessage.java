@@ -19,11 +19,11 @@ package io.moquette.interception.messages;
 import io.netty.handler.codec.mqtt.MqttMessage;
 import io.netty.handler.codec.mqtt.MqttQoS;
 
-public abstract class InterceptAbstractMessage implements InterceptMessage {
+public abstract class InterceptAbstractMessage<T extends MqttMessage> implements InterceptMessage {
 
-    private final MqttMessage msg;
+    public final T msg;
 
-    InterceptAbstractMessage(MqttMessage msg) {
+    InterceptAbstractMessage(T msg) {
         this.msg = msg;
     }
 

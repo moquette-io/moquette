@@ -19,15 +19,13 @@ package io.moquette.interception.messages;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 
-public class InterceptPublishMessage extends InterceptAbstractMessage {
+public class InterceptPublishMessage extends InterceptAbstractMessage<MqttPublishMessage> {
 
-    private final MqttPublishMessage msg;
     private final String clientID;
     private final String username;
 
     public InterceptPublishMessage(MqttPublishMessage msg, String clientID, String username) {
         super(msg);
-        this.msg = msg;
         this.clientID = clientID;
         this.username = username;
     }
