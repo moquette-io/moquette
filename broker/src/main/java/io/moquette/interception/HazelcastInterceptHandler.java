@@ -45,14 +45,10 @@ public class HazelcastInterceptHandler extends AbstractInterceptHandler {
 
     @Override
     public void onPublish(InterceptPublishMessage msg) {
-        // TODO ugly, too much array copy
-        ByteBuf payload = msg.getPayload();
-        byte[] payloadContent = readBytesAndRewind(payload);
-
-        LOG.info("{} publish on {} message: {}", msg.getClientID(), msg.getTopicName(), new String(payloadContent));
         ITopic<HazelcastMsg> topic = hz.getTopic(topicName);
         HazelcastMsg hazelcastMsg = new HazelcastMsg(msg);
+        LOG.debug("{} publish on {} message: {}",
+                hazelcastMsg.getClientId(), hazelcastMsg.getTopic(), hazelcastMsg.getPayload());
         topic.publish(hazelcastMsg);
     }
-
 }
