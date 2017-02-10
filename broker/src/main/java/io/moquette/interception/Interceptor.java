@@ -50,4 +50,6 @@ public interface Interceptor {
     void addInterceptHandler(InterceptHandler interceptHandler);
 
     void removeInterceptHandler(InterceptHandler interceptHandler);
+
+    void notifyWipeSubscriptions(String clientID);
 }

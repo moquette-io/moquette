@@ -24,6 +24,7 @@ import io.moquette.interception.messages.InterceptDisconnectMessage;
 import io.moquette.interception.messages.InterceptPublishMessage;
 import io.moquette.interception.messages.InterceptSubscribeMessage;
 import io.moquette.interception.messages.InterceptUnsubscribeMessage;
+import io.moquette.interception.messages.WipeSubscriptionsMessage;
 import io.moquette.server.Server;
 
 /**
@@ -72,6 +73,10 @@ public abstract class AbstractInterceptHandler implements InterceptHandler {
 
     @Override
     public void onUnsubscribe(InterceptUnsubscribeMessage msg) {
+    }
+
+    @Override
+    public void onWipeSubscriptions(WipeSubscriptionsMessage wipeSubscriptionsMessage) {
     }
 
     @Override

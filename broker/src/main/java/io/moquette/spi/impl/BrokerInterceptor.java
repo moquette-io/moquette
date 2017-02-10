@@ -144,6 +144,21 @@ final class BrokerInterceptor implements Interceptor {
             executor.execute(() -> handler.onUnsubscribe(new InterceptUnsubscribeMessage(topic, clientID, username)));
         }
     }
+    
+    @Override
+    public void notifyWipeSubscriptions(final String clientID) {
+        for (final InterceptHandler handler : this.handlers.get(WipeSubscriptionsMessage.class)) {
+            LOG.debug("Notifying MQTT ACK message to interceptor. MqttClientId = {}.", clientID);
+            executor.execute(new Runnable() {
+
+                @Override
+                public void run() {
+                    handler.onWipeSubscriptions(new WipeSubscriptionsMessage(clientID));
+                }
+            });
+        }
+    }
+    
 
     @Override
     public void notifyMessageAcknowledged(final InterceptAcknowledgedMessage msg) {

@@ -63,4 +63,6 @@ public interface InterceptHandler {
     void onUnsubscribe(InterceptUnsubscribeMessage msg);
 
     void onMessageAcknowledged(InterceptAcknowledgedMessage msg);
+
+    void onWipeSubscriptions(WipeSubscriptionsMessage wipeSubscriptionsMessage);
 }
