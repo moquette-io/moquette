@@ -16,7 +16,6 @@
 
 package io.moquette.interception;
 
-import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ITopic;
 import io.moquette.BrokerConstants;
 import io.moquette.interception.messages.InterceptPublishMessage;
@@ -27,21 +26,14 @@ import org.slf4j.LoggerFactory;
 public class HazelcastInterceptHandler extends AbstractInterceptHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(HazelcastInterceptHandler.class);
-    private final HazelcastInstance hz;
     private final ITopic<HazelcastMsg> topic;
-    private final String id;
 
     public HazelcastInterceptHandler(Server server) {
-        this.hz = server.getHazelcastInstance();
+        super(server);
+
         String topicName = server.getConfig().getProperty(BrokerConstants.HAZELCAST_TOPIC_NAME) == null
                 ? "moquette": server.getConfig().getProperty(BrokerConstants.HAZELCAST_TOPIC_NAME);
         topic = hz.getTopic(topicName);
-        id = HazelcastInterceptHandler.class.getName() + "@" + hz.getName();
-    }
-
-    @Override
-    public String getID() {
-        return id;
     }
 
     @Override

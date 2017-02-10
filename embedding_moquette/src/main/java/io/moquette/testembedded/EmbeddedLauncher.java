@@ -37,6 +37,10 @@ final class EmbeddedLauncher {
 
     static class PublisherListener extends AbstractInterceptHandler {
 
+        public PublisherListener(Server server) {
+            super(server);
+        }
+
         @Override
         public String getID() {
             return "EmbeddedLauncherPublishListener";
@@ -54,7 +58,7 @@ final class EmbeddedLauncher {
         final IConfig classPathConfig = new ResourceLoaderConfig(classpathLoader);
 
         final Server mqttBroker = new Server();
-        List<? extends InterceptHandler> userHandlers = Collections.singletonList(new PublisherListener());
+        List<? extends InterceptHandler> userHandlers = Collections.singletonList(new PublisherListener(mqttBroker));
         mqttBroker.startServer(classPathConfig, userHandlers);
 
         System.out.println("Broker started press [CTRL+C] to stop");

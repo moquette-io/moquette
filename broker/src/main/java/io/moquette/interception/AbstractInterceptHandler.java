@@ -16,6 +16,7 @@
 
 package io.moquette.interception;
 
+import com.hazelcast.core.HazelcastInstance;
 import io.moquette.interception.messages.InterceptAcknowledgedMessage;
 import io.moquette.interception.messages.InterceptConnectMessage;
 import io.moquette.interception.messages.InterceptConnectionLostMessage;
@@ -23,11 +24,26 @@ import io.moquette.interception.messages.InterceptDisconnectMessage;
 import io.moquette.interception.messages.InterceptPublishMessage;
 import io.moquette.interception.messages.InterceptSubscribeMessage;
 import io.moquette.interception.messages.InterceptUnsubscribeMessage;
+import io.moquette.server.Server;
 
 /**
  * Basic abstract class usefull to avoid empty methods creation in subclasses.
  */
 public abstract class AbstractInterceptHandler implements InterceptHandler {
+
+    protected final HazelcastInstance hz;
+
+    private final String id;
+
+    public AbstractInterceptHandler(Server server) {
+        this.hz = server.getHazelcastInstance();
+        this.id = HazelcastInterceptHandler.class.getName() + "@" + hz.getName();
+    }
+
+    @Override
+    public String getID() {
+        return id;
+    }
 
     @Override
     public Class<?>[] getInterceptedMessageTypes() {
