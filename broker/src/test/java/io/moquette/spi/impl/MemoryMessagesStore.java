@@ -18,7 +18,6 @@ package io.moquette.spi.impl;
 
 import io.moquette.spi.IMessagesStore;
 import io.moquette.spi.IMatchingCondition;
-import io.moquette.spi.MessageGUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.*;
@@ -31,11 +30,11 @@ public class MemoryMessagesStore implements IMessagesStore {
 
     private static final Logger LOG = LoggerFactory.getLogger(MemoryMessagesStore.class);
 
-    private Map<String, MessageGUID> m_retainedStore = new HashMap<>();
-    private Map<MessageGUID, StoredMessage> m_persistentMessageStore = new HashMap<>();
-    private Map<String, Map<Integer, MessageGUID>> m_messageToGuids;
+    private Map<String, UUID> m_retainedStore = new HashMap<>();
+    private Map<UUID, StoredMessage> m_persistentMessageStore = new HashMap<>();
+    private Map<String, Map<Integer, UUID>> m_messageToGuids;
 
-    MemoryMessagesStore(Map<String, Map<Integer, MessageGUID>> messageToGuids) {
+    MemoryMessagesStore(Map<String, Map<Integer, UUID>> messageToGuids) {
         m_messageToGuids = messageToGuids;
     }
 
@@ -44,7 +43,7 @@ public class MemoryMessagesStore implements IMessagesStore {
     }
 
     @Override
-    public void storeRetained(String topic, MessageGUID guid) {
+    public void storeRetained(String topic, UUID guid) {
         m_retainedStore.put(topic, guid);
     }
 
@@ -54,8 +53,8 @@ public class MemoryMessagesStore implements IMessagesStore {
 
         List<StoredMessage> results = new ArrayList<>();
 
-        for (Map.Entry<String, MessageGUID> entry : m_retainedStore.entrySet()) {
-            final MessageGUID guid = entry.getValue();
+        for (Map.Entry<String, UUID> entry : m_retainedStore.entrySet()) {
+            final UUID guid = entry.getValue();
             StoredMessage storedMsg = m_persistentMessageStore.get(guid);
             if (condition.match(entry.getKey())) {
                 results.add(storedMsg);
@@ -66,32 +65,32 @@ public class MemoryMessagesStore implements IMessagesStore {
     }
 
     @Override
-    public MessageGUID storePublishForFuture(StoredMessage storedMessage) {
+    public UUID storePublishForFuture(StoredMessage storedMessage) {
         LOG.debug("storePublishForFuture store evt {}", storedMessage);
-        MessageGUID guid = new MessageGUID(UUID.randomUUID().toString());
+        UUID guid = UUID.randomUUID();
         storedMessage.setGuid(guid);
         m_persistentMessageStore.put(guid, storedMessage);
-        HashMap<Integer, MessageGUID> guids = (HashMap<Integer, MessageGUID>) defaultGet(
+        HashMap<Integer, UUID> guids = (HashMap<Integer, UUID>) defaultGet(
                 m_messageToGuids,
                 storedMessage.getClientID(),
-                new HashMap<Integer, MessageGUID>());
+                new HashMap<Integer, UUID>());
         guids.put(storedMessage.getMessageID(), guid);
         return guid;
     }
 
     @Override
     public void dropMessagesInSession(String clientID) {
-        Map<Integer, MessageGUID> messageGUIDMap = m_messageToGuids.get(clientID);
-        if (messageGUIDMap == null || messageGUIDMap.isEmpty()) {
+        Map<Integer, UUID> UUIDMap = m_messageToGuids.get(clientID);
+        if (UUIDMap == null || UUIDMap.isEmpty()) {
             return;
         }
-        for (MessageGUID guid : messageGUIDMap.values()) {
+        for (UUID guid : UUIDMap.values()) {
             m_persistentMessageStore.remove(guid);
         }
     }
 
     @Override
-    public StoredMessage getMessageByGuid(MessageGUID guid) {
+    public StoredMessage getMessageByGuid(UUID guid) {
         return m_persistentMessageStore.get(guid);
     }
 
@@ -102,7 +101,7 @@ public class MemoryMessagesStore implements IMessagesStore {
 
     @Override
     public int getPendingPublishMessages(String clientID) {
-        Map<Integer, MessageGUID> messageToGuids = m_messageToGuids.get(clientID);
+        Map<Integer, UUID> messageToGuids = m_messageToGuids.get(clientID);
         if (messageToGuids == null)
             return 0;
         else

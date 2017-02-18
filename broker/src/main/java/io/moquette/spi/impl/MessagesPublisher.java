@@ -5,13 +5,13 @@ import io.moquette.server.ConnectionDescriptorStore;
 import io.moquette.spi.ClientSession;
 import io.moquette.spi.IMessagesStore;
 import io.moquette.spi.ISessionsStore;
-import io.moquette.spi.MessageGUID;
 import io.moquette.spi.impl.subscriptions.Subscription;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.mqtt.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.List;
+import java.util.UUID;
 import static io.moquette.spi.impl.ProtocolProcessor.lowerQosToTheSubscriptionDesired;
 
 class MessagesPublisher {
@@ -48,7 +48,7 @@ class MessagesPublisher {
 
         // if QoS 1 or 2 store the message
         // TODO perhaps this block is not needed.
-        MessageGUID guid = null;
+        UUID guid = null;
         if (publishingQos != MqttQoS.AT_MOST_ONCE) {
             guid = m_messagesStore.storePublishForFuture(pubMsg);
         }

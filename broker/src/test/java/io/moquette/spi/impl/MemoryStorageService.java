@@ -18,10 +18,10 @@ package io.moquette.spi.impl;
 
 import io.moquette.spi.IMessagesStore;
 import io.moquette.spi.ISessionsStore;
-import io.moquette.spi.MessageGUID;
 import io.moquette.spi.persistence.MemorySessionStore;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 public class MemoryStorageService {
 
@@ -29,7 +29,7 @@ public class MemoryStorageService {
     private MemoryMessagesStore m_messagesStore;
 
     public void initStore() {
-        Map<String, Map<Integer, MessageGUID>> messageToGuids = new HashMap<>();
+        Map<String, Map<Integer, UUID>> messageToGuids = new HashMap<>();
         m_messagesStore = new MemoryMessagesStore(messageToGuids);
         m_sessionsStore = new MemorySessionStore(m_messagesStore, messageToGuids);
     }

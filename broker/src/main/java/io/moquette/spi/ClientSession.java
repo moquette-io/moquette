@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 
 /**
@@ -166,14 +167,14 @@ public class ClientSession {
         m_sessionsStore.inFlightAck(this.clientID, messageID);
     }
 
-    public void inFlightAckWaiting(MessageGUID guid, int messageID) {
+    public void inFlightAckWaiting(UUID guid, int messageID) {
         if (LOG.isTraceEnabled())
             LOG.trace("Adding to inflight {}, guid <{}>", messageID, guid);
         m_sessionsStore.inFlight(this.clientID, messageID, guid);
     }
 
     public IMessagesStore.StoredMessage secondPhaseAcknowledged(int messageID) {
-        MessageGUID guid = m_sessionsStore.secondPhaseAcknowledged(clientID, messageID);
+        UUID guid = m_sessionsStore.secondPhaseAcknowledged(clientID, messageID);
         return messagesStore.getMessageByGuid(guid);
     }
 
@@ -188,7 +189,7 @@ public class ClientSession {
     }
 
     public IMessagesStore.StoredMessage storedMessage(int messageID) {
-        final MessageGUID guid = m_sessionsStore.mapToGuid(clientID, messageID);
+        final UUID guid = m_sessionsStore.mapToGuid(clientID, messageID);
         return messagesStore.getMessageByGuid(guid);
     }
 

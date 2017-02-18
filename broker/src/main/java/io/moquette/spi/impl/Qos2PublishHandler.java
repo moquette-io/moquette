@@ -6,7 +6,6 @@ import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.ClientSession;
 import io.moquette.spi.IMessagesStore;
 import io.moquette.spi.ISessionsStore;
-import io.moquette.spi.MessageGUID;
 import io.moquette.spi.impl.subscriptions.Subscription;
 import io.moquette.spi.impl.subscriptions.SubscriptionsStore;
 import io.moquette.spi.security.IAuthorizator;
@@ -19,6 +18,8 @@ import static io.moquette.spi.impl.ProtocolProcessor.asStoredMessage;
 import static io.moquette.spi.impl.Utils.messageId;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
+
+import java.util.UUID;
 
 class Qos2PublishHandler extends QosPublishHandler {
 
@@ -74,7 +75,7 @@ class Qos2PublishHandler extends QosPublishHandler {
         }
 
         // QoS2
-        MessageGUID guid = m_messagesStore.storePublishForFuture(toStoreMsg);
+        UUID guid = m_messagesStore.storePublishForFuture(toStoreMsg);
         // TODO Don't send PUBREC for Hz publish notification, if (msg.isLocal()) {
         sendPubRec(clientID, messageID);
         // }

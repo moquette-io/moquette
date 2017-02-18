@@ -24,7 +24,7 @@ import io.moquette.spi.ClientSession;
 import io.moquette.spi.IMessagesStore;
 import io.moquette.spi.ISessionsStore;
 import io.moquette.spi.ISessionsStore.ClientTopicCouple;
-import io.moquette.spi.MessageGUID;
+import java.util.UUID;
 import io.moquette.spi.impl.subscriptions.Subscription;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import org.junit.After;
@@ -108,8 +108,7 @@ public class MapDBPersistentStoreTest {
         // request a first ID
 
         int packetId = m_sessionsStore.nextPacketID("CLIENT");
-        m_sessionsStore.inFlight("CLIENT", packetId, new MessageGUID("ABCDE")); // simulate an
-                                                                                // inflight
+        m_sessionsStore.inFlight("CLIENT", packetId, UUID.randomUUID()); //simulate an inflight
         assertEquals(1, packetId);
 
         // release the ID
@@ -141,7 +140,7 @@ public class MapDBPersistentStoreTest {
         publishToStore.setClientID(TEST_CLIENT);
         publishToStore.setMessageID(1);
         publishToStore.setRetained(false);
-        MessageGUID guid = m_messagesStore.storePublishForFuture(publishToStore);
+        UUID guid = m_messagesStore.storePublishForFuture(publishToStore);
 
         // Exercise
         m_messagesStore.dropMessagesInSession("TestClient");
@@ -161,7 +160,7 @@ public class MapDBPersistentStoreTest {
         publishToStore.setClientID(TEST_CLIENT);
         publishToStore.setMessageID(1);
         publishToStore.setRetained(true);
-        MessageGUID guid = m_messagesStore.storePublishForFuture(publishToStore);
+        UUID guid = m_messagesStore.storePublishForFuture(publishToStore);
 
         // Exercise
         m_messagesStore.dropMessagesInSession("TestClient");

@@ -22,6 +22,7 @@ import io.netty.handler.codec.mqtt.MqttQoS;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.UUID;
 
 /**
  * Defines the SPI to be implemented by a StorageService that handle persistence of messages
@@ -38,7 +39,7 @@ public interface IMessagesStore {
         private String m_clientID;
         // Optional attribute, available only fo QoS 1 and 2
         private Integer m_msgID;
-        private MessageGUID m_guid;
+        private UUID m_guid;
 
         public StoredMessage(byte[] message, MqttQoS qos, String topic) {
             m_qos = qos;
@@ -58,11 +59,11 @@ public interface IMessagesStore {
             return m_topic;
         }
 
-        public void setGuid(MessageGUID guid) {
+        public void setGuid(UUID guid) {
             this.m_guid = guid;
         }
 
-        public MessageGUID getGuid() {
+        public UUID getGuid() {
             return m_guid;
         }
 
@@ -114,7 +115,7 @@ public interface IMessagesStore {
      * @param guid
      *            of the message to mark as retained.
      */
-    void storeRetained(String topic, MessageGUID guid);
+    void storeRetained(String topic, UUID guid);
 
     /**
      * Return a list of retained messages that satisfy the condition.
@@ -132,11 +133,11 @@ public interface IMessagesStore {
      *            the message to store for future usage.
      * @return the unique id in the storage (guid).
      */
-    MessageGUID storePublishForFuture(StoredMessage storedMessage);
+    UUID storePublishForFuture(StoredMessage storedMessage);
 
     void dropMessagesInSession(String clientID);
 
-    StoredMessage getMessageByGuid(MessageGUID guid);
+    StoredMessage getMessageByGuid(UUID guid);
 
     void cleanRetained(String topic);
 

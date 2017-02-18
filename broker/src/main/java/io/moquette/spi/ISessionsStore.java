@@ -18,6 +18,7 @@ package io.moquette.spi;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import io.moquette.spi.IMessagesStore.StoredMessage;
 import io.moquette.spi.impl.subscriptions.Subscription;
@@ -149,7 +150,7 @@ public interface ISessionsStore {
      * @param guid
      *            the uuid of the message to mark as inflight.
      */
-    void inFlight(String clientID, int messageID, MessageGUID guid);
+    void inFlight(String clientID, int messageID, UUID guid);
 
     /**
      * Return the next valid packetIdentifier for the given client session.
@@ -180,9 +181,9 @@ public interface ISessionsStore {
      *            the message ID that reached the second phase.
      * @return the guid of message just acked.
      */
-    MessageGUID secondPhaseAcknowledged(String clientID, int messageID);
+    UUID secondPhaseAcknowledged(String clientID, int messageID);
 
-    MessageGUID mapToGuid(String clientID, int messageID);
+    UUID mapToGuid(String clientID, int messageID);
 
     StoredMessage getInflightMessage(String clientID, int messageID);
 
