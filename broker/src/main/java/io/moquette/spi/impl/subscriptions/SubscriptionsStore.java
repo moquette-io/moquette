@@ -199,7 +199,7 @@ public class SubscriptionsStore {
         TreeNode newRoot;
         do {
             oldRoot = subscriptions.get();
-            newRoot = oldRoot.removeClientSubscriptions(clientID);
+            newRoot = oldRoot.removeClientSubscriptions(clientID).getNode();
             //spin lock repeating till we can, swap root, if can't swap just re-do the operation
         } while(!subscriptions.compareAndSet(oldRoot, newRoot));
     }

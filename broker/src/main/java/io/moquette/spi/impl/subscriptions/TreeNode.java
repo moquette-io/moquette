@@ -128,30 +128,54 @@ class TreeNode {
         }
         return res;
     }
+    
+	class PrunedTreeNode {
+		private TreeNode node;
+		private boolean hasSubscriptions;
+
+		PrunedTreeNode(TreeNode node, boolean hasSubscriptions) {
+			this.node = node;
+			this.hasSubscriptions = hasSubscriptions;
+		}
+
+		TreeNode getNode() {
+			return node;
+		}
+
+		boolean isHasSubscriptions() {
+			return hasSubscriptions;
+		}
+	}
 
     /**
      * Create a copied subtree rooted on this node but purged of clientID's subscriptions.
      * */
-    TreeNode removeClientSubscriptions(String clientID) {
-        //collect what to delete and then delete to avoid ConcurrentModification
-        TreeNode newSubRoot = this.copy();
-        List<ClientTopicCouple> subsToRemove = new ArrayList<>();
-        for (ClientTopicCouple s : newSubRoot.m_subscriptions) {
-            if (s.clientID.equals(clientID)) {
-                subsToRemove.add(s);
-            }
-        }
+	PrunedTreeNode removeClientSubscriptions(String clientID) {
+		// collect what to delete and then delete to avoid
+		// ConcurrentModification
+		TreeNode newSubRoot = this.copy();
+		List<ClientTopicCouple> subsToRemove = new ArrayList<>();
+		for (ClientTopicCouple s : newSubRoot.m_subscriptions) {
+			if (s.clientID.equals(clientID)) {
+				subsToRemove.add(s);
+			}
+		}
 
-        for (ClientTopicCouple s : subsToRemove) {
-            newSubRoot.m_subscriptions.remove(s);
-        }
+		for (ClientTopicCouple s : subsToRemove) {
+			newSubRoot.m_subscriptions.remove(s);
+		}
 
-        //go deep
-        List<TreeNode> newChildren = new ArrayList<>(newSubRoot.m_children.size());
-        for (TreeNode child : newSubRoot.m_children) {
-            newChildren.add(child.removeClientSubscriptions(clientID));
-        }
-        newSubRoot.m_children = newChildren;
-        return newSubRoot;
-    }
+		boolean hasSubscriptions = !m_subscriptions.isEmpty();
+
+		// go deep
+		List<TreeNode> newChildren = new ArrayList<>(newSubRoot.m_children.size());
+		for (TreeNode child : newSubRoot.m_children) {
+			PrunedTreeNode prunedSubtree = child.removeClientSubscriptions(clientID);
+			hasSubscriptions = hasSubscriptions || prunedSubtree.hasSubscriptions;
+			if (prunedSubtree.hasSubscriptions)
+				newChildren.add(prunedSubtree.getNode());
+		}
+		newSubRoot.m_children = newChildren;
+		return new PrunedTreeNode(newSubRoot, hasSubscriptions);
+	}
 }
