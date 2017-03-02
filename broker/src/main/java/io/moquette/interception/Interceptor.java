@@ -18,6 +18,7 @@ package io.moquette.interception;
 
 import io.moquette.interception.messages.InterceptAcknowledgedMessage;
 import io.moquette.spi.impl.subscriptions.Subscription;
+import io.moquette.spi.impl.subscriptions.Topic;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 
@@ -39,7 +40,7 @@ public interface Interceptor {
 
     void notifyClientConnectionLost(String clientID, String username);
 
-    void notifyTopicPublished(MqttPublishMessage msg, String clientID, String username);
+    void notifyTopicPublished(MqttPublishMessage msg, Topic topic, String clientID, String username);
 
     void notifyTopicSubscribed(Subscription sub, String username);
 

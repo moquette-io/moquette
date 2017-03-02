@@ -132,6 +132,7 @@ public class BrokerInterceptorTest {
         interceptor.notifyTopicPublished(
                 MqttMessageBuilders.publish().qos(MqttQoS.AT_MOST_ONCE)
                     .payload(Unpooled.copiedBuffer("Hello".getBytes())).build(),
+                new Topic(""),
                 "cli1234",
                 "cli1234");
         interval();

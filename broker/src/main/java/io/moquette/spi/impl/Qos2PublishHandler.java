@@ -94,7 +94,7 @@ class Qos2PublishHandler extends QosPublishHandler {
 //            }
 //        }
         //TODO this should happen on PUB_REL, else we notify false positive
-        m_interceptor.notifyTopicPublished(msg, clientID, username);
+        m_interceptor.notifyTopicPublished(msg, topic, clientID, username);
     }
 
     /**

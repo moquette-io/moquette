@@ -22,6 +22,7 @@ import io.moquette.interception.Interceptor;
 import io.moquette.interception.messages.*;
 import io.moquette.server.config.IConfig;
 import io.moquette.spi.impl.subscriptions.Subscription;
+import io.moquette.spi.impl.subscriptions.Topic;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import org.slf4j.Logger;
@@ -117,13 +118,13 @@ final class BrokerInterceptor implements Interceptor {
     }
 
     @Override
-    public void notifyTopicPublished(final MqttPublishMessage msg, final String clientID, final String username) {
+    public void notifyTopicPublished(final MqttPublishMessage msg, final Topic topic, final String clientID,
+            final String username) {
         int messageId = msg.variableHeader().messageId();
-        String topic = msg.variableHeader().topicName();
         for (final InterceptHandler handler : this.handlers.get(InterceptPublishMessage.class)) {
             LOG.debug("Notifying MQTT PUBLISH message to interceptor. CId={}, messageId={}, topic={}, interceptorId={}",
                 clientID, messageId, topic, handler.getID());
-            executor.execute(() -> handler.onPublish(new InterceptPublishMessage(msg, clientID, username)));
+            executor.execute(() -> handler.onPublish(new InterceptPublishMessage(msg, clientID, username, topic)));
         }
     }
 
@@ -144,7 +145,7 @@ final class BrokerInterceptor implements Interceptor {
             executor.execute(() -> handler.onUnsubscribe(new InterceptUnsubscribeMessage(topic, clientID, username)));
         }
     }
-    
+
     @Override
     public void notifyWipeSubscriptions(final String clientID) {
         for (final InterceptHandler handler : this.handlers.get(WipeSubscriptionsMessage.class)) {
@@ -158,7 +159,6 @@ final class BrokerInterceptor implements Interceptor {
             });
         }
     }
-    
 
     @Override
     public void notifyMessageAcknowledged(final InterceptAcknowledgedMessage msg) {

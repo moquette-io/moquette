@@ -49,7 +49,7 @@ final class EmbeddedLauncher {
         @Override
         public void onPublish(InterceptPublishMessage msg) {
             System.out.println(
-                    "Received on topic: " + msg.getTopicName() + " content: " + new String(msg.getPayload().array()));
+                    "Received on topic: " + msg.getTopic() + " content: " + new String(msg.getPayload().array()));
         }
     }
 

@@ -30,7 +30,7 @@ public class HazelcastMsg implements Serializable {
 
     public HazelcastMsg(InterceptPublishMessage msg) {
         this.clientId = msg.getClientID();
-        this.topic = msg.getTopicName();
+        this.topic = msg.getTopic().toString();
         this.qos = msg.getQos().value();
         this.payload = readBytesAndRewind(msg.getPayload());
     }
