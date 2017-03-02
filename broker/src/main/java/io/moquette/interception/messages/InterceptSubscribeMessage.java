@@ -17,6 +17,7 @@
 package io.moquette.interception.messages;
 
 import io.moquette.spi.impl.subscriptions.Subscription;
+import io.moquette.spi.impl.subscriptions.Topic;
 import io.netty.handler.codec.mqtt.MqttQoS;
 
 public class InterceptSubscribeMessage implements InterceptMessage {
@@ -37,8 +38,8 @@ public class InterceptSubscribeMessage implements InterceptMessage {
         return subscription.getRequestedQos();
     }
 
-    public String getTopicFilter() {
-        return subscription.getTopicFilter().toString();
+    public Topic getTopic() {
+        return subscription.getTopicFilter();
     }
 
     public String getUsername() {
