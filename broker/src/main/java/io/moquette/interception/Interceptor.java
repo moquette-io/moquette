@@ -44,7 +44,7 @@ public interface Interceptor {
 
     void notifyTopicSubscribed(Subscription sub, String username);
 
-    void notifyTopicUnsubscribed(String topic, String clientID, String username);
+    void notifyTopicUnsubscribed(Topic topic, String clientID, String username);
 
     void notifyMessageAcknowledged(InterceptAcknowledgedMessage msg);
 

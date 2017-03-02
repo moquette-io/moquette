@@ -759,7 +759,7 @@ public class ProtocolProcessor {
             subscriptions.removeSubscription(topic, clientID);
             clientSession.unsubscribeFrom(topic);
             String username = NettyUtils.userName(channel);
-            m_interceptor.notifyTopicUnsubscribed(topic.toString(), clientID, username);
+            m_interceptor.notifyTopicUnsubscribed(topic, clientID, username);
         }
 
         // ack the client

@@ -138,7 +138,7 @@ final class BrokerInterceptor implements Interceptor {
     }
 
     @Override
-    public void notifyTopicUnsubscribed(final String topic, final String clientID, final String username) {
+    public void notifyTopicUnsubscribed(final Topic topic, final String clientID, final String username) {
         for (final InterceptHandler handler : this.handlers.get(InterceptUnsubscribeMessage.class)) {
             LOG.debug("Notifying MQTT UNSUBSCRIBE message to interceptor. CId={}, topic={}, interceptorId={}", clientID,
                 topic, handler.getID());
