@@ -30,7 +30,7 @@ public class InterceptUnsubscribeMessage implements InterceptMessage {
         this.username = username;
     }
 
-    public Topic getTopicFilter() {
+    public Topic getTopic() {
         return topic;
     }
 
