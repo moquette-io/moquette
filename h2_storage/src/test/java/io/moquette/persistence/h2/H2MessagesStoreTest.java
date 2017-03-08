@@ -16,7 +16,7 @@
 package io.moquette.persistence.h2;
 
 import io.moquette.BrokerConstants;
-import io.moquette.persistence.MessageStoreTCK;
+import io.moquette.persistence.AbstractStoreTest;
 import io.moquette.server.config.IConfig;
 import io.moquette.server.config.MemoryConfig;
 import org.junit.After;
@@ -29,7 +29,7 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import static org.junit.Assert.assertFalse;
 
-public class H2MessagesStoreTest extends MessageStoreTCK {
+public class H2MessagesStoreTest extends AbstractStoreTest {
 
     H2PersistentStore storageService;
 
