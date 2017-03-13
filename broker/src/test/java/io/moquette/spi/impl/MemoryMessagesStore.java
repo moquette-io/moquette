@@ -109,4 +109,11 @@ public class MemoryMessagesStore implements IMessagesStore {
         else
             return messageToGuids.size();
     }
+
+    @Override
+    public MessageGUID mapToGuid(String clientID, int messageID) {
+        HashMap<Integer, MessageGUID> guids = (HashMap<Integer, MessageGUID>) Utils
+                .defaultGet(m_messageToGuids, clientID, new HashMap<Integer, MessageGUID>());
+        return guids.get(messageID);
+    }
 }

@@ -22,6 +22,7 @@ import io.moquette.spi.impl.subscriptions.Topic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.HashSet;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 
@@ -73,7 +74,7 @@ public class ClientSession {
      *
      * @return the list of messages to be delivered for client related to the session.
      */
-    public BlockingQueue<IMessagesStore.StoredMessage> queue() {
+    public Queue<IMessagesStore.StoredMessage> queue() {
         LOG.info("Retrieving stored messages. MqttClientId = {}.", clientID);
         return this.m_sessionsStore.queue(clientID);
     }

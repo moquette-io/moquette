@@ -298,11 +298,7 @@ class MapDBSessionsStore implements ISessionsStore {
 
     @Override
     public MessageGUID mapToGuid(String clientID, int messageID) {
-        LOG.debug("Mapping message ID to GUID CId={}, messageId={}", clientID, messageID);
-        ConcurrentMap<Integer, MessageGUID> messageIdToGuid = m_db.getHashMap(messageId2GuidsMapName(clientID));
-        MessageGUID result = messageIdToGuid.get(messageID);
-        LOG.debug("Message ID has been mapped to a GUID CId={}, messageId={}, guid={}", clientID, messageID, result);
-        return result;
+        return m_messagesStore.mapToGuid(clientID, messageID);
     }
 
     static String messageId2GuidsMapName(String clientID) {

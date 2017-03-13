@@ -31,7 +31,9 @@ import io.moquette.spi.impl.security.PermitAllAuthorizator;
 import io.moquette.spi.impl.security.ResourceAuthenticator;
 import io.moquette.spi.impl.subscriptions.Subscription;
 import io.moquette.spi.impl.subscriptions.SubscriptionsStore;
+import io.moquette.spi.persistence.IPersistentStore;
 import io.moquette.spi.persistence.MapDBPersistentStore;
+import io.moquette.spi.persistence.StoreType;
 import io.moquette.spi.security.IAuthenticator;
 import io.moquette.spi.security.IAuthorizator;
 import org.slf4j.Logger;
@@ -53,7 +55,7 @@ public class ProtocolProcessorBootstrapper {
 
     private SubscriptionsStore subscriptions;
 
-    private MapDBPersistentStore m_mapStorage;
+    private IPersistentStore m_mapStorage;
 
     private ISessionsStore m_sessionsStore;
 
@@ -90,7 +92,7 @@ public class ProtocolProcessorBootstrapper {
         subscriptions = new SubscriptionsStore();
 
         LOG.info("Initializing messages and sessions stores...");
-        m_mapStorage = new MapDBPersistentStore(props);
+        m_mapStorage = StoreType.createFromConfiguration(props).getFactory().createStore(props);
         m_mapStorage.initStore();
         IMessagesStore messagesStore = m_mapStorage.messagesStore();
         m_sessionsStore = m_mapStorage.sessionsStore();

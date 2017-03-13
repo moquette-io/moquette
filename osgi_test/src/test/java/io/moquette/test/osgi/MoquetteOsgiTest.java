@@ -65,6 +65,6 @@ public class MoquetteOsgiTest {
         }
 
         // If found no bundles with moquette in the name, fail the test.
-	    fail();
+        fail();
     }
 }

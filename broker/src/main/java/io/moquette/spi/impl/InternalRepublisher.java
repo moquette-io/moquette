@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 
 class InternalRepublisher {
@@ -45,9 +46,12 @@ class InternalRepublisher {
         }
     }
 
-    void publishStored(ClientSession clientSession, BlockingQueue<IMessagesStore.StoredMessage> publishedEvents) {
+    void publishStored(ClientSession clientSession, Queue<IMessagesStore.StoredMessage> publishedEvents) {
         List<IMessagesStore.StoredMessage> storedPublishes = new ArrayList<>();
-        publishedEvents.drainTo(storedPublishes);
+        IMessagesStore.StoredMessage head = null;
+        while( (head = publishedEvents.poll()) != null ) {
+            storedPublishes.add(head);
+        }
 
         for (IMessagesStore.StoredMessage pubEvt : storedPublishes) {
             // put in flight zone

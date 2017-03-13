@@ -18,11 +18,15 @@ package io.moquette;
 
 import java.io.File;
 
+import io.moquette.spi.persistence.StoreType;
+
 /**
  * Created by andrea on 08/12/15.
  */
 public class BrokerConstants {
 
+    public static final String STORE_TYPE_PROPERTY_NAME = "persistent_store_type";
+    public static final String STORE_TYPE_PROPERTY_DEFAULT = StoreType.MAPDB.getConfigValue();
     public static final String INTERCEPT_HANDLER_PROPERTY_NAME = "intercept.handler";
     public static final String BROKER_INTERCEPTOR_THREAD_POOL_SIZE = "intercept.thread_pool.size";
     public static final String PERSISTENT_STORE_PROPERTY_NAME = "persistent_store";
@@ -33,6 +37,9 @@ public class BrokerConstants {
     public static final String DEFAULT_MOQUETTE_STORE_MAP_DB_FILENAME = "moquette_store.mapdb";
     public static final String DEFAULT_PERSISTENT_PATH = System.getProperty("user.dir") + File.separator
             + DEFAULT_MOQUETTE_STORE_MAP_DB_FILENAME;
+    public static final String DEFAULT_MOQUETTE_STORE_LMDB_FOLDER = "moquette_store";
+    public static final String DEFAULT_LMDB_STORE_PATH = System.getProperty("user.dir") + File.separator 
+            + DEFAULT_MOQUETTE_STORE_LMDB_FOLDER;     
     public static final String WEB_SOCKET_PORT_PROPERTY_NAME = "websocket_port";
     public static final String WSS_PORT_PROPERTY_NAME = "secure_websocket_port";
     public static final String SSL_PORT_PROPERTY_NAME = "ssl_port";

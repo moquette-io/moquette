@@ -16,14 +16,16 @@
 
 package io.moquette.spi.impl;
 
-import io.moquette.spi.IMessagesStore;
-import io.moquette.spi.ISessionsStore;
-import io.moquette.spi.MessageGUID;
-import io.moquette.spi.persistence.MemorySessionStore;
 import java.util.HashMap;
 import java.util.Map;
 
-public class MemoryStorageService {
+import io.moquette.spi.IMessagesStore;
+import io.moquette.spi.ISessionsStore;
+import io.moquette.spi.MessageGUID;
+import io.moquette.spi.persistence.IPersistentStore;
+import io.moquette.spi.persistence.MemorySessionStore;
+
+public class MemoryStorageService implements IPersistentStore {
 
     private MemorySessionStore m_sessionsStore;
     private MemoryMessagesStore m_messagesStore;
@@ -40,6 +42,10 @@ public class MemoryStorageService {
 
     public ISessionsStore sessionsStore() {
         return m_sessionsStore;
+    }
+
+    @Override
+    public void close() {
     }
 
 }

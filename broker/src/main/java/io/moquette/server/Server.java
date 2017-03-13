@@ -258,9 +258,11 @@ public class Server {
 
     public void stopServer() {
         LOG.info("Unbinding server from the configured ports...");
-        m_acceptor.close();
+        if(m_acceptor != null)
+            m_acceptor.close();
         LOG.info("Stopping MQTT protocol processor...");
-        m_processorBootstrapper.shutdown();
+        if(m_processorBootstrapper != null)
+            m_processorBootstrapper.shutdown();
         m_initialized = false;
         if (hazelcastInstance != null) {
             LOG.info("Stopping embedded Hazelcast instance...");
