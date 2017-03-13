@@ -34,11 +34,11 @@ package io.moquette.testembedded;
 
     public class EmbeddedLauncher {
     static class PublisherListener extends AbstractInterceptHandler {
-    	
-    	@Override
-    	public String getID() {
-    		return "EmbeddedLauncherPublishListener";
-    	}
+        
+        @Override
+        public String getID() {
+            return "EmbeddedLauncherPublishListener";
+        }
 
         @Override
         public void onPublish(InterceptPublishMessage msg) {

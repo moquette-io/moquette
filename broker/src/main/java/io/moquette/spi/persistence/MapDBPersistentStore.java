@@ -35,7 +35,7 @@ import static io.moquette.BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME;
 /**
  * MapDB main persistence implementation
  */
-public class MapDBPersistentStore {
+public class MapDBPersistentStore implements IPersistentStore {
 
     /**
      * This is a DTO used to persist minimal status (clean session and activation status) of a

@@ -47,6 +47,10 @@ public class MessageGUID implements Serializable {
         return guid != null ? guid.hashCode() : 0;
     }
 
+    public String stringValue() {
+        return this.guid;
+    }
+    
     @Override
     public String toString() {
         return "MessageGUID{" + "guid='" + guid + '\'' + '}';

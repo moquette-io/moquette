@@ -18,6 +18,7 @@ package io.moquette.spi;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import io.moquette.spi.IMessagesStore.StoredMessage;
 import io.moquette.spi.impl.subscriptions.Subscription;
@@ -168,7 +169,7 @@ public interface ISessionsStore {
      *            the client ID owning the queue.
      * @return the list of queue message UUIDs.
      */
-    BlockingQueue<StoredMessage> queue(String clientID);
+    Queue<StoredMessage> queue(String clientID);
 
     void dropQueue(String clientID);
 

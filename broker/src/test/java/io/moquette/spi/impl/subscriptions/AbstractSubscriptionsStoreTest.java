@@ -16,38 +16,54 @@
 
 package io.moquette.spi.impl.subscriptions;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.List;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
 import io.moquette.spi.ClientSession;
 import io.moquette.spi.ISessionsStore;
 import io.moquette.spi.ISessionsStore.ClientTopicCouple;
 import io.moquette.spi.impl.MemoryStorageService;
+import io.moquette.spi.persistence.IPersistentStore;
 import io.netty.handler.codec.mqtt.MqttQoS;
-import org.junit.Before;
-import org.junit.Test;
-import java.io.IOException;
-import java.util.List;
-import static org.assertj.core.api.Assertions.*;
 
 /**
  *
  * @author andrea
  */
-public class SubscriptionsStoreTest {
+public abstract class AbstractSubscriptionsStoreTest {
 
+    private IPersistentStore storageService;
     private SubscriptionsStore store;
     private ISessionsStore sessionsStore;
 
-    public SubscriptionsStoreTest() {
+    public AbstractSubscriptionsStoreTest() {
     }
 
     @Before
-    public void setUp() throws IOException {
+    public void setUp() throws Exception {
         store = new SubscriptionsStore();
-        MemoryStorageService storageService = new MemoryStorageService();
+        storageService = setUpStore();        
         storageService.initStore();
         this.sessionsStore = storageService.sessionsStore();
         store.init(sessionsStore);
     }
+    
+    @After
+    public void tearDown() throws Exception {
+        if (storageService != null) {
+            storageService.close();
+        }
+        cleanUpStore();
+    }
 
+    protected abstract IPersistentStore setUpStore() throws Exception;
+    protected abstract void cleanUpStore() throws Exception;
+    
     @Test
     public void testMatchSimple() {
         Subscription slashSub = new Subscription("FAKE_CLI_ID_1", new Topic("/"), MqttQoS.AT_MOST_ONCE);

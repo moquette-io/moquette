@@ -40,6 +40,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -527,7 +528,7 @@ public class ProtocolProcessor {
      */
     private void republishStoredInSession(ClientSession clientSession) {
         LOG.info("Republishing stored publish events. CId = {}.", clientSession.clientID);
-        BlockingQueue<StoredMessage> publishedEvents = clientSession.queue();
+        Queue<StoredMessage> publishedEvents = clientSession.queue();
         if (publishedEvents.isEmpty()) {
             LOG.info("There are no stored publish events. ClientId = {}.", clientSession.clientID);
             return;
