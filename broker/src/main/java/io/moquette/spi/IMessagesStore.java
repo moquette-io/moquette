@@ -136,4 +136,6 @@ public interface IMessagesStore {
     StoredMessage getMessageByGuid(MessageGUID guid);
 
     void cleanRetained(String topic);
+
+	void removeStoredMessage(MessageGUID guid);
 }

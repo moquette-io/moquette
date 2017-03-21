@@ -50,8 +50,10 @@ class MessagesPublisher {
         //if QoS 1 or 2 store the message
         //TODO perhaps this block is not needed.
         MessageGUID guid = null;
-        if (publishingQos != AbstractMessage.QOSType.MOST_ONE) {
+        if (publishingQos == AbstractMessage.QOSType.LEAST_ONE) {
             guid = m_messagesStore.storePublishForFuture(pubMsg);
+        } else if(publishingQos == AbstractMessage.QOSType.EXACTLY_ONCE) {
+        	guid = pubMsg.getGuid();
         }
 
         LOG.trace("Found {} matching subscriptions to <{}>", topicMatchingSubscriptions.size(), topic);
@@ -80,6 +82,9 @@ class MessagesPublisher {
                     targetSession.enqueue(pubMsg);
                 }
             }
+        }
+        if(!pubMsg.isRetained()) {
+        	m_messagesStore.removeStoredMessage(guid);
         }
     }
 }

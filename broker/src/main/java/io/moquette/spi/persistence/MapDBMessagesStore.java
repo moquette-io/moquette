@@ -97,11 +97,11 @@ class MapDBMessagesStore implements IMessagesStore {
         }
         messageIdToGuid.clear();
     }
-
-    void removeStoredMessage(MessageGUID guid) {
+    @Override
+    public void removeStoredMessage(MessageGUID guid) {
         //remove only the not retained and no more referenced
         StoredMessage storedMessage = m_persistentMessageStore.get(guid);
-        if (!storedMessage.isRetained()) {
+        if (storedMessage != null && !storedMessage.isRetained()) {
             LOG.debug("Cleaning not retained message guid {}", guid);
             m_persistentMessageStore.remove(guid);
         }

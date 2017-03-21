@@ -424,14 +424,6 @@ public class ProtocolProcessor {
         ClientSession targetSession = m_sessionsStore.sessionForClient(clientID);
         StoredMessage inflightMsg = targetSession.getInflightMessage(messageID);
         targetSession.inFlightAcknowledged(messageID);
-
-        String topic = inflightMsg.getTopic();
-
-//        MessageGUID guid = inflightMsg.getGuid();
-        //Remove the message from message store
-//        m_messagesStore.decUsageCounter(guid);
-
-        m_interceptor.notifyMessageAcknowledged(new InterceptAcknowledgedMessage(inflightMsg, topic, username));
     }
 
     public static IMessagesStore.StoredMessage asStoredMessage(PublishMessage msg) {
@@ -521,6 +513,7 @@ public class ProtocolProcessor {
         IMessagesStore.StoredMessage tobeStored = asStoredMessage(will);
         tobeStored.setClientID(clientID);
         tobeStored.setMessageID(messageId);
+        tobeStored.setGuid(new MessageGUID(UUID.randomUUID().toString()));
         String topic = tobeStored.getTopic();
         List<Subscription> topicMatchingSubscriptions = subscriptions.matches(topic);
 
@@ -565,10 +558,6 @@ public class ProtocolProcessor {
         LOG.debug("\t\tSRV <--PUBCOMP-- SUB processPubComp invoked for clientID {} ad messageID {}", clientID, messageID);
         //once received the PUBCOMP then remove the message from the temp memory
         ClientSession targetSession = m_sessionsStore.sessionForClient(clientID);
-        StoredMessage inflightMsg = targetSession.secondPhaseAcknowledged(messageID);
-        String username = NettyUtils.userName(channel);
-        String topic = inflightMsg.getTopic();
-        m_interceptor.notifyMessageAcknowledged(new InterceptAcknowledgedMessage(inflightMsg, topic, username));
     }
 
     public void processDisconnect(Channel channel) throws InterruptedException {

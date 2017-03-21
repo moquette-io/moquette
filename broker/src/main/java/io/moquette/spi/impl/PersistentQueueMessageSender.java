@@ -42,7 +42,7 @@ class PersistentQueueMessageSender {
         }
         Channel channel = connectionDescriptors.get(clientId).channel;
         LOG.trace("Session for clientId {}", clientId);
-        if (channel.isWritable()) {
+        if (channel.isActive()) {
             LOG.debug("channel is writable");
             //if channel is writable don't enqueue
             channel.writeAndFlush(pubMessage);

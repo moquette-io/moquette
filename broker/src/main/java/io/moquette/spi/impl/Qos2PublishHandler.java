@@ -103,6 +103,8 @@ class Qos2PublishHandler {
             } else {
                 m_messagesStore.storeRetained(topic, evt.getGuid());
             }
+        } else {
+        	m_messagesStore.removeStoredMessage(evt.getGuid());
         }
 
         sendPubComp(clientID, messageID);

@@ -44,6 +44,4 @@ public interface InterceptHandler {
     void onSubscribe(InterceptSubscribeMessage msg);
 
     void onUnsubscribe(InterceptUnsubscribeMessage msg);
-    
-    void onMessageAcknowledged(InterceptAcknowledgedMessage msg);
 }
