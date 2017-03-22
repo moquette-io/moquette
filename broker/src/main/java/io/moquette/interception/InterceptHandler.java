@@ -33,7 +33,7 @@ public interface InterceptHandler {
 
     Class<?>[] ALL_MESSAGE_TYPES = {InterceptConnectMessage.class, InterceptDisconnectMessage.class,
             InterceptConnectionLostMessage.class, InterceptPublishMessage.class, InterceptSubscribeMessage.class,
-            InterceptUnsubscribeMessage.class, InterceptAcknowledgedMessage.class};
+            InterceptUnsubscribeMessage.class, InterceptAcknowledgedMessage.class, WipeSubscriptionsMessage.class};
 
     /**
      * Returns the identifier of this intercept handler.
