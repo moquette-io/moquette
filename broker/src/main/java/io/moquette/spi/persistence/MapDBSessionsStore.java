@@ -208,16 +208,17 @@ class MapDBSessionsStore implements ISessionsStore {
             inFlightForClient.add(nextPacketId);
             this.m_inFlightIds.put(clientID, inFlightForClient);
             return nextPacketId;
-
         }
 
-        int maxId = inFlightForClient.isEmpty() ? 0 : Collections.max(inFlightForClient);
-        int nextPacketId = (maxId % 0xFFFF) + 1;
-        inFlightForClient.add(nextPacketId);
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("The next packet ID has been generated. CId= {}, result = {}.", clientID, nextPacketId);
+        synchronized(inFlightForClient) {
+            int maxId = inFlightForClient.isEmpty() ? 0 : Collections.max(inFlightForClient);
+            int nextPacketId = (maxId % 0xFFFF) + 1;
+            inFlightForClient.add(nextPacketId);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("The next packet ID has been generated. CId= {}, result = {}.", clientID, nextPacketId);
+            }
+            return nextPacketId;
         }
-        return nextPacketId;
     }
 
     @Override
@@ -233,7 +234,9 @@ class MapDBSessionsStore implements ISessionsStore {
         // remove from the ids store
         Set<Integer> inFlightForClient = this.m_inFlightIds.get(clientID);
         if (inFlightForClient != null) {
-            inFlightForClient.remove(messageID);
+        	synchronized(inFlightForClient) {
+                inFlightForClient.remove(messageID);
+        	}
         }
     }
 
@@ -276,7 +279,9 @@ class MapDBSessionsStore implements ISessionsStore {
         // remove from the ids store
         Set<Integer> inFlightForClient = this.m_inFlightIds.get(clientID);
         if (inFlightForClient != null) {
-            inFlightForClient.remove(messageID);
+        	synchronized(inFlightForClient) {
+                inFlightForClient.remove(messageID);
+        	}
         }
 
         Map<Integer, MessageGUID> messageIDs = Utils
