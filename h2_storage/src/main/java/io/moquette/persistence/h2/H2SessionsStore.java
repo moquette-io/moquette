@@ -41,6 +41,7 @@ public class H2SessionsStore implements ISessionsStore, ISubscriptionsStore {
     // maps clientID->[MessageId -> msg]
     private ConcurrentMap<String, ConcurrentMap<Integer, StoredMessage>> outboundFlightMessages;
     // map clientID <-> set of currently in flight packet identifiers
+    // @GuardedBy("inFlightIds")
     private Map<String, Set<Integer>> inFlightIds;
     // maps clientID->[MessageId -> guid]
     private ConcurrentMap<String, ConcurrentMap<Integer, StoredMessage>> secondPhaseStore;
@@ -193,12 +194,14 @@ public class H2SessionsStore implements ISessionsStore, ISubscriptionsStore {
         StoredMessage msg = m.remove(messageID);
         this.outboundFlightMessages.put(clientID, m);
 
-        // remove from the ids store
-        Set<Integer> inFlightForClient = this.inFlightIds.get(clientID);
-        if (inFlightForClient != null) {
-            inFlightForClient.remove(messageID);
+        synchronized (inFlightIds) {
+            // remove from the ids store
+            Set<Integer> inFlightForClient = this.inFlightIds.get(clientID);
+            if (inFlightForClient != null) {
+                inFlightForClient.remove(messageID);
+            }
+            return msg;
         }
-        return msg;
     }
 
     @Override
@@ -214,20 +217,22 @@ public class H2SessionsStore implements ISessionsStore, ISubscriptionsStore {
     @Override
     public int nextPacketID(String clientID) {
         LOG.debug("Generating next packet ID CId={}", clientID);
-        Set<Integer> inFlightForClient = this.inFlightIds.get(clientID);
-        if (inFlightForClient == null) {
-            int nextPacketId = 1;
-            inFlightForClient = Collections.newSetFromMap(new ConcurrentHashMap<>());
+        synchronized (inFlightIds) {
+            Set<Integer> inFlightForClient = this.inFlightIds.get(clientID);
+            if (inFlightForClient == null) {
+                int nextPacketId = 1;
+                inFlightForClient = new HashSet<>();
+                inFlightForClient.add(nextPacketId);
+                this.inFlightIds.put(clientID, inFlightForClient);
+                return nextPacketId;
+            }
+
+            int maxId = inFlightForClient.isEmpty() ? 0 : Collections.max(inFlightForClient);
+            int nextPacketId = (maxId % 0xFFFF) + 1;
             inFlightForClient.add(nextPacketId);
-            this.inFlightIds.put(clientID, inFlightForClient);
+            LOG.debug("Next packet ID has been generated CId={}, result={}", clientID, nextPacketId);
             return nextPacketId;
         }
-
-        int maxId = inFlightForClient.isEmpty() ? 0 : Collections.max(inFlightForClient);
-        int nextPacketId = (maxId % 0xFFFF) + 1;
-        inFlightForClient.add(nextPacketId);
-        LOG.debug("Next packet ID has been generated CId={}, result={}", clientID, nextPacketId);
-        return nextPacketId;
     }
 
     @Override
@@ -327,7 +332,9 @@ public class H2SessionsStore implements ISessionsStore, ISubscriptionsStore {
 
         this.secondPhaseStore.remove(clientID);
         this.outboundFlightMessages.remove(clientID);
-        this.inFlightIds.remove(clientID);
+        synchronized (inFlightIds) {
+            this.inFlightIds.remove(clientID);
+        }
 
         LOG.info("Wiping existing subscriptions. ClientId={}", clientID);
         wipeSubscriptions(clientID);

@@ -40,6 +40,7 @@ class MapDBSessionsStore implements ISessionsStore, ISubscriptionsStore {
 
     // maps clientID->[MessageId -> msg]
     private ConcurrentMap<String, ConcurrentMap<Integer, StoredMessage>> outboundFlightMessages;
+    // @GuardedBy("inFlightIds")
     // map clientID <-> set of currently in flight packet identifiers
     private Map<String, Set<Integer>> m_inFlightIds;
     private ConcurrentMap<String, PersistentSession> m_persistentSessions;
@@ -187,21 +188,22 @@ class MapDBSessionsStore implements ISessionsStore, ISubscriptionsStore {
     @Override
     public int nextPacketID(String clientID) {
         LOG.debug("Generating next packet ID CId={}", clientID);
-        Set<Integer> inFlightForClient = this.m_inFlightIds.get(clientID);
-        if (inFlightForClient == null) {
-            int nextPacketId = 1;
-            inFlightForClient = Collections.newSetFromMap(new ConcurrentHashMap<>());
+        synchronized (m_inFlightIds) {
+            Set<Integer> inFlightForClient = this.m_inFlightIds.get(clientID);
+            if (inFlightForClient == null) {
+                int nextPacketId = 1;
+                inFlightForClient = new HashSet<>();
+                inFlightForClient.add(nextPacketId);
+                this.m_inFlightIds.put(clientID, inFlightForClient);
+                return nextPacketId;
+
+            }
+            int maxId = inFlightForClient.isEmpty() ? 0 : Collections.max(inFlightForClient);
+            int nextPacketId = (maxId % 0xFFFF) + 1;
             inFlightForClient.add(nextPacketId);
-            this.m_inFlightIds.put(clientID, inFlightForClient);
+            LOG.debug("Next packet ID has been generated CId={}, result={}", clientID, nextPacketId);
             return nextPacketId;
-
         }
-
-        int maxId = inFlightForClient.isEmpty() ? 0 : Collections.max(inFlightForClient);
-        int nextPacketId = (maxId % 0xFFFF) + 1;
-        inFlightForClient.add(nextPacketId);
-        LOG.debug("Next packet ID has been generated CId={}, result={}", clientID, nextPacketId);
-        return nextPacketId;
     }
 
     @Override
@@ -216,9 +218,11 @@ class MapDBSessionsStore implements ISessionsStore, ISubscriptionsStore {
         this.outboundFlightMessages.put(clientID, m);
 
         // remove from the ids store
-        Set<Integer> inFlightForClient = this.m_inFlightIds.get(clientID);
-        if (inFlightForClient != null) {
-            inFlightForClient.remove(messageID);
+        synchronized (m_inFlightIds) {
+            Set<Integer> inFlightForClient = this.m_inFlightIds.get(clientID);
+            if (inFlightForClient != null) {
+                inFlightForClient.remove(messageID);
+            }
         }
         return msg;
     }
@@ -327,7 +331,9 @@ class MapDBSessionsStore implements ISessionsStore, ISubscriptionsStore {
         LOG.info("Removing stored messages with QoS 1 and 2. ClientId={}", clientID);
         m_secondPhaseStore.remove(clientID);
         outboundFlightMessages.remove(clientID);
-        m_inFlightIds.remove(clientID);
+        synchronized (m_inFlightIds) {
+            m_inFlightIds.remove(clientID);
+        }
 
         LOG.info("Wiping existing subscriptions. ClientId={}", clientID);
         wipeSubscriptions(clientID);
