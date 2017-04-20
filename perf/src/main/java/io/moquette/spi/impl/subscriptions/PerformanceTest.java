@@ -17,9 +17,7 @@
 package io.moquette.spi.impl.subscriptions;
 
 import java.io.IOException;
-import java.lang.management.ManagementFactory;
-import java.lang.management.ThreadMXBean;
-
+import java.util.function.Consumer;
 import io.moquette.persistence.MemoryStorageService;
 import io.moquette.spi.ISessionsStore;
 import io.netty.handler.codec.mqtt.MqttQoS;
@@ -34,23 +32,21 @@ public final class PerformanceTest {
        cpufreq-set -g performance -u 800MHz -c 3
      */
     public static void main(String[] args) throws IOException, InterruptedException {
-        ISubscriptionsDirectory store = new SubscriptionsDirectory();
+        SubscriptionsDirectory store = new SubscriptionsDirectory();
         MemoryStorageService memStore = new MemoryStorageService(null, null);
         ISessionsStore aSessionsStore = memStore.sessionsStore();
         store.init(aSessionsStore);
 
-        int times = 10000;
+        int times = 500;
 
         int users = 500;
         int devices = 5;
         int values = 3;
         int subs = 2;
-        int n = users * devices * values * subs;
+        int topiccount = users * devices * values * subs;
 
-        ThreadMXBean b = ManagementFactory.getThreadMXBean();
-
-        Topic[] topics = new Topic[n];
-        for (int i = 0; i < n; i++) {
+        Topic[] topics = new Topic[topiccount];
+        for (int i = 0; i < topiccount; i++) {
             topics[i] = new Topic(
                     (i % users) + "/" + ((i / users) % devices) + "/" + ((i / (users * devices)) % values) + "/"
                             + ((i / (users * devices * values)) % subs));
@@ -60,38 +56,43 @@ public final class PerformanceTest {
             store.add(sub.asClientTopicCouple());
         }
 
-        long min = Long.MAX_VALUE;
-        //AtomicLong min = new AtomicLong(Long.MAX_VALUE);
-
-        System.out.println("Store size: " + store.size() + " " + n);
+        System.out.println("Store size: " + store.size() + " " + topiccount);
 
         // warm up
-        for (int i = 0; i < n; i++) {
+        for (int i = 0; i < topiccount; i++) {
             store.matches(topics[i]);
+        }
+
+        for (int i = 0; i < topiccount; i++) {
+            store.matches2(topics[i]);
         }
 
         System.out.println("press return for start");
         System.in.read();
 
-//        IntStream.range(0, times)
-//            .parallel()
-//            .forEach(j -> {
+        // test new
+        test(times, topiccount, i -> store.matches(topics[i]));
 
+        // test old
+        test(times, topiccount, i -> store.matches2(topics[i]));
+    }
+
+    private static void test(int times, int topiccount, Consumer<Integer> c) throws InterruptedException {
+        Thread.sleep(3000);
+        long min = Long.MAX_VALUE;
         for (int j = 0; j < times; j++) {
 
             System.gc();
             Thread.yield();
 
-            long time = b.getCurrentThreadCpuTime();
-            for (int i = 0; i < n; i++) {
-                store.matches(topics[i]);
+            long time = System.currentTimeMillis();
+            for (int i = 0; i < topiccount; i++) {
+                c.accept(i);
             }
-            long time2 = b.getCurrentThreadCpuTime() - time;
+            long time2 = System.currentTimeMillis() - time;
             min = Math.min(min, time2);
-//            min.updateAndGet(c -> Math.min(c, time2));
             System.out.println(".." + j + ": " + time2 + " min:" + min);
         }
-//            });
 
         System.out.println("min:" + min);
     }
