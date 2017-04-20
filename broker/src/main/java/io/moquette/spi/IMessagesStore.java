@@ -21,7 +21,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import java.io.Serializable;
-import java.nio.ByteBuffer;
 import java.util.Collection;
 
 /**
@@ -73,6 +72,10 @@ public interface IMessagesStore {
             return Unpooled.copiedBuffer(m_payload);
         }
 
+        public byte[] getPayloadArray() {
+            return m_payload;
+        }
+
         public void setRetained(boolean retained) {
             this.m_retained = retained;
         }
@@ -104,5 +107,5 @@ public interface IMessagesStore {
 
     void cleanRetained(Topic topic);
 
-    void storeRetained(Topic topic, StoredMessage storedMessage);
+    void storeRetained(Topic topic, StoredMessage msg);
 }

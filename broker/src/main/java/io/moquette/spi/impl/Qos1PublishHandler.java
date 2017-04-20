@@ -42,7 +42,7 @@ class Qos1PublishHandler extends QosPublishHandler {
     private final ConnectionDescriptorStore connectionDescriptors;
     private final MessagesPublisher publisher;
 
-    public Qos1PublishHandler(IAuthorizator authorizator, IMessagesStore messagesStore, BrokerInterceptor interceptor,
+    Qos1PublishHandler(IAuthorizator authorizator, IMessagesStore messagesStore, BrokerInterceptor interceptor,
                               ConnectionDescriptorStore connectionDescriptors, MessagesPublisher messagesPublisher) {
         super(authorizator);
         this.m_messagesStore = messagesStore;
@@ -71,14 +71,8 @@ class Qos1PublishHandler extends QosPublishHandler {
 
         sendPubAck(clientID, messageID);
 
-        if (msg.fixedHeader().isRetain()) {
-            if (!msg.payload().isReadable()) {
-                m_messagesStore.cleanRetained(topic);
-            } else {
-                // before wasn't stored
-                m_messagesStore.storeRetained(topic, toStoreMsg);
-            }
-        }
+        if (msg.fixedHeader().isRetain())
+            m_messagesStore.storeRetained(topic, toStoreMsg);
 
         m_interceptor.notifyTopicPublished(msg, clientID, username);
     }

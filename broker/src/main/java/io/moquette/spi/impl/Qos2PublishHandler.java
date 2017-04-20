@@ -115,13 +115,8 @@ class Qos2PublishHandler extends QosPublishHandler {
 
         this.publisher.publish2Subscribers(evt, topic, messageID);
 
-        if (evt.isRetained()) {
-            if (evt.getPayload().readableBytes() == 0) {
-                m_messagesStore.cleanRetained(topic);
-            } else {
-                m_messagesStore.storeRetained(topic, evt);
-            }
-        }
+        if (evt.isRetained())
+            m_messagesStore.storeRetained(topic, evt);
 
         //TODO here we should notify to the listeners
         //m_interceptor.notifyTopicPublished(msg, clientID, username);
