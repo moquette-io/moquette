@@ -39,8 +39,9 @@ public class HazelcastInterceptHandler extends AbstractInterceptHandler {
     @Override
     public void onPublish(InterceptPublishMessage msg) {
         HazelcastMsg hazelcastMsg = new HazelcastMsg(msg);
-        LOG.debug("{} publish on {} message: {}",
-                hazelcastMsg.getClientId(), hazelcastMsg.getTopic(), hazelcastMsg.getPayload());
+        if (LOG.isDebugEnabled())
+            LOG.debug("{} publish on {} message: {}",
+                hazelcastMsg.getClientId(), hazelcastMsg.getTopic(), new String(hazelcastMsg.getPayload()));
         topic.publish(hazelcastMsg);
     }
 }
