@@ -71,6 +71,8 @@ public class Server {
 
     private ScheduledExecutorService scheduler;
 
+    private boolean globalDatabase;
+
     public static void main(String[] args) throws IOException {
         final Server server = new Server();
         server.startServer();
@@ -331,5 +333,19 @@ public class Server {
 
     public ScheduledExecutorService getScheduler() {
         return scheduler;
+    }
+
+    /**
+     * true if you use a global database for retain messages
+     */
+    public boolean isGlobalDatabase() {
+        return globalDatabase;
+    }
+
+    /**
+     * Set this to true if you use a global database for retain messages
+     */
+    public void setGlobalDatabase(boolean globalDatabase) {
+        this.globalDatabase = globalDatabase;
     }
 }
