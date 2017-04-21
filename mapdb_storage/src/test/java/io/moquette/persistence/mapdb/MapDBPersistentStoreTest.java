@@ -21,6 +21,7 @@ import io.moquette.persistence.MessageStoreTCK;
 import io.moquette.server.config.IConfig;
 import io.moquette.server.config.MemoryConfig;
 import io.moquette.spi.IMessagesStore.StoredMessage;
+import io.moquette.spi.impl.subscriptions.Topic;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import org.junit.After;
 import org.junit.Before;
@@ -97,7 +98,7 @@ public class MapDBPersistentStoreTest extends MessageStoreTCK {
 
     @Test
     public void testNextPacketID() {
-        StoredMessage msgStored = new StoredMessage("Hello".getBytes(), MqttQoS.AT_LEAST_ONCE, "/topic");
+        StoredMessage msgStored = new StoredMessage("Hello".getBytes(), MqttQoS.AT_LEAST_ONCE, new Topic("/topic"));
         msgStored.setClientID(TEST_CLIENT);
 
         // request a first ID

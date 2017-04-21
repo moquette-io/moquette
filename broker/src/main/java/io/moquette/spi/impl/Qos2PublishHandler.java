@@ -111,9 +111,9 @@ class Qos2PublishHandler extends QosPublishHandler {
             LOG.warn("Can't find inbound inflight message for CId={}, messageId={}", clientID, messageID);
             throw new IllegalArgumentException("Can't find inbound inflight message");
         }
-        final Topic topic = new Topic(evt.getTopic());
+        final Topic topic = evt.getTopic();
 
-        this.publisher.publish2Subscribers(evt, topic, messageID);
+        this.publisher.publish2Subscribers(evt, messageID);
 
         if (evt.isRetained())
             m_messagesStore.storeRetained(topic, evt);

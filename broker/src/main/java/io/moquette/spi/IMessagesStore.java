@@ -33,12 +33,12 @@ public interface IMessagesStore {
         private static final long serialVersionUID = 1755296138639817304L;
         final MqttQoS m_qos;
         final byte[] m_payload;
-        final String m_topic;
+        final Topic m_topic;
         private boolean m_retained;
         private String m_clientID;
         private MessageGUID m_guid;
 
-        public StoredMessage(byte[] message, MqttQoS qos, String topic) {
+        public StoredMessage(byte[] message, MqttQoS qos, Topic topic) {
             m_qos = qos;
             m_payload = message;
             m_topic = topic;
@@ -48,7 +48,7 @@ public interface IMessagesStore {
             return m_qos;
         }
 
-        public String getTopic() {
+        public Topic getTopic() {
             return m_topic;
         }
 

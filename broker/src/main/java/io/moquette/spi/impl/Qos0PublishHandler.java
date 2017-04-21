@@ -18,7 +18,6 @@ package io.moquette.spi.impl;
 
 import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.IMessagesStore;
-import io.moquette.spi.impl.subscriptions.Topic;
 import io.moquette.spi.security.IAuthorizator;
 import io.netty.channel.Channel;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
@@ -34,7 +33,7 @@ class Qos0PublishHandler extends QosPublishHandler {
     private final BrokerInterceptor m_interceptor;
     private final MessagesPublisher publisher;
 
-    public Qos0PublishHandler(IAuthorizator authorizator, IMessagesStore messagesStore, BrokerInterceptor interceptor,
+    Qos0PublishHandler(IAuthorizator authorizator, IMessagesStore messagesStore, BrokerInterceptor interceptor,
                               MessagesPublisher messagesPublisher) {
         super(authorizator);
         this.m_messagesStore = messagesStore;
@@ -44,22 +43,21 @@ class Qos0PublishHandler extends QosPublishHandler {
 
     void receivedPublishQos0(Channel channel, MqttPublishMessage msg) {
         // verify if topic can be write
-        final Topic topic = new Topic(msg.variableHeader().topicName());
+        // route message to subscribers
+        IMessagesStore.StoredMessage toStoreMsg = asStoredMessage(msg);
         String clientID = NettyUtils.clientID(channel);
+        toStoreMsg.setClientID(clientID);
         String username = NettyUtils.userName(channel);
-        if (!m_authorizator.canWrite(topic, username, clientID)) {
-            LOG.error("MQTT client is not authorized to publish on topic. CId={}, topic={}", clientID, topic);
+        if (!m_authorizator.canWrite(toStoreMsg.getTopic(), username, clientID)) {
+            LOG.error("MQTT client is not authorized to publish on topic. CId={}, topic={}", clientID,
+                    toStoreMsg.getTopic());
             return;
         }
 
-        // route message to subscribers
-        IMessagesStore.StoredMessage toStoreMsg = asStoredMessage(msg);
-        toStoreMsg.setClientID(clientID);
-
-        this.publisher.publish2Subscribers(toStoreMsg, topic);
+        this.publisher.publish2Subscribers(toStoreMsg);
 
         if (msg.fixedHeader().isRetain())
-            m_messagesStore.storeRetained(topic, toStoreMsg);
+            m_messagesStore.storeRetained(toStoreMsg.getTopic(), toStoreMsg);
 
         m_interceptor.notifyTopicPublished(msg, clientID, username);
     }
