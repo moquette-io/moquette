@@ -46,15 +46,15 @@ class H2MessagesStore implements IMessagesStore {
     }
 
     @Override
-    public void storeRetained(Topic topic, StoredMessage storedMessage) {
-        LOG.debug("Store retained message for topic={}, CId={}", topic, storedMessage.getClientID());
-        if (storedMessage.getClientID() == null) {
+    public void storeRetained(StoredMessage storedMessage) {
+        LOG.debug("Store retained message for topic={}, CId={}", storedMessage.getTopic(), storedMessage.getClientID());
+        if (storedMessage.getClientID() == null)
             throw new IllegalArgumentException("Message to be persisted must have a not null client ID");
-        }
+
         if (storedMessage.getQos() != MqttQoS.AT_MOST_ONCE && storedMessage.getPayloadArray().length > 0)
-            retainedStore.put(topic, storedMessage);
+            retainedStore.put(storedMessage.getTopic(), storedMessage);
         else
-            cleanRetained(topic);
+            cleanRetained(storedMessage.getTopic());
     }
 
     @Override

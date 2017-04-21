@@ -267,7 +267,7 @@ public class ProtocolProcessorTest extends AbstractProtocolProcessorCommonUtils 
                 new Topic("/topic"));
         retainedMessage.setRetained(true);
         retainedMessage.setClientID(FAKE_PUBLISHER_ID);
-        m_messagesStore.storeRetained(new Topic("/topic"), retainedMessage);
+        m_messagesStore.storeRetained(retainedMessage);
 
         m_processor.init(subs, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizator(),
                 NO_OBSERVERS_INTERCEPTOR);

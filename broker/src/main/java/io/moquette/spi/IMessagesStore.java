@@ -107,5 +107,5 @@ public interface IMessagesStore {
 
     void cleanRetained(Topic topic);
 
-    void storeRetained(Topic topic, StoredMessage msg);
+    void storeRetained(StoredMessage msg);
 }

@@ -70,7 +70,7 @@ class Qos1PublishHandler extends QosPublishHandler {
         sendPubAck(clientID, messageID);
 
         if (msg.fixedHeader().isRetain())
-            m_messagesStore.storeRetained(toStoreMsg.getTopic(), toStoreMsg);
+            m_messagesStore.storeRetained(toStoreMsg);
 
         m_interceptor.notifyTopicPublished(msg, clientID, username);
     }

@@ -39,15 +39,15 @@ public class MemoryMessagesStore implements IMessagesStore {
     }
 
     @Override
-    public void storeRetained(Topic topic, StoredMessage msg) {
-        LOG.debug("Store retained message for topic={}, CId={}", topic, msg.getClientID());
+    public void storeRetained(StoredMessage msg) {
+        LOG.debug("Store retained message for topic={}, CId={}", msg.getTopic(), msg.getClientID());
         if (msg.getClientID() == null) {
             throw new IllegalArgumentException("Message to be persisted must have a not null client ID");
         }
         if (msg.getQos() != MqttQoS.AT_MOST_ONCE && msg.getPayloadArray().length > 0)
-            m_retainedStore.put(topic, msg);
+            m_retainedStore.put(msg.getTopic(), msg);
         else
-            cleanRetained(topic);
+            cleanRetained(msg.getTopic());
     }
 
     @Override

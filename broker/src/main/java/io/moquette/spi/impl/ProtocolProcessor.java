@@ -541,7 +541,7 @@ public class ProtocolProcessor {
         if (!msg.fixedHeader().isRetain()) {
             return;
         }
-        m_messagesStore.storeRetained(toStoreMsg.getTopic(), toStoreMsg);
+        m_messagesStore.storeRetained(toStoreMsg);
     }
 
     /**
@@ -556,9 +556,8 @@ public class ProtocolProcessor {
          this.messagesPublisher.publish2Subscribers(tobeStored);
 
          //Stores retained message to the topic
-         if(will.isRetained()) {
-             m_messagesStore.storeRetained(tobeStored.getTopic(), tobeStored);
-         }
+         if(will.isRetained())
+             m_messagesStore.storeRetained(tobeStored);
      }
 
     static MqttQoS lowerQosToTheSubscriptionDesired(Subscription sub, MqttQoS qos) {
