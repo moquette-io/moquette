@@ -62,6 +62,7 @@ public final class BrokerConstants {
     public static final String METRICS_LIBRATO_TOKEN_PROPERTY_NAME = "metrics.librato.token";
     public static final String METRICS_LIBRATO_SOURCE_PROPERTY_NAME = "metrics.librato.source";
     public static final String STORAGE_CLASS_NAME = "storage_class";
+    public static final String STORAGE_CLASS_TYPE = "storage_type_global";
 
     private BrokerConstants() {
     }

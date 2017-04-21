@@ -104,6 +104,7 @@ public class ProtocolProcessorBootstrapper {
                 store.close();
             }
         };
+        server.setGlobalDatabase(Boolean.parseBoolean(props.getProperty(BrokerConstants.STORAGE_CLASS_TYPE, "false")));
 
         LOG.info("Configuring message interceptors...");
 
