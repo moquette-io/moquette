@@ -250,7 +250,7 @@ public class Server {
             throw new IllegalStateException("Can't publish on a server is not yet started");
         }
         LOG.debug("Publishing message. CId={}, messageId={}", clientId, messageID);
-        m_processor.internalPublish(msg, clientId);
+        m_processor.internalPublish(msg, clientId, isGlobalDatabase());
     }
 
     public void stopServer() {
