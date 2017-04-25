@@ -76,7 +76,7 @@ public class MQTTMessageLogger extends ChannelDuplexHandler {
             case PINGREQ:
             case PINGRESP:
             case UNSUBACK:
-                LOG.debug("{} {} <{}> packetID <{}>", direction, messageType, clientID, messageId(msg));
+                LOG.debug("{} {} <{}> packetID <{}>", direction, messageType, clientID);
                 break;
 
             default:
