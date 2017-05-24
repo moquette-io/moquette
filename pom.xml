@@ -3,20 +3,33 @@
     <modelVersion>4.0.0</modelVersion>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <netty.version>4.0.30.Final</netty.version>
+        <netty.version>4.1.6.Final</netty.version>
         <source.version>1.7</source.version>
         <target.version>1.7</target.version>
         <bintray.repo>andsel/maven</bintray.repo>
-        <bintray.parent.package>org.dna.mqtt.moquette-parent</bintray.parent.package>
+        <bintray.parent.package>io.moquette.moquette-parent</bintray.parent.package>
     </properties>
 
     <groupId>io.moquette</groupId>
     <artifactId>moquette-parent</artifactId>
 
     <packaging>pom</packaging>
-    <version>0.8-SNAPSHOT</version>
-    <name>Moquette MQTT parent</name>
+    <version>0.10-SNAPSHOT</version>
+    <name>Moquette MQTT</name>
+    <description>Moquette lightweight MQTT Broker</description>
+    <inceptionYear>2011</inceptionYear>
     <url>https://github.com/andsel/moquette/</url>
+
+    <licenses>
+        <license>
+            <name>The Apache License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+        <license>
+            <name>Eclipse Public License - Version 1.0</name>
+            <url>http://www.eclipse.org/org/documents/epl-v10.php</url>
+        </license>
+    </licenses>
 
     <developers>
         <developer>
@@ -48,14 +61,59 @@
             <name>Wagner Macedo</name>
             <url>https://github.com/wagnerluis1982</url>
         </contributor>
+        <contributor>
+            <name>Luis Barrios</name>
+            <url>https://github.com/lbarriosh</url>
+        </contributor>
+        <contributor>
+            <name>Christophe Mourette</name>
+            <url>https://github.com/mackristof</url>
+        </contributor>
+        <contributor>
+            <name>Victor Kazakov</name>
+            <url>https://github.com/kazvictor</url>
+        </contributor>
+        <contributor>
+            <name>Neeme Praks</name>
+            <url>https://github.com/nemecec</url>
+        </contributor>
+        <contributor>
+            <name>Kevin Berendsen</name>
+            <url>https://github.com/kevto</url>
+        </contributor>
+        <contributor>
+            <name>Chris Schaefer</name>
+            <url>https://github.com/windbender</url>
+        </contributor>
+        <contributor>
+            <name>Keith Hughes</name>
+            <url>http://www.inhabitech.com/blog/author/keith/</url>
+        </contributor>
+        <contributor>
+            <name>Luca Capra</name>
+            <email>luca.capra@create-net.org</email>
+        </contributor>
+        <contributor>
+            <name>konradm</name>
+        </contributor>
+        <contributor>
+            <name>pkhanal</name>
+        </contributor>
     </contributors>
 
+    <scm>
+        <connection>scm:git:git@github.com:andsel/moquette.git</connection>
+        <developerConnection>scm:git:git@github.com:andsel/moquette.git</developerConnection>
+        <url>git@github.com:andsel/moquette.git</url>
+    </scm>
+
     <modules>
-        <module>parser_commons</module>
-        <module>netty_parser</module>
         <module>broker</module>
+        <module>mapdb_storage</module>
         <module>distribution</module>
         <module>embedding_moquette</module>
+        <module>osgi_test</module>
+        <module>perf</module>
     </modules>
 
     <reporting>
@@ -78,8 +136,79 @@
                     <target>${target.version}</target>
                 </configuration>
             </plugin>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-checkstyle-plugin</artifactId>
+              <version>2.17</version>
+              <configuration>
+                  <configLocation>checkstyle.xml</configLocation>
+                  <suppressionsLocation>checkstyle-suppressions.xml</suppressionsLocation>
+                  <!--
+                     <configLocation>/google_checks.xml</configLocation>
+                   -->
+                  <failOnViolation>true</failOnViolation>
+                  <consoleOutput>true</consoleOutput>
+              </configuration>
+              <executions>
+                <execution>
+                  <phase>validate</phase>
+                  <goals>
+                    <goal>check</goal>
+                  </goals>
+                </execution>
+              </executions>
+            </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>release-sign-artifacts</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
     <repositories>
         <repository>

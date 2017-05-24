@@ -3,7 +3,8 @@
 
 [![Build Status](https://api.travis-ci.org/andsel/moquette.svg?branch=master)](https://travis-ci.org/andsel/moquette)
 
-[Documentation site] (http://andsel.github.io/moquette/)
+* [Documentation reference guide] (http://andsel.github.io/moquette/) Guide on how to use and configure Moquette
+* [Google Group] (https://groups.google.com/forum/#!forum/moquette-mqtt) Google Group to participate in development discussions.
 Moquette aims to be a MQTT compliant broker. The broker supports QoS 0, QoS 1 and QoS 2.
 
 Its designed to be evented, uses Netty for the protocol encoding and decoding part.
@@ -16,10 +17,10 @@ Part of moquette are used into the [Vertx MQTT module] (https://github.com/giovi
 and into [WSO2 Messge broker] (http://techexplosives-pamod.blogspot.it/2014/05/mqtt-transport-architecture-wso2-mb-3x.html).
 
 ## 1 minute set up
-Start play with it, download the self distribution tar from [BinTray](http://dl.bintray.com/andsel/generic/distribution-0.7-bundle-tar.tar.gz) ,
+Start play with it, download the self distribution tar from [BinTray](https://bintray.com/artifact/download/andsel/generic/distribution-0.8-bundle-tar.tar.gz) ,
 the un untar and start the broker listening on 1883 port and enjoy! 
 ```
-tar zxf distribution-0.7-bundle-tar.tar.gz
+tar zxf distribution-0.8-bundle-tar.tar.gz
 cd bin
 ./moquette.sh
 ```
@@ -37,7 +38,7 @@ To embed Moquette in another maven project is sufficient to include a repository
 <repositories>
   <repository>
     <id>bintray</id>
-    <url>http://dl.bintray.com/andsel/maven/</url>
+    <url>https://jcenter.bintray.com</url>
     <releases>
       <enabled>true</enabled>
     </releases>
@@ -54,7 +55,7 @@ Include dependency in your project:
 <dependency>
       <groupId>io.moquette</groupId>
       <artifactId>moquette-broker</artifactId>
-      <version>0.8-SNAPSHOT</version>
+      <version>0.10-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -62,13 +63,4 @@ Include dependency in your project:
 
 After a git clone of the repository, cd into the cloned sources and: `mvn clean package`. 
 In distribution/target directory will be produced the selfcontained tar for the broker with all dependencies and a running script. 
-
-
-## Guide
-
- **Documentation reference guide**
-   Web site http://andsel.github.io/moquette/
-
- **Developers resources**
-   Google Group https://groups.google.com/forum/#!forum/moquette-mqtt
   

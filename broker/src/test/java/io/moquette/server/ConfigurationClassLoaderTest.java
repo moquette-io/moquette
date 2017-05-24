@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The original author or authors
+ * Copyright (c) 2012-2017 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -13,81 +13,79 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
+
 package io.moquette.server;
 
-import io.moquette.commons.Constants;
+import io.moquette.BrokerConstants;
 import io.moquette.server.config.IConfig;
 import io.moquette.server.config.MemoryConfig;
-import io.moquette.spi.impl.security.IAuthenticator;
-import io.moquette.spi.impl.security.IAuthorizator;
+import io.moquette.spi.impl.subscriptions.Topic;
+import io.moquette.persistence.MemoryMessagesStore;
+import io.moquette.persistence.MemoryStorageService;
+import io.moquette.persistence.MemorySessionStore;
+import io.moquette.spi.security.IAuthenticator;
+import io.moquette.spi.security.IAuthorizator;
 import org.junit.After;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
-
 import static org.junit.Assert.*;
 
-/**
- *
- * @author luca <luca.capra@create-net.org> 
- */
 public class ConfigurationClassLoaderTest implements IAuthenticator, IAuthorizator {
-    private static final Logger LOG = LoggerFactory.getLogger(ConfigurationClassLoaderTest.class);
 
     Server m_server;
     IConfig m_config;
-    
+
     protected void startServer(Properties props) throws IOException {
         m_server = new Server();
         m_config = new MemoryConfig(props);
         m_server.startServer(m_config);
     }
 
-
     @After
     public void tearDown() throws Exception {
         m_server.stopServer();
-        File dbFile = new File(m_config.getProperty(io.moquette.commons.Constants.PERSISTENT_STORE_PROPERTY_NAME));
-        if (dbFile.exists()) {
-            dbFile.delete();
-        }
     }
-    
+
     @Test
     public void loadAuthenticator() throws Exception {
-        Properties props = new Properties(IntegrationUtils.prepareTestPropeties());
-        props.setProperty(Constants.AUTHENTICATOR_CLASS_NAME, "io.moquette.server.ConfigurationClassLoaderTest");
+        Properties props = new Properties(IntegrationUtils.prepareTestProperties());
+        props.setProperty(BrokerConstants.AUTHENTICATOR_CLASS_NAME, getClass().getName());
         startServer(props);
         assertTrue(true);
-        m_server.stopServer();
     }
-    
+
     @Test
     public void loadAuthorizator() throws Exception {
-        Properties props = new Properties(IntegrationUtils.prepareTestPropeties());
-        props.setProperty(Constants.AUTHORIZATOR_CLASS_NAME, "io.moquette.server.ConfigurationClassLoaderTest");
+        Properties props = new Properties(IntegrationUtils.prepareTestProperties());
+        props.setProperty(BrokerConstants.AUTHORIZATOR_CLASS_NAME, getClass().getName());
         startServer(props);
         assertTrue(true);
-        m_server.stopServer();
+    }
+
+    @Test
+    public void loadStorage() throws Exception {
+        Properties props = new Properties(IntegrationUtils.prepareTestProperties());
+        props.setProperty(BrokerConstants.STORAGE_CLASS_NAME, MemoryStorageService.class.getName());
+
+        startServer(props);
+        assertTrue(m_server.getProcessor().getMessagesStore() instanceof MemoryMessagesStore);
+        assertTrue(m_server.getProcessor().getSessionsStore() instanceof MemorySessionStore);
     }
 
     @Override
-    public boolean checkValid(String username, byte[] password) {
+    public boolean checkValid(String clientID, String username, byte[] password) {
         return true;
     }
 
     @Override
-    public boolean canWrite(String topic, String user, String client) {
+    public boolean canWrite(Topic topic, String user, String client) {
         return true;
     }
 
     @Override
-    public boolean canRead(String topic, String user, String client) {
+    public boolean canRead(Topic topic, String user, String client) {
         return true;
     }
-    
+
 }

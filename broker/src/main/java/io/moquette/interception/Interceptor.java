@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The original author or authors
+ * Copyright (c) 2012-2017 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -13,35 +13,41 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
+
 package io.moquette.interception;
 
-import io.moquette.proto.messages.ConnectMessage;
-import io.moquette.proto.messages.PublishMessage;
+import io.moquette.interception.messages.InterceptAcknowledgedMessage;
 import io.moquette.spi.impl.subscriptions.Subscription;
+import io.netty.handler.codec.mqtt.MqttConnectMessage;
+import io.netty.handler.codec.mqtt.MqttPublishMessage;
 
 /**
  * This interface is to be used internally by the broker components.
  * <p>
- * An interface is used instead of a class to allow more flexibility in changing
- * an implementation.
+ * An interface is used instead of a class to allow more flexibility in changing an implementation.
  * <p>
- * Interceptor implementations forward notifications to a <code>InterceptHandler</code>,
- * that is normally a field. So, the implementations should act as a proxy to a custom
- * intercept handler.
+ * Interceptor implementations forward notifications to a <code>InterceptHandler</code>, that is
+ * normally a field. So, the implementations should act as a proxy to a custom intercept handler.
  *
  * @see InterceptHandler
- * @author Wagner Macedo
  */
 public interface Interceptor {
 
-    void notifyClientConnected(ConnectMessage msg);
+    void notifyClientConnected(MqttConnectMessage msg);
 
-    void notifyClientDisconnected(String clientID);
+    void notifyClientDisconnected(String clientID, String username);
 
-    void notifyTopicPublished(PublishMessage msg, String clientID);
+    void notifyClientConnectionLost(String clientID, String username);
 
-    void notifyTopicSubscribed(Subscription sub);
+    void notifyTopicPublished(MqttPublishMessage msg, String clientID, String username);
 
-    void notifyTopicUnsubscribed(String topic, String clientID);
+    void notifyTopicSubscribed(Subscription sub, String username);
 
+    void notifyTopicUnsubscribed(String topic, String clientID, String username);
+
+    void notifyMessageAcknowledged(InterceptAcknowledgedMessage msg);
+
+    void addInterceptHandler(InterceptHandler interceptHandler);
+
+    void removeInterceptHandler(InterceptHandler interceptHandler);
 }

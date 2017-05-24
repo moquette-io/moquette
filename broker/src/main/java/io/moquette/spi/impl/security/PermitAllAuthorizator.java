@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The original author or authors
+ * Copyright (c) 2012-2017 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -13,19 +13,21 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
+
 package io.moquette.spi.impl.security;
 
-/**
- * @author andrea
- */
+import io.moquette.spi.impl.subscriptions.Topic;
+import io.moquette.spi.security.IAuthorizator;
+
 public class PermitAllAuthorizator implements IAuthorizator {
+
     @Override
-    public boolean canWrite(String topic, String user, String client) {
+    public boolean canWrite(Topic topic, String user, String client) {
         return true;
     }
 
     @Override
-    public boolean canRead(String topic, String user, String client) {
+    public boolean canRead(Topic topic, String user, String client) {
         return true;
     }
 }

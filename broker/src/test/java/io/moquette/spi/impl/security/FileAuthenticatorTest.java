@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The original author or authors
+ * Copyright (c) 2012-2017 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -13,40 +13,38 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
+
 package io.moquette.spi.impl.security;
 
+import io.moquette.spi.security.IAuthenticator;
 import org.junit.Test;
-
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-/**
- *
- * @author andrea
- */
+@SuppressWarnings("deprecation")
 public class FileAuthenticatorTest {
-    
+
     @Test
     public void loadPasswordFile_verifyValid() {
-        String file = getClass().getResource("/password_file.conf").getPath();        
+        String file = getClass().getResource("/password_file.conf").getPath();
         IAuthenticator auth = new FileAuthenticator(null, file);
-        
-        assertTrue(auth.checkValid("testuser", "passwd".getBytes()));
+
+        assertTrue(auth.checkValid(null, "testuser", "passwd".getBytes()));
     }
-    
+
     @Test
     public void loadPasswordFile_verifyInvalid() {
-        String file = getClass().getResource("/password_file.conf").getPath();        
+        String file = getClass().getResource("/password_file.conf").getPath();
         IAuthenticator auth = new FileAuthenticator(null, file);
-        
-        assertFalse(auth.checkValid("testuser2", "passwd".getBytes()));
+
+        assertFalse(auth.checkValid(null, "testuser2", "passwd".getBytes()));
     }
-    
+
     @Test
     public void loadPasswordFile_verifyDirectoryRef() {
         IAuthenticator auth = new FileAuthenticator("", "");
-        
-        assertFalse(auth.checkValid("testuser2", "passwd".getBytes()));
+
+        assertFalse(auth.checkValid(null, "testuser2", "passwd".getBytes()));
     }
 
 }

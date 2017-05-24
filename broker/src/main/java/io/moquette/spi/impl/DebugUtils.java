@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The original author or authors
+ * Copyright (c) 2012-2017 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -13,20 +13,17 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
+
 package io.moquette.spi.impl;
 
-import java.nio.ByteBuffer;
+import io.netty.buffer.ByteBuf;
 
-/**
- *
- * @author andrea
- */
-class DebugUtils {
-    static String  payload2Str(ByteBuffer content) {
-        byte[] b = new byte[content.remaining()];
-        content.mark();
-        content.get(b);
-        content.reset();
-        return new String(b);
-    } 
+final class DebugUtils {
+
+    static String payload2Str(ByteBuf content) {
+        return new String(content.copy().array());
+    }
+
+    private DebugUtils() {
+    }
 }

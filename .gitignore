@@ -14,6 +14,9 @@ broker/moquette.log
 broker/runner
 /bundle/target/
 /bundle/runner/
+/osgi_test/target/
+/perf/target/
+/mapdb_storage/target/
 *~
 *log*
 .DS_Store
@@ -34,5 +37,9 @@ broker/runner
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
-broker/moquette_store.*
+broker/*moquette_store.*
 embedding_moquette/target/
+broker/nb-configuration.xml
+broker/nbactions-Server.xml
+
+maven-metadata.xml

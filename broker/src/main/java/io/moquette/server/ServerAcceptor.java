@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The original author or authors
+ * Copyright (c) 2012-2017 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -13,20 +13,17 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
+
 package io.moquette.server;
 
 import java.io.IOException;
-
 import io.moquette.server.config.IConfig;
 import io.moquette.spi.impl.ProtocolProcessor;
+import io.moquette.spi.security.ISslContextCreator;
 
-/**
- *
- * @author andrea
- */
 public interface ServerAcceptor {
-    
-    void initialize(ProtocolProcessor processor, IConfig props) throws IOException;
-    
+
+    void initialize(ProtocolProcessor processor, IConfig props, ISslContextCreator sslCtxCreator) throws IOException;
+
     void close();
 }

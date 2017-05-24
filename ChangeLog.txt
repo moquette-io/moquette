@@ -1,3 +1,15 @@
+Version 0.10:
+    Separated in memory and MapDB storage implementations
+    Cleanly separated inflight part (inbound and outbound)
+    
+
+Version 0.9:
+    Moved canRead check to topic from publish phase to subscribe (#144)
+    Added javadoc and src jars creations for JCenter/Maven central
+    Added persisting of clean session flag for already existing client session (fix issue #145)
+    Moved the message logic management fo FSM, to better control the concurrency.
+    Changed default config to use in memory store and not default moquette.mapdb
+
 Version 0.8:
     Introduced authenticator and authorizator implementations.
     Fixed bug, doesn't close the channel when connect doesn't contains a valid proto name, issue #65
@@ -14,6 +26,11 @@ Version 0.8:
     Fixed bug that on connection stolen dropped also the new connection (fix issue #108)
     Refactored the storage part to be more rational and use ClientSession concept
     Added config property 'autosave_interval' (issue #97)
+    Removed leaking ref to parent's node (issue #119 and #126)
+    Added internal publish once the broker is embedded (issue #113)
+    Removed client active/not active state from persistence (issue #118)
+    Avoid deletion of client descriptor in case of multiple clients with same clientID (issues #116 and #124)
+    Removed a queue per client of inFlightIds (never cleaned) in favor of single atomic generator
 
 Version 0.7:
     Fix issue #38, added aligned to MQTT 3.1.1

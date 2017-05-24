@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The original author or authors
+ * Copyright (c) 2012-2017 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -13,11 +13,13 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
+
 package io.moquette.server.netty.metrics;
 
 public class MessageMetrics {
-    private long m_messagesRead = 0;
-    private long m_messageWrote = 0;
+
+    private long m_messagesRead;
+    private long m_messageWrote;
 
     void incrementRead(long numMessages) {
         m_messagesRead += numMessages;

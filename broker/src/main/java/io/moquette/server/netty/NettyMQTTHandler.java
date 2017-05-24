@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The original author or authors
+ * Copyright (c) 2012-2017 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -13,28 +13,21 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
+
 package io.moquette.server.netty;
 
-import io.moquette.proto.Utils;
-import io.moquette.proto.messages.*;
 import io.moquette.spi.impl.ProtocolProcessor;
-import static io.moquette.proto.messages.AbstractMessage.*;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-
-import io.netty.handler.codec.CorruptedFrameException;
-
+import io.netty.handler.codec.mqtt.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 
-/**
- *
- * @author andrea
- */
 @Sharable
 public class NettyMQTTHandler extends ChannelInboundHandlerAdapter {
-    
+
     private static final Logger LOG = LoggerFactory.getLogger(NettyMQTTHandler.class);
     private final ProtocolProcessor m_processor;
 
@@ -44,71 +37,85 @@ public class NettyMQTTHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object message) {
-        AbstractMessage msg = (AbstractMessage) message;
-        LOG.info("Received a message of type {}", Utils.msgType2String(msg.getMessageType()));
+        MqttMessage msg = (MqttMessage) message;
+        MqttMessageType messageType = msg.fixedHeader().messageType();
+        LOG.debug("Processing MQTT message, type={}", messageType);
         try {
-            switch (msg.getMessageType()) {
+            switch (messageType) {
                 case CONNECT:
-                    m_processor.processConnect(new NettyChannel(ctx), (ConnectMessage) msg);
+                    m_processor.processConnect(ctx.channel(), (MqttConnectMessage) msg);
                     break;
                 case SUBSCRIBE:
-                    m_processor.processSubscribe(new NettyChannel(ctx), (SubscribeMessage) msg);
+                    m_processor.processSubscribe(ctx.channel(), (MqttSubscribeMessage) msg);
                     break;
                 case UNSUBSCRIBE:
-                    m_processor.processUnsubscribe(new NettyChannel(ctx), (UnsubscribeMessage) msg);
+                    m_processor.processUnsubscribe(ctx.channel(), (MqttUnsubscribeMessage) msg);
                     break;
                 case PUBLISH:
-                    m_processor.processPublish(new NettyChannel(ctx), (PublishMessage) msg);
+                    m_processor.processPublish(ctx.channel(), (MqttPublishMessage) msg);
                     break;
                 case PUBREC:
-                    m_processor.processPubRec(new NettyChannel(ctx), (PubRecMessage) msg);
+                    m_processor.processPubRec(ctx.channel(), msg);
                     break;
                 case PUBCOMP:
-                    m_processor.processPubComp(new NettyChannel(ctx), (PubCompMessage) msg);
+                    m_processor.processPubComp(ctx.channel(), msg);
                     break;
                 case PUBREL:
-                    m_processor.processPubRel(new NettyChannel(ctx), (PubRelMessage) msg);
+                    m_processor.processPubRel(ctx.channel(), msg);
                     break;
                 case DISCONNECT:
-                    m_processor.processDisconnect(new NettyChannel(ctx));
+                    m_processor.processDisconnect(ctx.channel());
                     break;
                 case PUBACK:
-                    m_processor.processPubAck(new NettyChannel(ctx), (PubAckMessage) msg);
+                    m_processor.processPubAck(ctx.channel(), (MqttPubAckMessage) msg);
                     break;
                 case PINGREQ:
-                    PingRespMessage pingResp = new PingRespMessage();
+                    MqttFixedHeader pingHeader = new MqttFixedHeader(
+                            MqttMessageType.PINGRESP,
+                            false,
+                            AT_MOST_ONCE,
+                            false,
+                            0);
+                    MqttMessage pingResp = new MqttMessage(pingHeader);
                     ctx.writeAndFlush(pingResp);
                     break;
+                default:
+                    LOG.error("Unkonwn MessageType:{}", messageType);
+                    break;
             }
-        } catch (Exception ex) {
-            LOG.error("Bad error in processing the message", ex);
+        } catch (Throwable ex) {
+            LOG.error("Exception was caught while processing MQTT message, " + ex.getCause(), ex);
+            ctx.fireExceptionCaught(ex);
         }
     }
-    
+
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        String clientID = (String) NettyUtils.getAttribute(ctx, NettyChannel.ATTR_KEY_CLIENTID);
+        String clientID = NettyUtils.clientID(ctx.channel());
         if (clientID != null && !clientID.isEmpty()) {
-            //if the channel was of a correctly connected client, inform messaging
-            //else it was of a not completed CONNECT message or sessionStolen
-            boolean stolen = false;
-            Boolean stolenAttr = (Boolean) NettyUtils.getAttribute(ctx, NettyChannel.ATTR_KEY_SESSION_STOLEN);
-            if (stolenAttr != null && stolenAttr == Boolean.TRUE) {
-                stolen = stolenAttr;
-            }
-            m_processor.processConnectionLost(clientID, stolen);
+            LOG.info("Notifying connection lost event. MqttClientId = {}.", clientID);
+            m_processor.processConnectionLost(clientID, ctx.channel());
         }
-        ctx.close(/*false*/);
+        ctx.close();
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        if (cause instanceof CorruptedFrameException) {
-            //something goes bad with decoding
-            LOG.warn("Error decoding a packet, probably a bad formatted packet, message: " + cause.getMessage());
-        } else {
-            LOG.error("Ugly error on networking", cause);
-        }
+        LOG.error(
+                "An unexpected exception was caught while processing MQTT message. "
+                + "Closing Netty channel. MqttClientId = {}, cause = {}, errorMessage = {}.",
+                NettyUtils.clientID(ctx.channel()),
+                cause.getCause(),
+                cause.getMessage());
         ctx.close();
     }
+
+    @Override
+    public void channelWritabilityChanged(ChannelHandlerContext ctx) throws Exception {
+        if (ctx.channel().isWritable()) {
+            m_processor.notifyChannelWritable(ctx.channel());
+        }
+        ctx.fireChannelWritabilityChanged();
+    }
+
 }

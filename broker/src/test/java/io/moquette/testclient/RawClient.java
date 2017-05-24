@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2012-2017 The original author or authors
+ * ------------------------------------------------------
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v1.0
+ * and Apache License v2.0 which accompanies this distribution.
+ *
+ * The Eclipse Public License is available at
+ * http://www.eclipse.org/legal/epl-v10.html
+ *
+ * The Apache License v2.0 is available at
+ * http://www.opensource.org/licenses/apache2.0.php
+ *
+ * You may elect to redistribute this code under either of these licenses.
+ */
+
 package io.moquette.testclient;
 
 import io.netty.bootstrap.Bootstrap;
@@ -8,20 +24,19 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.ReferenceCountUtil;
-import io.moquette.parser.netty.Utils;
+import io.moquette.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.UnsupportedEncodingException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 /**
- * This class is used to have a fluent interface to interact with a server.
- * Inspired by org.kaazing.robot
+ * This class is used to have a fluent interface to interact with a server. Inspired by
+ * org.kaazing.robot
  */
-public class RawClient {
+public final class RawClient {
 
     @ChannelHandler.Sharable
     class RawMessageHandler extends ChannelInboundHandlerAdapter {
@@ -41,9 +56,9 @@ public class RawClient {
 
         @Override
         public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-            //m_client.setConnectionLost(true);
+            // m_client.setConnectionLost(true);
             disconnectLatch.countDown();
-            ctx.close(/*false*/);
+            ctx.close(/* false */);
         }
     }
 
@@ -52,7 +67,7 @@ public class RawClient {
     EventLoopGroup workerGroup;
     Channel m_channel;
 
-    private boolean connected = false;
+    private boolean connected;
     private ByteBuf heapBuffer;
     private CountDownLatch disconnectLatch;
     private final Semaphore readableBytesSem;
@@ -71,6 +86,7 @@ public class RawClient {
             b.channel(NioSocketChannel.class);
             b.option(ChannelOption.SO_KEEPALIVE, true);
             b.handler(new ChannelInitializer<SocketChannel>() {
+
                 @Override
                 public void initChannel(SocketChannel ch) throws Exception {
                     ChannelPipeline pipeline = ch.pipeline();
@@ -117,14 +133,14 @@ public class RawClient {
 
     /**
      * Write just String bytes not length
-     * */
+     */
     public RawClient write(String str) {
         ByteBuf out = Unpooled.buffer(str.length());
         byte[] raw;
         try {
             raw = str.getBytes("UTF-8");
-            //NB every Java platform has got UTF-8 encoding by default, so this
-            //exception are never raised.
+            // NB every Java platform has got UTF-8 encoding by default, so this
+            // exception are never raised.
         } catch (UnsupportedEncodingException ex) {
             throw new IllegalStateException(ex);
         }
@@ -153,14 +169,14 @@ public class RawClient {
 
     /**
      * Expect the closing of the underling channel, with timeout
-     * */
+     */
     public void closed(long timeout) throws InterruptedException {
         disconnectLatch.await(timeout, TimeUnit.MILLISECONDS);
     }
 
     /**
      * Expect closing the connect with unbound time
-     * */
+     */
     public void closed() throws InterruptedException {
         disconnectLatch.await();
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The original author or authors
+ * Copyright (c) 2012-2017 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -13,13 +13,19 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
+
 package io.moquette.server;
 
 /**
  * Server constants keeper
  */
-public class Constants {
+public final class Constants {
+
     public static final String ATTR_CLIENTID = "ClientID";
     public static final String CLEAN_SESSION = "cleanSession";
     public static final String KEEP_ALIVE = "keepAlive";
+    public static final int MAX_MESSAGE_QUEUE = 1024; // number of messages
+
+    private Constants() {
+    }
 }
