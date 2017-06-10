@@ -1,0 +1,242 @@
+:toc: left
+:toclevels: 2
+
+:source-highlighter: highlightjs
+
+= Moquette Documentation
+
+Moquette is a lightweight Java implementation of MQTT broker. It's simple to install and embed sharing the same
+configuration file format with Eclipse Mosquitto.
+
+== Installation
+
+Start play with it, download the self distribution tar from
+https://bintray.com/artifact/download/andsel/generic/distribution-0.9-bundle-tar.tar.gz[BinTray]
+then un ```tar zxf distribution-0.9-bundle-tar.tar.gz``` and start the broker listening on 1883 port and enjoy!
+```
+tar zxf distribution-0.9-bundle-tar.tar.gz
+cd bin
+./moquette.sh
+```
+
+Or if you are on Windows shell
+```
+ cd bin
+ .\moquette.bat
+```
+
+=== Embedding into other projects
+To embed Moquette in another maven project is sufficient to include a repository and declare the dependency:
+
+```
+<repositories>
+  <repository>
+    <id>bintray</id>
+    <url>https://jcenter.bintray.com</url>
+    <releases>
+      <enabled>true</enabled>
+    </releases>
+    <snapshots>
+      <enabled>false</enabled>
+    </snapshots>
+  </repository>
+</repositories>
+```
+
+Include dependency in your project:
+
+```
+<dependency>
+      <groupId>io.moquette</groupId>
+      <artifactId>moquette-broker</artifactId>
+      <version>0.10-SNAPSHOT</version>
+</dependency>
+```
+
+=== Build from sources
+
+After a git clone of the repository, cd into the cloned sources and: `mvn clean package`.
+In distribution/target directory will be produced the self-contained tar for the broker with all dependencies and a
+running script.
+
+
+== Credentials management
+Credential management is inspired from Mosquitto, so there is a file named ```conf/moquette.conf``` which contains
+clients authentication and topics authorization informations.
+
+=== Passwords file
+If you have a broker that's open to public network probably you would protect the access of your users with some kind
+of credentials. Moquette, in its configuration file ```conf/moquette.conf``` has a key name password_file that point
+to a specific file used to store users's login and password.
+The name and format are borrowed from Mosquitto config, so this file contains one credential for line. The format for
+each line is:
+
+```
+username:sha512(yourpassword)
+```
+
+For example for an hypothetical user "testuser" with "passwd"
+```
+testuser:0d6be69b264717f2dd33652e212b173104b4a647b7c11ae72e9885f11cd312fb
+```
+
+If you are on a Linux box you can easy generate the hashing for your password with sha256sum utility, but remember to
+use the -n switch in echo else a newline char will be added at the of you password.
+```
+echo -n "yourpassword" | sha256sum
+```
+
+=== User specific ACL
+In some circumstances you should able to define some ACL only for defined users. In this case you should only define the
+user interested by the ACLs and make it followed by a list of ACLs.
+
+```
+user johndoe
+topic [read|write|readwrite] </topic-1/to/>
+...
+topic [read|write|readwrite] </topic-N/to/>
+```
+
+This snapshot means that the user ```johndoe``` is subjected to ACLs from 1 to N.
+
+=== Pattern ACL
+The third type of ACL is the pattern ones, and applies to all users like the simple ACLs. Has the concept of matching a
+topic doing some pattern substitusions. The placeholders admitted are one for the clientID (```%c```) and the other for
+the user name (```%u```). The pattern keyword is what distingueshes this kind of ACL from the other two. This type of ACL
+is usefull if you want to grant access to topics that cant' be predetermined, you can't know upfront all the clientID,
+nor you want to create the same ACL for each single user you grant access
+
+```
+pattern [read|write|readwrite] </topic/%c/%u>
+```
+
+== SSL Configuration
+
+
+To accept SSL connection in Moquette broker, first you have to set up the key store in the broker. Then you need to
+export a certificate from the broker’s keystore and improt in the client’s one. The last thing is to write a simple
+client that connect to the server using the SSL.
+
+So how do you get create a keystore? We suppose to use the crypto tools provided by the JDK.
+
+First create server’s key store, answering the questions presented to you. The first password the keytool asks to you
+is the keystore's one. Then after questions (you could skip almost all but your first name and the confirmation of
+data (type in yes). Then you need to fill the password for alias you are creating(testserver in our case).
+
+```
+keytool -keystore serverkeystore.jks -alias testserver -genkey -keyalg RSA
+```
+
+Now go to your broker config file (/config/moquette.conf) and provide the path to you just created keystore (jks_path)
+and the passwords you have just filled (key_store_password is the password of your keystore and key_manager_password is
+the one of the alias)
+
+
+=== Export the server certificate
+The next step is to export the certificate, so you need to:
+
+```
+keytool -export -alias testserver -keystore serverkeystore.jks -file testserver.crt
+```
+
+This command generate the certificate file that you need to import into your client’s keystore.
+
+=== Import the certificate into the client’s keystore
+In this step you need to import the server’s certificate into the client’s keystore.
+
+To create the client key store, if not yet done issue this:
+```
+keytool -keystore clientkeystore.jks -genkey -keyalg RSA
+```
+
+Once created the key store, import the certificate with:
+```
+keytool -keystore clientkeystore.jks -import -alias testserver -file testserver.crt -trustcacerts
+```
+It will ask you if the certificate is trusted, answer yes, because this certificate is not produced by a certifcation
+authority (you’ve created it ;-))
+
+=== Client source code
+At the end, after created the keystores, exprted and imported the certificate into the client, we are ready to see our
+client’s code:
+
+
+[[src-listing]]
+[source,java]
+.sslSimplePublisher.java
+----
+public SSLSocketFactory configureSSLSocketFactory() {
+    KeyStore ks = KeyStore.getInstance("JKS");
+    InputStream jksInputStream = new FileInputStream("clientkeystore.jks")
+    ks.load(jksInputStream, "passw0rdcli".toCharArray());
+
+    KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+    kmf.init(ks, "passw0rd".toCharArray());
+
+    TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+    tmf.init(ks);
+
+    SSLContext sc = SSLContext.getInstance("TLS");
+    TrustManager[] trustManagers = tmf.getTrustManagers();
+    sc.init(kmf.getKeyManagers(), trustManagers, null);
+
+    SSLSocketFactory ssf = sc.getSocketFactory();
+    return ssf;
+}
+
+String tmpDir = System.getProperty("java.io.tmpdir");
+MqttDefaultFilePersistence dataStore = new MqttDefaultFilePersistence(tmpDir);
+
+MqttClient client = new MqttClient("ssl://localhost:8883", "SSLClientTest", dataStore);
+SSLSocketFactory ssf = configureSSLSocketFactory();
+MqttConnectOptions options = new MqttConnectOptions();
+options.setSocketFactory(ssf);
+client.connect(options);
+----
+
+You could find it at
+https://github.com/andsel/moquette/blob/master/tools_scripts/integration/sslSimplePublisher.groovy[sslSimplePublisher.groovy]
+
+
+== ACL customization
+The broker has pluggable authorization and authentication interfaces. By default starts with implementations that
+use the ```password.conf``` and ```acl.conf``` files as specified above.
+
+=== Customize authenticator
+To create your custom authenticator you need to extend the class ```io.moquette.spi.security.IAuthenticator```:
+
+[[src-listing]]
+[source,java]
+.IAuthenticator.java
+----
+public interface IAuthenticator {
+    boolean checkValid(String username, String password);
+}
+----
+
+This method must return true if the username and password matches a valid registered user. To use a custom implementation
+remember to define the variable ```authenticator_class```, also take care that the class need a no-argument constructor
+to be correctly instantiated or defined a static no arg instantiation method named ```getInstance```.
+
+
+=== Customize authorizator
+To create your custom authorizator you need to extend the class ```io.moquette.spi.security.IAuthorizator```:
+
+[[src-listing]]
+[source,java]
+.IAuthorizator.java
+----
+public interface IAuthorizator {
+
+    boolean canWrite(String topic, String user, String client);
+
+    boolean canRead(String topic, String user, String client);
+}
+----
+
+The method ```canWrite``` must return true if the user has write access to given topic (the user can publish on topic),
+the ```canRead``` do the same checking, user can receive publishes on subscribed topic; this mean that the check is done
+during publishing checking if a subscription could receive the message, it's not applied during the subscription make
+the subscription failing. To use a custom implementation remember to define the variable ```authorizator_class```, also
+take care that the class need a no-argument constructor to be correctly instantiated or defined a static no arg
+instantiation method named ```getInstance```.
