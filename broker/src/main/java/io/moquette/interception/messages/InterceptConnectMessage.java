@@ -18,13 +18,10 @@ package io.moquette.interception.messages;
 
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 
-public class InterceptConnectMessage extends InterceptAbstractMessage {
-
-    private final MqttConnectMessage msg;
+public class InterceptConnectMessage extends InterceptAbstractMessage<MqttConnectMessage> {
 
     public InterceptConnectMessage(MqttConnectMessage msg) {
         super(msg);
-        this.msg = msg;
     }
 
     public String getClientID() {

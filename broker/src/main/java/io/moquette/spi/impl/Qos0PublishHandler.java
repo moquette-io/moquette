@@ -63,6 +63,6 @@ class Qos0PublishHandler extends QosPublishHandler {
             m_messagesStore.cleanRetained(topic);
         }
 
-        m_interceptor.notifyTopicPublished(msg, clientID, username);
+        m_interceptor.notifyTopicPublished(msg, topic, clientID, username);
     }
 }

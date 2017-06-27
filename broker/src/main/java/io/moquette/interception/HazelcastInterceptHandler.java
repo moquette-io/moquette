@@ -16,39 +16,32 @@
 
 package io.moquette.interception;
 
-import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ITopic;
+import io.moquette.BrokerConstants;
 import io.moquette.interception.messages.InterceptPublishMessage;
 import io.moquette.server.Server;
-import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import static io.moquette.spi.impl.Utils.readBytesAndRewind;
 
 public class HazelcastInterceptHandler extends AbstractInterceptHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(HazelcastInterceptHandler.class);
-    private final HazelcastInstance hz;
+    private final ITopic<HazelcastMsg> topic;
 
     public HazelcastInterceptHandler(Server server) {
-        this.hz = server.getHazelcastInstance();
-    }
+        super(server);
 
-    @Override
-    public String getID() {
-        return HazelcastInterceptHandler.class.getName() + "@" + hz.getName();
+        String topicName = server.getConfig().getProperty(BrokerConstants.HAZELCAST_TOPIC_NAME) == null
+                ? "moquette": server.getConfig().getProperty(BrokerConstants.HAZELCAST_TOPIC_NAME);
+        topic = hz.getTopic(topicName);
     }
 
     @Override
     public void onPublish(InterceptPublishMessage msg) {
-        // TODO ugly, too much array copy
-        ByteBuf payload = msg.getPayload();
-        byte[] payloadContent = readBytesAndRewind(payload);
-
-        LOG.info("{} publish on {} message: {}", msg.getClientID(), msg.getTopicName(), new String(payloadContent));
-        ITopic<HazelcastMsg> topic = hz.getTopic("moquette");
         HazelcastMsg hazelcastMsg = new HazelcastMsg(msg);
+        if (LOG.isDebugEnabled())
+            LOG.debug("{} publish on {} message: {}",
+                hazelcastMsg.getClientId(), hazelcastMsg.getTopic(), new String(hazelcastMsg.getPayload()));
         topic.publish(hazelcastMsg);
     }
-
 }

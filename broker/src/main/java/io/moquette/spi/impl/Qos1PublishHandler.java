@@ -80,7 +80,7 @@ class Qos1PublishHandler extends QosPublishHandler {
             }
         }
 
-        m_interceptor.notifyTopicPublished(msg, clientID, username);
+        m_interceptor.notifyTopicPublished(msg, topic, clientID, username);
     }
 
     private void sendPubAck(String clientId, int messageID) {

@@ -16,20 +16,22 @@
 
 package io.moquette.interception.messages;
 
+import io.moquette.spi.impl.subscriptions.Topic;
+
 public class InterceptUnsubscribeMessage implements InterceptMessage {
 
-    private final String topicFilter;
+    private final Topic topic;
     private final String clientID;
     private final String username;
 
-    public InterceptUnsubscribeMessage(String topicFilter, String clientID, String username) {
-        this.topicFilter = topicFilter;
+    public InterceptUnsubscribeMessage(Topic topic, String clientID, String username) {
+        this.topic = topic;
         this.clientID = clientID;
         this.username = username;
     }
 
-    public String getTopicFilter() {
-        return topicFilter;
+    public Topic getTopic() {
+        return topic;
     }
 
     public String getClientID() {

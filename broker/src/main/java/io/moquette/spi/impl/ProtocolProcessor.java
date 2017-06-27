@@ -412,6 +412,7 @@ public class ProtocolProcessor {
         }
         if (msg.variableHeader().isCleanSession()) {
             LOG.info("Cleaning session. CId={}", clientId);
+            m_interceptor.notifyWipeSubscriptions(clientId);
             clientSession.cleanSession();
         }
         return clientSession;
@@ -676,6 +677,7 @@ public class ProtocolProcessor {
         if (descriptor.cleanSession) {
             LOG.info("Removing saved subscriptions. CId={}", descriptor.clientID);
             subscriptionStore.wipeSubscriptions(clientID);
+            m_interceptor.notifyWipeSubscriptions(clientID);
             LOG.info("The saved subscriptions have been removed. CId={}", descriptor.clientID);
         }
         return true;
@@ -754,7 +756,7 @@ public class ProtocolProcessor {
             subscriptions.removeSubscription(topic, clientID);
             clientSession.unsubscribeFrom(topic);
             String username = NettyUtils.userName(channel);
-            m_interceptor.notifyTopicUnsubscribed(topic.toString(), clientID, username);
+            m_interceptor.notifyTopicUnsubscribed(topic, clientID, username);
         }
 
         // ack the client

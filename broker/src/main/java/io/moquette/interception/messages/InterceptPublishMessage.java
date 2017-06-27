@@ -16,24 +16,25 @@
 
 package io.moquette.interception.messages;
 
+import io.moquette.spi.impl.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 
-public class InterceptPublishMessage extends InterceptAbstractMessage {
+public class InterceptPublishMessage extends InterceptAbstractMessage<MqttPublishMessage> {
 
-    private final MqttPublishMessage msg;
     private final String clientID;
     private final String username;
+    private final Topic topic;
 
-    public InterceptPublishMessage(MqttPublishMessage msg, String clientID, String username) {
+    public InterceptPublishMessage(MqttPublishMessage msg, String clientID, String username, Topic topic) {
         super(msg);
-        this.msg = msg;
         this.clientID = clientID;
         this.username = username;
+        this.topic = topic;
     }
 
-    public String getTopicName() {
-        return msg.variableHeader().topicName();
+    public Topic getTopic() {
+        return topic;
     }
 
     public ByteBuf getPayload() {

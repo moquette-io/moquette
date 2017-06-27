@@ -71,6 +71,8 @@ public class Server {
 
     private ScheduledExecutorService scheduler;
 
+    private IConfig config;
+
     public static void main(String[] args) throws IOException {
         final Server server = new Server();
         server.startServer();
@@ -164,6 +166,9 @@ public class Server {
 
     public void startServer(IConfig config, List<? extends InterceptHandler> handlers, ISslContextCreator sslCtxCreator,
             IAuthenticator authenticator, IAuthorizator authorizator) throws IOException {
+
+        this.config = config;
+
         if (handlers == null) {
             handlers = Collections.emptyList();
         }
@@ -219,9 +224,12 @@ public class Server {
     }
 
     private void listenOnHazelCastMsg() {
-        LOG.info("Subscribing to Hazelcast topic. TopicName={}", "moquette");
+        String topicName = config.getProperty(BrokerConstants.HAZELCAST_TOPIC_NAME) == null
+                ? "moquette": config.getProperty(BrokerConstants.HAZELCAST_TOPIC_NAME);
+
+        LOG.info("Subscribing to Hazelcast topic. TopicName={}", topicName);
         HazelcastInstance hz = getHazelcastInstance();
-        ITopic<HazelcastMsg> topic = hz.getTopic("moquette");
+        ITopic<HazelcastMsg> topic = hz.getTopic(topicName);
         topic.addMessageListener(new HazelcastListener(this));
     }
 
@@ -331,5 +339,9 @@ public class Server {
 
     public ScheduledExecutorService getScheduler() {
         return scheduler;
+    }
+
+    public IConfig getConfig() {
+        return config;
     }
 }

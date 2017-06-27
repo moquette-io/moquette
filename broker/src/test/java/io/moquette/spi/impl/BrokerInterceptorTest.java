@@ -87,6 +87,11 @@ public class BrokerInterceptorTest {
         public void onMessageAcknowledged(InterceptAcknowledgedMessage msg) {
             n.set(90);
         }
+
+        @Override
+        public void onWipeSubscriptions(WipeSubscriptionsMessage wipeSubscriptionsMessage) {
+            n.set(100);
+        }
     }
 
     private static final BrokerInterceptor interceptor = new BrokerInterceptor(
@@ -127,6 +132,7 @@ public class BrokerInterceptorTest {
         interceptor.notifyTopicPublished(
                 MqttMessageBuilders.publish().qos(MqttQoS.AT_MOST_ONCE)
                     .payload(Unpooled.copiedBuffer("Hello".getBytes())).build(),
+                new Topic(""),
                 "cli1234",
                 "cli1234");
         interval();
@@ -142,9 +148,16 @@ public class BrokerInterceptorTest {
 
     @Test
     public void testNotifyTopicUnsubscribed() throws Exception {
-        interceptor.notifyTopicUnsubscribed("o2", "cli1234", "cli1234");
+        interceptor.notifyTopicUnsubscribed(new Topic("o2"), "cli1234", "cli1234");
         interval();
         assertEquals(80, n.get());
+    }
+
+    @Test
+    public void testWipeSubscriptions() throws Exception {
+        interceptor.notifyWipeSubscriptions("cli1234");
+        interval();
+        assertEquals(100, n.get());
     }
 
     @Test
