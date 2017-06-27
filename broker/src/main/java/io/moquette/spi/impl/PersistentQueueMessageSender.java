@@ -47,8 +47,11 @@ class PersistentQueueMessageSender {
 
         boolean messageDelivered = connectionDescriptorStore.sendMessage(pubMessage, messageId, clientId);
 
+        if (messageDelivered)
+            return;
+
         MqttQoS qos = pubMessage.fixedHeader().qosLevel();
-        if (!messageDelivered && qos != AT_MOST_ONCE && !clientsession.isCleanSession()) {
+        if (qos != AT_MOST_ONCE && !clientsession.isCleanSession()) {
             LOG.warn("PUBLISH message could not be delivered. It will be stored. MessageId={}, CId={}, topic={}, "
                     + "qos={}, cleanSession={}", messageId, clientId, topicName, qos, false);
             clientsession.enqueue(asStoredMessage(pubMessage));
