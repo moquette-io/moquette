@@ -28,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import static org.junit.Assert.assertTrue;
@@ -41,44 +42,53 @@ public class ServerIntegrationWebSocketTest {
 
     Server m_server;
     WebSocketClient client;
-    IConfig m_config;
 
-    protected void startServer() throws IOException {
-        m_server = new Server();
+    protected void startServer(String path) throws IOException {
         final Properties configProps = IntegrationUtils.prepareTestProperties();
         configProps
                 .put(BrokerConstants.WEB_SOCKET_PORT_PROPERTY_NAME, Integer.toString(BrokerConstants.WEBSOCKET_PORT));
-        m_config = new MemoryConfig(configProps);
+        configProps.put(BrokerConstants.WEB_SOCKET_PATH_PROPERTY_NAME, path);
+        IConfig m_config = new MemoryConfig(configProps);
         m_server.startServer(m_config);
+    }
+
+    protected boolean connectToServer(String uri) throws Exception {
+        MQTTWebSocket socket = new MQTTWebSocket();
+        client.start();
+        URI echoUri = new URI(uri);
+        ClientUpgradeRequest request = new ClientUpgradeRequest();
+        client.connect(socket, echoUri, request);
+        LOG.info("Connecting to : {}", echoUri);
+        boolean connected = socket.awaitConnected(4, TimeUnit.SECONDS);
+        LOG.info("Connected was : {}", connected);
+        return connected;
     }
 
     @Before
     public void setUp() throws Exception {
-        startServer();
+        m_server = new Server();
         client = new WebSocketClient();
     }
 
     @After
     public void tearDown() throws Exception {
         client.stop();
-
         m_server.stopServer();
     }
 
     @Test
     public void checkPlainConnect() throws Exception {
         LOG.info("*** checkPlainConnect ***");
+        startServer("/mqtt");
         String destUri = "ws://localhost:" + BrokerConstants.WEBSOCKET_PORT + "/mqtt";
+        assertTrue(connectToServer(destUri));
+    }
 
-        MQTTWebSocket socket = new MQTTWebSocket();
-        client.start();
-        URI echoUri = new URI(destUri);
-        ClientUpgradeRequest request = new ClientUpgradeRequest();
-        client.connect(socket, echoUri, request);
-        LOG.info("Connecting to : {}", echoUri);
-        boolean connected = socket.awaitConnected(4, TimeUnit.SECONDS);
-        LOG.info("Connected was : {}", connected);
-
-        assertTrue(connected);
+    @Test
+    public void checkCustomPathConnect() throws Exception {
+        LOG.info("*** checkCustomPathConnect ***");
+        startServer("/");
+        String destUri = "ws://localhost:" + BrokerConstants.WEBSOCKET_PORT + "/ws";
+        assertTrue(connectToServer(destUri));
     }
 }

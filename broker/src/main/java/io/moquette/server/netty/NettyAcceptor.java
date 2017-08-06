@@ -244,6 +244,7 @@ public class NettyAcceptor implements ServerAcceptor {
             return;
         }
         int port = Integer.parseInt(webSocketPortProp);
+        String path = props.getProperty(WEB_SOCKET_PATH_PROPERTY_NAME, WEBSOCKET_PATH);
 
         final MoquetteIdleTimeoutHandler timeoutHandler = new MoquetteIdleTimeoutHandler();
 
@@ -255,7 +256,7 @@ public class NettyAcceptor implements ServerAcceptor {
                 pipeline.addLast(new HttpServerCodec());
                 pipeline.addLast("aggregator", new HttpObjectAggregator(65536));
                 pipeline.addLast("webSocketHandler",
-                        new WebSocketServerProtocolHandler("/mqtt", MQTT_SUBPROTOCOL_CSV_LIST));
+                        new WebSocketServerProtocolHandler(path, MQTT_SUBPROTOCOL_CSV_LIST, false, 65536, false, true));
                 pipeline.addLast("ws2bytebufDecoder", new WebSocketFrameToByteBufDecoder());
                 pipeline.addLast("bytebuf2wsEncoder", new ByteBufToWebSocketFrameEncoder());
                 pipeline.addFirst("idleStateHandler", new IdleStateHandler(nettyChannelTimeoutSeconds, 0, 0));
