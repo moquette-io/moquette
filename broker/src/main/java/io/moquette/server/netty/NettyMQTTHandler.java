@@ -41,6 +41,7 @@ public class NettyMQTTHandler extends ChannelInboundHandlerAdapter {
         MqttMessage msg = (MqttMessage) message;
         MqttMessageType messageType = msg.fixedHeader().messageType();
         LOG.debug("Processing MQTT message, type={}", messageType);
+        m_processor.getSessionsStore().heartBeat(NettyUtils.clientID(ctx.channel()));
         try {
             switch (messageType) {
                 case CONNECT:

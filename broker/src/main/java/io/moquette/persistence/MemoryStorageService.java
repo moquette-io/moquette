@@ -30,7 +30,7 @@ public class MemoryStorageService implements IStore {
 
     public MemoryStorageService(IConfig props, ScheduledExecutorService scheduler) {
         m_messagesStore = new MemoryMessagesStore();
-        m_sessionsStore = new MemorySessionStore();
+        m_sessionsStore = new MemorySessionStore(props);
         m_messagesStore.initStore();
         m_sessionsStore.initStore();
     }
