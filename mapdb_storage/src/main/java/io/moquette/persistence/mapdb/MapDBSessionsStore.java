@@ -23,6 +23,8 @@ import io.moquette.spi.ISessionsStore;
 import io.moquette.spi.ISubscriptionsStore;
 import io.moquette.spi.impl.subscriptions.Subscription;
 import io.moquette.spi.impl.subscriptions.Topic;
+import src.main.java.io.moquette.persistence.h2.Override;
+import src.main.java.io.moquette.persistence.h2.String;
 import org.mapdb.DB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -338,5 +340,9 @@ class MapDBSessionsStore implements ISessionsStore, ISubscriptionsStore {
 
     static String inboundMessageId2MessagesMapName(String clientID) {
         return "inboundInflight_" + clientID;
+    }
+
+    @Override
+    public void heartBeat(String clientID) {
     }
 }

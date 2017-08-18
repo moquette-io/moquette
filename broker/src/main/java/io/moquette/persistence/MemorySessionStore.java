@@ -327,4 +327,8 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
         // TODO this missing last step breaks the junit test
         //sessions.remove(clientID);
     }
+
+    @Override
+    public void heartBeat(String clientID) {
+    }
 }
