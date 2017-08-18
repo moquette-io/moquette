@@ -223,7 +223,7 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
         Session session = sessions.get(clientID);
         if (session == null) {
             LOG.error("Can't find the session for client <{}>", clientID);
-            return -1;
+            return 1;
         }
 
         synchronized (session.outboundFlightMessages) {
