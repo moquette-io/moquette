@@ -17,12 +17,12 @@
 package io.moquette.spi;
 
 import io.moquette.persistence.MemoryStorageService;
+import io.moquette.server.config.IConfig;
+import io.moquette.server.config.MemoryConfig;
 import io.moquette.spi.impl.subscriptions.*;
 import org.junit.Before;
 import org.junit.Test;
-
 import java.util.List;
-
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
 import static org.junit.Assert.assertEquals;
@@ -37,7 +37,9 @@ public class ClientSessionTest {
     @Before
     public void setUp() {
         store = new CTrieSubscriptionDirectory();
-        MemoryStorageService storageService = new MemoryStorageService(null, null);
+        IConfig config = new MemoryConfig(System.getProperties());
+        MemoryStorageService storageService = new MemoryStorageService(config, null);
+        storageService.initStore();
         this.sessionsStore = storageService.sessionsStore();
         store.init(sessionsStore);
 

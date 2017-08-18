@@ -15,6 +15,8 @@
  */package io.moquette.spi.impl.subscriptions;
 
 import io.moquette.persistence.MemoryStorageService;
+import io.moquette.server.config.IConfig;
+import io.moquette.server.config.MemoryConfig;
 import io.moquette.spi.ISessionsStore;
 import io.moquette.spi.ISubscriptionsStore.ClientTopicCouple;
 import org.junit.Before;
@@ -34,7 +36,9 @@ public class CTrieSubscriptionDirectoryTest {
     @Before
     public void setUp() {
         sut = new CTrieSubscriptionDirectory();
-        MemoryStorageService memStore = new MemoryStorageService(null, null);
+        IConfig config = new MemoryConfig(System.getProperties());
+        MemoryStorageService memStore = new MemoryStorageService(config, null);
+        memStore.initStore();
         ISessionsStore aSessionsStore = memStore.sessionsStore();
         sut.init(aSessionsStore);
     }

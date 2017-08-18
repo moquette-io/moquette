@@ -15,16 +15,16 @@
  */package io.moquette.spi.impl.subscriptions;
 
 import io.moquette.persistence.MemoryStorageService;
+import io.moquette.server.config.IConfig;
+import io.moquette.server.config.MemoryConfig;
 import io.moquette.spi.ClientSession;
 import io.moquette.spi.ISessionsStore;
 import io.moquette.spi.ISubscriptionsStore;
 import io.moquette.spi.ISubscriptionsStore.ClientTopicCouple;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -45,8 +45,10 @@ public class CTrieSubscriptionDirectoryMatchingTest {
     public void setUp() {
         sut = new CTrieSubscriptionDirectory();
 
-        this.storageService = new MemoryStorageService(null, null);
+        IConfig config = new MemoryConfig(System.getProperties());
+        this.storageService = new MemoryStorageService(config, null);
         this.sessionsStore = storageService.sessionsStore();
+        storageService.initStore();
         sut.init(sessionsStore);
 
         this.subscriptionsStore = this.sessionsStore.subscriptionStore();
@@ -179,7 +181,9 @@ public class CTrieSubscriptionDirectoryMatchingTest {
 
     private void assertMatch(String s, String t) {
         sut = new CTrieSubscriptionDirectory();
-        MemoryStorageService memStore = new MemoryStorageService(null, null);
+        IConfig config = new MemoryConfig(System.getProperties());
+        MemoryStorageService memStore = new MemoryStorageService(config, null);
+        memStore.initStore();
         ISessionsStore aSessionsStore = memStore.sessionsStore();
         sut.init(aSessionsStore);
 
@@ -191,7 +195,9 @@ public class CTrieSubscriptionDirectoryMatchingTest {
 
     private void assertNotMatch(String subscription, String topic) {
         sut = new CTrieSubscriptionDirectory();
-        MemoryStorageService memStore = new MemoryStorageService(null, null);
+        IConfig config = new MemoryConfig(System.getProperties());
+        MemoryStorageService memStore = new MemoryStorageService(config, null);
+        memStore.initStore();
         ISessionsStore aSessionsStore = memStore.sessionsStore();
         sut.init(aSessionsStore);
 
