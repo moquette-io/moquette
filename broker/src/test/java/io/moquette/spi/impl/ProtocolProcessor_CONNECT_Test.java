@@ -17,6 +17,8 @@
 package io.moquette.spi.impl;
 
 import io.moquette.persistence.MemoryStorageService;
+import io.moquette.server.config.IConfig;
+import io.moquette.server.config.MemoryConfig;
 import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.ClientSession;
 import io.moquette.spi.IMessagesStore;
@@ -54,10 +56,11 @@ public class ProtocolProcessor_CONNECT_Test {
 
         m_session = new EmbeddedChannel();
 
-        MemoryStorageService memStorage = new MemoryStorageService(null, null);
+        IConfig config = new MemoryConfig(System.getProperties());
+        MemoryStorageService memStorage = new MemoryStorageService(config, null);
         m_messagesStore = memStorage.messagesStore();
         m_sessionStore = memStorage.sessionsStore();
-        // m_messagesStore.initStore();
+        m_messagesStore.initStore();
 
         m_mockAuthenticator = new MockAuthenticator(singleton(FAKE_CLIENT_ID), singletonMap(TEST_USER, TEST_PWD));
 

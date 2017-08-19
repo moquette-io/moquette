@@ -339,4 +339,8 @@ class MapDBSessionsStore implements ISessionsStore, ISubscriptionsStore {
     static String inboundMessageId2MessagesMapName(String clientID) {
         return "inboundInflight_" + clientID;
     }
+
+    @Override
+    public void heartBeat(String clientID) {
+    }
 }

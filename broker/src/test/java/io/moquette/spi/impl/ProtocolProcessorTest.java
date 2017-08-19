@@ -18,6 +18,8 @@ package io.moquette.spi.impl;
 
 import io.moquette.interception.InterceptHandler;
 import io.moquette.persistence.MemoryStorageService;
+import io.moquette.server.config.IConfig;
+import io.moquette.server.config.MemoryConfig;
 import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.IMessagesStore;
 import io.moquette.spi.IMessagesStore.StoredMessage;
@@ -82,7 +84,9 @@ public class ProtocolProcessorTest extends AbstractProtocolProcessorCommonUtils 
         };
 
         // simulate a connect that register a clientID to an IoSession
-        MemoryStorageService storageService = new MemoryStorageService(null, null);
+        IConfig config = new MemoryConfig(System.getProperties());
+        MemoryStorageService storageService = new MemoryStorageService(config, null);
+        storageService.initStore();
         subs.init(storageService.sessionsStore());
         m_processor.init(subs, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizator(),
                 NO_OBSERVERS_INTERCEPTOR);
@@ -118,7 +122,9 @@ public class ProtocolProcessorTest extends AbstractProtocolProcessorCommonUtils 
         };
 
         // simulate a connect that register a clientID to an IoSession
-        MemoryStorageService storageService = new MemoryStorageService(null, null);
+        IConfig config = new MemoryConfig(System.getProperties());
+        MemoryStorageService storageService = new MemoryStorageService(config, null);
+        storageService.initStore();
         subs.init(storageService.sessionsStore());
         m_processor.init(subs, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizator(),
                 NO_OBSERVERS_INTERCEPTOR);
@@ -240,7 +246,9 @@ public class ProtocolProcessorTest extends AbstractProtocolProcessorCommonUtils 
                 }
             }
         };
-        MemoryStorageService storageService = new MemoryStorageService(null, null);
+        IConfig config = new MemoryConfig(System.getProperties());
+        MemoryStorageService storageService = new MemoryStorageService(config, null);
+        storageService.initStore();
         subs.init(storageService.sessionsStore());
 
         // simulate a connect that register a clientID to an IoSession

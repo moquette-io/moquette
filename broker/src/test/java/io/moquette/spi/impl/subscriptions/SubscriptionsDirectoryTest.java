@@ -17,6 +17,8 @@
 package io.moquette.spi.impl.subscriptions;
 
 import io.moquette.persistence.MemoryStorageService;
+import io.moquette.server.config.IConfig;
+import io.moquette.server.config.MemoryConfig;
 import io.moquette.spi.ClientSession;
 import io.moquette.spi.ISessionsStore;
 import io.moquette.spi.ISubscriptionsStore;
@@ -42,8 +44,10 @@ public class SubscriptionsDirectoryTest {
     @Before
     public void setUp() throws IOException {
         store = new SubscriptionsDirectory();
-        MemoryStorageService storageService = new MemoryStorageService(null, null);
+        IConfig config = new MemoryConfig(System.getProperties());
+        MemoryStorageService storageService = new MemoryStorageService(config, null);
         this.sessionsStore = storageService.sessionsStore();
+        storageService.initStore();
         store.init(sessionsStore);
 
         this.subscriptionsStore = this.sessionsStore.subscriptionStore();
@@ -212,7 +216,9 @@ public class SubscriptionsDirectoryTest {
         Topic subscription = new Topic(s);
         Topic topic = new Topic(t);
         store = new SubscriptionsDirectory();
-        MemoryStorageService memStore = new MemoryStorageService(null, null);
+        IConfig config = new MemoryConfig(System.getProperties());
+        MemoryStorageService memStore = new MemoryStorageService(config, null);
+        memStore.initStore();
         ISessionsStore aSessionsStore = memStore.sessionsStore();
         aSessionsStore.createNewSession("FAKE_CLI_ID_1", false);
         store.init(aSessionsStore);
@@ -226,7 +232,9 @@ public class SubscriptionsDirectoryTest {
         Topic subscription = new Topic(s);
         Topic topic = new Topic(t);
         store = new SubscriptionsDirectory();
-        MemoryStorageService memStore = new MemoryStorageService(null, null);
+        IConfig config = new MemoryConfig(System.getProperties());
+        MemoryStorageService memStore = new MemoryStorageService(config, null);
+        memStore.initStore();
         store.init(memStore.sessionsStore());
         Subscription sub = new Subscription("FAKE_CLI_ID_1", subscription, MqttQoS.AT_MOST_ONCE);
         this.subscriptionsStore.addNewSubscription(sub);
@@ -250,7 +258,9 @@ public class SubscriptionsDirectoryTest {
     @Test
     public void removeSubscription_withDifferentClients_subscribedSameTopic() {
         ISubscriptionsDirectory aStore = new SubscriptionsDirectory();
-        MemoryStorageService memStore = new MemoryStorageService(null, null);
+        IConfig config = new MemoryConfig(System.getProperties());
+        MemoryStorageService memStore = new MemoryStorageService(config, null);
+        memStore.initStore();
         ISessionsStore sessionsStore = memStore.sessionsStore();
         aStore.init(sessionsStore);
         // subscribe a not active clientID1 to /topic

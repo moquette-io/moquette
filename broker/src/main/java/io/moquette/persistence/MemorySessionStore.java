@@ -16,7 +16,9 @@
 
 package io.moquette.persistence;
 
+import io.moquette.BrokerConstants;
 import io.moquette.server.Constants;
+import io.moquette.server.config.IConfig;
 import io.moquette.spi.ClientSession;
 import io.moquette.spi.IMessagesStore.StoredMessage;
 import io.moquette.spi.ISessionsStore;
@@ -25,11 +27,13 @@ import io.moquette.spi.impl.subscriptions.Subscription;
 import io.moquette.spi.impl.subscriptions.Topic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
@@ -51,15 +55,38 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
             this.clientID = clientID;
             this.clientSession = clientSession;
         }
+
+        public void clean() {
+            LOG.info("Cleaning Session. ClientId={}", clientID);
+
+            secondPhaseStore.clear();
+            outboundFlightMessages.clear();
+            inboundFlightMessages.clear();
+            subscriptions.clear();
+            queue.clear();
+        }
     }
 
-    private final Map<String, Session> sessions = new ConcurrentHashMap<>();
+    private Cache<String, Session> sessions;
 
-    public MemorySessionStore() {
+    public MemorySessionStore(IConfig config) {
+        int expireInDays = Integer.parseInt(config.getProperty(BrokerConstants.STORAGE_CLASS_SESSION_EXPIRE, "28"));
+        int maxSessions = Integer.parseInt(config.getProperty(BrokerConstants.STORAGE_CLASS_MAX_SESSIONS, "5000"));
+
+        sessions = CacheBuilder
+                .newBuilder()
+                .expireAfterAccess(expireInDays, TimeUnit.DAYS)
+                .removalListener(k -> {
+                    LOG.error("Session for CID: {} removed Cause: {}", k.getKey(), k.getCause());
+                    ((Session) k.getValue()).clean();
+                })
+                .maximumSize(maxSessions)
+                .build();
+
     }
 
     private Session getSession(String clientID) {
-        Session session = sessions.get(clientID);
+        Session session = sessions.getIfPresent(clientID);
         if (session == null) {
             LOG.error("Can't find the session for client <{}>", clientID);
             throw new RuntimeException("Can't find the session for client <" + clientID + ">");
@@ -85,7 +112,7 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
     @Override
     public void addNewSubscription(Subscription newSubscription) {
         final String clientID = newSubscription.getClientId();
-        Session session = sessions.get(clientID);
+        Session session = sessions.getIfPresent(clientID);
         if (session == null) {
             LOG.error("Can't find the session for client <{}>", clientID);
             return;
@@ -96,23 +123,24 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
 
     @Override
     public void wipeSubscriptions(String clientID) {
-        if (!sessions.containsKey(clientID)) {
+        Session session = sessions.getIfPresent(clientID);
+        if (session == null) {
             LOG.error("Can't find the session for client <{}>", clientID);
             return;
         }
 
-        sessions.get(clientID).subscriptions.clear();
+        session.subscriptions.clear();
     }
 
     @Override
     public boolean contains(String clientID) {
-        return sessions.containsKey(clientID);
+        return sessions.getIfPresent(clientID) != null;
     }
 
     @Override
     public ClientSession createNewSession(String clientID, boolean cleanSession) {
         LOG.debug("createNewSession for client <{}>", clientID);
-        Session session = sessions.get(clientID);
+        Session session = sessions.getIfPresent(clientID);
         if (session != null) {
             LOG.error("already exists a session for client <{}>, bad condition", clientID);
             throw new IllegalArgumentException("Can't create a session with the ID of an already existing" + clientID);
@@ -126,19 +154,20 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
 
     @Override
     public ClientSession sessionForClient(String clientID) {
-        if (!sessions.containsKey(clientID)) {
+        Session session = sessions.getIfPresent(clientID);
+        if (session == null) {
             LOG.error("Can't find the session for client <{}>", clientID);
             return null;
         }
 
-        PersistentSession storedSession = sessions.get(clientID).persistentSession.get();
+        PersistentSession storedSession = session.persistentSession.get();
         return new ClientSession(clientID, this, this, storedSession.cleanSession);
     }
 
     @Override
     public Collection<ClientSession> getAllSessions() {
         Collection<ClientSession> result = new ArrayList<>();
-        for (Session entry : sessions.values()) {
+        for (Session entry : sessions.asMap().values()) {
             result.add(new ClientSession(entry.clientID, this, this, entry.persistentSession.get().cleanSession));
         }
         return result;
@@ -146,18 +175,19 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
 
     @Override
     public void updateCleanStatus(String clientID, boolean cleanSession) {
-        if (!sessions.containsKey(clientID)) {
+        Session session = sessions.getIfPresent(clientID);
+        if (session == null) {
             LOG.error("Can't find the session for client <{}>", clientID);
             return;
         }
 
-        sessions.get(clientID).persistentSession.set(new PersistentSession(cleanSession));
+        session.persistentSession.set(new PersistentSession(cleanSession));
     }
 
     @Override
     public List<ClientTopicCouple> listAllSubscriptions() {
         List<ClientTopicCouple> allSubscriptions = new ArrayList<>();
-        for (Session entry : sessions.values()) {
+        for (Session entry : sessions.asMap().values()) {
             for (Subscription sub : entry.subscriptions.values()) {
                 allSubscriptions.add(sub.asClientTopicCouple());
             }
@@ -168,12 +198,13 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
     @Override
     public Subscription getSubscription(ClientTopicCouple couple) {
         String clientID = couple.clientID;
-        if (!sessions.containsKey(clientID)) {
+        Session session = sessions.getIfPresent(clientID);
+        if (session == null) {
             LOG.error("Can't find the session for client <{}>", clientID);
             return null;
         }
 
-        Map<Topic, Subscription> subscriptions = sessions.get(clientID).subscriptions;
+        Map<Topic, Subscription> subscriptions = session.subscriptions;
         if (subscriptions == null || subscriptions.isEmpty()) {
             return null;
         }
@@ -183,7 +214,7 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
     @Override
     public List<Subscription> getSubscriptions() {
         List<Subscription> subscriptions = new ArrayList<>();
-        for (Session entry : sessions.values()) {
+        for (Session entry : sessions.asMap().values()) {
             subscriptions.addAll(entry.subscriptions.values());
         }
         return subscriptions;
@@ -196,7 +227,7 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
 
     @Override
     public void inFlight(String clientID, int messageID, StoredMessage msg) {
-        Session session = sessions.get(clientID);
+        Session session = sessions.getIfPresent(clientID);
         if (session == null) {
             LOG.error("Can't find the session for client <{}>", clientID);
             return;
@@ -210,12 +241,13 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
      */
     @Override
     public int nextPacketID(String clientID) {
-        if (!sessions.containsKey(clientID)) {
+        Session session = sessions.getIfPresent(clientID);
+        if (session == null) {
             LOG.error("Can't find the session for client <{}>", clientID);
             return -1;
         }
 
-        Map<Integer, StoredMessage> m = sessions.get(clientID).outboundFlightMessages;
+        Map<Integer, StoredMessage> m = session.outboundFlightMessages;
         int maxId = m.keySet().isEmpty() ? 0 : Collections.max(m.keySet());
         int nextPacketId = (maxId + 1) % 0xFFFF;
         m.put(nextPacketId, null);
@@ -224,23 +256,30 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
 
     @Override
     public BlockingQueue<StoredMessage> queue(String clientID) {
-        if (!sessions.containsKey(clientID)) {
+        Session session = sessions.getIfPresent(clientID);
+        if (session == null) {
             LOG.error("Can't find the session for client <{}>", clientID);
             return null;
         }
 
-        return sessions.get(clientID).queue;
+        return session.queue;
     }
 
     @Override
     public void dropQueue(String clientID) {
-        sessions.get(clientID).queue.clear();
+        Session session = sessions.getIfPresent(clientID);
+        if (session == null) {
+            LOG.error("Can't find the session for client <{}>", clientID);
+            return;
+        }
+
+        session.queue.clear();
     }
 
     @Override
     public void moveInFlightToSecondPhaseAckWaiting(String clientID, int messageID, StoredMessage msg) {
         LOG.info("Moving msg inflight second phase store, clientID <{}> messageID {}", clientID, messageID);
-        Session session = sessions.get(clientID);
+        Session session = sessions.getIfPresent(clientID);
         if (session == null) {
             LOG.error("Can't find the session for client <{}>", clientID);
             return;
@@ -258,7 +297,7 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
 
     @Override
     public int getInflightMessagesNo(String clientID) {
-        Session session = sessions.get(clientID);
+        Session session = sessions.getIfPresent(clientID);
         if (session == null) {
             LOG.error("Can't find the session for client <{}>", clientID);
             return 0;
@@ -275,56 +314,50 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
 
     @Override
     public void markAsInboundInflight(String clientID, int messageID, StoredMessage msg) {
-        if (!sessions.containsKey(clientID))
+        Session session = sessions.getIfPresent(clientID);
+        if (session == null) {
             LOG.error("Can't find the session for client <{}>", clientID);
-
-        sessions.get(clientID).inboundFlightMessages.put(messageID, msg);
+            return;
+        }
+        session.inboundFlightMessages.put(messageID, msg);
     }
 
     @Override
     public int getPendingPublishMessagesNo(String clientID) {
-        if (!sessions.containsKey(clientID)) {
+        Session session = sessions.getIfPresent(clientID);
+        if (session == null) {
             LOG.error("Can't find the session for client <{}>", clientID);
             return 0;
         }
 
-        return sessions.get(clientID).queue.size();
+        return session.queue.size();
     }
 
     @Override
     public int getSecondPhaseAckPendingMessages(String clientID) {
-        if (!sessions.containsKey(clientID)) {
-            LOG.error("Can't find the session for client <{}>", clientID);
+        Session session = sessions.getIfPresent(clientID);
+        if (session == null) {
             return 0;
         }
 
-        return sessions.get(clientID).secondPhaseStore.size();
+        return session.secondPhaseStore.size();
     }
 
     @Override
     public void cleanSession(String clientID) {
         LOG.debug("Session cleanup for client <{}>", clientID);
 
-        Session session = sessions.get(clientID);
+        Session session = sessions.getIfPresent(clientID);
         if (session == null) {
             LOG.error("Can't find the session for client <{}>", clientID);
             return;
         }
 
-        // remove also the messages stored of type QoS1/2
-        LOG.info("Removing stored messages with QoS 1 and 2. ClientId={}", clientID);
+        session.clean();
+    }
 
-        session.secondPhaseStore.clear();
-        session.outboundFlightMessages.clear();
-        session.inboundFlightMessages.clear();
-
-        LOG.info("Wiping existing subscriptions. ClientId={}", clientID);
-        wipeSubscriptions(clientID);
-
-        //remove also the enqueued messages
-        dropQueue(clientID);
-
-        // TODO this missing last step breaks the junit test
-        //sessions.remove(clientID);
+    @Override
+    public void heartBeat(String clientID) {
+        sessions.getIfPresent(clientID);
     }
 }

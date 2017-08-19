@@ -82,6 +82,7 @@ class MessagesPublisher {
             boolean targetIsActive = this.connectionDescriptors.isConnected(sub.getClientId());
 //TODO move all this logic into messageSender, which puts into the flightZone only the messages that pull out of the queue.
             if (targetIsActive) {
+                m_sessionsStore.heartBeat(sub.getClientId());
                 LOG.debug("Sending PUBLISH message to active subscriber. CId={}, topicFilter={}, qos={}",
                     sub.getClientId(), sub.getTopicFilter(), qos);
                 // we need to retain because duplicate only copy r/w indexes and don't retain() causing

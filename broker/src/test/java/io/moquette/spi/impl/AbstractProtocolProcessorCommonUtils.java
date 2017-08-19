@@ -17,6 +17,8 @@ package io.moquette.spi.impl;
 
 import io.moquette.interception.InterceptHandler;
 import io.moquette.persistence.MemoryStorageService;
+import io.moquette.server.config.IConfig;
+import io.moquette.server.config.MemoryConfig;
 import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.IMessagesStore;
 import io.moquette.spi.ISessionsStore;
@@ -62,11 +64,13 @@ abstract class AbstractProtocolProcessorCommonUtils {
         NettyUtils.clientID(m_channel, FAKE_CLIENT_ID);
         NettyUtils.cleanSession(m_channel, false);
 
+        IConfig config = new MemoryConfig(System.getProperties());
+
         // sleep to let the messaging batch processor to process the initEvent
-        MemoryStorageService memStorage = new MemoryStorageService(null, null);
+        MemoryStorageService memStorage = new MemoryStorageService(config, null);
         m_messagesStore = memStorage.messagesStore();
         m_sessionStore = memStorage.sessionsStore();
-        // m_messagesStore.initStore();
+        m_messagesStore.initStore();
 
         Set<String> clientIds = new HashSet<>();
         clientIds.add(FAKE_CLIENT_ID);

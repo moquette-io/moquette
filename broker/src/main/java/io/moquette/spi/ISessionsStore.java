@@ -132,4 +132,9 @@ public interface ISessionsStore {
     int getSecondPhaseAckPendingMessages(String clientID);
 
     void cleanSession(String clientID);
+
+    /**
+     * Call this method if there is a life sign from the client
+     */
+    void heartBeat(String clientID);
 }

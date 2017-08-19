@@ -336,4 +336,7 @@ public class H2SessionsStore implements ISessionsStore, ISubscriptionsStore {
         dropQueue(clientID);
     }
 
+    @Override
+    public void heartBeat(String clientID) {
+    }
 }
