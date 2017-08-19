@@ -66,6 +66,7 @@ public final class BrokerConstants {
     public static final String BUGSNAG_TOKEN_PROPERTY_NAME = "bugsnag.token";
 
     public static final String STORAGE_CLASS_NAME = "storage_class";
+    public static final String STORAGE_CLASS_TYPE = "storage_type_global";
 
     private BrokerConstants() {
     }
