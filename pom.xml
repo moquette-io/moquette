@@ -113,7 +113,7 @@
         <module>h2_storage</module>
         <module>distribution</module>
         <module>embedding_moquette</module>
-        <module>osgi_test</module>
+        <!-- <module>osgi_test</module> -->
         <module>perf</module>
     </modules>
 
