@@ -26,7 +26,7 @@ import io.netty.handler.codec.mqtt.MqttQoS;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -126,7 +126,7 @@ public class BrokerInterceptorTest {
     public void testNotifyTopicPublished() throws Exception {
         interceptor.notifyTopicPublished(
                 MqttMessageBuilders.publish().qos(MqttQoS.AT_MOST_ONCE)
-                    .payload(Unpooled.copiedBuffer("Hello".getBytes())).build(),
+                    .payload(Unpooled.copiedBuffer("Hello".getBytes(StandardCharsets.UTF_8))).build(),
                 "cli1234",
                 "cli1234");
         interval();

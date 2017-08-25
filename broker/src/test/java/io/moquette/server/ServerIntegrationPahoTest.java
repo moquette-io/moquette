@@ -26,7 +26,9 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
+
 import static org.junit.Assert.*;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class ServerIntegrationPahoTest {
 
@@ -83,7 +85,6 @@ public class ServerIntegrationPahoTest {
         m_server.stopServer();
     }
 
-
     @Ignore("This test hasn't any meaning using in memory storage service")
     @Test
     public void testCleanSession_maintainClientSubscriptions_withServerRestart() throws Exception {
@@ -100,11 +101,10 @@ public class ServerIntegrationPahoTest {
 
         // reconnect and publish
         m_client.connect(options);
-        m_client.publish("/topic", "Test my payload".getBytes(), 0, false);
+        m_client.publish("/topic", "Test my payload".getBytes(UTF_8), 0, false);
 
         assertEquals("/topic", m_messagesCollector.getTopic());
     }
-
 
     /**
      * subscriber A connect and subscribe on "a/b" QoS 1 subscriber B connect and subscribe on "a/+"
@@ -133,15 +133,15 @@ public class ServerIntegrationPahoTest {
         subscriberB.subscribe("a/+", 2);
 
         m_client.connect();
-        m_client.publish("a/b", "Hello world MQTT!!".getBytes(), 2, false);
+        m_client.publish("a/b", "Hello world MQTT!!".getBytes(UTF_8), 2, false);
 
         MqttMessage messageOnA = cbSubscriberA.waitMessage(1);
-        assertEquals("Hello world MQTT!!", new String(messageOnA.getPayload()));
+        assertEquals("Hello world MQTT!!", new String(messageOnA.getPayload(), UTF_8));
         assertEquals(1, messageOnA.getQos());
         subscriberA.disconnect();
 
         MqttMessage messageOnB = cbSubscriberB.waitMessage(1);
-        assertEquals("Hello world MQTT!!", new String(messageOnB.getPayload()));
+        assertEquals("Hello world MQTT!!", new String(messageOnB.getPayload(), UTF_8));
         assertEquals(2, messageOnB.getQos());
         subscriberB.disconnect();
     }
@@ -180,7 +180,7 @@ public class ServerIntegrationPahoTest {
                 tmpDir + File.separator + "clientForPublish");
         MqttClient clientForPublish = new MqttClient("tcp://localhost:1883", "clientForPublish", dsSubscriberPUB);
         clientForPublish.connect();
-        clientForPublish.publish("topic", "Hello".getBytes(), 2, true);
+        clientForPublish.publish("topic", "Hello".getBytes(UTF_8), 2, true);
 
         // verify clientForSubscribe1 doesn't receive a notification but clientForSubscribe2 yes
         LOG.info("Before waiting to receive 1 sec from " + clientForSubscribe1.getClientId());
@@ -188,7 +188,7 @@ public class ServerIntegrationPahoTest {
         assertTrue(clientForSubscribe2.isConnected());
         LOG.info("Waiting to receive 1 sec from " + clientForSubscribe2.getClientId());
         MqttMessage messageOnB = cbSubscriber2.waitMessage(1);
-        assertEquals("Hello", new String(messageOnB.getPayload()));
+        assertEquals("Hello", new String(messageOnB.getPayload(), UTF_8));
     }
 
 //    @Test
@@ -202,7 +202,7 @@ public class ServerIntegrationPahoTest {
 //
 //        MqttClient clientXB = createClient("publisher", "X");
 //        LOG.info("Connected 'publisher' first time");
-//        clientXB.publish("topic", "Hello".getBytes(), 2, false);
+//        clientXB.publish("topic", "Hello".getBytes(UTF_8), 2, false);
 //        LOG.info("Published on 'topic' from 'publisher' first time");
 //
 //        LOG.info("Creating second new 'subscriber'");
@@ -212,7 +212,7 @@ public class ServerIntegrationPahoTest {
 //        clientYA.subscribe("topic", 0);
 //
 //        MqttClient clientYB = createClient("publisher", "Y");
-//        clientYB.publish("topic", "Hello 2".getBytes(), 2, true);
+//        clientYB.publish("topic", "Hello 2".getBytes(UTF_8), 2, true);
 //
 //        // Verify that the second subscriber client get notified and not the first.
 //        assertTrue(cbSubscriber1.connectionLost());
@@ -226,13 +226,13 @@ public class ServerIntegrationPahoTest {
 //        options.setCleanSession(false);
 //        m_client.connect(options);
 //        m_client.subscribe("/topic", 0);
-//        m_client.publish("/topic", "Hello".getBytes(), 0, true);
+//        m_client.publish("/topic", "Hello".getBytes(UTF_8), 0, true);
 //        m_client.disconnect();
 //
 //        // second loop
 //        m_client.connect(options);
 //        m_client.subscribe("/topic", 0);
-//        m_client.publish("/topic", "Hello".getBytes(), 0, true);
+//        m_client.publish("/topic", "Hello".getBytes(UTF_8), 0, true);
 //        m_client.disconnect(); // this should give timeout
 //
 //        assertFalse("after a disconnect the client should be disconnected", m_client.isConnected());
@@ -251,23 +251,23 @@ public class ServerIntegrationPahoTest {
 //        m_client.subscribe("/topic", 1);
 //
 //        // force the publisher to send
-//        m_publisher.publish("/topic", "Hello world MQTT!!-1".getBytes(), 1, false);
+//        m_publisher.publish("/topic", "Hello world MQTT!!-1".getBytes(UTF_8), 1, false);
 //
 //        // read the first message and drop the connection
 //        MqttMessage msg = m_messagesCollector.waitMessage(1);
-//        assertEquals("Hello world MQTT!!-1", new String(msg.getPayload()));
+//        assertEquals("Hello world MQTT!!-1", new String(msg.getPayload(), UTF_8));
 //        m_client.disconnect();
 //
-//        m_publisher.publish("/topic", "Hello world MQTT!!-2".getBytes(), 1, false);
-//        m_publisher.publish("/topic", "Hello world MQTT!!-3".getBytes(), 1, false);
+//        m_publisher.publish("/topic", "Hello world MQTT!!-2".getBytes(UTF_8), 1, false);
+//        m_publisher.publish("/topic", "Hello world MQTT!!-3".getBytes(UTF_8), 1, false);
 //
 //        // reconnect and expect to receive the hello 2 message
 //        m_client.connect(options);
 //        msg = m_messagesCollector.waitMessage(1);
-//        assertEquals("Hello world MQTT!!-2", new String(msg.getPayload()));
+//        assertEquals("Hello world MQTT!!-2", new String(msg.getPayload(), UTF_8));
 //
 //        msg = m_messagesCollector.waitMessage(1);
-//        assertEquals("Hello world MQTT!!-3", new String(msg.getPayload()));
+//        assertEquals("Hello world MQTT!!-3", new String(msg.getPayload(), UTF_8));
 //        m_client.disconnect();
 //    }
 
@@ -285,14 +285,14 @@ public class ServerIntegrationPahoTest {
 //        m_client.disconnect();
 //
 //        // force the publisher to send
-//        m_publisher.publish("/topic", "Hello world MQTT!!-1".getBytes(), 1, false);
+//        m_publisher.publish("/topic", "Hello world MQTT!!-1".getBytes(UTF_8), 1, false);
 //
 //        // reconnect and expect to receive the hello 2 message
 //        m_client.connect(options);
 //        m_client.subscribe("/topic", 1);
 //        MqttMessage msg = messagesCollector.waitMessage(1);
 //        assertNotNull(msg);
-//        assertEquals("Hello world MQTT!!-1", new String(msg.getPayload()));
+//        assertEquals("Hello world MQTT!!-1", new String(msg.getPayload(), UTF_8));
 //    }
 
 //    /**
@@ -312,8 +312,8 @@ public class ServerIntegrationPahoTest {
 //        m_client.disconnect();
 //
 //        m_publisher.connect();
-//        m_publisher.publish("topic", "Hello1".getBytes(), 2, true);
-//        m_publisher.publish("topic", "Hello2".getBytes(), 2, true);
+//        m_publisher.publish("topic", "Hello1".getBytes(UTF_8), 2, true);
+//        m_publisher.publish("topic", "Hello2".getBytes(UTF_8), 2, true);
 //        m_publisher.disconnect();
 //
 //        // subscriber reconnects
@@ -321,10 +321,10 @@ public class ServerIntegrationPahoTest {
 //        // subscriber should receive the 2 messages missed
 //        MqttMessage msg = messagesCollector.waitMessage(1);
 //        assertNotNull(msg);
-//        assertEquals("Hello1", new String(msg.getPayload()));
+//        assertEquals("Hello1", new String(msg.getPayload(), UTF_8));
 //        msg = messagesCollector.waitMessage(1);
 //        assertNotNull(msg);
-//        assertEquals("Hello2", new String(msg.getPayload()));
+//        assertEquals("Hello2", new String(msg.getPayload(), UTF_8));
 //    }
 //
 //    /**
@@ -345,11 +345,11 @@ public class ServerIntegrationPahoTest {
 //        m_client.subscribe("a/b", 1);
 //
 //        // force the publisher to send
-//        m_publisher.publish("a/b", "Hello world MQTT!!".getBytes(), 1, false);
+//        m_publisher.publish("a/b", "Hello world MQTT!!".getBytes(UTF_8), 1, false);
 //
 //        // reconnect and expect to receive the hello 2 message
 //        MqttMessage msg = messagesCollector.waitMessage(1);
-//        assertEquals("Hello world MQTT!!", new String(msg.getPayload()));
+//        assertEquals("Hello world MQTT!!", new String(msg.getPayload(), UTF_8));
 //
 //        // try to listen a second publish
 //        msg = messagesCollector.waitMessage(1);

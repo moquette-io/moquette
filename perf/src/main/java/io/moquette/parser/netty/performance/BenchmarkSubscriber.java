@@ -20,7 +20,7 @@ import org.HdrHistogram.Histogram;
 import org.eclipse.paho.client.mqttv3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 
 class BenchmarkSubscriber {
@@ -54,7 +54,7 @@ class BenchmarkSubscriber {
                 histogram.outputPercentileDistribution(System.out, 1000.0); //nanos/1000
                 m_latch.countDown();
             } else {
-                String payload = new String(message.getPayload());
+                String payload = new String(message.getPayload(), StandardCharsets.UTF_8);
                 //long sentTime = Long.parseLong(payload.split("-")[1]);
                 long sentTime = Long.parseLong(payload.split("-")[1]);
                 long delay = System.nanoTime() - sentTime;

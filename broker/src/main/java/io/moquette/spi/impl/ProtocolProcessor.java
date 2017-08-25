@@ -37,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -323,7 +324,7 @@ public class ProtocolProcessor {
         if (msg.variableHeader().hasUserName()) {
             byte[] pwd = null;
             if (msg.variableHeader().hasPassword()) {
-                pwd = msg.payload().password().getBytes();
+                pwd = msg.payload().password().getBytes(StandardCharsets.UTF_8);
             } else if (!this.allowAnonymous) {
                 LOG.error("Client didn't supply any password and MQTT anonymous mode is disabled CId={}", clientId);
                 failedCredentials(channel);
@@ -391,7 +392,7 @@ public class ProtocolProcessor {
             MqttQoS willQos = MqttQoS.valueOf(msg.variableHeader().willQos());
             LOG.info("Configuring MQTT last will and testament CId={}, willQos={}, willTopic={}, willRetain={}",
                     clientId, willQos, msg.payload().willTopic(), msg.variableHeader().isWillRetain());
-            byte[] willPayload = msg.payload().willMessage().getBytes();
+            byte[] willPayload = msg.payload().willMessage().getBytes(StandardCharsets.UTF_8);
             ByteBuffer bb = (ByteBuffer) ByteBuffer.allocate(willPayload.length).put(willPayload).flip();
             // save the will testament in the clientID store
             WillMessage will = new WillMessage(msg.payload().willTopic(), bb, msg.variableHeader().isWillRetain(),
@@ -471,7 +472,8 @@ public class ProtocolProcessor {
         StoredMessage inflightMsg = targetSession.inFlightAcknowledged(messageID);
 
         String topic = inflightMsg.getTopic();
-        InterceptAcknowledgedMessage wrapped = new InterceptAcknowledgedMessage(inflightMsg, topic, username, messageID);
+        InterceptAcknowledgedMessage wrapped =
+                new InterceptAcknowledgedMessage(inflightMsg, topic, username, messageID);
         m_interceptor.notifyMessageAcknowledged(wrapped);
     }
 
@@ -531,7 +533,6 @@ public class ProtocolProcessor {
         final Topic topic = new Topic(msg.variableHeader().topicName());
         LOG.info("Sending PUBLISH message. Topic={}, qos={}", topic, qos);
 
-        MessageGUID guid = null;
         IMessagesStore.StoredMessage toStoreMsg = asStoredMessage(msg);
         if (clientId == null || clientId.isEmpty()) {
             toStoreMsg.setClientID("BROKER_SELF");
@@ -561,20 +562,20 @@ public class ProtocolProcessor {
     /**
      * Specialized version to publish will testament message.
      */
-     private void forwardPublishWill(WillMessage will, String clientID) {
-         LOG.info("Publishing will message. CId={}, topic={}", clientID, will.getTopic());
-         // it has just to publish the message downstream to the subscribers
-         // NB it's a will publish, it needs a PacketIdentifier for this conn, default to 1
-         IMessagesStore.StoredMessage tobeStored = asStoredMessage(will);
-         tobeStored.setClientID(clientID);
-         Topic topic = new Topic(tobeStored.getTopic());
-         this.messagesPublisher.publish2Subscribers(tobeStored, topic);
+    private void forwardPublishWill(WillMessage will, String clientID) {
+        LOG.info("Publishing will message. CId={}, topic={}", clientID, will.getTopic());
+        // it has just to publish the message downstream to the subscribers
+        // NB it's a will publish, it needs a PacketIdentifier for this conn, default to 1
+        IMessagesStore.StoredMessage tobeStored = asStoredMessage(will);
+        tobeStored.setClientID(clientID);
+        Topic topic = new Topic(tobeStored.getTopic());
+        this.messagesPublisher.publish2Subscribers(tobeStored, topic);
 
-         //Stores retained message to the topic
- 	    if(will.isRetained()) {
- 	    	m_messagesStore.storeRetained(topic, tobeStored);
- 	    }
-     }
+        // Stores retained message to the topic
+        if (will.isRetained()) {
+            m_messagesStore.storeRetained(topic, tobeStored);
+        }
+    }
 
     static MqttQoS lowerQosToTheSubscriptionDesired(Subscription sub, MqttQoS qos) {
         if (qos.value() > sub.getRequestedQos().value()) {

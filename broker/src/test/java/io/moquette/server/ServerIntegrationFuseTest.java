@@ -25,6 +25,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import static org.junit.Assert.*;
@@ -98,6 +99,6 @@ public class ServerIntegrationFuseTest {
         Message msg = m_subscriber.receive(500, TimeUnit.MILLISECONDS);
         assertNotNull("We should get notified with 'Will' message", msg);
         msg.ack();
-        assertEquals(willTestamentMsg, new String(msg.getPayload()));
+        assertEquals(willTestamentMsg, new String(msg.getPayload(), StandardCharsets.UTF_8));
     }
 }

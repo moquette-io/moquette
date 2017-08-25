@@ -23,6 +23,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.mqtt.MqttMessage;
 import io.netty.handler.codec.mqtt.MqttMessageType;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
+import java.nio.charset.StandardCharsets;
 import org.HdrHistogram.Histogram;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,7 +77,7 @@ class NettyPublishReceiverHandler extends ChannelInboundHandlerAdapter {
             rawBytes = new byte[size];
             content.getBytes(content.readerIndex(), rawBytes);
         }
-        return new String(rawBytes);
+        return new String(rawBytes, StandardCharsets.UTF_8);
     }
 
     @Override

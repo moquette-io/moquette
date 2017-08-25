@@ -29,6 +29,7 @@ import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import io.netty.handler.codec.mqtt.MqttQoS;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 
@@ -44,8 +45,8 @@ final class EmbeddedLauncher {
 
         @Override
         public void onPublish(InterceptPublishMessage msg) {
-            System.out.println(
-                    "Received on topic: " + msg.getTopicName() + " content: " + new String(msg.getPayload().array()));
+            System.out.println("Received on topic: " + msg.getTopicName() + " content: " +
+                    new String(msg.getPayload().array(), StandardCharsets.UTF_8));
         }
     }
 
@@ -73,7 +74,7 @@ final class EmbeddedLauncher {
 //        qos(MqttQoS.AT_MOST_ONCE);
 //        qQos(MqttQoS.AT_LEAST_ONCE);
             .qos(MqttQoS.EXACTLY_ONCE)
-            .payload(Unpooled.copiedBuffer("Hello World!!".getBytes()))
+            .payload(Unpooled.copiedBuffer("Hello World!!".getBytes(StandardCharsets.UTF_8)))
             .build();
 
         mqttBroker.internalPublish(message, "INTRLPUB");

@@ -16,6 +16,7 @@
 
 package io.moquette.spi.impl;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
 import io.moquette.spi.security.IAuthenticator;
@@ -43,7 +44,7 @@ class MockAuthenticator implements IAuthenticator {
         if (password == null) {
             return false;
         }
-        return m_userPwds.get(username).equals(new String(password));
+        return m_userPwds.get(username).equals(new String(password, StandardCharsets.UTF_8));
     }
 
 }

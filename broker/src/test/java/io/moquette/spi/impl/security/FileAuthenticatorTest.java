@@ -20,6 +20,7 @@ import io.moquette.spi.security.IAuthenticator;
 import org.junit.Test;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import java.nio.charset.StandardCharsets;
 
 @SuppressWarnings("deprecation")
 public class FileAuthenticatorTest {
@@ -29,7 +30,7 @@ public class FileAuthenticatorTest {
         String file = getClass().getResource("/password_file.conf").getPath();
         IAuthenticator auth = new FileAuthenticator(null, file);
 
-        assertTrue(auth.checkValid(null, "testuser", "passwd".getBytes()));
+        assertTrue(auth.checkValid(null, "testuser", "passwd".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
@@ -37,14 +38,14 @@ public class FileAuthenticatorTest {
         String file = getClass().getResource("/password_file.conf").getPath();
         IAuthenticator auth = new FileAuthenticator(null, file);
 
-        assertFalse(auth.checkValid(null, "testuser2", "passwd".getBytes()));
+        assertFalse(auth.checkValid(null, "testuser2", "passwd".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
     public void loadPasswordFile_verifyDirectoryRef() {
         IAuthenticator auth = new FileAuthenticator("", "");
 
-        assertFalse(auth.checkValid(null, "testuser2", "passwd".getBytes()));
+        assertFalse(auth.checkValid(null, "testuser2", "passwd".getBytes(StandardCharsets.UTF_8)));
     }
 
 }

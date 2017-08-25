@@ -17,9 +17,10 @@
 package io.moquette.server.config;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
+import java.io.IOException;
 import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,8 +69,8 @@ public class FileResourceLoader implements IResourceLoader {
             throw new ResourceIsDirectoryException("File \"" + f + "\" is a directory!");
         }
         try {
-            return new FileReader(f);
-        } catch (FileNotFoundException e) {
+            return Files.newBufferedReader(f.toPath(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
             LOG.error("The file does not exist. Path = {}.", f.getAbsolutePath());
             return null;
         }

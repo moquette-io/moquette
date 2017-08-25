@@ -153,7 +153,7 @@ public class ServerLowlevelMessagesIntegrationTests {
 
         // Verify will testament is published
         org.eclipse.paho.client.mqttv3.MqttMessage receivedTestament = m_messageCollector.waitMessage(1);
-        assertEquals(willTestamentMsg, new String(receivedTestament.getPayload()));
+        assertEquals(willTestamentMsg, new String(receivedTestament.getPayload(), StandardCharsets.UTF_8));
         m_willSubscriber.disconnect();
     }
 

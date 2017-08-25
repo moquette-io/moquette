@@ -27,6 +27,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -97,7 +98,8 @@ public class MapDBPersistentStoreTest extends MessageStoreTCK {
 
     @Test
     public void testNextPacketID() {
-        StoredMessage msgStored = new StoredMessage("Hello".getBytes(), MqttQoS.AT_LEAST_ONCE, "/topic");
+        StoredMessage msgStored = new StoredMessage("Hello".getBytes(StandardCharsets.UTF_8), MqttQoS.AT_LEAST_ONCE,
+                "/topic");
         msgStored.setClientID(TEST_CLIENT);
 
         // request a first ID
