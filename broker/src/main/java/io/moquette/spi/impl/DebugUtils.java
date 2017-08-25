@@ -16,12 +16,13 @@
 
 package io.moquette.spi.impl;
 
+import java.nio.charset.StandardCharsets;
 import io.netty.buffer.ByteBuf;
 
 final class DebugUtils {
 
     static String payload2Str(ByteBuf content) {
-        return new String(content.copy().array());
+        return new String(content.copy().array(), StandardCharsets.UTF_8);
     }
 
     private DebugUtils() {

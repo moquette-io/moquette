@@ -20,6 +20,7 @@ import static org.junit.Assert.assertFalse;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -150,7 +151,7 @@ public class ServerIntegrationSSLTest {
         MqttConnectOptions secondClientOptions = new MqttConnectOptions();
         secondClientOptions.setSocketFactory(ssf);
         secondClient.connect(secondClientOptions);
-        secondClient.publish("/topic", new MqttMessage("message".getBytes()));
+        secondClient.publish("/topic", new MqttMessage("message".getBytes(StandardCharsets.UTF_8)));
         secondClient.disconnect();
 
         m_client.disconnect();

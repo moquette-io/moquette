@@ -24,6 +24,7 @@ import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import static io.moquette.spi.impl.Utils.readBytesAndRewind;
+import java.nio.charset.StandardCharsets;
 
 public class HazelcastInterceptHandler extends AbstractInterceptHandler {
 
@@ -45,7 +46,9 @@ public class HazelcastInterceptHandler extends AbstractInterceptHandler {
         ByteBuf payload = msg.getPayload();
         byte[] payloadContent = readBytesAndRewind(payload);
 
-        LOG.info("{} publish on {} message: {}", msg.getClientID(), msg.getTopicName(), new String(payloadContent));
+        LOG.info("{} publish on {} message: {}", msg.getClientID(), msg.getTopicName(), new String(payloadContent,
+                StandardCharsets.UTF_8));
+
         ITopic<HazelcastMsg> topic = hz.getTopic("moquette");
         HazelcastMsg hazelcastMsg = new HazelcastMsg(msg);
         topic.publish(hazelcastMsg);

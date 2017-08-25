@@ -24,6 +24,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.mqtt.*;
+import java.nio.charset.StandardCharsets;
 import org.eclipse.jetty.toolchain.perf.PlatformTimer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,7 +79,7 @@ class PublishBomber {
         PlatformTimer timer = PlatformTimer.detect();
         for (int i = 0; i < numToSend; i++) {
             long nanos = System.nanoTime();
-            byte[] rawContent = ("Hello world!!-" + nanos).getBytes();
+            byte[] rawContent = ("Hello world!!-" + nanos).getBytes(StandardCharsets.UTF_8);
             ByteBuf payload = Unpooled.copiedBuffer(rawContent);
 
             MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, MqttQoS.AT_MOST_ONCE,

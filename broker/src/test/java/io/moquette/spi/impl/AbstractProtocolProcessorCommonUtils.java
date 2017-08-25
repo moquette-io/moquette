@@ -27,9 +27,9 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.*;
-
 import java.util.*;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_LEAST_ONCE;
@@ -104,7 +104,8 @@ abstract class AbstractProtocolProcessorCommonUtils {
         verifySubscriptionExists(channel, m_sessionStore, expectedSubscription);
     }
 
-    protected static void verifySubscriptionExists(Channel channel, ISessionsStore sessionsStore, Subscription expectedSubscription) {
+    protected static void verifySubscriptionExists(Channel channel, ISessionsStore sessionsStore,
+            Subscription expectedSubscription) {
         final String clientId = NettyUtils.clientID(channel);
         final Subscription subscription = sessionsStore.subscriptionStore()
             .getSubscription(new ClientTopicCouple(clientId, expectedSubscription.getTopicFilter()));
@@ -164,7 +165,7 @@ abstract class AbstractProtocolProcessorCommonUtils {
             .topicName(topic)
             .retained(retained)
             .qos(qos)
-            .payload(Unpooled.copiedBuffer(HELLO_WORLD_MQTT.getBytes())).build();
+            .payload(Unpooled.copiedBuffer(HELLO_WORLD_MQTT.getBytes(UTF_8))).build();
         this.m_processor.internalPublish(publish, "INTRPUBL");
     }
 
@@ -178,7 +179,7 @@ abstract class AbstractProtocolProcessorCommonUtils {
             .topicName(topic)
             .retained(retained)
             .qos(qos)
-            .payload(Unpooled.copiedBuffer(HELLO_WORLD_MQTT.getBytes())).build();
+            .payload(Unpooled.copiedBuffer(HELLO_WORLD_MQTT.getBytes(UTF_8))).build();
         this.m_processor.processPublish(m_channel, publish);
     }
 
@@ -186,33 +187,37 @@ abstract class AbstractProtocolProcessorCommonUtils {
         publishToAs(this.m_channel, clientId, topic, qos, messageId, retained);
     }
 
-    protected void publishToAs(EmbeddedChannel channel, String clientId, String topic, MqttQoS qos, int messageId, boolean retained) {
+    protected void publishToAs(EmbeddedChannel channel, String clientId, String topic, MqttQoS qos, int messageId,
+            boolean retained) {
         publishToAs(channel, clientId, topic, HELLO_WORLD_MQTT, qos, messageId, retained);
     }
 
-    protected void publishToAs(EmbeddedChannel channel, String clientId, String topic, String payload, MqttQoS qos, int messageId, boolean retained) {
+    protected void publishToAs(EmbeddedChannel channel, String clientId, String topic, String payload, MqttQoS qos,
+            int messageId, boolean retained) {
         NettyUtils.userName(channel, clientId);
         MqttPublishMessage publish = MqttMessageBuilders.publish()
             .topicName(topic)
             .retained(retained)
             .messageId(messageId)
             .qos(qos)
-            .payload(Unpooled.copiedBuffer(payload.getBytes())).build();
+            .payload(Unpooled.copiedBuffer(payload.getBytes(UTF_8))).build();
         this.m_processor.processPublish(channel, publish);
     }
 
-    protected void publishQoS2ToAs(EmbeddedChannel channel, String clientId, String topic, int messageId, boolean retained) {
+    protected void publishQoS2ToAs(EmbeddedChannel channel, String clientId, String topic, int messageId,
+            boolean retained) {
         publishQoS2ToAs(channel, clientId, topic, HELLO_WORLD_MQTT, messageId, retained);
     }
 
-    protected void publishQoS2ToAs(EmbeddedChannel channel, String clientId, String topic, String payload, int messageId, boolean retained) {
+    protected void publishQoS2ToAs(EmbeddedChannel channel, String clientId, String topic, String payload,
+            int messageId, boolean retained) {
         NettyUtils.userName(channel, clientId);
         MqttPublishMessage publish = MqttMessageBuilders.publish()
             .topicName(topic)
             .retained(retained)
             .messageId(messageId)
             .qos(MqttQoS.EXACTLY_ONCE)
-            .payload(Unpooled.copiedBuffer(payload.getBytes())).build();
+            .payload(Unpooled.copiedBuffer(payload.getBytes(UTF_8))).build();
         this.m_processor.processPublish(channel, publish);
 
         verifyPubrecIsReceived(channel, messageId);
@@ -233,7 +238,6 @@ abstract class AbstractProtocolProcessorCommonUtils {
         final MqttMessage pubComp = channel.readOutbound();
         assertEquals(messageId, Utils.messageId(pubComp));
     }
-
 
     protected void connect() {
         connectAsClient(FAKE_CLIENT_ID);
@@ -305,7 +309,7 @@ abstract class AbstractProtocolProcessorCommonUtils {
 
     protected void verifyPublishIsReceived(EmbeddedChannel channel) {
         final MqttPublishMessage publishReceived = channel.readOutbound();
-        String payloadMessage = new String(publishReceived.payload().array());
+        String payloadMessage = new String(publishReceived.payload().array(), UTF_8);
         assertEquals("Sent and received payload must be identical", HELLO_WORLD_MQTT, payloadMessage);
     }
 
@@ -319,7 +323,7 @@ abstract class AbstractProtocolProcessorCommonUtils {
 
     protected void verifyPublishIsReceived(EmbeddedChannel channel, String expectedPayload, MqttQoS expectedQoS) {
         final MqttPublishMessage publishReceived = channel.readOutbound();
-        String payloadMessage = new String(publishReceived.payload().array());
+        String payloadMessage = new String(publishReceived.payload().array(), UTF_8);
         assertEquals("Sent and received payload must be identical", expectedPayload, payloadMessage);
         assertEquals("Expected QoS don't match", expectedQoS, publishReceived.fixedHeader().qosLevel());
     }

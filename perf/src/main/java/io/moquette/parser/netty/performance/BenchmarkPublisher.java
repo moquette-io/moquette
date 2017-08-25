@@ -20,7 +20,7 @@ import org.eclipse.jetty.toolchain.perf.PlatformTimer;
 import org.eclipse.paho.client.mqttv3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 
 class  BenchmarkPublisher {
@@ -116,14 +116,14 @@ class  BenchmarkPublisher {
         IMqttActionListener pubCallback = new PublishCallback();
         for (int i = 0; i < numToSend; i++) {
             long nanos = System.nanoTime();
-            byte[] message = ("Hello world!!-" + nanos).getBytes();
+            byte[] message = ("Hello world!!-" + nanos).getBytes(StandardCharsets.UTF_8);
             this.client.publish("/topic" + dialog_id, message, qos, retain, null, pubCallback);
             timer.sleep(pauseMicroseconds);
         }
 
         IMqttActionListener exitCallback = new ExitTopicCallback(startTime, numToSend, this.client, m_latch);
         long nanosExit = System.nanoTime();
-        byte[] exitMessage = ("Hello world!!-" + nanosExit).getBytes();
+        byte[] exitMessage = ("Hello world!!-" + nanosExit).getBytes(StandardCharsets.UTF_8);
         this.client.publish("/exit" + dialog_id, exitMessage, qos, retain, null, exitCallback);
     }
 
