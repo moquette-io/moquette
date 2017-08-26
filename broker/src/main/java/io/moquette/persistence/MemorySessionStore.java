@@ -210,10 +210,8 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
      */
     @Override
     public int nextPacketID(String clientID) {
-        if (!sessions.containsKey(clientID)) {
-            LOG.error("Can't find the session for client <{}>", clientID);
-            return -1;
-        }
+        if (!sessions.containsKey(clientID))
+            throw new RuntimeException("Can't find a session for client <" + clientID + ">");
 
         Map<Integer, StoredMessage> m = sessions.get(clientID).outboundFlightMessages;
         int maxId = m.keySet().isEmpty() ? 0 : Collections.max(m.keySet());

@@ -213,6 +213,9 @@ public class H2SessionsStore implements ISessionsStore, ISubscriptionsStore {
 
     @Override
     public int nextPacketID(String clientID) {
+        if (!sessions.containsKey(clientID))
+            throw new RuntimeException("Can't find a session for client <" + clientID + ">");
+
         LOG.debug("Generating next packet ID CId={}", clientID);
         Set<Integer> inFlightForClient = this.inFlightIds.get(clientID);
         if (inFlightForClient == null) {

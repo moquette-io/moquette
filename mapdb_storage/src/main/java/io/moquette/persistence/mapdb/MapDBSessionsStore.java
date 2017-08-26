@@ -186,6 +186,9 @@ class MapDBSessionsStore implements ISessionsStore, ISubscriptionsStore {
      */
     @Override
     public int nextPacketID(String clientID) {
+        if (!m_persistentSessions.containsKey(clientID))
+            throw new RuntimeException("Can't find a session for client <" + clientID + ">");
+
         LOG.debug("Generating next packet ID CId={}", clientID);
         Set<Integer> inFlightForClient = this.m_inFlightIds.get(clientID);
         if (inFlightForClient == null) {

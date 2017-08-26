@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2012-2017 The original author or authors
+ * ------------------------------------------------------
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v1.0
+ * and Apache License v2.0 which accompanies this distribution.
+ *
+ * The Eclipse Public License is available at
+ * http://www.eclipse.org/legal/epl-v10.html
+ *
+ * The Apache License v2.0 is available at
+ * http://www.opensource.org/licenses/apache2.0.php
+ *
+ * You may elect to redistribute this code under either of these licenses.
+ */
+
 package io.moquette.persistence;
 
 import io.moquette.spi.*;
@@ -14,8 +30,7 @@ import java.util.List;
 import static io.moquette.spi.impl.subscriptions.Topic.asTopic;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.assertj.core.api.Assertions.*;
 
 /**
  * Defines all test that an implementation of a IMessageStore should satisfy.
@@ -45,7 +60,9 @@ public abstract class MessageStoreTCK {
                 return key.match(new Topic("/topic"));
             }
         }).iterator().next();
-        assertNotNull("The stored retained message must be present after client's session drop", storedPublish);
+
+        assertThat(storedPublish).as("The stored retained message must be present after client's session drop")
+            .isNotNull();
     }
 
     @Test
@@ -67,7 +84,7 @@ public abstract class MessageStoreTCK {
         final ByteBuf payload = msgRetrieved.getPayload();
         byte[] content = new byte[payload.readableBytes()];
         payload.readBytes(content);
-        assertEquals("Hello", new String(content));
+        assertThat(new String(content)).isEqualTo("Hello");
     }
 
     @Test
@@ -85,8 +102,8 @@ public abstract class MessageStoreTCK {
         // Verify
         final ISubscriptionsStore subscriptionsStore = sessionsStore.subscriptionStore();
         List<ClientTopicCouple> subscriptions = subscriptionsStore.listAllSubscriptions();
-        assertEquals(1, subscriptions.size());
+        assertThat(subscriptions).hasSize(1);
         Subscription sub = subscriptionsStore.getSubscription(subscriptions.get(0));
-        assertEquals(overridingSubscription.getRequestedQos(), sub.getRequestedQos());
+        assertThat(sub.getRequestedQos()).isEqualTo(overridingSubscription.getRequestedQos());
     }
 }
