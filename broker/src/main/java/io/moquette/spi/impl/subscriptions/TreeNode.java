@@ -18,7 +18,7 @@ package io.moquette.spi.impl.subscriptions;
 
 import io.moquette.spi.ISubscriptionsStore.ClientTopicCouple;
 import java.util.*;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.LinkedBlockingDeque;
 
 class TreeNode {
 
@@ -116,7 +116,39 @@ class TreeNode {
             if (n.getToken().match(t)) {
                 // Create a copy of token, else if navigate 2 sibling it
                 // consumes 2 elements on the queue instead of one
-                n.matches(new LinkedBlockingQueue<>(tokens), matchingSubs);
+                n.matches(new ArrayDeque<>(tokens), matchingSubs);
+                // TODO don't create a copy n.matches(tokens, matchingSubs);
+            }
+        }
+    }
+
+    void matches2(Queue<Token> tokens, List<ClientTopicCouple> matchingSubs) {
+        Token t = tokens.poll();
+
+        // check if t is null <=> tokens finished
+        if (t == null) {
+            matchingSubs.addAll(m_subscriptions);
+            // check if it has got a MULTI child and add its subscriptions
+            for (TreeNode n : m_children) {
+                if (n.getToken() == Token.MULTI || n.getToken() == Token.SINGLE) {
+                    matchingSubs.addAll(n.subscriptions());
+                }
+            }
+
+            return;
+        }
+
+        // we are on MULTI, than add subscriptions and return
+        if (m_token == Token.MULTI) {
+            matchingSubs.addAll(m_subscriptions);
+            return;
+        }
+
+        for (TreeNode n : m_children) {
+            if (n.getToken().match(t)) {
+                // Create a copy of token, else if navigate 2 sibling it
+                // consumes 2 elements on the queue instead of one
+                n.matches(new LinkedBlockingDeque<>(tokens), matchingSubs);
                 // TODO don't create a copy n.matches(tokens, matchingSubs);
             }
         }
