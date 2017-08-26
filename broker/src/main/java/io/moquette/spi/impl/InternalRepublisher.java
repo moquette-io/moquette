@@ -18,6 +18,7 @@ package io.moquette.spi.impl;
 
 import io.moquette.spi.ClientSession;
 import io.moquette.spi.IMessagesStore;
+import io.moquette.spi.impl.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.mqtt.*;
 import org.slf4j.Logger;
@@ -89,10 +90,10 @@ class InternalRepublisher {
             packetID);
     }
 
-    public static MqttPublishMessage createPublishForQos(String topic, MqttQoS qos, ByteBuf message, boolean retained,
+    public static MqttPublishMessage createPublishForQos(Topic topic, MqttQoS qos, ByteBuf message, boolean retained,
             int messageId) {
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, retained, 0);
-        MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId);
+        MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic.toString(), messageId);
         return new MqttPublishMessage(fixedHeader, varHeader, message);
     }
 }

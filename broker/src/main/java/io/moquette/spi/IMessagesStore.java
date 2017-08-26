@@ -21,7 +21,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import java.io.Serializable;
-import java.nio.ByteBuffer;
 import java.util.Collection;
 
 /**
@@ -34,12 +33,12 @@ public interface IMessagesStore {
         private static final long serialVersionUID = 1755296138639817304L;
         final MqttQoS m_qos;
         final byte[] m_payload;
-        final String m_topic;
+        final Topic m_topic;
         private boolean m_retained;
         private String m_clientID;
         private MessageGUID m_guid;
 
-        public StoredMessage(byte[] message, MqttQoS qos, String topic) {
+        public StoredMessage(byte[] message, MqttQoS qos, Topic topic) {
             m_qos = qos;
             m_payload = message;
             m_topic = topic;
@@ -49,7 +48,7 @@ public interface IMessagesStore {
             return m_qos;
         }
 
-        public String getTopic() {
+        public Topic getTopic() {
             return m_topic;
         }
 
@@ -71,6 +70,10 @@ public interface IMessagesStore {
 
         public ByteBuf getPayload() {
             return Unpooled.copiedBuffer(m_payload);
+        }
+
+        public byte[] getPayloadArray() {
+            return m_payload;
         }
 
         public void setRetained(boolean retained) {
@@ -104,5 +107,5 @@ public interface IMessagesStore {
 
     void cleanRetained(Topic topic);
 
-    void storeRetained(Topic topic, StoredMessage storedMessage);
+    void storeRetained(StoredMessage msg);
 }

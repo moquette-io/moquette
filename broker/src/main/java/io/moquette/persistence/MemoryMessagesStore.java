@@ -19,6 +19,7 @@ package io.moquette.persistence;
 import io.moquette.spi.IMatchingCondition;
 import io.moquette.spi.IMessagesStore;
 import io.moquette.spi.impl.subscriptions.Topic;
+import io.netty.handler.codec.mqtt.MqttQoS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,12 +39,15 @@ public class MemoryMessagesStore implements IMessagesStore {
     }
 
     @Override
-    public void storeRetained(Topic topic, StoredMessage storedMessage) {
-        LOG.debug("Store retained message for topic={}, CId={}", topic, storedMessage.getClientID());
-        if (storedMessage.getClientID() == null) {
-            throw new IllegalArgumentException( "Message to be persisted must have a not null client ID");
+    public void storeRetained(StoredMessage msg) {
+        LOG.debug("Store retained message for topic={}, CId={}", msg.getTopic(), msg.getClientID());
+        if (msg.getClientID() == null) {
+            throw new IllegalArgumentException("Message to be persisted must have a not null client ID");
         }
-        m_retainedStore.put(topic, storedMessage);
+        if (msg.getQos() != MqttQoS.AT_MOST_ONCE && msg.getPayloadArray().length > 0)
+            m_retainedStore.put(msg.getTopic(), msg);
+        else
+            cleanRetained(msg.getTopic());
     }
 
     @Override

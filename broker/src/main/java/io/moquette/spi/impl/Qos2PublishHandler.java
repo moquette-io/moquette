@@ -86,13 +86,6 @@ class Qos2PublishHandler extends QosPublishHandler {
         // Next the client will send us a pub rel
         // NB publish to subscribers for QoS 2 happen upon PUBREL from publisher
 
-//        if (msg.fixedHeader().isRetain()) {
-//            if (msg.payload().readableBytes() == 0) {
-//                m_messagesStore.cleanRetained(topic);
-//            } else {
-//                m_messagesStore.storeRetained(topic, toStoreMsg);
-//            }
-//        }
         //TODO this should happen on PUB_REL, else we notify false positive
         m_interceptor.notifyTopicPublished(msg, clientID, username);
     }
@@ -111,17 +104,10 @@ class Qos2PublishHandler extends QosPublishHandler {
             LOG.warn("Can't find inbound inflight message for CId={}, messageId={}", clientID, messageID);
             throw new IllegalArgumentException("Can't find inbound inflight message");
         }
-        final Topic topic = new Topic(evt.getTopic());
+        this.publisher.publish2Subscribers(evt, messageID);
 
-        this.publisher.publish2Subscribers(evt, topic, messageID);
-
-        if (evt.isRetained()) {
-            if (evt.getPayload().readableBytes() == 0) {
-                m_messagesStore.cleanRetained(topic);
-            } else {
-                m_messagesStore.storeRetained(topic, evt);
-            }
-        }
+        if (evt.isRetained())
+            m_messagesStore.storeRetained(evt);
 
         //TODO here we should notify to the listeners
         //m_interceptor.notifyTopicPublished(msg, clientID, username);

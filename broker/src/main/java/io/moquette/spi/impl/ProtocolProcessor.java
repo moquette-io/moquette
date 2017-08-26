@@ -59,19 +59,19 @@ public class ProtocolProcessor {
 
     static final class WillMessage {
 
-        private final String topic;
+        private final Topic topic;
         private final ByteBuffer payload;
         private final boolean retained;
         private final MqttQoS qos;
 
-        WillMessage(String topic, ByteBuffer payload, boolean retained, MqttQoS qos) {
+        WillMessage(Topic topic, ByteBuffer payload, boolean retained, MqttQoS qos) {
             this.topic = topic;
             this.payload = payload;
             this.retained = retained;
             this.qos = qos;
         }
 
-        public String getTopic() {
+        public Topic getTopic() {
             return topic;
         }
 
@@ -394,8 +394,8 @@ public class ProtocolProcessor {
             byte[] willPayload = msg.payload().willMessage().getBytes();
             ByteBuffer bb = (ByteBuffer) ByteBuffer.allocate(willPayload.length).put(willPayload).flip();
             // save the will testament in the clientID store
-            WillMessage will = new WillMessage(msg.payload().willTopic(), bb, msg.variableHeader().isWillRetain(),
-                    willQos);
+            WillMessage will = new WillMessage(new Topic(msg.payload().willTopic()), bb,
+                    msg.variableHeader().isWillRetain(), willQos);
             m_willStore.put(clientId, will);
             LOG.info("MQTT last will and testament has been configured. CId={}", clientId);
         }
@@ -470,7 +470,7 @@ public class ProtocolProcessor {
         ClientSession targetSession = m_sessionsStore.sessionForClient(clientID);
         StoredMessage inflightMsg = targetSession.inFlightAcknowledged(messageID);
 
-        String topic = inflightMsg.getTopic();
+        Topic topic = inflightMsg.getTopic();
         InterceptAcknowledgedMessage wrapped = new InterceptAcknowledgedMessage(inflightMsg, topic, username, messageID);
         m_interceptor.notifyMessageAcknowledged(wrapped);
     }
@@ -481,7 +481,7 @@ public class ProtocolProcessor {
         byte[] payloadContent = readBytesAndRewind(payload);
 
         IMessagesStore.StoredMessage stored = new IMessagesStore.StoredMessage(payloadContent,
-                msg.fixedHeader().qosLevel(), msg.variableHeader().topicName());
+                msg.fixedHeader().qosLevel(), new Topic(msg.variableHeader().topicName()));
         stored.setRetained(msg.fixedHeader().isRetain());
         return stored;
     }
@@ -528,34 +528,20 @@ public class ProtocolProcessor {
      */
     public void internalPublish(MqttPublishMessage msg, final String clientId) {
         final MqttQoS qos = msg.fixedHeader().qosLevel();
-        final Topic topic = new Topic(msg.variableHeader().topicName());
-        LOG.info("Sending PUBLISH message. Topic={}, qos={}", topic, qos);
 
-        MessageGUID guid = null;
         IMessagesStore.StoredMessage toStoreMsg = asStoredMessage(msg);
+        LOG.info("Sending PUBLISH message. Topic={}, qos={}", toStoreMsg.getTopic(), qos);
         if (clientId == null || clientId.isEmpty()) {
             toStoreMsg.setClientID("BROKER_SELF");
         } else {
             toStoreMsg.setClientID(clientId);
         }
-//        if (qos == EXACTLY_ONCE) { // QoS2
-//            guid = m_messagesStore.storePublishForFuture(toStoreMsg);
-//        }
-        this.messagesPublisher.publish2Subscribers(toStoreMsg, topic);
+        this.messagesPublisher.publish2Subscribers(toStoreMsg);
 
         if (!msg.fixedHeader().isRetain()) {
             return;
         }
-        if (qos == AT_MOST_ONCE || msg.payload().readableBytes() == 0) {
-            // QoS == 0 && retain => clean old retained
-            m_messagesStore.cleanRetained(topic);
-            return;
-        }
-//        if (guid == null) {
-//            // before wasn't stored
-//            guid = m_messagesStore.storePublishForFuture(toStoreMsg);
-//        }
-        m_messagesStore.storeRetained(topic, toStoreMsg);
+        m_messagesStore.storeRetained(toStoreMsg);
     }
 
     /**
@@ -567,13 +553,11 @@ public class ProtocolProcessor {
          // NB it's a will publish, it needs a PacketIdentifier for this conn, default to 1
          IMessagesStore.StoredMessage tobeStored = asStoredMessage(will);
          tobeStored.setClientID(clientID);
-         Topic topic = new Topic(tobeStored.getTopic());
-         this.messagesPublisher.publish2Subscribers(tobeStored, topic);
+         this.messagesPublisher.publish2Subscribers(tobeStored);
 
          //Stores retained message to the topic
- 	    if(will.isRetained()) {
- 	    	m_messagesStore.storeRetained(topic, tobeStored);
- 	    }
+         if(will.isRetained())
+             m_messagesStore.storeRetained(tobeStored);
      }
 
     static MqttQoS lowerQosToTheSubscriptionDesired(Subscription sub, MqttQoS qos) {
@@ -619,7 +603,7 @@ public class ProtocolProcessor {
         ClientSession targetSession = m_sessionsStore.sessionForClient(clientID);
         StoredMessage inflightMsg = targetSession.secondPhaseAcknowledged(messageID);
         String username = NettyUtils.userName(channel);
-        String topic = inflightMsg.getTopic();
+        Topic topic = inflightMsg.getTopic();
         m_interceptor
                 .notifyMessageAcknowledged(new InterceptAcknowledgedMessage(inflightMsg, topic, username, messageID));
     }

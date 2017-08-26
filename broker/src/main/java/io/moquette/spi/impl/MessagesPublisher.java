@@ -46,32 +46,32 @@ class MessagesPublisher {
         this.subscriptions = subscriptions;
     }
 
-    static MqttPublishMessage notRetainedPublish(String topic, MqttQoS qos, ByteBuf message) {
+    static MqttPublishMessage notRetainedPublish(Topic topic, MqttQoS qos, ByteBuf message) {
         return notRetainedPublishWithMessageId(topic, qos, message, 0);
     }
 
-    private static MqttPublishMessage notRetainedPublishWithMessageId(String topic, MqttQoS qos, ByteBuf message,
+    private static MqttPublishMessage notRetainedPublishWithMessageId(Topic topic, MqttQoS qos, ByteBuf message,
             int messageId) {
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, false, 0);
-        MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId);
+        MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic.toString(), messageId);
         return new MqttPublishMessage(fixedHeader, varHeader, message);
     }
 
-    void publish2Subscribers(IMessagesStore.StoredMessage pubMsg, Topic topic, int messageID) {
+    void publish2Subscribers(IMessagesStore.StoredMessage pubMsg, int messageID) {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Sending publish message to subscribers. ClientId={}, topic={}, messageId={}, payload={}, " +
-                    "subscriptionTree={}", pubMsg.getClientID(), topic, messageID, DebugUtils.payload2Str(pubMsg.getPayload()),
-                subscriptions.dumpTree());
+                    "subscriptionTree={}", pubMsg.getClientID(), pubMsg.getTopic(), messageID,
+                    new String(pubMsg.getPayloadArray()), subscriptions.dumpTree());
         } else {
-            LOG.info("Sending publish message to subscribers. ClientId={}, topic={}, messageId={}", pubMsg.getClientID(), topic,
-                messageID);
+            LOG.info("Sending publish message to subscribers. ClientId={}, topic={}, messageId={}",
+                    pubMsg.getClientID(), pubMsg.getTopic(), messageID);
         }
-        publish2Subscribers(pubMsg, topic);
+        publish2Subscribers(pubMsg);
     }
 
-    void publish2Subscribers(IMessagesStore.StoredMessage pubMsg, Topic topic) {
+    void publish2Subscribers(IMessagesStore.StoredMessage pubMsg) {
+        final Topic topic = pubMsg.getTopic();
         List<Subscription> topicMatchingSubscriptions = subscriptions.matches(topic);
-        final String topic1 = pubMsg.getTopic();
         final MqttQoS publishingQos = pubMsg.getQos();
         final ByteBuf origPayload = pubMsg.getPayload();
 
@@ -92,9 +92,9 @@ class MessagesPublisher {
                     // QoS 1 or 2
                     int messageId = targetSession.inFlightAckWaiting(pubMsg);
                     // set the PacketIdentifier only for QoS > 0
-                    publishMsg = notRetainedPublishWithMessageId(topic1, qos, payload, messageId);
+                    publishMsg = notRetainedPublishWithMessageId(topic, qos, payload, messageId);
                 } else {
-                    publishMsg = notRetainedPublish(topic1, qos, payload);
+                    publishMsg = notRetainedPublish(topic, qos, payload);
                 }
                 this.messageSender.sendPublish(targetSession, publishMsg);
             } else {

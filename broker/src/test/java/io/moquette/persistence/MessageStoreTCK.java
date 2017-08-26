@@ -29,10 +29,11 @@ public abstract class MessageStoreTCK {
     @Test
     public void testDropMessagesInSessionDoesntCleanAnyRetainedStoredMessages() {
         final ClientSession session = sessionsStore.createNewSession(TEST_CLIENT, true);
-        StoredMessage publishToStore = new StoredMessage("Hello".getBytes(), EXACTLY_ONCE, "/topic");
+
+        StoredMessage publishToStore = new StoredMessage("Hello".getBytes(), EXACTLY_ONCE, new Topic("/topic"));
         publishToStore.setClientID(TEST_CLIENT);
         publishToStore.setRetained(true);
-        messagesStore.storeRetained(new Topic("/topic"), publishToStore);
+        messagesStore.storeRetained(publishToStore);
 
         // Exercise
         session.cleanSession();
@@ -50,10 +51,10 @@ public abstract class MessageStoreTCK {
 
     @Test
     public void testStoreRetained() {
-        StoredMessage msgStored = new StoredMessage("Hello".getBytes(), MqttQoS.AT_LEAST_ONCE, "/topic");
+        StoredMessage msgStored = new StoredMessage("Hello".getBytes(), MqttQoS.AT_LEAST_ONCE, asTopic("/topic"));
         msgStored.setClientID(TEST_CLIENT);
 
-        messagesStore.storeRetained(asTopic("/topic"), msgStored);
+        messagesStore.storeRetained(msgStored);
 
         //Verify the message is in the store
         StoredMessage msgRetrieved = messagesStore.searchMatching(new IMatchingCondition() {

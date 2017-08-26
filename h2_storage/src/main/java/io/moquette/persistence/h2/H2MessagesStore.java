@@ -19,6 +19,7 @@ package io.moquette.persistence.h2;
 import io.moquette.spi.IMatchingCondition;
 import io.moquette.spi.IMessagesStore;
 import io.moquette.spi.impl.subscriptions.Topic;
+import io.netty.handler.codec.mqtt.MqttQoS;
 import org.h2.mvstore.Cursor;
 import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVStore;
@@ -45,12 +46,15 @@ class H2MessagesStore implements IMessagesStore {
     }
 
     @Override
-    public void storeRetained(Topic topic, StoredMessage storedMessage) {
-        LOG.debug("Store retained message for topic={}, CId={}", topic, storedMessage.getClientID());
-        if (storedMessage.getClientID() == null) {
+    public void storeRetained(StoredMessage storedMessage) {
+        LOG.debug("Store retained message for topic={}, CId={}", storedMessage.getTopic(), storedMessage.getClientID());
+        if (storedMessage.getClientID() == null)
             throw new IllegalArgumentException("Message to be persisted must have a not null client ID");
-        }
-        retainedStore.put(topic, storedMessage);
+
+        if (storedMessage.getQos() != MqttQoS.AT_MOST_ONCE && storedMessage.getPayloadArray().length > 0)
+            retainedStore.put(storedMessage.getTopic(), storedMessage);
+        else
+            cleanRetained(storedMessage.getTopic());
     }
 
     @Override
