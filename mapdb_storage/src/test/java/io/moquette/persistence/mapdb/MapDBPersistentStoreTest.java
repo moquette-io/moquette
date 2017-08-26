@@ -20,8 +20,6 @@ import io.moquette.BrokerConstants;
 import io.moquette.persistence.MessageStoreTCK;
 import io.moquette.server.config.IConfig;
 import io.moquette.server.config.MemoryConfig;
-import io.moquette.spi.IMessagesStore.StoredMessage;
-import io.netty.handler.codec.mqtt.MqttQoS;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -76,41 +74,6 @@ public class MapDBPersistentStoreTest extends MessageStoreTCK {
             new File(fileName + ".t").delete();
         }
         assertFalse(dbFile.exists());
-    }
-
-    @Test
-    public void testNextPacketID_notExistingClientSession() {
-        int packetId = sessionsStore.nextPacketID("NOT_EXISTING_CLI");
-        assertEquals(1, packetId);
-    }
-
-    @Test
-    public void testNextPacketID_existingClientSession() {
-        // Force creation of inflight map for the CLIENT session
-        int packetId = sessionsStore.nextPacketID("CLIENT");
-        assertEquals(1, packetId);
-
-        // request a second packetID
-        packetId = sessionsStore.nextPacketID("CLIENT");
-        assertEquals(2, packetId);
-    }
-
-    @Test
-    public void testNextPacketID() {
-        StoredMessage msgStored = new StoredMessage("Hello".getBytes(), MqttQoS.AT_LEAST_ONCE, "/topic");
-        msgStored.setClientID(TEST_CLIENT);
-
-        // request a first ID
-        int packetId = sessionsStore.nextPacketID("CLIENT");
-        sessionsStore.inFlight("CLIENT", packetId, msgStored); // simulate an inflight
-        assertEquals(1, packetId);
-
-        // release the ID
-        sessionsStore.inFlightAck("CLIENT", packetId);
-
-        // request a second packetID, counter restarts from 0
-        packetId = sessionsStore.nextPacketID("CLIENT");
-        assertEquals(1, packetId);
     }
 
     @Test

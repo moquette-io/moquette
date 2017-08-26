@@ -43,8 +43,9 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
         final AtomicReference<PersistentSession> persistentSession = new AtomicReference<>(null);
         final BlockingQueue<StoredMessage> queue = new ArrayBlockingQueue<>(Constants.MAX_MESSAGE_QUEUE);
         final Map<Integer, StoredMessage> secondPhaseStore = new ConcurrentHashMap<>();
-        final Map<Integer, StoredMessage> outboundFlightMessages =
-                Collections.synchronizedMap(new HashMap<Integer, StoredMessage>());
+
+        // @GuardedBy("outboundFlightMessages")
+        final Map<Integer, StoredMessage> outboundFlightMessages = new HashMap<>();
         final Map<Integer, StoredMessage> inboundFlightMessages = new ConcurrentHashMap<>();
 
         Session(String clientID, ClientSession clientSession) {
@@ -191,7 +192,14 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
 
     @Override
     public StoredMessage inFlightAck(String clientID, int messageID) {
-        return getSession(clientID).outboundFlightMessages.remove(messageID);
+        Session session = getSession(clientID);
+        if (session == null) {
+            LOG.error("Can't find the session for client <{}>", clientID);
+            return null;
+        }
+        synchronized (session.outboundFlightMessages) {
+            return session.outboundFlightMessages.remove(messageID);
+        }
     }
 
     @Override
@@ -202,7 +210,9 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
             return;
         }
 
-        session.outboundFlightMessages.put(messageID, msg);
+        synchronized (session.outboundFlightMessages) {
+            session.outboundFlightMessages.put(messageID, msg);
+        }
     }
 
     /**
@@ -210,16 +220,19 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
      */
     @Override
     public int nextPacketID(String clientID) {
-        if (!sessions.containsKey(clientID)) {
+        Session session = sessions.get(clientID);
+        if (session == null) {
             LOG.error("Can't find the session for client <{}>", clientID);
-            return -1;
+            return 1;
         }
 
-        Map<Integer, StoredMessage> m = sessions.get(clientID).outboundFlightMessages;
-        int maxId = m.keySet().isEmpty() ? 0 : Collections.max(m.keySet());
-        int nextPacketId = (maxId + 1) % 0xFFFF;
-        m.put(nextPacketId, null);
-        return nextPacketId;
+        synchronized (session.outboundFlightMessages) {
+            Map<Integer, StoredMessage> m = session.outboundFlightMessages;
+            int maxId = m.keySet().isEmpty() ? 0 : Collections.max(m.keySet());
+            int nextPacketId = (maxId % 0xFFFF) + 1;
+            m.put(nextPacketId, null);
+            return nextPacketId;
+        }
     }
 
     @Override
@@ -247,7 +260,9 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
         }
 
         session.secondPhaseStore.put(messageID, msg);
-        session.outboundFlightMessages.put(messageID, msg);
+        synchronized (session.outboundFlightMessages) {
+            session.outboundFlightMessages.put(messageID, msg);
+        }
     }
 
     @Override
@@ -264,8 +279,12 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
             return 0;
         }
 
-        return session.inboundFlightMessages.size() + session.secondPhaseStore.size()
-            + session.outboundFlightMessages.size();
+        int outbound = 0;
+        synchronized (session.outboundFlightMessages) {
+            outbound = session.outboundFlightMessages.size();
+        }
+
+        return session.inboundFlightMessages.size() + session.secondPhaseStore.size() + outbound;
     }
 
     @Override
@@ -315,7 +334,9 @@ public class MemorySessionStore implements ISessionsStore, ISubscriptionsStore {
         LOG.info("Removing stored messages with QoS 1 and 2. ClientId={}", clientID);
 
         session.secondPhaseStore.clear();
-        session.outboundFlightMessages.clear();
+        synchronized (session.outboundFlightMessages) {
+            session.outboundFlightMessages.clear();
+        }
         session.inboundFlightMessages.clear();
 
         LOG.info("Wiping existing subscriptions. ClientId={}", clientID);

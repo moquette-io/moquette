@@ -23,12 +23,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class MemoryMessagesStore implements IMessagesStore {
 
     private static final Logger LOG = LoggerFactory.getLogger(MemoryMessagesStore.class);
 
-    private Map<Topic, StoredMessage> m_retainedStore = new HashMap<>();
+    private Map<Topic, StoredMessage> m_retainedStore = new ConcurrentHashMap<>();
 
     MemoryMessagesStore() {
     }

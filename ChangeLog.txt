@@ -2,7 +2,9 @@ Version 0.10:
     Netty epoll system added
     Separated in memory and MapDB storage implementations
     Cleanly separated inflight part (inbound and outbound)
-    
+    New MapDB file layout
+    Fixes bug #208
+    Fixes bug #237
 
 Version 0.9:
     Moved canRead check to topic from publish phase to subscribe (#144)

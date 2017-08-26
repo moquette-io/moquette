@@ -72,7 +72,7 @@ public abstract class MessageStoreTCK {
 
     @Test
     public void givenSubscriptionAlreadyStoredIsOverwrittenByAnotherWithSameTopic() {
-        ClientSession session1 = sessionsStore.createNewSession("SESSION_ID_1", true);
+        ClientSession session1 = sessionsStore.createNewSession(TEST_CLIENT, true);
 
         // Subscribe on /topic with QOSType.MOST_ONE
         Subscription oldSubscription = new Subscription(session1.clientID, new Topic("/topic"), AT_MOST_ONCE);
@@ -89,4 +89,44 @@ public abstract class MessageStoreTCK {
         Subscription sub = subscriptionsStore.getSubscription(subscriptions.get(0));
         assertEquals(overridingSubscription.getRequestedQos(), sub.getRequestedQos());
     }
+
+    @Test
+    public void testNextPacketID_notExistingClientSession() {
+        int packetId = sessionsStore.nextPacketID("NOT_EXISTING_CLI");
+        assertEquals(1, packetId);
+    }
+
+    @Test
+    public void testNextPacketID_existingClientSession() {
+        sessionsStore.createNewSession(TEST_CLIENT, true);
+
+        // Force creation of inflight map for the CLIENT session
+        int packetId = sessionsStore.nextPacketID(TEST_CLIENT);
+        assertEquals(1, packetId);
+
+        // request a second packetID
+        packetId = sessionsStore.nextPacketID(TEST_CLIENT);
+        assertEquals(2, packetId);
+    }
+
+    @Test
+    public void testNextPacketID() {
+        sessionsStore.createNewSession(TEST_CLIENT, true);
+
+        StoredMessage msgStored = new StoredMessage("Hello".getBytes(), MqttQoS.AT_LEAST_ONCE, "/topic");
+        msgStored.setClientID(TEST_CLIENT);
+
+        // request a first ID
+        int packetId = sessionsStore.nextPacketID(TEST_CLIENT);
+        sessionsStore.inFlight(TEST_CLIENT, packetId, msgStored); // simulate an inflight
+        assertEquals(1, packetId);
+
+        // release the ID
+        sessionsStore.inFlightAck(TEST_CLIENT, packetId);
+
+        // request a second packetID, counter restarts from 0
+        packetId = sessionsStore.nextPacketID(TEST_CLIENT);
+        assertEquals(1, packetId);
+    }
+
 }
