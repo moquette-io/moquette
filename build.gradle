@@ -38,6 +38,10 @@ subprojects {
     resolutionStrategy.force 'com.google.errorprone:error_prone_core:2.0.14'
   }
 
+  tasks.withType(JavaCompile) {
+    options.compilerArgs += [ '-Xep:DefaultCharset:OFF' ]
+  }
+
   ext {
     nettyVersion = '4.1.12.Final'
   }

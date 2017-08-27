@@ -1,6 +1,11 @@
 
 description = 'Moquette - broker'
 
+apply plugin: 'application'
+
+mainClassName = "io.moquette.server.Server"
+applicationDefaultJvmArgs = [ '-Dfile.encoding=UTF-8' , '-Dlog4j.configuration=file:src/test/resources/log4j.properties']
+
 dependencies {
     compile group: 'io.netty', name: 'netty-common', version: nettyVersion
     compile group: 'io.netty', name: 'netty-buffer', version: nettyVersion
@@ -23,6 +28,8 @@ dependencies {
     compile group: 'commons-codec', name: 'commons-codec', version:'1.10'
     // compile group: 'org.hdrhistogram', name: 'HdrHistogram', version:'2.1.4'
     compile group: 'com.hazelcast', name: 'hazelcast', version:'3.5.4'
+
+    compile group: 'org.slf4j', name: 'slf4j-log4j12', version:'1.7.5'
 
     testCompile group: 'org.fusesource.mqtt-client', name: 'mqtt-client', version:'1.12'
     testCompile group: 'org.eclipse.paho', name: 'org.eclipse.paho.client.mqttv3', version:'1.0.2'

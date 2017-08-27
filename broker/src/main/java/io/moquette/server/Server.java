@@ -164,6 +164,10 @@ public class Server {
 
     public void startServer(IConfig config, List<? extends InterceptHandler> handlers, ISslContextCreator sslCtxCreator,
             IAuthenticator authenticator, IAuthorizator authorizator) throws IOException {
+
+        if (!"UTF-8".equals(System.getProperty("file.encoding")))
+            LOG.error("file.encoding: {}", System.getProperty("file.encoding", "Not set!"));
+
         if (handlers == null) {
             handlers = Collections.emptyList();
         }
