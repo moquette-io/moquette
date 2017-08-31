@@ -16,6 +16,7 @@
 
 package io.moquette.server;
 
+import io.moquette.interception.AbstractInterceptHandler;
 import io.moquette.server.config.IConfig;
 import io.moquette.server.config.MemoryConfig;
 import org.fusesource.mqtt.client.*;
@@ -27,7 +28,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+
 import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
 
 public class ServerIntegrationFuseTest {
 
@@ -71,6 +74,9 @@ public class ServerIntegrationFuseTest {
     public void checkWillTestamentIsPublishedOnConnectionKill_noRetain() throws Exception {
         LOG.info("checkWillTestamentIsPublishedOnConnectionKill_noRetain");
 
+        TestInterceptHandler tih = spy(new TestInterceptHandler());
+        m_server.addInterceptHandler(tih);
+
         String willTestamentTopic = "/will/test";
         String willTestamentMsg = "Bye bye";
 
@@ -99,5 +105,18 @@ public class ServerIntegrationFuseTest {
         assertNotNull("We should get notified with 'Will' message", msg);
         msg.ack();
         assertEquals(willTestamentMsg, new String(msg.getPayload()));
+
+        verify(tih, times(2)).onConnect(any());
+        verify(tih).onPublish(any());
+        verify(tih).onConnectionLost(any());
+        verify(tih, times(0)).onDisconnect(any());
+    }
+
+    class TestInterceptHandler extends AbstractInterceptHandler {
+
+        @Override
+        public String getID() {
+            return "test";
+        }
     }
 }

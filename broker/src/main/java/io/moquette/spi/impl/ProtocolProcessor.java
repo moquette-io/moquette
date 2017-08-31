@@ -29,6 +29,7 @@ import io.moquette.spi.impl.subscriptions.Topic;
 import io.moquette.spi.security.IAuthenticator;
 import io.moquette.spi.security.IAuthorizator;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.mqtt.*;
@@ -531,7 +532,6 @@ public class ProtocolProcessor {
         final Topic topic = new Topic(msg.variableHeader().topicName());
         LOG.info("Sending PUBLISH message. Topic={}, qos={}", topic, qos);
 
-        MessageGUID guid = null;
         IMessagesStore.StoredMessage toStoreMsg = asStoredMessage(msg);
         if (clientId == null || clientId.isEmpty()) {
             toStoreMsg.setClientID("BROKER_SELF");
@@ -561,20 +561,25 @@ public class ProtocolProcessor {
     /**
      * Specialized version to publish will testament message.
      */
-     private void forwardPublishWill(WillMessage will, String clientID) {
-         LOG.info("Publishing will message. CId={}, topic={}", clientID, will.getTopic());
-         // it has just to publish the message downstream to the subscribers
-         // NB it's a will publish, it needs a PacketIdentifier for this conn, default to 1
-         IMessagesStore.StoredMessage tobeStored = asStoredMessage(will);
-         tobeStored.setClientID(clientID);
-         Topic topic = new Topic(tobeStored.getTopic());
-         this.messagesPublisher.publish2Subscribers(tobeStored, topic);
+    private void forwardPublishWill(WillMessage will, String clientID, String username) {
+        LOG.info("Publishing will message. CId={}, topic={}", clientID, will.getTopic());
+        // it has just to publish the message downstream to the subscribers
+        // NB it's a will publish, it needs a PacketIdentifier for this conn, default to 1
+        IMessagesStore.StoredMessage tobeStored = asStoredMessage(will);
+        tobeStored.setClientID(clientID);
+        Topic topic = new Topic(tobeStored.getTopic());
+        this.messagesPublisher.publish2Subscribers(tobeStored, topic);
 
-         //Stores retained message to the topic
- 	    if(will.isRetained()) {
- 	    	m_messagesStore.storeRetained(topic, tobeStored);
- 	    }
-     }
+        MqttPublishMessage msg = MqttMessageBuilders.publish().payload(Unpooled.wrappedBuffer(will.payload))
+                .qos(will.qos).retained(will.isRetained()).topicName(will.getTopic()).build();
+
+        m_interceptor.notifyTopicPublished(msg, clientID, username);
+
+        // Stores retained message to the topic
+        if (will.isRetained()) {
+            m_messagesStore.storeRetained(topic, tobeStored);
+        }
+    }
 
     static MqttQoS lowerQosToTheSubscriptionDesired(Subscription sub, MqttQoS qos) {
         if (qos.value() > sub.getRequestedQos().value()) {
@@ -721,14 +726,15 @@ public class ProtocolProcessor {
         LOG.info("Processing connection lost event. CId={}", clientID);
         ConnectionDescriptor oldConnDescr = new ConnectionDescriptor(clientID, channel, true);
         connectionDescriptors.removeConnection(oldConnDescr);
+        String username = NettyUtils.userName(channel);
+
         // publish the Will message (if any) for the clientID
         if (m_willStore.containsKey(clientID)) {
             WillMessage will = m_willStore.get(clientID);
-            forwardPublishWill(will, clientID);
+            forwardPublishWill(will, clientID, username);
             m_willStore.remove(clientID);
         }
 
-        String username = NettyUtils.userName(channel);
         m_interceptor.notifyClientConnectionLost(clientID, username);
     }
 
@@ -920,7 +926,7 @@ public class ProtocolProcessor {
                 emptyQueue = true;
             } else {
                 // recreate a publish from stored publish in queue
-                MqttPublishMessage pubMsg = createPublishForQos( msg.getTopic(), msg.getQos(), msg.getPayload(),
+                MqttPublishMessage pubMsg = createPublishForQos(msg.getTopic(), msg.getQos(), msg.getPayload(),
                         msg.isRetained(), 0);
                 channel.write(pubMsg);
             }
