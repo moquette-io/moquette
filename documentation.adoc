@@ -59,6 +59,13 @@ After a git clone of the repository, cd into the cloned sources and: `mvn clean 
 In distribution/target directory will be produced the self-contained tar for the broker with all dependencies and a
 running script.
 
+=== Embedding inside Android
+
+Some people seems to be able to run Moquette in Android applications. Two thing needs to be configured in Android project:
+- add the permission WRITE_EXTERNAL_STORAGE in the manifest
+- change in the gradle file the targetSdkVersion from 26 to 22 
+Check the issue #338 for details.
+
 
 == Credentials management
 Credential management is inspired from Mosquitto, so there is a file named ```conf/moquette.conf``` which contains
