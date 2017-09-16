@@ -428,6 +428,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <ul class="sectlevel2">
 <li><a href="#_embedding_into_other_projects">Embedding into other projects</a></li>
 <li><a href="#_build_from_sources">Build from sources</a></li>
+<li><a href="#_embedding_inside_android">Embedding inside Android</a></li>
 </ul>
 </li>
 <li><a href="#_credentials_management">Credentials management</a>
@@ -526,6 +527,17 @@ cd bin
 <p>After a git clone of the repository, cd into the cloned sources and: <code>mvn clean package</code>.
 In distribution/target directory will be produced the self-contained tar for the broker with all dependencies and a
 running script.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_embedding_inside_android">Embedding inside Android</h3>
+<div class="paragraph">
+<p>Some people seems to be able to run Moquette in Android applications. Two thing needs to be configured in Android project:
+- add the permission WRITE_EXTERNAL_STORAGE in the manifest
+- change in the gradle file the targetSdkVersion from 26 to 22.</p>
+</div>
+<div class="paragraph">
+<p>Check the <a href="https://github.com/andsel/moquette/issues/338">issue #338</a> for details.</p>
 </div>
 </div>
 </div>
@@ -771,7 +783,7 @@ instantiation method named <code><code>getInstance</code></code>.</p>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-06-10 19:21:38 CEST
+Last updated 2017-09-16 15:51:31 CEST
 </div>
 </div>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/8.9.1/styles/github.min.css">
