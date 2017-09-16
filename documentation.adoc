@@ -62,8 +62,9 @@ running script.
 === Embedding inside Android
 
 Some people seems to be able to run Moquette in Android applications. Two thing needs to be configured in Android project:
-- add the permission WRITE_EXTERNAL_STORAGE in the manifest
-- change in the gradle file the targetSdkVersion from 26 to 22.
+
+* add the permission `WRITE_EXTERNAL_STORAGE` in the Manifest.mf
+* change in the gradle file the `targetSdkVersion` from 26 to 22
 
 Check the https://github.com/andsel/moquette/issues/338[issue #338] for details.
 
