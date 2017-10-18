@@ -12,7 +12,8 @@
  * http://www.opensource.org/licenses/apache2.0.php
  *
  * You may elect to redistribute this code under either of these licenses.
- */package io.moquette.spi.impl.subscriptions;
+ */
+package io.moquette.spi.impl.subscriptions;
 
 import io.moquette.persistence.MemoryStorageService;
 import io.moquette.spi.ClientSession;

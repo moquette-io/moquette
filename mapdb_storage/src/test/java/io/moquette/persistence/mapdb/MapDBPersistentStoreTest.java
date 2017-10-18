@@ -70,7 +70,7 @@ public class MapDBPersistentStoreTest extends MessageStoreTCK {
         cleanPersistenceFile(BrokerConstants.DEFAULT_PERSISTENT_PATH);
     }
 
-    public static void cleanPersistenceFile(String fileName) {
+    static void cleanPersistenceFile(String fileName) {
         File dbFile = new File(fileName);
         if (dbFile.exists()) {
             dbFile.delete();
