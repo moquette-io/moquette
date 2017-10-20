@@ -855,7 +855,15 @@ public class ProtocolProcessor {
         final int messageId = messageId(msg);
         for (MqttTopicSubscription req : msg.payload().topicSubscriptions()) {
             Topic topic = new Topic(req.topicName());
-            if (!m_authorizator.canRead(topic, username, clientSession.clientID)) {
+            boolean canRead = false;
+            try {
+                canRead = m_authorizator.canRead(topic, username, clientSession.clientID);
+            } catch (Exception e) {
+                LOG.error("Caught exception calling canRead, please wrap and return false instead of throwing an excecption", e);
+                canRead = false;
+            }
+
+            if (!canRead) {
                 // send SUBACK with 0x80, the user hasn't credentials to read the topic
                 LOG.error("Client does not have read permissions on the topic CId={}, username={}, messageId={}, " +
                     "topic={}", clientID, username, messageId, topic);

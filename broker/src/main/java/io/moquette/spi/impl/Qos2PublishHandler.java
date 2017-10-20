@@ -28,6 +28,7 @@ import io.netty.channel.Channel;
 import io.netty.handler.codec.mqtt.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.rmi.runtime.Log;
 
 import static io.moquette.spi.impl.DebugUtils.payload2Str;
 import static io.moquette.spi.impl.ProtocolProcessor.asStoredMessage;
@@ -64,7 +65,16 @@ class Qos2PublishHandler extends QosPublishHandler {
         // check if the topic can be wrote
         String clientID = NettyUtils.clientID(channel);
         String username = NettyUtils.userName(channel);
-        if (!m_authorizator.canWrite(topic, username, clientID)) {
+
+        boolean canWrite = false;
+
+        try {
+            canWrite = m_authorizator.canWrite(topic, username, clientID);
+        } catch (Exception e)  {
+            LOG.error("Caught exception from canWrite, please wrap and return false instead throwing", e);
+        }
+
+        if (!canWrite) {
             LOG.error("MQTT client is not authorized to publish on topic. CId={}, topic={}", clientID, topic);
             return;
         }
