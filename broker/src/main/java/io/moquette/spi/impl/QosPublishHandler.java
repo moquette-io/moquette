@@ -36,10 +36,19 @@ abstract class QosPublishHandler {
     public boolean checkWriteOnTopic(Topic topic, Channel channel) {
         String clientID = NettyUtils.clientID(channel);
         String username = NettyUtils.userName(channel);
-        if (!m_authorizator.canWrite(topic, username, clientID)) {
-            LOG.error("MQTT client is not authorized to publish on topic. CId={}, topic={}", clientID, topic);
-            return true;
+
+        boolean canWrite = false;
+
+        try {
+            canWrite = m_authorizator.canWrite(topic, username, clientID);
+        } catch (Exception e)  {
+            LOG.error("Caught exception from canWrite, please wrap and return false instead throwing", e);
         }
-        return false;
+
+        if (!canWrite) {
+            LOG.error("MQTT client is not authorized to publish on topic. CId={}, topic={}", clientID, topic);
+            return false;
+        }
+        return true;
     }
 }
