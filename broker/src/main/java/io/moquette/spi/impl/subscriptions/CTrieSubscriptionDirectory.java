@@ -103,7 +103,7 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Reloading all stored subscriptions. SubscriptionTree = {}", dumpTree());
         }
-        for (ClientSession session : this.sessionsRepository.getAllSessions()) {
+        for (ClientSession session : this.sessionsRepository.getAllSessions(false)) {
             for (Subscription subscription : session.getSubscriptions()) {
                 LOG.info("Re-subscribing client to topic CId={}, topicFilter={}", subscription.clientId,
                     subscription.topicFilter);
