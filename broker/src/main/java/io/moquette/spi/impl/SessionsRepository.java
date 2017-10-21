@@ -100,10 +100,17 @@ public class SessionsRepository {
         return newClientSessionAndCacheIt(clientID, cleanSession);
     }
 
-    public Collection<ClientSession> getAllSessions() {
+    public Collection<ClientSession> getAllSessions(boolean includeTransient) {
         Collection<ClientSession> result = new ArrayList<>();
-        for (PersistentSession persistentSession : this.sessions.listAllSessions()) {
+        for (PersistentSession persistentSession : this.sessions.listAllSessions()) { // these seems to be persistent only
             result.add(sessionForClient(persistentSession.clientID));
+        }
+        if (includeTransient) {
+            for (ClientSession cs : this.sessionsCache.values()) { // Transient Sessions as well
+                if (cs instanceof TransientSession) {
+                    result.add(cs);
+                }
+            }
         }
         return result;
     }

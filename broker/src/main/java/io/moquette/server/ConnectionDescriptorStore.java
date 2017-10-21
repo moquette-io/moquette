@@ -129,7 +129,7 @@ public class ConnectionDescriptorStore implements IConnectionsManager {
     public Collection<MqttSession> getSessions() {
         LOG.info("Retrieving status of all sessions.");
         Collection<MqttSession> result = new ArrayList<>();
-        for (ClientSession session : this.sessionsRepository.getAllSessions()) {
+        for (ClientSession session : this.sessionsRepository.getAllSessions(true)) {
             result.add(buildMqttSession(session));
         }
         return result;
@@ -145,6 +145,7 @@ public class ConnectionDescriptorStore implements IConnectionsManager {
         result.setActiveSubscriptions(mqttSubscriptions);
         result.setCleanSession(session.isCleanSession());
         ConnectionDescriptor descriptor = this.getConnection(session.clientID);
+        result.setClientID(session.clientID);
         if (descriptor != null) {
             result.setConnectionEstablished(true);
             BytesMetrics bytesMetrics = descriptor.getBytesMetrics();

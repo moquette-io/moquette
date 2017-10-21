@@ -15,6 +15,9 @@
  */
 package io.moquette.spi.impl.subscriptions;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.concurrent.atomic.AtomicReference;
 
 class INode {
@@ -22,6 +25,9 @@ class INode {
 
     INode(CNode mainNode) {
         this.mainNode.set(mainNode);
+        if (mainNode instanceof TNode) { // this should never happen
+            throw new IllegalStateException("TNode should not be set on mainNnode");
+        }
     }
 
     boolean compareAndSet(CNode old, CNode newNode) {
@@ -34,5 +40,9 @@ class INode {
 
     CNode mainNode() {
         return this.mainNode.get();
+    }
+
+    boolean isTombed() {
+        return this.mainNode() instanceof TNode;
     }
 }

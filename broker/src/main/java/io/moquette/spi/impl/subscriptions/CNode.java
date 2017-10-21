@@ -24,20 +24,20 @@ class CNode {
 
     Token token;
     private List<INode> children;
-    Set<Subscription> subscriptions = new HashSet<>();
+    Set<Subscription> subscriptions;
 
     //private int subtreeSubscriptions;
 
     CNode() {
-        this.children = new ArrayList<>();
-        this.subscriptions = new HashSet<>();
+        subscriptions = new HashSet<>();
+        children = new ArrayList<>();
     }
 
     //Copy constructor
     private CNode(Token token, List<INode> children, Set<Subscription> subscriptions) {
+        this.subscriptions = new HashSet<>(subscriptions);
         this.token = token;
-        this.children = children;
-        this.subscriptions = subscriptions;
+        this.children = new ArrayList<>(children);
     }
 
     boolean anyChildrenMatch(Token token) {
@@ -75,6 +75,7 @@ class CNode {
     public void add(INode newINode) {
         this.children.add(newINode);
     }
+    public void remove(INode node) { this.children.remove(node); }
 
     CNode addSubscription(String clientId, Topic topic) {
         this.subscriptions.add(new Subscription(clientId, topic));
@@ -83,6 +84,7 @@ class CNode {
 
     /**
      * @return true iff the subscriptions contained in this node are owned by clientId
+     *   AND at least one subscription is actually present for that clientId
      * */
     boolean containsOnly(String clientId) {
         for (Subscription sub : this.subscriptions) {
@@ -90,7 +92,7 @@ class CNode {
                 return false;
             }
         }
-        return true;
+        return !this.subscriptions.isEmpty();
     }
 
     //TODO this is equivalent to negate(containsOnly(clientId))

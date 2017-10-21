@@ -71,14 +71,7 @@ public class NettyMQTTHandler extends ChannelInboundHandlerAdapter {
                     m_processor.processPubAck(ctx.channel(), (MqttPubAckMessage) msg);
                     break;
                 case PINGREQ:
-                    MqttFixedHeader pingHeader = new MqttFixedHeader(
-                            MqttMessageType.PINGRESP,
-                            false,
-                            AT_MOST_ONCE,
-                            false,
-                            0);
-                    MqttMessage pingResp = new MqttMessage(pingHeader);
-                    ctx.writeAndFlush(pingResp);
+                    m_processor.processPingRequest(ctx.channel(), msg);
                     break;
                 default:
                     LOG.error("Unkonwn MessageType:{}", messageType);

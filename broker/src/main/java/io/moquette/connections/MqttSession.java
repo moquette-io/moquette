@@ -31,6 +31,7 @@ public class MqttSession {
     private int secondPhaseAckPendingMessages;
     private Collection<MqttSubscription> activeSubscriptions;
     private MqttConnectionMetrics connectionMetrics;
+    private String clientID;
 
     public boolean isConnectionEstablished() {
         return connectionEstablished;
@@ -88,4 +89,9 @@ public class MqttSession {
         this.connectionMetrics = connectionMetrics;
     }
 
+    public String getClientID() { return clientID; }
+
+    public void setClientID(String clientID) {
+        this.clientID = clientID;
+    }
 }
