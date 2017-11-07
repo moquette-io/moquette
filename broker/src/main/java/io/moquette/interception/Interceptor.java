@@ -47,6 +47,8 @@ public interface Interceptor {
 
     void notifyMessageAcknowledged(InterceptAcknowledgedMessage msg);
 
+    void notifyPublishedToSubscriber(MqttPublishMessage msg, String clientID, String username, Subscription subscription);
+
     void addInterceptHandler(InterceptHandler interceptHandler);
 
     void removeInterceptHandler(InterceptHandler interceptHandler);

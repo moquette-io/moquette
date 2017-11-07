@@ -164,6 +164,25 @@ final class BrokerInterceptor implements Interceptor {
     }
 
     @Override
+    public void notifyPublishedToSubscriber(MqttPublishMessage msg, String clientID, String username, Subscription subscription) {
+        msg.retain();
+
+        executor.execute(() -> {
+            try {
+                int messageId = msg.variableHeader().messageId();
+                String topic = msg.variableHeader().topicName();
+                for (InterceptHandler handler : handlers.get(InterceptPublishMessage.class)) {
+                    LOG.debug("Notifying MQTT PUBLISH Subscription to interceptor. CId={}, messageId={}, topic={}, SId: {}"
+                        + "interceptorId={}", clientID, messageId, topic, subscription.getClientId(), handler.getID());
+                    handler.onPublishedToSubscriber(new InterceptPublishMessage(msg, clientID, username), subscription);
+                }
+            } finally {
+                ReferenceCountUtil.release(msg);
+            }
+        });
+    }
+
+    @Override
     public void addInterceptHandler(InterceptHandler interceptHandler) {
         Class<?>[] interceptedMessageTypes = getInterceptedMessageTypes(interceptHandler);
         LOG.info("Adding MQTT message interceptor. InterceptorId={}, handledMessageTypes={}",

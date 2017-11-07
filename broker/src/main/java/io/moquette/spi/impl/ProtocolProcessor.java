@@ -501,7 +501,7 @@ public class ProtocolProcessor {
         } else {
             toStoreMsg.setClientID(clientId);
         }
-        this.messagesPublisher.publish2Subscribers(toStoreMsg, topic);
+        List<Subscription> subs = this.messagesPublisher.publish2Subscribers(toStoreMsg, topic);
 
         if (!msg.fixedHeader().isRetain()) {
             return;
@@ -512,6 +512,10 @@ public class ProtocolProcessor {
             return;
         }
         m_messagesStore.storeRetained(topic, toStoreMsg);
+
+        for (Subscription sub : subs) {
+            m_interceptor.notifyPublishedToSubscriber(msg, toStoreMsg.getClientID(), null, sub);
+        }
     }
 
     /**

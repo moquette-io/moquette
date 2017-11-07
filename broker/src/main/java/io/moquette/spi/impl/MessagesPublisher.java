@@ -27,6 +27,7 @@ import io.netty.handler.codec.mqtt.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static io.moquette.spi.impl.ProtocolProcessor.lowerQosToTheSubscriptionDesired;
@@ -59,7 +60,7 @@ class MessagesPublisher {
         return new MqttPublishMessage(fixedHeader, varHeader, message);
     }
 
-    void publish2Subscribers(IMessagesStore.StoredMessage pubMsg, Topic topic, int messageID) {
+    List<Subscription> publish2Subscribers(IMessagesStore.StoredMessage pubMsg, Topic topic, int messageID) {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Sending publish message to subscribers. ClientId={}, topic={}, messageId={}, payload={}, " +
                     "subscriptionTree={}", pubMsg.getClientID(), topic, messageID, DebugUtils.payload2Str(pubMsg.getPayload()),
@@ -68,15 +69,16 @@ class MessagesPublisher {
             LOG.info("Sending publish message to subscribers. ClientId={}, topic={}, messageId={}", pubMsg.getClientID(), topic,
                 messageID);
         }
-        publish2Subscribers(pubMsg, topic);
+        return publish2Subscribers(pubMsg, topic);
     }
 
-    void publish2Subscribers(IMessagesStore.StoredMessage pubMsg, Topic topic) {
+    List<Subscription> publish2Subscribers(IMessagesStore.StoredMessage pubMsg, Topic topic) {
         List<Subscription> topicMatchingSubscriptions = subscriptions.matches(topic);
         final String topic1 = pubMsg.getTopic();
         final MqttQoS publishingQos = pubMsg.getQos();
         final ByteBuf origPayload = pubMsg.getPayload();
 
+        List<Subscription> publishedSubscribers = new ArrayList<>();
         for (final Subscription sub : topicMatchingSubscriptions) {
             MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
             ClientSession targetSession = this.sessionsRepository.sessionForClient(sub.getClientId());
@@ -99,6 +101,7 @@ class MessagesPublisher {
                     publishMsg = notRetainedPublish(topic1, qos, payload);
                 }
                 this.messageSender.sendPublish(targetSession, publishMsg);
+                publishedSubscribers.add(sub);
             } else {
                 if (!targetSession.isCleanSession()) {
                     LOG.debug("Storing pending PUBLISH inactive message. CId={}, topicFilter={}, qos={}",
@@ -108,6 +111,8 @@ class MessagesPublisher {
                 }
             }
         }
+
+        return publishedSubscribers;
     }
 
 }

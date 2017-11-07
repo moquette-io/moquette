@@ -23,6 +23,7 @@ import io.moquette.interception.messages.InterceptDisconnectMessage;
 import io.moquette.interception.messages.InterceptPublishMessage;
 import io.moquette.interception.messages.InterceptSubscribeMessage;
 import io.moquette.interception.messages.InterceptUnsubscribeMessage;
+import io.moquette.spi.impl.subscriptions.Subscription;
 
 /**
  * Basic abstract class usefull to avoid empty methods creation in subclasses.
@@ -60,5 +61,9 @@ public abstract class AbstractInterceptHandler implements InterceptHandler {
 
     @Override
     public void onMessageAcknowledged(InterceptAcknowledgedMessage msg) {
+    }
+
+    @Override
+    public void onPublishedToSubscriber(InterceptPublishMessage msg, Subscription subscription) {
     }
 }

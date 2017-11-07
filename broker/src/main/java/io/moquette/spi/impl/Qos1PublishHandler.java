@@ -19,6 +19,7 @@ package io.moquette.spi.impl;
 import io.moquette.server.ConnectionDescriptorStore;
 import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.IMessagesStore;
+import io.moquette.spi.impl.subscriptions.Subscription;
 import io.moquette.spi.impl.subscriptions.Topic;
 import io.moquette.spi.security.IAuthorizator;
 import io.netty.channel.Channel;
@@ -28,6 +29,8 @@ import io.netty.handler.codec.mqtt.MqttPubAckMessage;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.List;
 
 import static io.moquette.spi.impl.ProtocolProcessor.asStoredMessage;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
@@ -67,7 +70,7 @@ class Qos1PublishHandler extends QosPublishHandler {
         IMessagesStore.StoredMessage toStoreMsg = asStoredMessage(msg);
         toStoreMsg.setClientID(clientID);
 
-        this.publisher.publish2Subscribers(toStoreMsg, topic, messageID);
+        List<Subscription> subs = this.publisher.publish2Subscribers(toStoreMsg, topic, messageID);
 
         sendPubAck(clientID, messageID);
 
@@ -81,6 +84,10 @@ class Qos1PublishHandler extends QosPublishHandler {
         }
 
         m_interceptor.notifyTopicPublished(msg, clientID, username);
+
+        for (Subscription sub : subs) {
+            m_interceptor.notifyPublishedToSubscriber(msg, clientID, username, sub);
+        }
     }
 
     private void sendPubAck(String clientId, int messageID) {

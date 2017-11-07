@@ -87,6 +87,11 @@ public class BrokerInterceptorTest {
         public void onMessageAcknowledged(InterceptAcknowledgedMessage msg) {
             n.set(90);
         }
+
+        @Override
+        public void onPublishedToSubscriber(InterceptPublishMessage msg, Subscription subscription) {
+            n.set(100);
+        }
     }
 
     private static final BrokerInterceptor interceptor = new BrokerInterceptor(
