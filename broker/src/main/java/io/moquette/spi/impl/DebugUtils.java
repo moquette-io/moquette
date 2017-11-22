@@ -21,7 +21,10 @@ import io.netty.buffer.ByteBuf;
 final class DebugUtils {
 
     static String payload2Str(ByteBuf content) {
-        return new String(content.copy().array());
+        int size = content.readableBytes();
+        byte[] rawBytes = new byte[size];
+        content.getBytes(content.readerIndex(), rawBytes);
+        return new String(rawBytes);
     }
 
     private DebugUtils() {

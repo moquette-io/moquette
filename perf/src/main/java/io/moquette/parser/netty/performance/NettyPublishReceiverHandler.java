@@ -68,14 +68,9 @@ class NettyPublishReceiverHandler extends ChannelInboundHandlerAdapter {
     }
 
     static String payload2Str(ByteBuf content) {
-        byte[] rawBytes;
-        if (content.hasArray()) {
-            rawBytes = content.array();
-        } else {
-            int size = content.readableBytes();
-            rawBytes = new byte[size];
-            content.getBytes(content.readerIndex(), rawBytes);
-        }
+        int size = content.readableBytes();
+        byte[] rawBytes = new byte[size];
+        content.getBytes(content.readerIndex(), rawBytes);
         return new String(rawBytes);
     }
 

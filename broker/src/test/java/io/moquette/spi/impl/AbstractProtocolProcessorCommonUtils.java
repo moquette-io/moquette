@@ -21,13 +21,33 @@ import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.IMessagesStore;
 import io.moquette.spi.ISessionsStore;
 import io.moquette.spi.impl.security.PermitAllAuthorizator;
-import io.moquette.spi.impl.subscriptions.*;
+import io.moquette.spi.impl.subscriptions.CTrieSubscriptionDirectory;
+import io.moquette.spi.impl.subscriptions.ISubscriptionsDirectory;
+import io.moquette.spi.impl.subscriptions.Subscription;
+import io.moquette.spi.impl.subscriptions.Topic;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.embedded.EmbeddedChannel;
-import io.netty.handler.codec.mqtt.*;
+import io.netty.handler.codec.mqtt.MqttConnAckMessage;
+import io.netty.handler.codec.mqtt.MqttConnectMessage;
+import io.netty.handler.codec.mqtt.MqttFixedHeader;
+import io.netty.handler.codec.mqtt.MqttMessage;
+import io.netty.handler.codec.mqtt.MqttMessageBuilders;
+import io.netty.handler.codec.mqtt.MqttMessageType;
+import io.netty.handler.codec.mqtt.MqttPublishMessage;
+import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttSubAckMessage;
+import io.netty.handler.codec.mqtt.MqttSubscribeMessage;
+import io.netty.handler.codec.mqtt.MqttUnsubAckMessage;
+import io.netty.handler.codec.mqtt.MqttUnsubscribeMessage;
+import io.netty.handler.codec.mqtt.MqttVersion;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
@@ -307,7 +327,7 @@ abstract class AbstractProtocolProcessorCommonUtils {
 
     protected void verifyPublishIsReceived(EmbeddedChannel channel) {
         final MqttPublishMessage publishReceived = channel.readOutbound();
-        String payloadMessage = new String(publishReceived.payload().array());
+        String payloadMessage = DebugUtils.payload2Str(publishReceived.payload());
         assertEquals("Sent and received payload must be identical", HELLO_WORLD_MQTT, payloadMessage);
     }
 
@@ -321,7 +341,7 @@ abstract class AbstractProtocolProcessorCommonUtils {
 
     protected void verifyPublishIsReceived(EmbeddedChannel channel, String expectedPayload, MqttQoS expectedQoS) {
         final MqttPublishMessage publishReceived = channel.readOutbound();
-        String payloadMessage = new String(publishReceived.payload().array());
+        String payloadMessage = DebugUtils.payload2Str(publishReceived.payload());
         assertEquals("Sent and received payload must be identical", expectedPayload, payloadMessage);
         assertEquals("Expected QoS don't match", expectedQoS, publishReceived.fixedHeader().qosLevel());
     }
