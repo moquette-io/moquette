@@ -124,7 +124,7 @@ public class ProtocolProcessor {
     SessionsRepository sessionsRepository;
 
     // maps clientID to Will testament, if specified on CONNECT
-    private ConcurrentMap<String, WillMessage> m_willStore = new ConcurrentHashMap<>();
+    private ConcurrentMap<ConnectionDescriptor, WillMessage> m_willStore = new ConcurrentHashMap<>();
 
     ProtocolProcessor() {
     }
@@ -243,11 +243,14 @@ public class ProtocolProcessor {
             existing.abort();
             //return;
             this.connectionDescriptors.removeConnection(existing);
+            fireWillMessage(existing);
+            LOG.info("Existing connection closed. CId={}", clientId);
+
             this.connectionDescriptors.addConnection(descriptor);
         }
 
         initializeKeepAliveTimeout(channel, msg, clientId);
-        storeWillMessage(msg, clientId);
+        storeWillMessage(msg, descriptor);
         if (!sendAck(descriptor, msg, clientId)) {
             channel.close().addListener(CLOSE_ON_FAILURE);
             return;
@@ -371,19 +374,19 @@ public class ProtocolProcessor {
                 clientId, keepAlive, msg.variableHeader().isCleanSession(), idleTime);
     }
 
-    private void storeWillMessage(MqttConnectMessage msg, String clientId) {
+    private void storeWillMessage(MqttConnectMessage msg, ConnectionDescriptor descriptor) {
         // Handle will flag
         if (msg.variableHeader().isWillFlag()) {
             MqttQoS willQos = MqttQoS.valueOf(msg.variableHeader().willQos());
             LOG.debug("Configuring MQTT last will and testament CId={}, willQos={}, willTopic={}, willRetain={}",
-                     clientId, willQos, msg.payload().willTopic(), msg.variableHeader().isWillRetain());
+                    descriptor.clientID, willQos, msg.payload().willTopic(), msg.variableHeader().isWillRetain());
             byte[] willPayload = msg.payload().willMessage().getBytes(StandardCharsets.UTF_8);
             ByteBuffer bb = (ByteBuffer) ByteBuffer.allocate(willPayload.length).put(willPayload).flip();
             // save the will testament in the clientID store
             WillMessage will = new WillMessage(msg.payload().willTopic(), bb, msg.variableHeader().isWillRetain(),
                                                willQos);
-            m_willStore.put(clientId, will);
-            LOG.debug("MQTT last will and testament has been configured. CId={}", clientId);
+            m_willStore.put(descriptor, will);
+            LOG.debug("MQTT last will and testament has been configured. CId={}", descriptor.clientID);
         }
     }
 
@@ -663,7 +666,7 @@ public class ProtocolProcessor {
 
         LOG.trace("Removing will message. ClientId={}", descriptor.clientID);
         // cleanup the will store
-        m_willStore.remove(clientID);
+        m_willStore.remove(descriptor);
         String username = descriptor.getUsername();
         m_interceptor.notifyClientDisconnected(clientID, username);
         return true;
@@ -673,15 +676,18 @@ public class ProtocolProcessor {
         LOG.info("Lost connection with client <{}>", clientID);
         ConnectionDescriptor oldConnDescr = new ConnectionDescriptor(clientID, channel, true);
         connectionDescriptors.removeConnection(oldConnDescr);
-        // publish the Will message (if any) for the clientID
-        if (m_willStore.containsKey(clientID)) {
-            WillMessage will = m_willStore.get(clientID);
-            forwardPublishWill(will, clientID);
-            m_willStore.remove(clientID);
-        }
+        fireWillMessage(oldConnDescr);
 
         String username = NettyUtils.userName(channel);
         m_interceptor.notifyClientConnectionLost(clientID, username);
+    }
+
+    private void fireWillMessage(ConnectionDescriptor descriptor) {
+        // publish the Will message (if any) for the clientID
+        WillMessage will = m_willStore.remove(descriptor);
+        if (will != null) {
+            forwardPublishWill(will, descriptor.clientID);
+        }
     }
 
     /**
