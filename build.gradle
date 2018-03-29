@@ -35,6 +35,10 @@ subprojects {
   apply plugin: 'com.jfrog.bintray'
   apply plugin: 'eclipse'
 
+  tasks.withType(JavaCompile) {
+    options.compilerArgs += [ '-Xep:DefaultCharset:OFF' ]
+  }
+
   ext {
     nettyVersion = '4.1.12.Final'
   }
