@@ -247,5 +247,4 @@ The method ```canWrite``` must return true if the user has write access to given
 the ```canRead``` do the same checking, user can receive publishes on subscribed topic; this mean that the check is done
 during publishing checking if a subscription could receive the message, it's not applied during the subscription make
 the subscription failing. To use a custom implementation remember to define the variable ```authorizator_class```, also
-take care that the class need a no-argument constructor to be correctly instantiated or defined a static no arg
-instantiation method named ```getInstance```.
+take care that the class need a no-argument constructor to be correctly instantiated.
