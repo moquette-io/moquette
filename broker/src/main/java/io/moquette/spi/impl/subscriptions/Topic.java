@@ -128,7 +128,10 @@ public class Topic implements Serializable {
 
     public boolean isEmpty() {
         final List<Token> tokens = getTokens();
-        return tokens == null || tokens.isEmpty();
+        if (tokens == null || tokens.isEmpty()){
+            return true;
+        }
+        return tokens.size()==1 && tokens.get(0)==Token.EMPTY;
     }
 
     /**
