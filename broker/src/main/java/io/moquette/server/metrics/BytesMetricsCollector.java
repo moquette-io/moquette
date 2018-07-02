@@ -14,30 +14,30 @@
  * You may elect to redistribute this code under either of these licenses.
  */
 
-package io.moquette.server.netty.metrics;
+package io.moquette.server.metrics;
 
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Collects all the metrics from the various pipeline.
  */
-public class MessageMetricsCollector {
+public class BytesMetricsCollector {
 
-    private AtomicLong readMsgs = new AtomicLong();
-    private AtomicLong wroteMsgs = new AtomicLong();
+    private AtomicLong readBytes = new AtomicLong();
+    private AtomicLong wroteBytes = new AtomicLong();
 
-    public MessageMetrics computeMetrics() {
-        MessageMetrics allMetrics = new MessageMetrics();
-        allMetrics.incrementRead(readMsgs.get());
-        allMetrics.incrementWrote(wroteMsgs.get());
+    public BytesMetrics computeMetrics() {
+        BytesMetrics allMetrics = new BytesMetrics();
+        allMetrics.incrementRead(readBytes.get());
+        allMetrics.incrementWrote(wroteBytes.get());
         return allMetrics;
     }
 
-    public void sumReadMessages(long count) {
-        readMsgs.getAndAdd(count);
+    public void sumReadBytes(long count) {
+        readBytes.getAndAdd(count);
     }
 
-    public void sumWroteMessages(long count) {
-        wroteMsgs.getAndAdd(count);
+    public void sumWroteBytes(long count) {
+        wroteBytes.getAndAdd(count);
     }
 }

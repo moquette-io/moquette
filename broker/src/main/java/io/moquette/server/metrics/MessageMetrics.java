@@ -14,18 +14,18 @@
  * You may elect to redistribute this code under either of these licenses.
  */
 
-package io.moquette.server.netty.metrics;
+package io.moquette.server.metrics;
 
 public class MessageMetrics {
 
     private long m_messagesRead;
     private long m_messageWrote;
 
-    void incrementRead(long numMessages) {
+    public void incrementRead(long numMessages) {
         m_messagesRead += numMessages;
     }
 
-    void incrementWrote(long numMessages) {
+    public void incrementWrote(long numMessages) {
         m_messageWrote += numMessages;
     }
 

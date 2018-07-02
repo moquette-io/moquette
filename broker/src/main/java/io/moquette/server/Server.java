@@ -315,6 +315,10 @@ public class Server {
     public ProtocolProcessor getProcessor() {
         return m_processor;
     }
+    
+    public ServerAcceptor getAcceptor() {
+    	return m_acceptor;
+    }
 
     public ScheduledExecutorService getScheduler() {
         return scheduler;

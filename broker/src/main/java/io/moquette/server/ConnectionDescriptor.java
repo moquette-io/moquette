@@ -21,11 +21,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import io.moquette.server.metrics.BytesMetrics;
+import io.moquette.server.metrics.MessageMetrics;
 import io.moquette.server.netty.AutoFlushHandler;
 import io.moquette.server.netty.NettyUtils;
-import io.moquette.server.netty.metrics.BytesMetrics;
 import io.moquette.server.netty.metrics.BytesMetricsHandler;
-import io.moquette.server.netty.metrics.MessageMetrics;
 import io.moquette.server.netty.metrics.MessageMetricsHandler;
 import io.netty.channel.Channel;
 

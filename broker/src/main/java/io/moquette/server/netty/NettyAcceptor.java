@@ -23,13 +23,13 @@ import java.util.concurrent.TimeUnit;
 import io.moquette.BrokerConstants;
 import io.moquette.server.ServerAcceptor;
 import io.moquette.server.config.IConfig;
-import io.moquette.server.netty.metrics.BytesMetrics;
-import io.moquette.server.netty.metrics.BytesMetricsCollector;
+import io.moquette.server.metrics.BytesMetrics;
+import io.moquette.server.metrics.BytesMetricsCollector;
+import io.moquette.server.metrics.MessageMetrics;
+import io.moquette.server.metrics.MessageMetricsCollector;
 import io.moquette.server.netty.metrics.BytesMetricsHandler;
 import io.moquette.server.netty.metrics.DropWizardMetricsHandler;
 import io.moquette.server.netty.metrics.MQTTMessageLogger;
-import io.moquette.server.netty.metrics.MessageMetrics;
-import io.moquette.server.netty.metrics.MessageMetricsCollector;
 import io.moquette.server.netty.metrics.MessageMetricsHandler;
 import io.moquette.spi.impl.ProtocolProcessor;
 import io.moquette.spi.security.ISslContextCreator;
@@ -393,6 +393,16 @@ public class NettyAcceptor implements ServerAcceptor {
         BytesMetrics bytesMetrics = m_bytesMetricsCollector.computeMetrics();
         LOG.info("Metrics messages[read={}, write={}] bytes[read={}, write={}]", metrics.messagesRead(),
                 metrics.messagesWrote(), bytesMetrics.readBytes(), bytesMetrics.wroteBytes());
+    }
+    
+    @Override
+    public BytesMetrics getBytesMetrics() {
+    	return m_bytesMetricsCollector.computeMetrics();
+    }
+    
+    @Override
+    public MessageMetrics getMessageMetrics() {
+    	return m_metricsCollector.computeMetrics();
     }
 
     private ChannelHandler createSslHandler(SocketChannel channel, SslContext sslContext, boolean needsClientAuth) {
