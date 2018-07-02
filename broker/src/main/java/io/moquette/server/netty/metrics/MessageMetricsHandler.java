@@ -25,6 +25,9 @@ import io.netty.util.AttributeKey;
 
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 
+import io.moquette.server.metrics.MessageMetrics;
+import io.moquette.server.metrics.MessageMetricsCollector;
+
 public class MessageMetricsHandler extends ChannelDuplexHandler {
 
     private static final AttributeKey<MessageMetrics> ATTR_KEY_METRICS = AttributeKey.valueOf("MessageMetrics");

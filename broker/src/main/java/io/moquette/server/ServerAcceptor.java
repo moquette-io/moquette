@@ -17,13 +17,19 @@
 package io.moquette.server;
 
 import java.io.IOException;
+
 import io.moquette.server.config.IConfig;
+import io.moquette.server.metrics.BytesMetrics;
+import io.moquette.server.metrics.MessageMetrics;
 import io.moquette.spi.impl.ProtocolProcessor;
 import io.moquette.spi.security.ISslContextCreator;
 
 public interface ServerAcceptor {
 
     void initialize(ProtocolProcessor processor, IConfig props, ISslContextCreator sslCtxCreator) throws IOException;
+    
+    public BytesMetrics getBytesMetrics();
+    public MessageMetrics getMessageMetrics();
 
     void close();
 }
