@@ -784,13 +784,20 @@ during publishing checking if a subscription could receive the message, it&#8217
 the subscription failing. To use a custom implementation remember to define the variable <code><code>authorizator_class</code></code>, also
 take care that the class need a no-argument constructor to be correctly instantiated.</p>
 </div>
+<div class="paragraph">
+<p>There is use cases when the authorizator could change opinion on a previously granted read. For example a client that has
+read access for certain conditions and then thas conditions vary and client shouldn&#8217;t have anymore read access. In
+these cases there is configuration flag to force the re-validation of subscriptions for the conencting client,
+it&#8217;s the <code><code>reauthorize_subscriptions_on_connect</code></code> flag that in case of clean session false can remove the existing client&#8217;s
+subscriptions it the authorization is not anymore granted.</p>
+</div>
 </div>
 </div>
 </div>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2018-04-18 22:02:56 CEST
+Last updated 2018-07-19 11:40:08 CEST
 </div>
 </div>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/8.9.1/styles/github.min.css">

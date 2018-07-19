@@ -248,3 +248,9 @@ the ```canRead``` do the same checking, user can receive publishes on subscribed
 during publishing checking if a subscription could receive the message, it's not applied during the subscription make
 the subscription failing. To use a custom implementation remember to define the variable ```authorizator_class```, also
 take care that the class need a no-argument constructor to be correctly instantiated.
+
+There is use cases when the authorizator could change opinion on a previously granted read. For example a client that has
+read access for certain conditions and then thas conditions vary and client shouldn't have anymore read access. In 
+these cases there is configuration flag to force the re-validation of subscriptions for the conencting client, 
+it's the ```reauthorize_subscriptions_on_connect``` flag that in case of clean session false can remove the existing client's 
+subscriptions it the authorization is not anymore granted.
