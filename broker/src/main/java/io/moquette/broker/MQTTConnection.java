@@ -22,14 +22,20 @@ class MQTTConnection {
     private BrokerConfiguration brokerConfig;
     private IAuthenticator authenticator;
     private SessionRegistry sessionRegistry;
+    private final PostOffice postOffice;
 
-    MQTTConnection(Channel channel) {
+    MQTTConnection(Channel channel, BrokerConfiguration brokerConfig, IAuthenticator authenticator,
+                   SessionRegistry sessionRegistry, PostOffice postOffice) {
         this.channel = channel;
+        this.brokerConfig = brokerConfig;
+        this.authenticator = authenticator;
+        this.sessionRegistry = sessionRegistry;
+        this.postOffice = postOffice;
     }
 
     void handleMessage(MqttMessage msg) {
         MqttMessageType messageType = msg.fixedHeader().messageType();
-        LOG.debug("Processing MQTT message, type: {}", messageType);
+        LOG.debug("Received MQTT message, type: {}, channel: {}", messageType, channel);
         switch (messageType) {
             case CONNECT:
                 processConnect((MqttConnectMessage) msg);
@@ -52,9 +58,9 @@ class MQTTConnection {
 //            case PUBREL:
 //                m_processor.processPubRel(channel, msg);
 //                break;
-//            case DISCONNECT:
-//                m_processor.processDisconnect(channel);
-//                break;
+            case DISCONNECT:
+                processDisconnect(msg);
+                break;
 //            case PUBACK:
 //                m_processor.processPubAck(channel, (MqttPubAckMessage) msg);
 //                break;
@@ -69,7 +75,7 @@ class MQTTConnection {
                 channel.writeAndFlush(pingResp).addListener(CLOSE_ON_FAILURE);
                 break;
             default:
-                LOG.error("Unknown MessageType: {}", messageType);
+                LOG.error("Unknown MessageType: {}, channel: {}", messageType, channel);
                 break;
         }
     }
@@ -78,30 +84,30 @@ class MQTTConnection {
         MqttConnectPayload payload = msg.payload();
         String clientId = payload.clientIdentifier();
         final String username = payload.userName();
-        LOG.debug("Processing CONNECT message. CId={}, username={}", clientId, username);
+        LOG.trace("Processing CONNECT message. CId={} username: {} channel: {}", clientId, username, channel);
 
         if (isNotProtocolVersion(msg, MqttVersion.MQTT_3_1) && isNotProtocolVersion(msg, MqttVersion.MQTT_3_1_1)) {
-            LOG.error("MQTT protocol version is not valid. CId={}", clientId);
+            LOG.warn("MQTT protocol version is not valid. CId={} channel: {}", clientId, channel);
             abortConnection(CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION);
             return;
         }
         final boolean cleanSession = msg.variableHeader().isCleanSession();
         if (clientId == null || clientId.length() == 0) {
             if (!brokerConfig.allowZeroByteClientId) {
-                LOG.error("Broker doesn't permit MQTT client ID empty. Username={}", username);
+                LOG.warn("Broker doesn't permit MQTT client ID empty. Username={}, channel: {}", username, channel);
                 abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
                 return;
             }
 
             if (!cleanSession) {
-                LOG.error("MQTT client ID cannot be empty for persistent session. Username={}", username);
+                LOG.warn("MQTT client ID cannot be empty for persistent session. Username={}, channel: {}", username, channel);
                 abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
                 return;
             }
 
             // Generating client id.
             clientId = UUID.randomUUID().toString().replace("-", "");
-            LOG.info("Client has connected with server generated id={}, username={}", clientId, username);
+            LOG.debug("Client has connected with server generated id={}, username={}, channel: {}", clientId, username, channel);
         }
 
         if (!login(msg, clientId)) {
@@ -110,8 +116,15 @@ class MQTTConnection {
             return;
         }
 
-        sessionRegistry.bindToSession(this, msg);
-
+        try {
+            LOG.trace("Binding MQTTConnection (channel: {}) to session", channel);
+            sessionRegistry.bindToSession(this, msg);
+            NettyUtils.clientID(channel, clientId);
+            LOG.trace("CONNACK sent, channel: {}", channel);
+        } catch (/*SessionCorrupted*/Exception scex) {
+            LOG.warn("MQTT session for client ID {} cannot be created, channel: {}", clientId, channel);
+            abortConnection(CONNECTION_REFUSED_SERVER_UNAVAILABLE);
+        }
     }
 
     private boolean isNotProtocolVersion(MqttConnectMessage msg, MqttVersion version) {
@@ -155,9 +168,28 @@ class MQTTConnection {
     void handleConnectionLost() {
         String clientID = NettyUtils.clientID(channel);
         if (clientID != null && !clientID.isEmpty()) {
-            LOG.info("Notifying connection lost event. MqttClientId = {}", clientID);
-            m_processor.processConnectionLost(clientID, channel);
+            LOG.info("Notifying connection lost event. CId = {}, channel: {}", clientID, channel);
+            Session session = sessionRegistry.retrieve(clientID);
+            postOffice.fireWill(session.getWill());
+            sessionRegistry.remove(clientID);
         }
         channel.close().addListener(CLOSE_ON_FAILURE);
+    }
+
+    void sendConnAck(boolean isSessionAlreadyPresent) {
+        final MqttConnAckMessage ackMessage = connAck(CONNECTION_ACCEPTED, isSessionAlreadyPresent);
+        channel.writeAndFlush(ackMessage);
+    }
+
+    void dropConnection() {
+        channel.close();
+    }
+
+    private void processDisconnect(MqttMessage msg) {
+        final String clientID = NettyUtils.clientID(channel);
+        LOG.trace("Start DISCONNECT CId={}, channel: {}", clientID, channel);
+//        channel.flush();
+        sessionRegistry.disconnect(clientID);
+        LOG.trace("Processed DISCONNECT CId={}, channel: {}", clientID, channel);
     }
 }

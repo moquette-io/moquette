@@ -8,27 +8,28 @@ import org.eclipse.paho.client.mqttv3.MqttException
 import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence
 
 /**
- * A client that connect and disconnect multiple times, to check that on disconnection there isn't
- * any resource leakage.
+ * A client that try all the simple MQTT commands
  * */
 
-if (args.size() != 3) {
-    println "usage: <host> <num_serial_connections> <local client name>"
+if (args.size() != 2) {
+    println "usage: <host> <local client name>"
     return
 }
 
 String host = args[0]
-long numSerialConnection = args[1] as long
-String clientName = args[2]
+String clientName = args[1]
 
 String tmpDir = System.getProperty("java.io.tmpdir")
 MqttDefaultFilePersistence dataStore1 = new MqttDefaultFilePersistence(tmpDir + "/" + clientName)
 MqttClient client1 = new MqttClient("tcp://${host}:1883", "ConCli${clientName}", dataStore1)
 
-println "start loppoing to ${numSerialConnection} conn-discon"
-(1..numSerialConnection).each {
-    client1.connect()
-    client1.disconnect()
-    print "."
-}
+println "start test"
+print "connect..."
+client1.connect()
+println "OK!"
+
+print "disconnect..."
+client1.disconnect()
+println "OK!"
 println "Done"
+System.exit(0)
