@@ -21,12 +21,12 @@ import io.moquette.persistence.MemoryStorageService;
 import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.IMessagesStore;
 import io.moquette.spi.IMessagesStore.StoredMessage;
-import io.moquette.spi.impl.security.PermitAllAuthorizator;
+import io.moquette.spi.impl.security.PermitAllAuthorizatorPolicy;
 import io.moquette.spi.impl.subscriptions.CTrieSubscriptionDirectory;
 import io.moquette.spi.impl.subscriptions.ISubscriptionsDirectory;
 import io.moquette.spi.impl.subscriptions.Subscription;
 import io.moquette.spi.impl.subscriptions.Topic;
-import io.moquette.spi.security.IAuthorizator;
+import io.moquette.spi.security.IAuthorizatorPolicy;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.*;
@@ -90,7 +90,7 @@ public class ProtocolProcessorTest extends AbstractProtocolProcessorCommonUtils 
         MemoryStorageService storageService = new MemoryStorageService(null, null);
         SessionsRepository sessionsRepository = new SessionsRepository(storageService.sessionsStore(), null);
         subs.init(sessionsRepository);
-        m_processor.init(subs, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizator(),
+        m_processor.init(subs, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizatorPolicy(),
                 NO_OBSERVERS_INTERCEPTOR, this.sessionsRepository, false);
 
         connect_v3_1();
@@ -127,7 +127,7 @@ public class ProtocolProcessorTest extends AbstractProtocolProcessorCommonUtils 
         MemoryStorageService storageService = new MemoryStorageService(null, null);
         SessionsRepository sessionsRepository = new SessionsRepository(storageService.sessionsStore(), null);
         subs.init(sessionsRepository);
-        m_processor.init(subs, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizator(),
+        m_processor.init(subs, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizatorPolicy(),
                 NO_OBSERVERS_INTERCEPTOR, this.sessionsRepository, false);
 
         EmbeddedChannel firstReceiverChannel = new EmbeddedChannel();
@@ -176,7 +176,7 @@ public class ProtocolProcessorTest extends AbstractProtocolProcessorCommonUtils 
         final String fakeUserName = "UnAuthUser";
         NettyUtils.userName(m_channel, fakeUserName);
 
-        IAuthorizator mockAuthorizator = mock(IAuthorizator.class);
+        IAuthorizatorPolicy mockAuthorizator = mock(IAuthorizatorPolicy.class);
         when(mockAuthorizator.canRead(eq(new Topic(NEWS_TOPIC)), eq(fakeUserName), eq(FAKE_CLIENT_ID)))
             .thenReturn(false);
 
@@ -252,7 +252,7 @@ public class ProtocolProcessorTest extends AbstractProtocolProcessorCommonUtils 
         subs.init(sessionsRepository);
 
         // simulate a connect that register a clientID to an IoSession
-        m_processor.init(subs, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizator(),
+        m_processor.init(subs, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizatorPolicy(),
                 NO_OBSERVERS_INTERCEPTOR, this.sessionsRepository, false);
         connect_v3_1_asClient(PUBLISHER_ID);
         publishToAs(PUBLISHER_ID, NEWS_TOPIC, AT_MOST_ONCE, true);
@@ -276,7 +276,7 @@ public class ProtocolProcessorTest extends AbstractProtocolProcessorCommonUtils 
         retainedMessage.setClientID(PUBLISHER_ID);
         m_messagesStore.storeRetained(new Topic("/topic"), retainedMessage);
 
-        m_processor.init(subs, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizator(),
+        m_processor.init(subs, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizatorPolicy(),
                 NO_OBSERVERS_INTERCEPTOR, this.sessionsRepository, false);
 
         connect_v3_1_asClient(PUBLISHER_ID);
@@ -293,7 +293,7 @@ public class ProtocolProcessorTest extends AbstractProtocolProcessorCommonUtils 
         List<Subscription> inactiveSubscriptions = Collections.singletonList(inactiveSub);
         when(mockedSubscriptions.matches(eq(new Topic("/topic")))).thenReturn(inactiveSubscriptions);
         m_processor = new ProtocolProcessor();
-        m_processor.init(mockedSubscriptions, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizator(),
+        m_processor.init(mockedSubscriptions, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizatorPolicy(),
                 NO_OBSERVERS_INTERCEPTOR, this.sessionsRepository, false);
 
         m_processor.sessionsRepository.createNewSession("Subscriber", false);
@@ -347,7 +347,7 @@ public class ProtocolProcessorTest extends AbstractProtocolProcessorCommonUtils 
         subs.init(sessionsRepository);
 
         // simulate a connect that register a clientID to an IoSession
-        m_processor.init(subs, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizator(),
+        m_processor.init(subs, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizatorPolicy(),
                          NO_OBSERVERS_INTERCEPTOR, this.sessionsRepository, false);
         connect_v3_1_asClient(PUBLISHER_ID);
         publishQoS2ToAs(this.m_channel, PUBLISHER_ID, NEWS_TOPIC, 1, true);

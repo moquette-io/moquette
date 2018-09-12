@@ -6,7 +6,7 @@ import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.ClientSession;
 import io.moquette.spi.IMessagesStore;
 import io.moquette.spi.ISessionsStore;
-import io.moquette.spi.impl.security.PermitAllAuthorizator;
+import io.moquette.spi.impl.security.PermitAllAuthorizatorPolicy;
 import io.moquette.spi.impl.subscriptions.CTrieSubscriptionDirectory;
 import io.moquette.spi.impl.subscriptions.ISubscriptionsDirectory;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -54,7 +54,7 @@ public class ConnectHandlerTest {
 
         final ConnectionDescriptorStore connectionsRegistry = new ConnectionDescriptorStore();
         sut = new ConnectHandler(connectionsRegistry, NO_OBSERVERS_INTERCEPTOR, sessionsRepository, m_sessionStore, m_mockAuthenticator,
-            new PermitAllAuthorizator(), subscriptions, true, true, false, null);
+            new PermitAllAuthorizatorPolicy(), subscriptions, true, true, false, null);
 
         disconnectHandler = new DisconnectHandler(connectionsRegistry, sessionsRepository,
                                                   subscriptions, NO_OBSERVERS_INTERCEPTOR);
@@ -64,7 +64,7 @@ public class ConnectHandlerTest {
     public void testZeroByteClientIdWithCleanSession() {
         // Allow zero byte client ids
         sut = new ConnectHandler(new ConnectionDescriptorStore(), NO_OBSERVERS_INTERCEPTOR, new SessionsRepository(this.m_sessionStore, null), m_sessionStore, m_mockAuthenticator,
-            new PermitAllAuthorizator(), subscriptions, true, true, false, null);
+            new PermitAllAuthorizatorPolicy(), subscriptions, true, true, false, null);
 
         // Connect message with clean session set to true and client id is null.
         MqttConnectMessage msg = connMsg.clientId(null)
@@ -208,7 +208,7 @@ public class ConnectHandlerTest {
 
     protected void reinitProcessorProhibitingAnonymousClients() {
         sut = new ConnectHandler(new ConnectionDescriptorStore(), NO_OBSERVERS_INTERCEPTOR, new SessionsRepository(this.m_sessionStore, null), m_sessionStore, m_mockAuthenticator,
-            new PermitAllAuthorizator(), subscriptions, false, true, false, null);
+            new PermitAllAuthorizatorPolicy(), subscriptions, false, true, false, null);
     }
 
     @Test
@@ -229,7 +229,7 @@ public class ConnectHandlerTest {
     @Test
     public void testZeroByteClientIdNotAllowed() {
         sut = new ConnectHandler(new ConnectionDescriptorStore(), NO_OBSERVERS_INTERCEPTOR, new SessionsRepository(this.m_sessionStore, null), m_sessionStore, m_mockAuthenticator,
-            new PermitAllAuthorizator(), subscriptions, false, false, false, null);
+            new PermitAllAuthorizatorPolicy(), subscriptions, false, false, false, null);
 
         // Connect message with clean session set to true and client id is null.
         MqttConnectMessage msg = connMsg.clientId(null)
@@ -264,7 +264,7 @@ public class ConnectHandlerTest {
 
     protected void reinitProtocolProcessorWithZeroLengthClientIdAndAnonymousClients() {
         sut = new ConnectHandler(new ConnectionDescriptorStore(), NO_OBSERVERS_INTERCEPTOR, new SessionsRepository(this.m_sessionStore, null), m_sessionStore, m_mockAuthenticator,
-            new PermitAllAuthorizator(), subscriptions, true, true, false, null);
+            new PermitAllAuthorizatorPolicy(), subscriptions, true, true, false, null);
     }
 
     @Test

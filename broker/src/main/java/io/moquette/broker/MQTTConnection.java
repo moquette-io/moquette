@@ -1,18 +1,27 @@
 package io.moquette.broker;
 
 import io.moquette.server.netty.NettyUtils;
+import io.moquette.spi.impl.subscriptions.ISubscriptionsDirectory;
+import io.moquette.spi.impl.subscriptions.Subscription;
+import io.moquette.spi.impl.subscriptions.Topic;
 import io.moquette.spi.security.IAuthenticator;
 import io.netty.channel.Channel;
 import io.netty.handler.codec.mqtt.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
+import static io.moquette.spi.impl.Utils.messageId;
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 import static io.netty.channel.ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
+import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
+import static io.netty.handler.codec.mqtt.MqttQoS.FAILURE;
 
 class MQTTConnection {
 
@@ -23,6 +32,7 @@ class MQTTConnection {
     private IAuthenticator authenticator;
     private SessionRegistry sessionRegistry;
     private final PostOffice postOffice;
+    private boolean connected;
 
     MQTTConnection(Channel channel, BrokerConfiguration brokerConfig, IAuthenticator authenticator,
                    SessionRegistry sessionRegistry, PostOffice postOffice) {
@@ -31,6 +41,7 @@ class MQTTConnection {
         this.authenticator = authenticator;
         this.sessionRegistry = sessionRegistry;
         this.postOffice = postOffice;
+        this.connected = false;
     }
 
     void handleMessage(MqttMessage msg) {
@@ -40,9 +51,9 @@ class MQTTConnection {
             case CONNECT:
                 processConnect((MqttConnectMessage) msg);
                 break;
-//            case SUBSCRIBE:
-//                m_processor.processSubscribe(channel, (MqttSubscribeMessage) msg);
-//                break;
+            case SUBSCRIBE:
+                processSubscribe((MqttSubscribeMessage) msg);
+                break;
 //            case UNSUBSCRIBE:
 //                m_processor.processUnsubscribe(channel, (MqttUnsubscribeMessage) msg);
 //                break;
@@ -177,6 +188,7 @@ class MQTTConnection {
     }
 
     void sendConnAck(boolean isSessionAlreadyPresent) {
+        connected = true;
         final MqttConnAckMessage ackMessage = connAck(CONNECTION_ACCEPTED, isSessionAlreadyPresent);
         channel.writeAndFlush(ackMessage);
     }
@@ -189,7 +201,28 @@ class MQTTConnection {
         final String clientID = NettyUtils.clientID(channel);
         LOG.trace("Start DISCONNECT CId={}, channel: {}", clientID, channel);
 //        channel.flush();
+        if (!connected) {
+            LOG.info("DISCONNECT received on already closed connection, CId={}, channel: {}", clientID, channel);
+            return;
+        }
         sessionRegistry.disconnect(clientID);
+        connected = false;
         LOG.trace("Processed DISCONNECT CId={}, channel: {}", clientID, channel);
+    }
+
+    private void processSubscribe(MqttSubscribeMessage msg) {
+        final String clientID = NettyUtils.clientID(channel);
+        if (!connected) {
+            LOG.warn("SUBSCRIBE received on already closed connection, CId={}, channel: {}", clientID, channel);
+            dropConnection();
+            return;
+        }
+        postOffice.subscribeClientToTopics(msg, clientID, NettyUtils.userName(channel), this);
+    }
+
+    void sendAckMessage(int messageID, MqttSubAckMessage ackMessage) {
+        final String clientId = NettyUtils.clientID(channel);
+        LOG.trace("Sending SUBACK response CId={}, messageId: {}", clientId, messageID);
+        channel.writeAndFlush(ackMessage).addListener(FIRE_EXCEPTION_ON_FAILURE);
     }
 }

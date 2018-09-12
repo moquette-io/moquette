@@ -28,6 +28,10 @@ print "connect..."
 client1.connect()
 println "OK!"
 
+print "subscribe..."
+client1.subscribe("/news", 0)
+println "OK!"
+
 print "disconnect..."
 client1.disconnect()
 println "OK!"

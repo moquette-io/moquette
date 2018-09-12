@@ -15,14 +15,12 @@
  */
 package io.moquette.spi.impl;
 
-import io.moquette.interception.InterceptHandler;
 import io.moquette.persistence.MemoryStorageService;
 import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.IMessagesStore;
 import io.moquette.spi.ISessionsStore;
-import io.moquette.spi.impl.security.PermitAllAuthorizator;
+import io.moquette.spi.impl.security.PermitAllAuthorizatorPolicy;
 import io.moquette.spi.impl.subscriptions.*;
-import io.moquette.spi.security.IAuthorizator;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.*;
@@ -81,7 +79,7 @@ abstract class AbstractProtocolProcessorCommonUtils {
         subscriptions.init(sessionsRepository);
         m_processor = new ProtocolProcessor();
         m_processor.init(subscriptions, m_messagesStore, m_sessionStore, m_mockAuthenticator, true,
-                         new PermitAllAuthorizator(), NO_OBSERVERS_INTERCEPTOR, sessionsRepository, false);
+                         new PermitAllAuthorizatorPolicy(), NO_OBSERVERS_INTERCEPTOR, sessionsRepository, false);
     }
 
     void verifyNoPublishIsReceived() {

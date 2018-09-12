@@ -2,16 +2,20 @@ package io.moquette.broker;
 
 import io.moquette.BrokerConstants;
 import io.moquette.interception.InterceptHandler;
+import io.moquette.persistence.MemoryStorageService;
 import io.moquette.server.config.FileResourceLoader;
 import io.moquette.server.config.IConfig;
 import io.moquette.server.config.IResourceLoader;
 import io.moquette.server.config.ResourceLoaderConfig;
-import io.moquette.spi.impl.ProtocolProcessor;
+import io.moquette.spi.IMessagesStore;
+import io.moquette.spi.ISessionsStore;
+import io.moquette.spi.impl.SessionsRepository;
 import io.moquette.spi.impl.security.AcceptAllAuthenticator;
+import io.moquette.spi.impl.security.PermitAllAuthorizatorPolicy;
 import io.moquette.spi.impl.subscriptions.CTrieSubscriptionDirectory;
 import io.moquette.spi.impl.subscriptions.ISubscriptionsDirectory;
 import io.moquette.spi.security.IAuthenticator;
-import io.moquette.spi.security.IAuthorizator;
+import io.moquette.spi.security.IAuthorizatorPolicy;
 import io.moquette.spi.security.ISslContextCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +28,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 import static io.moquette.logging.LoggingUtils.getInterceptorIds;
+import static java.util.Collections.singleton;
+import static java.util.Collections.singletonMap;
 
 public class Server {
 
@@ -65,7 +71,7 @@ public class Server {
     }
 
     public void startServer(IConfig config, List<? extends InterceptHandler> handlers, ISslContextCreator sslCtxCreator,
-                            IAuthenticator authenticator, IAuthorizator authorizator) throws IOException {
+                            IAuthenticator authenticator, IAuthorizatorPolicy authorizatorPolicy) throws IOException {
         final long start = System.currentTimeMillis();
         if (handlers == null) {
             handlers = Collections.emptyList();
@@ -92,9 +98,18 @@ public class Server {
         if (authenticator == null) {
             authenticator = new AcceptAllAuthenticator();
         }
+        if (authorizatorPolicy == null) {
+            authorizatorPolicy = new PermitAllAuthorizatorPolicy();
+        }
+
+        MemoryStorageService memStorage = new MemoryStorageService(null, null);
+        ISessionsStore sessionStore = memStorage.sessionsStore();
+        SessionsRepository sessionsRepository = new SessionsRepository(sessionStore, null);
         // DBG
-        final PostOffice dispatcher = new PostOffice();
+        
         ISubscriptionsDirectory subscriptions = new CTrieSubscriptionDirectory();
+        subscriptions.init(sessionsRepository);
+        final PostOffice dispatcher = new PostOffice(subscriptions, authorizatorPolicy);
         SessionRegistry sessions = new SessionRegistry(subscriptions, dispatcher);
         final BrokerConfiguration brokerConfig = new BrokerConfiguration(config);
         MQTTConnectionFactory connectionFactory = new MQTTConnectionFactory(brokerConfig, authenticator, sessions,
