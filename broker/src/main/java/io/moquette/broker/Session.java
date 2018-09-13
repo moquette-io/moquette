@@ -91,4 +91,8 @@ class Session {
 
         assignState(SessionStatus.DISCONNECTING, SessionStatus.DISCONNECTED);
     }
+
+    boolean isClean() {
+        return clean;
+    }
 }

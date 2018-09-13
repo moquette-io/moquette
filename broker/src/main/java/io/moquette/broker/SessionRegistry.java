@@ -15,7 +15,7 @@ class SessionRegistry {
     private static final Logger LOG = LoggerFactory.getLogger(SessionRegistry.class);
 
     private final ConcurrentMap<String, Session> pool = new ConcurrentHashMap<>();
-    private final PostOffice postOffice/* = new PostOffice()*/;
+    private final PostOffice postOffice;
     private final ISubscriptionsDirectory subscriptionsDirectory;
 
     SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory, PostOffice postOffice) {
@@ -23,8 +23,7 @@ class SessionRegistry {
         this.postOffice = postOffice;
     }
 
-    void bindToSession(MQTTConnection mqttConnection, MqttConnectMessage msg) {
-        final String clientId = msg.payload().clientIdentifier();
+    void bindToSession(MQTTConnection mqttConnection, MqttConnectMessage msg, String clientId) {
         boolean isSessionAlreadyStored = false;
         if (!pool.containsKey(clientId)) {
             // case 1

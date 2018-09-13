@@ -32,6 +32,10 @@ print "subscribe..."
 client1.subscribe("/news", 0)
 println "OK!"
 
+print "unsubscribe..."
+client1.unsubscribe("/news")
+println "OK!"
+
 print "disconnect..."
 client1.disconnect()
 println "OK!"

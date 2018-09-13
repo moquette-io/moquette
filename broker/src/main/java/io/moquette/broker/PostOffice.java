@@ -5,6 +5,8 @@ import io.moquette.spi.impl.subscriptions.Subscription;
 import io.moquette.spi.impl.subscriptions.Topic;
 import io.moquette.spi.security.IAuthorizatorPolicy;
 import io.netty.handler.codec.mqtt.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,11 +16,14 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 import static io.moquette.spi.impl.Utils.messageId;
+import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.FAILURE;
 
 class PostOffice {
+
+    private static final Logger LOG = LoggerFactory.getLogger(PostOffice.class);
 
     private final ConcurrentMap<String, Queue> queues = new ConcurrentHashMap<>();
     private final Authorizator authorizator;
@@ -61,7 +66,7 @@ class PostOffice {
         }
 
         // send ack message
-        mqttConnection.sendAckMessage(messageID, ackMessage);
+        mqttConnection.sendSubAckMessage(messageID, ackMessage);
 
         //TODO  republish all retained messages matching the subscription topics
     }
@@ -79,5 +84,31 @@ class PostOffice {
                                                   false, 0);
         MqttSubAckPayload payload = new MqttSubAckPayload(grantedQoSLevels);
         return new MqttSubAckMessage(fixedHeader, from(messageId), payload);
+    }
+
+    public void unsubscribe(List<String> topics, MQTTConnection mqttConnection) {
+        final String clientID = mqttConnection.getClientId();
+        for (String t : topics) {
+            Topic topic = new Topic(t);
+            boolean validTopic = topic.isValid();
+            if (!validTopic) {
+                // close the connection, not valid topicFilter is a protocol violation
+                mqttConnection.dropConnection();
+                LOG.error("Topic filter is not valid. CId={}, topics: {}, offending topic filter: {}",
+                          clientID, topics, topic);
+                return;
+            }
+
+            LOG.trace("Removing subscription. CId={}, topic={}", clientID, topic);
+            subscriptions.removeSubscription(topic, clientID);
+
+            // TODO remove the subscriptions to Session
+//            clientSession.unsubscribeFrom(topic);
+
+            //TODO notify interceptors
+//            String username = NettyUtils.userName(channel);
+//            m_interceptor.notifyTopicUnsubscribed(topic.toString(), clientID, username);
+        }
+
     }
 }

@@ -1,29 +1,23 @@
 package io.moquette.broker;
 
 import io.moquette.server.netty.NettyUtils;
-import io.moquette.spi.impl.subscriptions.ISubscriptionsDirectory;
-import io.moquette.spi.impl.subscriptions.Subscription;
-import io.moquette.spi.impl.subscriptions.Topic;
 import io.moquette.spi.security.IAuthenticator;
 import io.netty.channel.Channel;
 import io.netty.handler.codec.mqtt.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
-import static io.moquette.spi.impl.Utils.messageId;
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 import static io.netty.channel.ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
-import static io.netty.handler.codec.mqtt.MqttQoS.FAILURE;
 
-class MQTTConnection {
+final class MQTTConnection {
 
     private static final Logger LOG = LoggerFactory.getLogger(MQTTConnection.class);
 
@@ -54,9 +48,9 @@ class MQTTConnection {
             case SUBSCRIBE:
                 processSubscribe((MqttSubscribeMessage) msg);
                 break;
-//            case UNSUBSCRIBE:
-//                m_processor.processUnsubscribe(channel, (MqttUnsubscribeMessage) msg);
-//                break;
+            case UNSUBSCRIBE:
+                processUnsubscribe((MqttUnsubscribeMessage) msg);
+                break;
 //            case PUBLISH:
 //                m_processor.processPublish(channel, (MqttPublishMessage) msg);
 //                break;
@@ -91,7 +85,7 @@ class MQTTConnection {
         }
     }
 
-    private void processConnect(MqttConnectMessage msg) {
+    void processConnect(MqttConnectMessage msg) {
         MqttConnectPayload payload = msg.payload();
         String clientId = payload.clientIdentifier();
         final String username = payload.userName();
@@ -104,7 +98,7 @@ class MQTTConnection {
         }
         final boolean cleanSession = msg.variableHeader().isCleanSession();
         if (clientId == null || clientId.length() == 0) {
-            if (!brokerConfig.allowZeroByteClientId) {
+            if (!brokerConfig.isAllowZeroByteClientId()) {
                 LOG.warn("Broker doesn't permit MQTT client ID empty. Username={}, channel: {}", username, channel);
                 abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
                 return;
@@ -129,7 +123,7 @@ class MQTTConnection {
 
         try {
             LOG.trace("Binding MQTTConnection (channel: {}) to session", channel);
-            sessionRegistry.bindToSession(this, msg);
+            sessionRegistry.bindToSession(this, msg, clientId);
             NettyUtils.clientID(channel, clientId);
             LOG.trace("CONNACK sent, channel: {}", channel);
         } catch (/*SessionCorrupted*/Exception scex) {
@@ -157,22 +151,24 @@ class MQTTConnection {
 
     private boolean login(MqttConnectMessage msg, final String clientId) {
         // handle user authentication
-        if (!msg.variableHeader().hasUserName() && !brokerConfig.allowAnonymous) {
+        if (msg.variableHeader().hasUserName()) {
+            byte[] pwd = null;
+            if (msg.variableHeader().hasPassword()) {
+                pwd = msg.payload().password().getBytes(StandardCharsets.UTF_8);
+            } else if (!brokerConfig.isAllowAnonymous()) {
+                LOG.error("Client didn't supply any password and MQTT anonymous mode is disabled CId={}", clientId);
+                return false;
+            }
+            final String login = msg.payload().userName();
+            if (!authenticator.checkValid(clientId, login, pwd)) {
+                LOG.error("Authenticator has rejected the MQTT credentials CId={}, username={}", clientId, login);
+                return false;
+            }
+            NettyUtils.userName(channel, login);
+        } else if (!brokerConfig.isAllowAnonymous()) {
             LOG.error("Client didn't supply any credentials and MQTT anonymous mode is disabled. CId={}", clientId);
             return false;
         }
-
-        if (!msg.variableHeader().hasPassword() && !brokerConfig.allowAnonymous) {
-            LOG.error("Client didn't supply any password and MQTT anonymous mode is disabled CId={}", clientId);
-            return false;
-        }
-        byte[] pwd = msg.payload().passwordInBytes();
-        final String login = msg.payload().userName();
-        if (!authenticator.checkValid(clientId, login, pwd)) {
-            LOG.error("Authenticator has rejected the MQTT credentials CId={}, username={}", clientId, login);
-            return false;
-        }
-        NettyUtils.userName(channel, login);
         return true;
     }
 
@@ -218,11 +214,47 @@ class MQTTConnection {
             return;
         }
         postOffice.subscribeClientToTopics(msg, clientID, NettyUtils.userName(channel), this);
+
+        // TODO add the subscriptions to Session
     }
 
-    void sendAckMessage(int messageID, MqttSubAckMessage ackMessage) {
+    void sendSubAckMessage(int messageID, MqttSubAckMessage ackMessage) {
         final String clientId = NettyUtils.clientID(channel);
         LOG.trace("Sending SUBACK response CId={}, messageId: {}", clientId, messageID);
         channel.writeAndFlush(ackMessage).addListener(FIRE_EXCEPTION_ON_FAILURE);
+    }
+
+    private void processUnsubscribe(MqttUnsubscribeMessage msg) {
+        List<String> topics = msg.payload().topics();
+        String clientID = NettyUtils.clientID(channel);
+
+        LOG.trace("Processing UNSUBSCRIBE message. CId={}, topics: {}", clientID, topics);
+        postOffice.unsubscribe(topics, this);
+
+        // ack the client
+        sendUnsubAckMessage(msg, topics, clientID);
+    }
+
+    private void sendUnsubAckMessage(MqttUnsubscribeMessage msg, List<String> topics, String clientID) {
+        int messageID = msg.variableHeader().messageId();
+        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.UNSUBACK, false, AT_MOST_ONCE,
+            false, 0);
+        MqttUnsubAckMessage ackMessage = new MqttUnsubAckMessage(fixedHeader, from(messageID));
+
+        LOG.trace("Sending UNSUBACK message. CId={}, messageId: {}, topics: {}", clientID, messageID, topics);
+        channel.writeAndFlush(ackMessage).addListener(FIRE_EXCEPTION_ON_FAILURE);
+        LOG.trace("Client <{}> unsubscribed from topics <{}>", clientID, topics);
+    }
+
+    String getClientId() {
+        return NettyUtils.clientID(channel);
+    }
+
+    @Override
+    public String toString() {
+        return "MQTTConnection{" +
+            "channel=" + channel +
+            ", connected=" + connected +
+            '}';
     }
 }
