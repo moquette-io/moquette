@@ -193,7 +193,7 @@ final class MQTTConnection {
         channel.close();
     }
 
-    private void processDisconnect(MqttMessage msg) {
+    protected void processDisconnect(MqttMessage msg) {
         final String clientID = NettyUtils.clientID(channel);
         LOG.trace("Start DISCONNECT CId={}, channel: {}", clientID, channel);
 //        channel.flush();
@@ -203,6 +203,7 @@ final class MQTTConnection {
         }
         sessionRegistry.disconnect(clientID);
         connected = false;
+        channel.close();
         LOG.trace("Processed DISCONNECT CId={}, channel: {}", clientID, channel);
     }
 
