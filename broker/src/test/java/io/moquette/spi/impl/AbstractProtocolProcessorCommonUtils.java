@@ -141,16 +141,6 @@ abstract class AbstractProtocolProcessorCommonUtils {
         this.m_processor.processSubscribe(m_channel, subscribe);
     }
 
-    protected void unsubscribe(String topic) {
-        final int messageId = 1;
-        MqttUnsubscribeMessage msg = MqttMessageBuilders.unsubscribe()
-            .addTopicFilter(topic)
-            .messageId(messageId)
-            .build();
-
-        m_processor.processUnsubscribe(m_channel, msg);
-    }
-
     protected void unsubscribeAndVerifyAck(String topic) {
         final int messageId = 1;
         MqttUnsubscribeMessage msg = MqttMessageBuilders.unsubscribe()

@@ -12,7 +12,6 @@ import io.moquette.spi.security.IAuthenticator;
 import io.netty.channel.Channel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
-import io.netty.handler.codec.mqtt.MqttConnectReturnCode;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttVersion;
 import org.junit.Before;
@@ -42,9 +41,9 @@ public class SessionRegistryTest {
     static final String EVIL_TEST_USER = "eviluser";
     static final String EVIL_TEST_PWD = "unsecret";
 
-    private MQTTConnection sut;
+    private MQTTConnection connection;
     private EmbeddedChannel channel;
-    private SessionRegistry sessionRegistry;
+    private SessionRegistry sut;
     private MqttMessageBuilders.ConnectBuilder connMsg;
     private static final BrokerConfiguration ALLOW_ANONYMOUS_AND_ZEROBYTE_CLIENT_ID =
         new BrokerConfiguration(true, true, false);
@@ -58,7 +57,7 @@ public class SessionRegistryTest {
 
     private void createMQTTConnection(BrokerConfiguration config) {
         channel = new EmbeddedChannel();
-        sut = createMQTTConnection(config, channel);
+        connection = createMQTTConnection(config, channel);
     }
 
     private MQTTConnection createMQTTConnection(BrokerConfiguration config, Channel channel) {
@@ -71,8 +70,8 @@ public class SessionRegistryTest {
         subscriptions.init(sessionsRepository);
 
         final PostOffice postOffice = new PostOffice(subscriptions, new PermitAllAuthorizatorPolicy());
-        sessionRegistry = new SessionRegistry(subscriptions, postOffice);
-        return new MQTTConnection(channel, config, mockAuthenticator, sessionRegistry, postOffice);
+        sut = new SessionRegistry(subscriptions, postOffice);
+        return new MQTTConnection(channel, config, mockAuthenticator, sut, postOffice);
     }
 
     @Test
@@ -84,14 +83,14 @@ public class SessionRegistryTest {
         NettyUtils.cleanSession(channel, false);
 
         // Connect a first time
-        sessionRegistry.bindToSession(sut, msg, FAKE_CLIENT_ID);
+        sut.bindToSession(connection, msg, FAKE_CLIENT_ID);
         // disconnect
-        sessionRegistry.disconnect(FAKE_CLIENT_ID);
+        sut.disconnect(FAKE_CLIENT_ID);
 
         // Exercise, reconnect
         EmbeddedChannel anotherChannel = new EmbeddedChannel();
         MQTTConnection anotherConnection = createMQTTConnection(ALLOW_ANONYMOUS_AND_ZEROBYTE_CLIENT_ID, anotherChannel);
-        sessionRegistry.bindToSession(anotherConnection, msg, FAKE_CLIENT_ID);
+        sut.bindToSession(anotherConnection, msg, FAKE_CLIENT_ID);
 
         // Verify
         assertEqualsConnAck(CONNECTION_ACCEPTED, anotherChannel.readOutbound());
@@ -102,9 +101,9 @@ public class SessionRegistryTest {
     public void connectWithCleanSessionUpdateClientSession() {
         // first connect with clean session true
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).cleanSession(true).build();
-        sut.processConnect(msg);
+        connection.processConnect(msg);
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
-        sut.processDisconnect(null);
+        connection.processDisconnect(null);
         assertFalse(channel.isOpen());
 
         // second connect with clean session false
@@ -120,7 +119,7 @@ public class SessionRegistryTest {
         assertEqualsConnAck(CONNECTION_ACCEPTED, anotherChannel.readOutbound());
 
         // Verify client session is clean false
-        Session session = sessionRegistry.retrieve(FAKE_CLIENT_ID);
+        Session session = sut.retrieve(FAKE_CLIENT_ID);
         assertFalse(session.isClean());
     }
 }

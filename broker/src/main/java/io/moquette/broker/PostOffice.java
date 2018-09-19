@@ -16,7 +16,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 import static io.moquette.spi.impl.Utils.messageId;
-import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.FAILURE;
@@ -94,8 +93,8 @@ class PostOffice {
             if (!validTopic) {
                 // close the connection, not valid topicFilter is a protocol violation
                 mqttConnection.dropConnection();
-                LOG.error("Topic filter is not valid. CId={}, topics: {}, offending topic filter: {}",
-                          clientID, topics, topic);
+                LOG.warn("Topic filter is not valid. CId={}, topics: {}, offending topic filter: {}", clientID,
+                         topics, topic);
                 return;
             }
 

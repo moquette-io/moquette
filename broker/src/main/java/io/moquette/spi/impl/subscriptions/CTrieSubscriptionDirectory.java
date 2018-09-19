@@ -98,9 +98,28 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
      *            to use fo searching matching subscriptions.
      * @return the list of matching subscriptions, or empty if not matching.
      */
-     Set<Subscription> match(Topic topic) {
-        final Set<Subscription> matchingSubs = recursiveMatch(topic, this.root);
+    @Override
+    public Set<Subscription> matchWithoutQosSharpening(Topic topic) {
+        return recursiveMatch(topic, this.root);
+    }
+
+    /**
+     * Given a topic string return the clients subscriptions that matches it. Topic string can't
+     * contain character # and + because they are reserved to listeners subscriptions, and not topic
+     * publishing.
+     *
+     * @param topic
+     *            to use fo searching matching subscriptions.
+     * @return the list of matching subscriptions, or empty if not matching.
+     */
+    Set<Subscription> match(Topic topic) {
+        final Set<Subscription> matchingSubs = matchWithoutQosSharpening(topic);
         // remove the overlapping subscriptions, selecting ones with greatest qos
+        Map<String, Subscription> subsForClient = loadSubscriptionsFromStorage(matchingSubs);
+        return new HashSet<>(subsForClient.values());
+    }
+
+    private Map<String, Subscription> loadSubscriptionsFromStorage(Set<Subscription> matchingSubs) {
         Map<String, Subscription> subsForClient = new HashMap<>();
         for (Subscription matchingSub : matchingSubs) {
             Subscription existingSub = subsForClient.get(matchingSub.clientId);
@@ -120,7 +139,7 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
                 subsForClient.put(sub.clientId, sub);
             }
         }
-        return new HashSet<>(subsForClient.values());
+        return subsForClient;
     }
 
     Set<Subscription> recursiveMatch(Topic topic, INode inode) {

@@ -252,6 +252,5 @@ public class MQTTConnectionConnectTest {
         // the good client remains connected
         assertTrue("Original connected client must remain connected", channel.isOpen());
         assertFalse("Channel trying to connect with bad credentials must be closed", evilChannel.isOpen());
-
     }
 }
