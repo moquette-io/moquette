@@ -4,6 +4,7 @@ import io.moquette.spi.impl.subscriptions.ISubscriptionsDirectory;
 import io.moquette.spi.impl.subscriptions.Subscription;
 import io.moquette.spi.impl.subscriptions.Topic;
 import io.moquette.spi.security.IAuthorizatorPolicy;
+import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.mqtt.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
@@ -22,15 +24,31 @@ import static io.netty.handler.codec.mqtt.MqttQoS.FAILURE;
 
 class PostOffice {
 
+    private static final class PublishedMessage {
+
+        private final Topic topic;
+        private final MqttQoS publishingQos;
+
+        PublishedMessage(Topic topic, MqttQoS publishingQos) {
+            this.topic = topic;
+            this.publishingQos = publishingQos;
+        }
+    }
+
     private static final Logger LOG = LoggerFactory.getLogger(PostOffice.class);
 
     private final ConcurrentMap<String, Queue> queues = new ConcurrentHashMap<>();
     private final Authorizator authorizator;
     private final ISubscriptionsDirectory subscriptions;
+    private SessionRegistry sessionRegistry;
 
     PostOffice(ISubscriptionsDirectory subscriptions, IAuthorizatorPolicy authorizatorPolicy) {
         this.authorizator = new Authorizator(authorizatorPolicy);
         this.subscriptions = subscriptions;
+    }
+
+    public void init(SessionRegistry sessionRegistry) {
+        this.sessionRegistry = sessionRegistry;
     }
 
     void dropQueuesForClient(String clientId) {
@@ -108,6 +126,63 @@ class PostOffice {
 //            String username = NettyUtils.userName(channel);
 //            m_interceptor.notifyTopicUnsubscribed(topic.toString(), clientID, username);
         }
+    }
 
+    void receivedPublishQos0(Topic topic, String username, String clientID, ByteBuf payload) {
+        if (!authorizator.canWrite(topic, username, clientID)) {
+            LOG.error("MQTT client is not authorized to publish on topic. CId={}, topic: {}", clientID, topic);
+            return;
+        }
+        publish2Subscribers(payload, topic, AT_MOST_ONCE);
+
+//        if (msg.fixedHeader().isRetain()) {
+//            // QoS == 0 && retain => clean old retained
+//            m_messagesStore.cleanRetained(topic);
+//        }
+//
+//        m_interceptor.notifyTopicPublished(msg, clientID, username);
+    }
+
+    private void publish2Subscribers(ByteBuf origPayload, Topic topic, MqttQoS publishingQos) {
+        Set<Subscription> topicMatchingSubscriptions = subscriptions.matchWithoutQosSharpening(topic);
+
+        for (final Subscription sub : topicMatchingSubscriptions) {
+            MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
+            Session targetSession = this.sessionRegistry.retrieve(sub.getClientId());
+
+            boolean targetIsActive = targetSession != null && targetSession.connected();
+            // TODO move all this logic into messageSender, which puts into the flightZone only the messages
+            // that pull out of the queue.
+            if (targetIsActive) {
+                LOG.debug("Sending PUBLISH message to active subscriber. CId={}, topicFilter={}, qos={}",
+                    sub.getClientId(), sub.getTopicFilter(), qos);
+                // we need to retain because duplicate only copy r/w indexes and don't retain() causing
+                // refCnt = 0
+                ByteBuf payload = origPayload.retainedDuplicate();
+                if (qos != MqttQoS.AT_MOST_ONCE) {
+//                    // QoS 1 or 2
+//                    int messageId = targetSession.inFlightAckWaiting(pubMsg);
+//                    // set the PacketIdentifier only for QoS > 0
+//                    publishMsg = notRetainedPublishWithMessageId(topic.toString(), qos, payload, messageId);
+                } else {
+                    targetSession.sendPublishNotRetained(topic, publishingQos, payload);
+                }
+//                this.messageSender.sendPublish(targetSession, publishMsg);
+            } else {
+                if (!targetSession.isClean()) {
+                    LOG.debug("Storing pending PUBLISH inactive message. CId={}, topicFilter: {}, qos: {}",
+                        sub.getClientId(), sub.getTopicFilter(), qos);
+                    // store the message in targetSession queue to deliver
+                    queues.get(sub.getClientId()).add(new PublishedMessage(topic, publishingQos/*, payload*/));
+                }
+            }
+        }
+    }
+
+    static MqttQoS lowerQosToTheSubscriptionDesired(Subscription sub, MqttQoS qos) {
+        if (qos.value() > sub.getRequestedQos().value()) {
+            qos = sub.getRequestedQos();
+        }
+        return qos;
     }
 }

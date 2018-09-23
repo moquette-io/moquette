@@ -1,6 +1,9 @@
 package io.moquette.broker;
 
 import io.moquette.spi.impl.subscriptions.Subscription;
+import io.moquette.spi.impl.subscriptions.Topic;
+import io.netty.buffer.ByteBuf;
+import io.netty.handler.codec.mqtt.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -94,5 +97,21 @@ class Session {
 
     boolean isClean() {
         return clean;
+    }
+
+    void sendPublishNotRetained(Topic topic, MqttQoS qos, ByteBuf payload) {
+        MqttPublishMessage publishMsg = notRetainedPublish(topic.toString(), qos, payload);
+        mqttConnection.sendPublish(publishMsg);
+    }
+
+    private static MqttPublishMessage notRetainedPublish(String topic, MqttQoS qos, ByteBuf message) {
+        return notRetainedPublishWithMessageId(topic, qos, message, 0);
+    }
+
+    private static MqttPublishMessage notRetainedPublishWithMessageId(String topic, MqttQoS qos, ByteBuf message,
+                                                                      int messageId) {
+        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, false, 0);
+        MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId);
+        return new MqttPublishMessage(fixedHeader, varHeader, message);
     }
 }

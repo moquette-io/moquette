@@ -1,7 +1,10 @@
 package io.moquette.broker;
 
 import io.moquette.server.netty.NettyUtils;
+import io.moquette.spi.impl.DebugUtils;
+import io.moquette.spi.impl.subscriptions.Topic;
 import io.moquette.spi.security.IAuthenticator;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.handler.codec.mqtt.*;
 import org.slf4j.Logger;
@@ -51,9 +54,9 @@ final class MQTTConnection {
             case UNSUBSCRIBE:
                 processUnsubscribe((MqttUnsubscribeMessage) msg);
                 break;
-//            case PUBLISH:
-//                m_processor.processPublish(channel, (MqttPublishMessage) msg);
-//                break;
+            case PUBLISH:
+                processPublish((MqttPublishMessage) msg);
+                break;
 //            case PUBREC:
 //                m_processor.processPubRec(channel, msg);
 //                break;
@@ -245,6 +248,65 @@ final class MQTTConnection {
         LOG.trace("Sending UNSUBACK message. CId={}, messageId: {}, topics: {}", clientID, messageID, topics);
         channel.writeAndFlush(ackMessage).addListener(FIRE_EXCEPTION_ON_FAILURE);
         LOG.trace("Client <{}> unsubscribed from topics <{}>", clientID, topics);
+    }
+
+    private void processPublish(MqttPublishMessage msg) {
+        final MqttQoS qos = msg.fixedHeader().qosLevel();
+        final String username = NettyUtils.userName(channel);
+        final String topicName = msg.variableHeader().topicName();
+        final String clientId = getClientId();
+        LOG.trace("Processing PUBLISH message. CId={}, topic: {}, messageId: {}, qos: {}", clientId, topicName,
+                  msg.variableHeader().packetId(), qos);
+        ByteBuf payload = msg.payload();
+        switch (qos) {
+            case AT_MOST_ONCE:
+                postOffice.receivedPublishQos0(new Topic(topicName), username, clientId, payload);
+                break;
+                // TODO to implement
+//            case AT_LEAST_ONCE:
+//                this.qos1PublishHandler.receivedPublishQos1(channel, msg);
+//                break;
+//            case EXACTLY_ONCE:
+//                this.qos2PublishHandler.receivedPublishQos2(channel, msg);
+//                break;
+            default:
+                LOG.error("Unknown QoS-Type:{}", qos);
+                break;
+        }
+    }
+
+    void sendPublish(MqttPublishMessage publishMsg) {
+        final int messageId = publishMsg.variableHeader().packetId();
+        final String topicName = publishMsg.variableHeader().topicName();
+        final String clientId = getClientId();
+        MqttQoS qos = publishMsg.fixedHeader().qosLevel();
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("Sending PUBLISH message. MessageId={}, CId={}, topic={}, qos={}, payload={}", messageId,
+                      clientId, topicName, qos, DebugUtils.payload2Str(publishMsg.payload()));
+        } else {
+            LOG.debug("Sending PUBLISH message. MessageId={}, CId={}, topic={}", messageId, clientId, topicName);
+        }
+
+        boolean messageDelivered = false;
+        try {
+            channel.writeAndFlush(publishMsg);
+            messageDelivered = true;
+        } catch (Throwable th) {
+            LOG.error("Unable to send {} message. CId=<{}>, messageId={}", publishMsg.fixedHeader().messageType(),
+                clientId, messageId, th);
+        }
+        // TODO improve this for in-flight messages (qos != 0)
+//
+//        if (!messageDelivered) {
+//            if (qos != AT_MOST_ONCE && !clientsession.isCleanSession()) {
+//                LOG.warn("PUBLISH message could not be delivered. It will be stored. MessageId={}, CId={}, topic={}, " +
+//                    "qos={}, removeTemporaryQoS2={}", messageId, clientId, topicName, qos, false);
+//                clientsession.enqueue(asStoredMessage(pubMessage));
+//            } else {
+//                LOG.warn("PUBLISH message could not be delivered. It will be discarded. MessageId={}, CId={}, " +
+//                    "topic={}, qos={}, removeTemporaryQoS2={}", messageId, clientId, topicName, qos, true);
+//            }
+//        }
     }
 
     String getClientId() {

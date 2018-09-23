@@ -111,6 +111,7 @@ public class Server {
         subscriptions.init(sessionsRepository);
         final PostOffice dispatcher = new PostOffice(subscriptions, authorizatorPolicy);
         SessionRegistry sessions = new SessionRegistry(subscriptions, dispatcher);
+        dispatcher.init(sessions);
         final BrokerConfiguration brokerConfig = new BrokerConfiguration(config);
         MQTTConnectionFactory connectionFactory = new MQTTConnectionFactory(brokerConfig, authenticator, sessions,
                                                                             dispatcher);

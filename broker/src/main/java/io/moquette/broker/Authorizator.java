@@ -61,4 +61,20 @@ final class Authorizator {
         }
         return ackTopics;
     }
+
+    /**
+     * Ask the authorization policy if the topic can be used in a publish.
+     *
+     * @param topic
+     *            the topic to write to.
+     * @param user
+     *            the user
+     * @param client
+     *            the client
+     * @return true if the user from client can publish data on topic.
+     */
+    boolean canWrite(Topic topic, String user, String client) {
+        return policy.canWrite(topic, user, client);
+    }
+
 }
