@@ -345,10 +345,12 @@ public class ProtocolProcessor {
         connectionDescriptors.removeConnection(oldConnDescr);
         // publish the Will message (if any) for the clientID
         final ClientSession clientSession = this.sessionsRepository.sessionForClient(clientID);
-        WillMessage will = clientSession.willMessage();
-        if (will != null) {
-            forwardPublishWill(will, clientID);
-            clientSession.removeWill();
+        if (clientSession != null) {
+            WillMessage will = clientSession.willMessage();
+            if (will != null) {
+                forwardPublishWill(will, clientID);
+                clientSession.removeWill();
+            }
         }
 
         String username = NettyUtils.userName(channel);
