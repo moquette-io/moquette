@@ -58,7 +58,7 @@ public class MQTTConnectionConnectTest {
         SessionsRepository sessionsRepository = new SessionsRepository(sessionStore, null);
         subscriptions.init(sessionsRepository);
 
-        final PostOffice postOffice = new PostOffice(subscriptions, new PermitAllAuthorizatorPolicy());
+        final PostOffice postOffice = new PostOffice(subscriptions, new PermitAllAuthorizatorPolicy(), new MemoryRetainedRepository());
         sessionRegistry = new SessionRegistry(subscriptions, postOffice);
         return new MQTTConnection(channel, config, mockAuthenticator, sessionRegistry, postOffice);
     }

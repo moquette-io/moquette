@@ -40,11 +40,14 @@ class PostOffice {
     private final ConcurrentMap<String, Queue> queues = new ConcurrentHashMap<>();
     private final Authorizator authorizator;
     private final ISubscriptionsDirectory subscriptions;
+    private final IRetainedRepository retainedRepository;
     private SessionRegistry sessionRegistry;
 
-    PostOffice(ISubscriptionsDirectory subscriptions, IAuthorizatorPolicy authorizatorPolicy) {
+    PostOffice(ISubscriptionsDirectory subscriptions, IAuthorizatorPolicy authorizatorPolicy,
+               IRetainedRepository retainedRepository) {
         this.authorizator = new Authorizator(authorizatorPolicy);
         this.subscriptions = subscriptions;
+        this.retainedRepository = retainedRepository;
     }
 
     public void init(SessionRegistry sessionRegistry) {
@@ -128,18 +131,18 @@ class PostOffice {
         }
     }
 
-    void receivedPublishQos0(Topic topic, String username, String clientID, ByteBuf payload) {
+    void receivedPublishQos0(Topic topic, String username, String clientID, ByteBuf payload, boolean retain) {
         if (!authorizator.canWrite(topic, username, clientID)) {
             LOG.error("MQTT client is not authorized to publish on topic. CId={}, topic: {}", clientID, topic);
             return;
         }
         publish2Subscribers(payload, topic, AT_MOST_ONCE);
 
-//        if (msg.fixedHeader().isRetain()) {
-//            // QoS == 0 && retain => clean old retained
-//            m_messagesStore.cleanRetained(topic);
-//        }
-//
+        if (retain) {
+            // QoS == 0 && retain => clean old retained
+            retainedRepository.cleanRetained(topic);
+        }
+// TODO
 //        m_interceptor.notifyTopicPublished(msg, clientID, username);
     }
 
@@ -154,8 +157,8 @@ class PostOffice {
             // TODO move all this logic into messageSender, which puts into the flightZone only the messages
             // that pull out of the queue.
             if (targetIsActive) {
-                LOG.debug("Sending PUBLISH message to active subscriber. CId={}, topicFilter={}, qos={}",
-                    sub.getClientId(), sub.getTopicFilter(), qos);
+                LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
+                          sub.getClientId(), sub.getTopicFilter(), qos);
                 // we need to retain because duplicate only copy r/w indexes and don't retain() causing
                 // refCnt = 0
                 ByteBuf payload = origPayload.retainedDuplicate();

@@ -7,7 +7,6 @@ import io.moquette.server.config.FileResourceLoader;
 import io.moquette.server.config.IConfig;
 import io.moquette.server.config.IResourceLoader;
 import io.moquette.server.config.ResourceLoaderConfig;
-import io.moquette.spi.IMessagesStore;
 import io.moquette.spi.ISessionsStore;
 import io.moquette.spi.impl.SessionsRepository;
 import io.moquette.spi.impl.security.AcceptAllAuthenticator;
@@ -28,8 +27,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 import static io.moquette.logging.LoggingUtils.getInterceptorIds;
-import static java.util.Collections.singleton;
-import static java.util.Collections.singletonMap;
 
 public class Server {
 
@@ -109,7 +106,7 @@ public class Server {
         
         ISubscriptionsDirectory subscriptions = new CTrieSubscriptionDirectory();
         subscriptions.init(sessionsRepository);
-        final PostOffice dispatcher = new PostOffice(subscriptions, authorizatorPolicy);
+        final PostOffice dispatcher = new PostOffice(subscriptions, authorizatorPolicy, new MemoryRetainedRepository());
         SessionRegistry sessions = new SessionRegistry(subscriptions, dispatcher);
         dispatcher.init(sessions);
         final BrokerConfiguration brokerConfig = new BrokerConfiguration(config);

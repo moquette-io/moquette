@@ -69,100 +69,103 @@ public class ProtocolProcessorTest extends AbstractProtocolProcessorCommonUtils 
         initializeProcessorAndSubsystems();
     }
 
-    @Test
-    public void testPublishToItself() {
-        final Subscription subscription = new Subscription(FAKE_CLIENT_ID, new Topic(NEWS_TOPIC), AT_MOST_ONCE);
+    //same test moved into PostOfficePublishTest
+//    @Test
+//    public void testPublishToItself() {
+//        final Subscription subscription = new Subscription(FAKE_CLIENT_ID, new Topic(NEWS_TOPIC), AT_MOST_ONCE);
+//
+//        // subscriptions.matches(topic) redefine the method to return true
+//        ISubscriptionsDirectory subs = new CTrieSubscriptionDirectory() {
+//
+//            @Override
+//            public List<Subscription> matches(Topic topic) {
+//                if (topic.toString().equals(NEWS_TOPIC)) {
+//                    return Collections.singletonList(subscription);
+//                } else {
+//                    throw new IllegalArgumentException("Expected " + NEWS_TOPIC + " buf found " + topic);
+//                }
+//            }
+//        };
+//
+//        // simulate a connect that register a clientID to an IoSession
+//        MemoryStorageService storageService = new MemoryStorageService(null, null);
+//        SessionsRepository sessionsRepository = new SessionsRepository(storageService.sessionsStore(), null);
+//        subs.init(sessionsRepository);
+//        m_processor.init(subs, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizatorPolicy(),
+//                NO_OBSERVERS_INTERCEPTOR, this.sessionsRepository, false);
+//
+//        connect_v3_1();
+//
+//        // Exercise
+//        publishToAs("FakeCLI", NEWS_TOPIC, AT_MOST_ONCE, false);
+//
+//        // Verify
+//        verifyPublishIsReceived();
+//    }
 
-        // subscriptions.matches(topic) redefine the method to return true
-        ISubscriptionsDirectory subs = new CTrieSubscriptionDirectory() {
+    //same test moved into PostOfficePublishTest
+//    @Test
+//    public void testPublishToMultipleSubscribers() {
+//        final Subscription subscription = new Subscription(FAKE_CLIENT_ID, new Topic(NEWS_TOPIC), AT_MOST_ONCE);
+//        final Subscription subscriptionClient2 = new Subscription(
+//                FAKE_CLIENT_ID2,
+//                new Topic(NEWS_TOPIC),
+//                AT_MOST_ONCE);
+//
+//        // subscriptions.matches(topic) redefine the method to return true
+//        ISubscriptionsDirectory subs = new CTrieSubscriptionDirectory() {
+//
+//            @Override
+//            public List<Subscription> matches(Topic topic) {
+//                if (topic.toString().equals(NEWS_TOPIC)) {
+//                    return Arrays.asList(subscription, subscriptionClient2);
+//                } else {
+//                    throw new IllegalArgumentException("Expected " + NEWS_TOPIC + " buf found " + topic);
+//                }
+//            }
+//        };
+//
+//        // simulate a connect that register a clientID to an IoSession
+//        MemoryStorageService storageService = new MemoryStorageService(null, null);
+//        SessionsRepository sessionsRepository = new SessionsRepository(storageService.sessionsStore(), null);
+//        subs.init(sessionsRepository);
+//        m_processor.init(subs, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizatorPolicy(),
+//                NO_OBSERVERS_INTERCEPTOR, this.sessionsRepository, false);
+//
+//        EmbeddedChannel firstReceiverChannel = new EmbeddedChannel();
+//        MqttConnectMessage connectMessage = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_3_1)
+//                .clientId(FAKE_CLIENT_ID).cleanSession(true).build();
+//        m_processor.processConnect(firstReceiverChannel, connectMessage);
+//        assertConnAckAccepted(firstReceiverChannel);
+//
+//        // connect the second fake subscriber
+//        EmbeddedChannel secondReceiverChannel = new EmbeddedChannel();
+//        MqttConnectMessage connectMessage2 = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_3_1)
+//                .clientId(FAKE_CLIENT_ID2).cleanSession(true).build();
+//        m_processor.processConnect(secondReceiverChannel, connectMessage2);
+//        assertConnAckAccepted(secondReceiverChannel);
+//
+//        // Exercise
+//        MqttPublishMessage msg = MqttMessageBuilders.publish().topicName(NEWS_TOPIC).qos(AT_MOST_ONCE)
+//                .retained(false).payload(Unpooled.copiedBuffer("Hello".getBytes(UTF_8))).build();
+//        NettyUtils.userName(m_channel, "FakeCLI");
+//        m_processor.processPublish(m_channel, msg);
+//
+//        // Verify
+//        firstReceiverChannel.flush();
+//        MqttPublishMessage pub2FirstSubscriber = firstReceiverChannel.readOutbound();
+//        assertNotNull(pub2FirstSubscriber);
+//        String firstMessageContent = DebugUtils.payload2Str(pub2FirstSubscriber.payload());
+//        assertEquals("Hello", firstMessageContent);
+//
+//        secondReceiverChannel.flush();
+//        MqttPublishMessage pub2SecondSubscriber = secondReceiverChannel.readOutbound();
+//        assertNotNull(pub2SecondSubscriber);
+//        String secondMessageContent = DebugUtils.payload2Str(pub2SecondSubscriber.payload());
+//        assertEquals("Hello", secondMessageContent);
+//    }
 
-            @Override
-            public List<Subscription> matches(Topic topic) {
-                if (topic.toString().equals(NEWS_TOPIC)) {
-                    return Collections.singletonList(subscription);
-                } else {
-                    throw new IllegalArgumentException("Expected " + NEWS_TOPIC + " buf found " + topic);
-                }
-            }
-        };
-
-        // simulate a connect that register a clientID to an IoSession
-        MemoryStorageService storageService = new MemoryStorageService(null, null);
-        SessionsRepository sessionsRepository = new SessionsRepository(storageService.sessionsStore(), null);
-        subs.init(sessionsRepository);
-        m_processor.init(subs, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizatorPolicy(),
-                NO_OBSERVERS_INTERCEPTOR, this.sessionsRepository, false);
-
-        connect_v3_1();
-
-        // Exercise
-        publishToAs("FakeCLI", NEWS_TOPIC, AT_MOST_ONCE, false);
-
-        // Verify
-        verifyPublishIsReceived();
-    }
-
-    @Test
-    public void testPublishToMultipleSubscribers() {
-        final Subscription subscription = new Subscription(FAKE_CLIENT_ID, new Topic(NEWS_TOPIC), AT_MOST_ONCE);
-        final Subscription subscriptionClient2 = new Subscription(
-                FAKE_CLIENT_ID2,
-                new Topic(NEWS_TOPIC),
-                AT_MOST_ONCE);
-
-        // subscriptions.matches(topic) redefine the method to return true
-        ISubscriptionsDirectory subs = new CTrieSubscriptionDirectory() {
-
-            @Override
-            public List<Subscription> matches(Topic topic) {
-                if (topic.toString().equals(NEWS_TOPIC)) {
-                    return Arrays.asList(subscription, subscriptionClient2);
-                } else {
-                    throw new IllegalArgumentException("Expected " + NEWS_TOPIC + " buf found " + topic);
-                }
-            }
-        };
-
-        // simulate a connect that register a clientID to an IoSession
-        MemoryStorageService storageService = new MemoryStorageService(null, null);
-        SessionsRepository sessionsRepository = new SessionsRepository(storageService.sessionsStore(), null);
-        subs.init(sessionsRepository);
-        m_processor.init(subs, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizatorPolicy(),
-                NO_OBSERVERS_INTERCEPTOR, this.sessionsRepository, false);
-
-        EmbeddedChannel firstReceiverChannel = new EmbeddedChannel();
-        MqttConnectMessage connectMessage = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_3_1)
-                .clientId(FAKE_CLIENT_ID).cleanSession(true).build();
-        m_processor.processConnect(firstReceiverChannel, connectMessage);
-        assertConnAckAccepted(firstReceiverChannel);
-
-        // connect the second fake subscriber
-        EmbeddedChannel secondReceiverChannel = new EmbeddedChannel();
-        MqttConnectMessage connectMessage2 = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_3_1)
-                .clientId(FAKE_CLIENT_ID2).cleanSession(true).build();
-        m_processor.processConnect(secondReceiverChannel, connectMessage2);
-        assertConnAckAccepted(secondReceiverChannel);
-
-        // Exercise
-        MqttPublishMessage msg = MqttMessageBuilders.publish().topicName(NEWS_TOPIC).qos(AT_MOST_ONCE)
-                .retained(false).payload(Unpooled.copiedBuffer("Hello".getBytes(UTF_8))).build();
-        NettyUtils.userName(m_channel, "FakeCLI");
-        m_processor.processPublish(m_channel, msg);
-
-        // Verify
-        firstReceiverChannel.flush();
-        MqttPublishMessage pub2FirstSubscriber = firstReceiverChannel.readOutbound();
-        assertNotNull(pub2FirstSubscriber);
-        String firstMessageContent = DebugUtils.payload2Str(pub2FirstSubscriber.payload());
-        assertEquals("Hello", firstMessageContent);
-
-        secondReceiverChannel.flush();
-        MqttPublishMessage pub2SecondSubscriber = secondReceiverChannel.readOutbound();
-        assertNotNull(pub2SecondSubscriber);
-        String secondMessageContent = DebugUtils.payload2Str(pub2SecondSubscriber.payload());
-        assertEquals("Hello", secondMessageContent);
-    }
-
+    //TODO move this test on PostOfficeSubscribeTest
     @Test
     public void testPublishOfRetainedMessage_afterNewSubscription() throws Exception {
         // simulate a connect that register a clientID to an IoSession

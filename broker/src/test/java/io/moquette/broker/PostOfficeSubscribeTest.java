@@ -71,7 +71,7 @@ public class PostOfficeSubscribeTest {
         SessionsRepository sessionsRepository = new SessionsRepository(sessionStore, null);
         subscriptions.init(sessionsRepository);
 
-        sut = new PostOffice(subscriptions, new PermitAllAuthorizatorPolicy());
+        sut = new PostOffice(subscriptions, new PermitAllAuthorizatorPolicy(), new MemoryRetainedRepository());
         SessionRegistry sessionRegistry = new SessionRegistry(subscriptions, sut);
         return new MQTTConnection(channel, config, mockAuthenticator, sessionRegistry, sut);
     }
@@ -118,7 +118,7 @@ public class PostOfficeSubscribeTest {
         when(prohibitReadOnNewsTopic.canRead(eq(new Topic(NEWS_TOPIC)), eq(FAKE_USER_NAME), eq(FAKE_CLIENT_ID)))
             .thenReturn(false);
 
-        sut = new PostOffice(subscriptions, prohibitReadOnNewsTopic);
+        sut = new PostOffice(subscriptions, prohibitReadOnNewsTopic, new MemoryRetainedRepository());
 
         connection.processConnect(connectMessage);
         assertConnectAccepted(channel);

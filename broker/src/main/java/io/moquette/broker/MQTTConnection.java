@@ -24,7 +24,7 @@ final class MQTTConnection {
 
     private static final Logger LOG = LoggerFactory.getLogger(MQTTConnection.class);
 
-    private final Channel channel;
+    final Channel channel;
     private BrokerConfiguration brokerConfig;
     private IAuthenticator authenticator;
     private SessionRegistry sessionRegistry;
@@ -260,7 +260,8 @@ final class MQTTConnection {
         ByteBuf payload = msg.payload();
         switch (qos) {
             case AT_MOST_ONCE:
-                postOffice.receivedPublishQos0(new Topic(topicName), username, clientId, payload);
+                final boolean retain = msg.fixedHeader().isRetain();
+                postOffice.receivedPublishQos0(new Topic(topicName), username, clientId, payload, retain);
                 break;
                 // TODO to implement
 //            case AT_LEAST_ONCE:
