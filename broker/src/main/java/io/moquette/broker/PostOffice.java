@@ -14,11 +14,13 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 import static io.moquette.spi.impl.Utils.messageId;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
+import static io.netty.handler.codec.mqtt.MqttQoS.AT_LEAST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.FAILURE;
 
@@ -28,10 +30,12 @@ class PostOffice {
 
         private final Topic topic;
         private final MqttQoS publishingQos;
+        private final ByteBuf payload;
 
-        PublishedMessage(Topic topic, MqttQoS publishingQos) {
+        PublishedMessage(Topic topic, MqttQoS publishingQos, ByteBuf payload) {
             this.topic = topic;
             this.publishingQos = publishingQos;
+            this.payload = payload;
         }
     }
 
@@ -146,6 +150,37 @@ class PostOffice {
 //        m_interceptor.notifyTopicPublished(msg, clientID, username);
     }
 
+    void receivedPublishQos1(MQTTConnection connection, Topic topic, String username, ByteBuf payload, int messageID,
+                             boolean retain) {
+        // verify if topic can be write
+        topic.getTokens();
+        if (!topic.isValid()) {
+            LOG.warn("Invalid topic format, force close the connection");
+            connection.dropConnection();
+            return;
+        }
+        final String clientId = connection.getClientId();
+        if (!authorizator.canWrite(topic, username, clientId)) {
+            LOG.error("MQTT client is not authorized to publish on topic. CId={}, topic: {}", clientId, topic);
+            return;
+        }
+
+        publish2Subscribers(payload, topic, AT_LEAST_ONCE);
+
+        connection.sendPubAck(clientId, messageID);
+// TODO
+//        if (retain) {
+//            if (!payload.isReadable()) {
+//                m_messagesStore.cleanRetained(topic);
+//            } else {
+//                // before wasn't stored
+//                m_messagesStore.storeRetained(topic, toStoreMsg);
+//            }
+//        }
+//TODO
+//        m_interceptor.notifyTopicPublished(msg, clientID, username);
+    }
+
     private void publish2Subscribers(ByteBuf origPayload, Topic topic, MqttQoS publishingQos) {
         Set<Subscription> topicMatchingSubscriptions = subscriptions.matchWithoutQosSharpening(topic);
 
@@ -163,23 +198,30 @@ class PostOffice {
                 // refCnt = 0
                 ByteBuf payload = origPayload.retainedDuplicate();
                 if (qos != MqttQoS.AT_MOST_ONCE) {
-//                    // QoS 1 or 2
+                    // QoS 1 or 2
+                    // TODO
 //                    int messageId = targetSession.inFlightAckWaiting(pubMsg);
-//                    // set the PacketIdentifier only for QoS > 0
+                    int messageId = 1;
+                    // set the PacketIdentifier only for QoS > 0
 //                    publishMsg = notRetainedPublishWithMessageId(topic.toString(), qos, payload, messageId);
+                    targetSession.sendPublishNotRetainedWithMessageId(topic, qos, payload, messageId);
                 } else {
                     targetSession.sendPublishNotRetained(topic, publishingQos, payload);
                 }
-//                this.messageSender.sendPublish(targetSession, publishMsg);
             } else {
                 if (!targetSession.isClean()) {
                     LOG.debug("Storing pending PUBLISH inactive message. CId={}, topicFilter: {}, qos: {}",
-                        sub.getClientId(), sub.getTopicFilter(), qos);
+                              sub.getClientId(), sub.getTopicFilter(), qos);
                     // store the message in targetSession queue to deliver
-                    queues.get(sub.getClientId()).add(new PublishedMessage(topic, publishingQos/*, payload*/));
+                    enqueueToClient(sub.getClientId(), new PublishedMessage(topic, publishingQos, origPayload));
                 }
             }
         }
+    }
+
+    private void enqueueToClient(String clientId, PublishedMessage msg) {
+        queues.computeIfAbsent(clientId, (String cli) -> new ConcurrentLinkedQueue());
+        queues.get(clientId).add(msg);
     }
 
     static MqttQoS lowerQosToTheSubscriptionDesired(Subscription sub, MqttQoS qos) {

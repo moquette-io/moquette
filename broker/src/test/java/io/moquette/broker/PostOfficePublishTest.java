@@ -22,9 +22,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.nio.charset.Charset;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_LEAST_ONCE;
@@ -32,6 +30,7 @@ import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
@@ -40,6 +39,8 @@ public class PostOfficePublishTest {
 
     private static final String FAKE_CLIENT_ID = "FAKE_123";
     private static final String FAKE_CLIENT_ID2 = "FAKE_456";
+    private static final String SUBSCRIBER_ID= "Subscriber";
+    private static final String PUBLISHER_ID = "Publisher";
     private static final String TEST_USER = "fakeuser";
     private static final String TEST_PWD = "fakepwd";
     private static final String NEWS_TOPIC = "/news";
@@ -70,6 +71,13 @@ public class PostOfficePublishTest {
     private MqttConnectMessage buildConnect(String clientId) {
         return MqttMessageBuilders.connect()
             .clientId(clientId)
+            .build();
+    }
+
+    private MqttConnectMessage buildConnectNotClean(String clientId) {
+        return MqttMessageBuilders.connect()
+            .clientId(clientId)
+            .cleanSession(false)
             .build();
     }
 
@@ -132,12 +140,12 @@ public class PostOfficePublishTest {
         assertEquals("Connect must be accepted", CONNECTION_ACCEPTED, connAckReturnCode);
     }
 
-    protected void subscribe(EmbeddedChannel channel, String topic, MqttQoS desiredQos) {
+    protected void subscribe(EmbeddedChannel channel, String topic, MqttQoS desiredQos, String clientID) {
         MqttSubscribeMessage subscribe = MqttMessageBuilders.subscribe()
             .addSubscription(desiredQos, topic)
             .messageId(1)
             .build();
-        sut.subscribeClientToTopics(subscribe, FAKE_CLIENT_ID, null, connection);
+        sut.subscribeClientToTopics(subscribe, clientID, null, connection);
 
         MqttSubAckMessage subAck = channel.readOutbound();
         assertEquals(desiredQos.value(), (int) subAck.payload().grantedQoSLevels().get(0));
@@ -187,7 +195,6 @@ public class PostOfficePublishTest {
         assertEquals(expectedTopic, receivedPublish.variableHeader().topicName());
     }
 
-
     @Test
     public void testPublishWithEmptyPayloadClearRetainedStore() {
         connection.processConnect(connectMessage);
@@ -206,5 +213,49 @@ public class PostOfficePublishTest {
         assertTrue("QoS0 MUST clean retained message for topic", retainedRepository.isEmtpy());
     }
 
+    @Test
+    public void testPublishWithQoS1() {
+        connection.processConnect(connectMessage);
+        assertConnectAccepted(channel);
+        subscribe(channel, NEWS_TOPIC, AT_LEAST_ONCE, FAKE_CLIENT_ID);
 
+        // Exercise
+        final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
+        sut.receivedPublishQos1(connection, new Topic(NEWS_TOPIC), TEST_USER, anyPayload, 1,true);
+
+        // Verify
+        verifyPublishIsReceived(AT_LEAST_ONCE, "Any payload");
+    }
+
+    private void verifyPublishIsReceived(MqttQoS expectedQos, String ExpectedPayload) {
+        final MqttPublishMessage publishReceived = channel.readOutbound();
+        final String payloadMessage = DebugUtils.payload2Str(publishReceived.payload());
+        assertEquals("Sent and received payload must be identical", ExpectedPayload, payloadMessage);
+        assertEquals("Expected QoS don't match", expectedQos, publishReceived.fixedHeader().qosLevel());
+    }
+
+    @Test
+    public void publishNoPublishToInactiveSession() {
+        // create an inactive session for Subscriber
+        connection.processConnect(buildConnectNotClean(SUBSCRIBER_ID));
+        assertConnectAccepted(channel);
+        subscribe(channel, NEWS_TOPIC, AT_LEAST_ONCE, SUBSCRIBER_ID);
+        connection.processDisconnect(null);
+
+        // Exercise
+        EmbeddedChannel pubChannel = new EmbeddedChannel();
+        MQTTConnection pubConn = createMQTTConnection(ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID, pubChannel);
+        pubConn.processConnect(buildConnect(PUBLISHER_ID));
+        assertConnectAccepted(pubChannel);
+
+        final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
+        sut.receivedPublishQos1(pubConn, new Topic(NEWS_TOPIC), TEST_USER, anyPayload, 1,true);
+
+        verifyNoPublishIsReceived(channel);
+    }
+
+    private void verifyNoPublishIsReceived(EmbeddedChannel channel) {
+        final Object messageReceived = channel.readOutbound();
+        assertNull("Received an out message from processor while not expected", messageReceived);
+    }
 }

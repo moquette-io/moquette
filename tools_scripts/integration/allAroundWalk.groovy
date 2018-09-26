@@ -65,8 +65,12 @@ client1.subscribe("/news", 0)
 println "OK!"
 
 print "publish qos0..."
-byte[] bytes = "Moquette is going to big refactoring".bytes
-client1.publish("/news", bytes, 0, false)
+client1.publish("/news", "Moquette is going to big refactoring, QoS0".bytes, 0, false)
+callback.waitFinish()
+println "OK!"
+
+print "publish qos1..."
+client1.publish("/news", "Moquette is going to big refactoring, QoS1".bytes, 1, false)
 callback.waitFinish()
 println "OK!"
 

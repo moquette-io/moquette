@@ -258,15 +258,16 @@ final class MQTTConnection {
         LOG.trace("Processing PUBLISH message. CId={}, topic: {}, messageId: {}, qos: {}", clientId, topicName,
                   msg.variableHeader().packetId(), qos);
         ByteBuf payload = msg.payload();
+        final boolean retain = msg.fixedHeader().isRetain();
+        final Topic topic = new Topic(topicName);
         switch (qos) {
             case AT_MOST_ONCE:
-                final boolean retain = msg.fixedHeader().isRetain();
-                postOffice.receivedPublishQos0(new Topic(topicName), username, clientId, payload, retain);
+                postOffice.receivedPublishQos0(topic, username, clientId, payload, retain);
                 break;
-                // TODO to implement
-//            case AT_LEAST_ONCE:
-//                this.qos1PublishHandler.receivedPublishQos1(channel, msg);
-//                break;
+            case AT_LEAST_ONCE:
+                final int messageID = msg.variableHeader().messageId();
+                postOffice.receivedPublishQos1(this, topic, username, payload, messageID, retain);
+                break;
 //            case EXACTLY_ONCE:
 //                this.qos2PublishHandler.receivedPublishQos2(channel, msg);
 //                break;
@@ -288,6 +289,10 @@ final class MQTTConnection {
             LOG.debug("Sending PUBLISH message. MessageId={}, CId={}, topic={}", messageId, clientId, topicName);
         }
 
+        rawSend(publishMsg, messageId, clientId);
+    }
+
+    private void rawSend(MqttMessage publishMsg, int messageId, String clientId) {
         boolean messageDelivered = false;
         try {
             channel.writeAndFlush(publishMsg);
@@ -308,6 +313,14 @@ final class MQTTConnection {
 //                    "topic={}, qos={}, removeTemporaryQoS2={}", messageId, clientId, topicName, qos, true);
 //            }
 //        }
+    }
+
+    void sendPubAck(String clientId, int messageID) {
+        LOG.trace("sendPubAck invoked");
+        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBACK, false, AT_MOST_ONCE,
+                                                  false, 0);
+        MqttPubAckMessage pubAckMessage = new MqttPubAckMessage(fixedHeader, from(messageID));
+        rawSend(pubAckMessage, messageID, clientId);
     }
 
     String getClientId() {

@@ -114,4 +114,9 @@ class Session {
         MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId);
         return new MqttPublishMessage(fixedHeader, varHeader, message);
     }
+
+    void sendPublishNotRetainedWithMessageId(Topic topic, MqttQoS qos, ByteBuf payload, int messageId) {
+        MqttPublishMessage publishMsg = notRetainedPublishWithMessageId(topic.toString(), qos, payload, messageId);
+        mqttConnection.sendPublish(publishMsg);
+    }
 }

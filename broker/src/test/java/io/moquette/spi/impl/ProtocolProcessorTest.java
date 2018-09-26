@@ -16,6 +16,7 @@
 
 package io.moquette.spi.impl;
 
+import io.moquette.broker.PostOfficePublishTest;
 import io.moquette.interception.InterceptHandler;
 import io.moquette.persistence.MemoryStorageService;
 import io.moquette.server.netty.NettyUtils;
@@ -222,25 +223,26 @@ public class ProtocolProcessorTest extends AbstractProtocolProcessorCommonUtils 
         assertTrue(this.sessionsRepository.sessionForClient(PUBLISHER_ID).isEmptyQueue());
     }
 
-    @Test
-    public void publishNoPublishToInactiveSession() {
-        // create an inactive session for Subscriber
-        ISubscriptionsDirectory mockedSubscriptions = mock(ISubscriptionsDirectory.class);
-        Subscription inactiveSub = new Subscription("Subscriber", new Topic("/topic"), MqttQoS.AT_LEAST_ONCE);
-        List<Subscription> inactiveSubscriptions = Collections.singletonList(inactiveSub);
-        when(mockedSubscriptions.matches(eq(new Topic("/topic")))).thenReturn(inactiveSubscriptions);
-        m_processor = new ProtocolProcessor();
-        m_processor.init(mockedSubscriptions, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizatorPolicy(),
-                NO_OBSERVERS_INTERCEPTOR, this.sessionsRepository, false);
-
-        m_processor.sessionsRepository.createNewSession("Subscriber", false);
-
-        // Exercise
-        connectAsClient("Publisher");
-        publishToAs("Publisher", "/topic", AT_MOST_ONCE, true);
-
-        verifyNoPublishIsReceived();
-    }
+//    Moved to PostOfficePublishTest
+//    @Test
+//    public void publishNoPublishToInactiveSession() {
+//        // create an inactive session for Subscriber
+//        ISubscriptionsDirectory mockedSubscriptions = mock(ISubscriptionsDirectory.class);
+//        Subscription inactiveSub = new Subscription("Subscriber", new Topic("/topic"), MqttQoS.AT_LEAST_ONCE);
+//        List<Subscription> inactiveSubscriptions = Collections.singletonList(inactiveSub);
+//        when(mockedSubscriptions.matches(eq(new Topic("/topic")))).thenReturn(inactiveSubscriptions);
+//        m_processor = new ProtocolProcessor();
+//        m_processor.init(mockedSubscriptions, m_messagesStore, m_sessionStore, null, true, new PermitAllAuthorizatorPolicy(),
+//                NO_OBSERVERS_INTERCEPTOR, this.sessionsRepository, false);
+//
+//        m_processor.sessionsRepository.createNewSession("Subscriber", false);
+//
+//        // Exercise
+//        connectAsClient("Publisher");
+//        publishToAs("Publisher", "/topic", AT_MOST_ONCE, true);
+//
+//        verifyNoPublishIsReceived();
+//    }
 
     /**
      * Verify that receiving a publish with retained message and with Q0S = 0 clean the existing

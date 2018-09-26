@@ -123,16 +123,16 @@ public class ProtocolProcessor_VariousUseCases_Test extends AbstractProtocolProc
         publishToAs(FAKE_CLIENT_ID, "/topic", AT_MOST_ONCE, false);
         verifyNoPublishIsReceived();
     }
-
-    @Test
-    public void testPublishWithQoS1() {
-        connect();
-        subscribe("/topic", AT_LEAST_ONCE);
-        publishToAs(FAKE_CLIENT_ID, "/topic", AT_LEAST_ONCE, 66, false);
-        disconnect();
-
-        verifyPublishIsReceived(AT_LEAST_ONCE);
-    }
+// Moved to PostOfficePublishTest
+//    @Test
+//    public void testPublishWithQoS1() {
+//        connect();
+//        subscribe("/topic", AT_LEAST_ONCE);
+//        publishToAs(FAKE_CLIENT_ID, "/topic", AT_LEAST_ONCE, 66, false);
+//        disconnect();
+//
+//        verifyPublishIsReceived(AT_LEAST_ONCE);
+//    }
 
     @Test
     public void testPublishWithQoS1_notCleanSession() {
