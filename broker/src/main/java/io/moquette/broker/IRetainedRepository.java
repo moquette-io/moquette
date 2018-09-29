@@ -9,4 +9,6 @@ public interface IRetainedRepository {
     void retain(Topic topic, MqttPublishMessage msg);
 
     boolean isEmtpy();
+
+    MqttPublishMessage retainedOnTopic(String topic);
 }

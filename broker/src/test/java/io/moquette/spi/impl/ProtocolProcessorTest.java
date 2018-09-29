@@ -243,31 +243,31 @@ public class ProtocolProcessorTest extends AbstractProtocolProcessorCommonUtils 
 //
 //        verifyNoPublishIsReceived();
 //    }
-
-    /**
-     * Verify that receiving a publish with retained message and with Q0S = 0 clean the existing
-     * retained messages for that topic.
-     */
-    @Test
-    public void testCleanRetainedStoreAfterAQoS0AndRetainedTrue() {
-        // force a connect
-        connect_v3_1_asClient("Publisher");
-
-        // prepare and existing retained store
-        publishToAs("Publisher", NEWS_TOPIC, AT_LEAST_ONCE, 100, true);
-
-        Collection<IMessagesStore.StoredMessage> messages = m_messagesStore
-                .searchMatching(key -> key.match(new Topic(NEWS_TOPIC)));
-        assertFalse(messages.isEmpty());
-
-        // Exercise
-        // send a message that clean the previous retained publish
-        publishToAs("Publisher", NEWS_TOPIC, AT_MOST_ONCE, true);
-
-        // Verify
-        messages = m_messagesStore.searchMatching(key -> key.match(new Topic(NEWS_TOPIC)));
-        assertTrue(messages.isEmpty());
-    }
+//
+//    /**
+//     * Verify that receiving a publish with retained message and with Q0S = 0 clean the existing
+//     * retained messages for that topic.
+//     */
+//    @Test
+//    public void testCleanRetainedStoreAfterAQoS0AndRetainedTrue() {
+//        // force a connect
+//        connect_v3_1_asClient("Publisher");
+//
+//        // prepare and existing retained store
+//        publishToAs("Publisher", NEWS_TOPIC, AT_LEAST_ONCE, 100, true);
+//
+//        Collection<IMessagesStore.StoredMessage> messages = m_messagesStore
+//                .searchMatching(key -> key.match(new Topic(NEWS_TOPIC)));
+//        assertFalse(messages.isEmpty());
+//
+//        // Exercise
+//        // send a message that clean the previous retained publish
+//        publishToAs("Publisher", NEWS_TOPIC, AT_MOST_ONCE, true);
+//
+//        // Verify
+//        messages = m_messagesStore.searchMatching(key -> key.match(new Topic(NEWS_TOPIC)));
+//        assertTrue(messages.isEmpty());
+//    }
 
     @Test
     public void testLowerTheQosToTheRequestedBySubscription() {

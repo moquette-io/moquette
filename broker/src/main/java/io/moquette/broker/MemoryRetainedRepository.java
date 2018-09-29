@@ -27,4 +27,9 @@ final class MemoryRetainedRepository implements IRetainedRepository {
     public boolean isEmtpy() {
         return storage.isEmpty();
     }
+
+    @Override
+    public MqttPublishMessage retainedOnTopic(String topic) {
+        return storage.get(topic);
+    }
 }

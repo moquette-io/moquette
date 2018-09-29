@@ -266,7 +266,7 @@ final class MQTTConnection {
                 break;
             case AT_LEAST_ONCE:
                 final int messageID = msg.variableHeader().messageId();
-                postOffice.receivedPublishQos1(this, topic, username, payload, messageID, retain);
+                postOffice.receivedPublishQos1(this, topic, username, payload, messageID, retain, msg);
                 break;
 //            case EXACTLY_ONCE:
 //                this.qos2PublishHandler.receivedPublishQos2(channel, msg);

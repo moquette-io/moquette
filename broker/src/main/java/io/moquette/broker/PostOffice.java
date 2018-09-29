@@ -105,7 +105,7 @@ class PostOffice {
         }
 
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.SUBACK, false, AT_MOST_ONCE,
-                                                  false, 0);
+            false, 0);
         MqttSubAckPayload payload = new MqttSubAckPayload(grantedQoSLevels);
         return new MqttSubAckMessage(fixedHeader, from(messageId), payload);
     }
@@ -119,7 +119,7 @@ class PostOffice {
                 // close the connection, not valid topicFilter is a protocol violation
                 mqttConnection.dropConnection();
                 LOG.warn("Topic filter is not valid. CId={}, topics: {}, offending topic filter: {}", clientID,
-                         topics, topic);
+                    topics, topic);
                 return;
             }
 
@@ -151,7 +151,7 @@ class PostOffice {
     }
 
     void receivedPublishQos1(MQTTConnection connection, Topic topic, String username, ByteBuf payload, int messageID,
-                             boolean retain) {
+                             boolean retain, MqttPublishMessage msg) {
         // verify if topic can be write
         topic.getTokens();
         if (!topic.isValid()) {
@@ -168,15 +168,15 @@ class PostOffice {
         publish2Subscribers(payload, topic, AT_LEAST_ONCE);
 
         connection.sendPubAck(clientId, messageID);
-// TODO
-//        if (retain) {
-//            if (!payload.isReadable()) {
-//                m_messagesStore.cleanRetained(topic);
-//            } else {
-//                // before wasn't stored
-//                m_messagesStore.storeRetained(topic, toStoreMsg);
-//            }
-//        }
+
+        if (retain) {
+            if (!payload.isReadable()) {
+                retainedRepository.cleanRetained(topic);
+            } else {
+                // before wasn't stored
+                retainedRepository.retain(topic, msg);
+            }
+        }
 //TODO
 //        m_interceptor.notifyTopicPublished(msg, clientID, username);
     }
@@ -193,7 +193,7 @@ class PostOffice {
             // that pull out of the queue.
             if (targetIsActive) {
                 LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
-                          sub.getClientId(), sub.getTopicFilter(), qos);
+                    sub.getClientId(), sub.getTopicFilter(), qos);
                 // we need to retain because duplicate only copy r/w indexes and don't retain() causing
                 // refCnt = 0
                 ByteBuf payload = origPayload.retainedDuplicate();
@@ -211,7 +211,7 @@ class PostOffice {
             } else {
                 if (!targetSession.isClean()) {
                     LOG.debug("Storing pending PUBLISH inactive message. CId={}, topicFilter: {}, qos: {}",
-                              sub.getClientId(), sub.getTopicFilter(), qos);
+                        sub.getClientId(), sub.getTopicFilter(), qos);
                     // store the message in targetSession queue to deliver
                     enqueueToClient(sub.getClientId(), new PublishedMessage(topic, publishingQos, origPayload));
                 }

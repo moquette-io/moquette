@@ -32,8 +32,6 @@ import static java.util.Collections.singletonMap;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.mock;
 
 public class PostOfficePublishTest {
 
@@ -221,7 +219,12 @@ public class PostOfficePublishTest {
 
         // Exercise
         final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
-        sut.receivedPublishQos1(connection, new Topic(NEWS_TOPIC), TEST_USER, anyPayload, 1,true);
+        sut.receivedPublishQos1(connection, new Topic(NEWS_TOPIC), TEST_USER, anyPayload, 1,true,
+            MqttMessageBuilders.publish()
+                .payload(Unpooled.copiedBuffer("Any payload", Charset.defaultCharset()))
+                .qos(MqttQoS.AT_LEAST_ONCE)
+                .retained(true)
+                .topicName(NEWS_TOPIC).build());
 
         // Verify
         verifyPublishIsReceived(AT_LEAST_ONCE, "Any payload");
@@ -249,7 +252,12 @@ public class PostOfficePublishTest {
         assertConnectAccepted(pubChannel);
 
         final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
-        sut.receivedPublishQos1(pubConn, new Topic(NEWS_TOPIC), TEST_USER, anyPayload, 1,true);
+        sut.receivedPublishQos1(pubConn, new Topic(NEWS_TOPIC), TEST_USER, anyPayload, 1,true,
+            MqttMessageBuilders.publish()
+                .payload(anyPayload)
+                .qos(MqttQoS.AT_LEAST_ONCE)
+                .retained(true)
+                .topicName(NEWS_TOPIC).build());
 
         verifyNoPublishIsReceived(channel);
     }
@@ -257,5 +265,37 @@ public class PostOfficePublishTest {
     private void verifyNoPublishIsReceived(EmbeddedChannel channel) {
         final Object messageReceived = channel.readOutbound();
         assertNull("Received an out message from processor while not expected", messageReceived);
+    }
+
+    @Test
+    public void cleanRetainedMessageStoreWhenPublishWithRetainedQos0IsReceived() {
+        connection.processConnect(connectMessage);
+        assertConnectAccepted(channel);
+
+        // publish a QoS1 retained message
+        final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
+        final MqttPublishMessage publishMsg = MqttMessageBuilders.publish()
+            .payload(Unpooled.copiedBuffer("Any payload", Charset.defaultCharset()))
+            .qos(MqttQoS.AT_LEAST_ONCE)
+            .retained(true)
+            .topicName(NEWS_TOPIC)
+            .build();
+        sut.receivedPublishQos1(connection, new Topic(NEWS_TOPIC), TEST_USER, anyPayload, 1,true,
+            publishMsg);
+
+        assertMessageIsRetained(NEWS_TOPIC);
+
+        // publish a QoS0 retained message
+        // Exercise
+        final ByteBuf qos0Payload = Unpooled.copiedBuffer("QoS0 payload", Charset.defaultCharset());
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, connection.getClientId(), qos0Payload, true);
+
+        // Verify
+        assertTrue("Retained message for topic /news must be cleared", retainedRepository.isEmtpy());
+    }
+
+    private void assertMessageIsRetained(String expectedTopicName) {
+        MqttPublishMessage msg = retainedRepository.retainedOnTopic(expectedTopicName);
+        assertEquals(expectedTopicName, msg.variableHeader().topicName());
     }
 }
