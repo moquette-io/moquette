@@ -27,6 +27,7 @@ import java.util.*;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_LEAST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
+import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
 import static org.junit.Assert.assertEquals;
@@ -235,6 +236,24 @@ public class PostOfficePublishTest {
         final String payloadMessage = DebugUtils.payload2Str(publishReceived.payload());
         assertEquals("Sent and received payload must be identical", ExpectedPayload, payloadMessage);
         assertEquals("Expected QoS don't match", expectedQos, publishReceived.fixedHeader().qosLevel());
+    }
+
+    @Test
+    public void testPublishWithQoS2() {
+        connection.processConnect(connectMessage);
+        assertConnectAccepted(channel);
+        subscribe(channel, NEWS_TOPIC, EXACTLY_ONCE, FAKE_CLIENT_ID);
+
+        // Exercise
+        final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
+        sut.receivedPublishRelQos2(connection, MqttMessageBuilders.publish()
+                .payload(anyPayload)
+                .qos(MqttQoS.EXACTLY_ONCE)
+                .retained(true)
+                .topicName(NEWS_TOPIC).build(), 1);
+
+        // Verify
+        verifyPublishIsReceived(EXACTLY_ONCE, "Any payload");
     }
 
     @Test

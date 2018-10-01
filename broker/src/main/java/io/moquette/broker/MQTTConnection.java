@@ -11,7 +11,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
@@ -30,6 +32,7 @@ final class MQTTConnection {
     private SessionRegistry sessionRegistry;
     private final PostOffice postOffice;
     private boolean connected;
+    private final Map<Integer, MqttPublishMessage> qos2Receiving = new HashMap<>();
 
     MQTTConnection(Channel channel, BrokerConfiguration brokerConfig, IAuthenticator authenticator,
                    SessionRegistry sessionRegistry, PostOffice postOffice) {
@@ -63,9 +66,9 @@ final class MQTTConnection {
 //            case PUBCOMP:
 //                m_processor.processPubComp(channel, msg);
 //                break;
-//            case PUBREL:
-//                m_processor.processPubRel(channel, msg);
-//                break;
+            case PUBREL:
+                processPubRel(msg);
+                break;
             case DISCONNECT:
                 processDisconnect(msg);
                 break;
@@ -73,12 +76,8 @@ final class MQTTConnection {
 //                m_processor.processPubAck(channel, (MqttPubAckMessage) msg);
 //                break;
             case PINGREQ:
-                MqttFixedHeader pingHeader = new MqttFixedHeader(
-                        MqttMessageType.PINGRESP,
-                        false,
-                        AT_MOST_ONCE,
-                        false,
-                        0);
+                MqttFixedHeader pingHeader = new MqttFixedHeader(MqttMessageType.PINGRESP,false, AT_MOST_ONCE,
+                                                                false,0);
                 MqttMessage pingResp = new MqttMessage(pingHeader);
                 channel.writeAndFlush(pingResp).addListener(CLOSE_ON_FAILURE);
                 break;
@@ -264,17 +263,38 @@ final class MQTTConnection {
             case AT_MOST_ONCE:
                 postOffice.receivedPublishQos0(topic, username, clientId, payload, retain);
                 break;
-            case AT_LEAST_ONCE:
-                final int messageID = msg.variableHeader().messageId();
+            case AT_LEAST_ONCE: {
+                final int messageID = msg.variableHeader().packetId();
                 postOffice.receivedPublishQos1(this, topic, username, payload, messageID, retain, msg);
                 break;
-//            case EXACTLY_ONCE:
-//                this.qos2PublishHandler.receivedPublishQos2(channel, msg);
-//                break;
+            }
+            case EXACTLY_ONCE: {
+                final int messageID = msg.variableHeader().packetId();
+                qos2Receiving.put(messageID, msg);
+                msg.retain();
+                sendPublishReceived(messageID);
+                break;
+            }
             default:
                 LOG.error("Unknown QoS-Type:{}", qos);
                 break;
         }
+    }
+
+    private void sendPublishReceived(int messageID) {
+        LOG.trace("sendPubRec invoked on channel: {}", channel);
+        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBREC, false, AT_MOST_ONCE,
+            false, 0);
+        MqttPubAckMessage pubRecMessage = new MqttPubAckMessage(fixedHeader, from(messageID));
+        rawSend(pubRecMessage, messageID, getClientId());
+    }
+
+    private void processPubRel(MqttMessage msg) {
+        final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
+        final MqttPublishMessage mqttPublishMessage = qos2Receiving.get(messageID);
+        postOffice.receivedPublishRelQos2(this, mqttPublishMessage, messageID);
+        qos2Receiving.remove(messageID);
+        mqttPublishMessage.release();
     }
 
     void sendPublish(MqttPublishMessage publishMsg) {
@@ -315,12 +335,21 @@ final class MQTTConnection {
 //        }
     }
 
-    void sendPubAck(String clientId, int messageID) {
+    void sendPubAck(int messageID) {
         LOG.trace("sendPubAck invoked");
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBACK, false, AT_MOST_ONCE,
                                                   false, 0);
         MqttPubAckMessage pubAckMessage = new MqttPubAckMessage(fixedHeader, from(messageID));
+        final String clientId = getClientId();
         rawSend(pubAckMessage, messageID, clientId);
+    }
+
+    void sendPubCompMessage(int messageID) {
+        LOG.trace("Sending PUBCOMP message on channel: {}, messageId: {}", channel, messageID);
+        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBCOMP, false, AT_MOST_ONCE, false, 0);
+        MqttMessage pubCompMessage = new MqttMessage(fixedHeader, from(messageID));
+        final String clientId = getClientId();
+        rawSend(pubCompMessage, messageID, clientId);
     }
 
     String getClientId() {

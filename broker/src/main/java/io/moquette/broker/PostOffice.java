@@ -20,9 +20,7 @@ import java.util.stream.Collectors;
 
 import static io.moquette.spi.impl.Utils.messageId;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
-import static io.netty.handler.codec.mqtt.MqttQoS.AT_LEAST_ONCE;
-import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
-import static io.netty.handler.codec.mqtt.MqttQoS.FAILURE;
+import static io.netty.handler.codec.mqtt.MqttQoS.*;
 
 class PostOffice {
 
@@ -167,7 +165,7 @@ class PostOffice {
 
         publish2Subscribers(payload, topic, AT_LEAST_ONCE);
 
-        connection.sendPubAck(clientId, messageID);
+        connection.sendPubAck(messageID);
 
         if (retain) {
             if (!payload.isReadable()) {
@@ -222,6 +220,33 @@ class PostOffice {
     private void enqueueToClient(String clientId, PublishedMessage msg) {
         queues.computeIfAbsent(clientId, (String cli) -> new ConcurrentLinkedQueue());
         queues.get(clientId).add(msg);
+    }
+
+    /**
+     * Second phase of a publish QoS2 protocol, sent by publisher to the broker. Search the stored
+     * message and publish to all interested subscribers.
+     */
+    void receivedPublishRelQos2(MQTTConnection connection, MqttPublishMessage mqttPublishMessage, int messageID) {
+        LOG.trace("Processing PUBREL message on connection: {}", connection);
+        final Topic topic = new Topic(mqttPublishMessage.variableHeader().topicName());
+
+        final ByteBuf payload = mqttPublishMessage.payload();
+        publish2Subscribers(payload, topic, EXACTLY_ONCE);
+
+        connection.sendPubCompMessage(messageID);
+
+        final boolean retained = mqttPublishMessage.fixedHeader().isRetain();
+        if (retained) {
+            if (!payload.isReadable()) {
+                retainedRepository.cleanRetained(topic);
+            } else {
+                // before wasn't stored
+                retainedRepository.retain(topic, mqttPublishMessage);
+            }
+        }
+
+        //TODO here we should notify to the listeners
+        //m_interceptor.notifyTopicPublished(msg, clientID, username);
     }
 
     static MqttQoS lowerQosToTheSubscriptionDesired(Subscription sub, MqttQoS qos) {

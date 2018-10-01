@@ -30,6 +30,10 @@ class SubscriberCallback implements MqttCallback {
         }
     }
 
+    void renewWaiter() {
+        m_latch = new CountDownLatch(1)
+    }
+
     void messageArrived(String topic, MqttMessage message) throws Exception {
         println "Received on [$topic] message: [$message]"
         m_latch.countDown()
@@ -71,6 +75,12 @@ println "OK!"
 
 print "publish qos1..."
 client1.publish("/news", "Moquette is going to big refactoring, QoS1".bytes, 1, false)
+callback.waitFinish()
+println "OK!"
+
+print "publish qos2..."
+callback.renewWaiter()
+client1.publish("/news", "Moquette is going to big refactoring, QoS2".bytes, 2, false)
 callback.waitFinish()
 println "OK!"
 
