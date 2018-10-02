@@ -1,5 +1,5 @@
 @GrabResolver(name='Paho', root='https://repo.eclipse.org/content/repositories/paho-releases/')
-@Grab(group='org.eclipse.paho', module='org.eclipse.paho.client.mqttv3', version='1.0.1', ext='jar')
+@Grab(group='org.eclipse.paho', module='org.eclipse.paho.client.mqttv3', version='1.2.0', ext='jar')
 
 
 import org.eclipse.paho.client.mqttv3.MqttClient
@@ -24,8 +24,8 @@ class SubscriberCallback implements MqttCallback {
     private CountDownLatch m_latch = new CountDownLatch(1)
 
     void waitFinish() {
-        boolean expired = m_latch.await(4, TimeUnit.SECONDS)
-        if (expired) {
+        boolean reachZero = m_latch.await(4, TimeUnit.SECONDS)
+        if (!reachZero) {
             println "Expired the time to receive the publish"
         }
     }
@@ -40,7 +40,7 @@ class SubscriberCallback implements MqttCallback {
     }
 
     void deliveryComplete(IMqttDeliveryToken token) {
-        //To change body of implemented methods use File | Settings | File Templates.
+        println "Delivery complete"
     }
 
     void connectionLost(Throwable th) {
@@ -68,18 +68,19 @@ print "subscribe..."
 client1.subscribe("/news", 0)
 println "OK!"
 
-print "publish qos0..."
+/*print "publish qos0..."
 client1.publish("/news", "Moquette is going to big refactoring, QoS0".bytes, 0, false)
 callback.waitFinish()
 println "OK!"
+callback.renewWaiter()
 
 print "publish qos1..."
 client1.publish("/news", "Moquette is going to big refactoring, QoS1".bytes, 1, false)
 callback.waitFinish()
 println "OK!"
+callback.renewWaiter()*/
 
 print "publish qos2..."
-callback.renewWaiter()
 client1.publish("/news", "Moquette is going to big refactoring, QoS2".bytes, 2, false)
 callback.waitFinish()
 println "OK!"

@@ -204,7 +204,7 @@ class PostOffice {
 //                    publishMsg = notRetainedPublishWithMessageId(topic.toString(), qos, payload, messageId);
                     targetSession.sendPublishNotRetainedWithMessageId(topic, qos, payload, messageId);
                 } else {
-                    targetSession.sendPublishNotRetained(topic, publishingQos, payload);
+                    targetSession.sendPublishNotRetained(topic, qos, payload);
                 }
             } else {
                 if (!targetSession.isClean()) {

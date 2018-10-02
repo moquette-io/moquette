@@ -1,5 +1,6 @@
 package io.moquette.broker;
 
+import io.moquette.interception.messages.InterceptAcknowledgedMessage;
 import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.impl.DebugUtils;
 import io.moquette.spi.impl.subscriptions.Topic;
@@ -11,16 +12,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 import static io.netty.channel.ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
+import static io.netty.handler.codec.mqtt.MqttQoS.AT_LEAST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
+import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
 
 final class MQTTConnection {
 
@@ -33,6 +33,9 @@ final class MQTTConnection {
     private final PostOffice postOffice;
     private boolean connected;
     private final Map<Integer, MqttPublishMessage> qos2Receiving = new HashMap<>();
+    private final Map<Integer, MqttPublishMessage> qos1Sending = new HashMap<>();
+    private final Map<Integer, MqttPublishMessage> qos2SendingPhase1 = new HashMap<>();
+    private final Set<Integer> qos2SendingPhase2 = new HashSet<>();
 
     MQTTConnection(Channel channel, BrokerConfiguration brokerConfig, IAuthenticator authenticator,
                    SessionRegistry sessionRegistry, PostOffice postOffice) {
@@ -60,21 +63,21 @@ final class MQTTConnection {
             case PUBLISH:
                 processPublish((MqttPublishMessage) msg);
                 break;
-//            case PUBREC:
-//                m_processor.processPubRec(channel, msg);
-//                break;
-//            case PUBCOMP:
-//                m_processor.processPubComp(channel, msg);
-//                break;
+            case PUBREC:
+                processPubRec(msg);
+                break;
+            case PUBCOMP:
+                processPubComp(msg);
+                break;
             case PUBREL:
                 processPubRel(msg);
                 break;
             case DISCONNECT:
                 processDisconnect(msg);
                 break;
-//            case PUBACK:
-//                m_processor.processPubAck(channel, (MqttPubAckMessage) msg);
-//                break;
+            case PUBACK:
+                processPubAck(msg);
+                break;
             case PINGREQ:
                 MqttFixedHeader pingHeader = new MqttFixedHeader(MqttMessageType.PINGRESP,false, AT_MOST_ONCE,
                                                                 false,0);
@@ -85,6 +88,31 @@ final class MQTTConnection {
                 LOG.error("Unknown MessageType: {}, channel: {}", messageType, channel);
                 break;
         }
+    }
+
+    private void processPubComp(MqttMessage msg) {
+        final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
+        qos2SendingPhase2.remove(messageID);
+        // TODO notify the interceptor
+//                final InterceptAcknowledgedMessage interceptAckMsg = new InterceptAcknowledgedMessage(inflightMsg, topic,
+//                    username, messageID);
+//                m_interceptor.notifyMessageAcknowledged(interceptAckMsg);
+    }
+
+    private void processPubRec(MqttMessage msg) {
+        final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
+        qos2SendingPhase1.remove(messageID);
+        qos2SendingPhase2.add(messageID);
+
+        MqttFixedHeader pubRelHeader = new MqttFixedHeader(MqttMessageType.PUBREL, false, AT_LEAST_ONCE, false, 0);
+        MqttMessage pubRelMessage = new MqttMessage(pubRelHeader, from(messageID));
+        rawSend(pubRelMessage, messageID, getClientId());
+    }
+
+    private void processPubAck(MqttMessage msg) {
+        // TODO remain to invoke in somehow m_interceptor.notifyMessageAcknowledged
+        final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
+        qos1Sending.remove(messageID);
     }
 
     void processConnect(MqttConnectMessage msg) {
@@ -303,22 +331,29 @@ final class MQTTConnection {
         final String clientId = getClientId();
         MqttQoS qos = publishMsg.fixedHeader().qosLevel();
         if (LOG.isTraceEnabled()) {
-            LOG.trace("Sending PUBLISH message. MessageId={}, CId={}, topic={}, qos={}, payload={}", messageId,
-                      clientId, topicName, qos, DebugUtils.payload2Str(publishMsg.payload()));
+            LOG.trace("Sending PUBLISH({}) message. MessageId={}, CId={}, topic={}, payload={}", qos, messageId,
+                      clientId, topicName, DebugUtils.payload2Str(publishMsg.payload()));
         } else {
-            LOG.debug("Sending PUBLISH message. MessageId={}, CId={}, topic={}", messageId, clientId, topicName);
+            LOG.debug("Sending PUBLISH({}) message. MessageId={}, CId={}, topic={}", qos, messageId, clientId, topicName);
+        }
+        if (qos == AT_LEAST_ONCE) {
+            // TODO generate an incremental packetID for outbound in flight messages
+            qos1Sending.put(1, publishMsg);
+        } else if (qos == EXACTLY_ONCE) {
+            // TODO generate an incremental packetID for outbound in flight messages
+            qos2SendingPhase1.put(1, publishMsg);
         }
 
         rawSend(publishMsg, messageId, clientId);
     }
 
-    private void rawSend(MqttMessage publishMsg, int messageId, String clientId) {
+    private void rawSend(MqttMessage msg, int messageId, String clientId) {
         boolean messageDelivered = false;
         try {
-            channel.writeAndFlush(publishMsg);
+            channel.writeAndFlush(msg);
             messageDelivered = true;
         } catch (Throwable th) {
-            LOG.error("Unable to send {} message. CId=<{}>, messageId={}", publishMsg.fixedHeader().messageType(),
+            LOG.error("Unable to send {} message. CId=<{}>, messageId={}", msg.fixedHeader().messageType(),
                 clientId, messageId, th);
         }
         // TODO improve this for in-flight messages (qos != 0)
