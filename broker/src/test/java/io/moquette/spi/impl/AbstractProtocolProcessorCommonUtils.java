@@ -124,14 +124,14 @@ abstract class AbstractProtocolProcessorCommonUtils {
         assertEquals(expectedSubscription, subscription);
     }
 
-    protected MqttSubAckMessage subscribeWithoutVerify(String topic, MqttQoS desiredQos) {
-        MqttSubscribeMessage subscribe = MqttMessageBuilders.subscribe()
-            .addSubscription(desiredQos, topic)
-            .messageId(1)
-            .build();
-        this.m_processor.processSubscribe(m_channel, subscribe);
-        return m_channel.readOutbound();
-    }
+//    protected MqttSubAckMessage subscribeWithoutVerify(String topic, MqttQoS desiredQos) {
+//        MqttSubscribeMessage subscribe = MqttMessageBuilders.subscribe()
+//            .addSubscription(desiredQos, topic)
+//            .messageId(1)
+//            .build();
+//        this.m_processor.processSubscribe(m_channel, subscribe);
+//        return m_channel.readOutbound();
+//    }
 
     protected void subscribeAndNotReadResponse(String topic, MqttQoS desiredQos) {
         MqttSubscribeMessage subscribe = MqttMessageBuilders.subscribe()

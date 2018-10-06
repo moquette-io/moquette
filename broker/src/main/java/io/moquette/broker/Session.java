@@ -108,6 +108,10 @@ class Session {
         return notRetainedPublishWithMessageId(topic, qos, message, 0);
     }
 
+    private static MqttPublishMessage retainedPublish(String topic, MqttQoS qos, ByteBuf message) {
+        return retainedPublishWithMessageId(topic, qos, message, 0);
+    }
+
     private static MqttPublishMessage notRetainedPublishWithMessageId(String topic, MqttQoS qos, ByteBuf message,
                                                                       int messageId) {
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, false, 0);
@@ -115,7 +119,24 @@ class Session {
         return new MqttPublishMessage(fixedHeader, varHeader, message);
     }
 
+    private static MqttPublishMessage retainedPublishWithMessageId(String topic, MqttQoS qos, ByteBuf message,
+                                                                   int messageId) {
+        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, true, 0);
+        MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId);
+        return new MqttPublishMessage(fixedHeader, varHeader, message);
+    }
+
     void sendPublishNotRetainedWithMessageId(Topic topic, MqttQoS qos, ByteBuf payload, int messageId) {
+        MqttPublishMessage publishMsg = notRetainedPublishWithMessageId(topic.toString(), qos, payload, messageId);
+        mqttConnection.sendPublish(publishMsg);
+    }
+
+    void sendRetainedPublish(Topic topic, MqttQoS qos, ByteBuf payload) {
+        MqttPublishMessage publishMsg = retainedPublish(topic.toString(), qos, payload);
+        mqttConnection.sendPublish(publishMsg);
+    }
+
+    void sendRetainedPublishWithMessageId(Topic topic, MqttQoS qos, ByteBuf payload, int messageId) {
         MqttPublishMessage publishMsg = notRetainedPublishWithMessageId(topic.toString(), qos, payload, messageId);
         mqttConnection.sendPublish(publishMsg);
     }

@@ -97,7 +97,32 @@ class PostOffice {
         // send ack message
         mqttConnection.sendSubAckMessage(messageID, ackMessage);
 
-        //TODO  republish all retained messages matching the subscription topics
+        publishRetainedMessagesForSubscriptions(clientID, newSubscriptions);
+
+        // TODO notify the Observables
+//        for (Subscription subscription : newSubscriptions) {
+//            m_interceptor.notifyTopicSubscribed(newSubscription, username);
+//        }
+    }
+
+    private void publishRetainedMessagesForSubscriptions(String clientID, List<Subscription> newSubscriptions) {
+        Session targetSession = this.sessionRegistry.retrieve(clientID);
+        for (Subscription subscription : newSubscriptions) {
+            final String topicFilter = subscription.getTopicFilter().toString();
+            final MqttPublishMessage retainedMsg = retainedRepository.retainedOnTopic(topicFilter);
+
+            if (retainedMsg == null) {
+                // not found
+                continue;
+            }
+
+            final MqttQoS retainedQos = retainedMsg.fixedHeader().qosLevel();
+            MqttQoS qos = lowerQosToTheSubscriptionDesired(subscription, retainedQos);
+
+            final ByteBuf origPayload = retainedMsg.payload();
+            ByteBuf payload = origPayload.retainedDuplicate();
+            sendRetainedPublishOnSessionAtQos(subscription.getTopicFilter(), qos, targetSession, payload);
+        }
     }
 
     /**
@@ -225,6 +250,20 @@ class PostOffice {
             targetSession.sendPublishNotRetainedWithMessageId(topic, qos, payload, messageId);
         } else {
             targetSession.sendPublishNotRetained(topic, qos, payload);
+        }
+    }
+
+    private void sendRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, Session targetSession, ByteBuf payload) {
+        if (qos != MqttQoS.AT_MOST_ONCE) {
+            // QoS 1 or 2
+            // TODO create a packetIdGenerator but on Connection
+//                    int messageId = targetSession.inFlightAckWaiting(pubMsg);
+            int messageId = 1;
+            // set the PacketIdentifier only for QoS > 0
+//                    publishMsg = notRetainedPublishWithMessageId(topic.toString(), qos, payload, messageId);
+            targetSession.sendRetainedPublishWithMessageId(topic, qos, payload, messageId);
+        } else {
+            targetSession.sendRetainedPublish(topic, qos, payload);
         }
     }
 
