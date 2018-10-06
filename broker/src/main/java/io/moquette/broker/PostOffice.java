@@ -64,8 +64,15 @@ class PostOffice {
         // TODO
     }
 
-    public void sendQueuedMessagesWhileOffline(String clientId) {
-        // TODO
+    public void sendQueuedMessagesWhileOffline(String clientId, Session targetSession) {
+        LOG.trace("Republishing all saved messages for session {} on CId={}", targetSession, clientId);
+        if (!queues.containsKey(clientId)) {
+            return;
+        }
+        final Queue<PublishedMessage> queue = queues.get(clientId);
+        for (PublishedMessage msgToPublish : queue) {
+            sendPublishOnSessionAtQos(msgToPublish.topic, msgToPublish.publishingQos, targetSession, msgToPublish.payload);
+        }
     }
 
     public void subscribeClientToTopics(MqttSubscribeMessage msg, String clientID, String username,
@@ -195,17 +202,7 @@ class PostOffice {
                 // we need to retain because duplicate only copy r/w indexes and don't retain() causing
                 // refCnt = 0
                 ByteBuf payload = origPayload.retainedDuplicate();
-                if (qos != MqttQoS.AT_MOST_ONCE) {
-                    // QoS 1 or 2
-                    // TODO
-//                    int messageId = targetSession.inFlightAckWaiting(pubMsg);
-                    int messageId = 1;
-                    // set the PacketIdentifier only for QoS > 0
-//                    publishMsg = notRetainedPublishWithMessageId(topic.toString(), qos, payload, messageId);
-                    targetSession.sendPublishNotRetainedWithMessageId(topic, qos, payload, messageId);
-                } else {
-                    targetSession.sendPublishNotRetained(topic, qos, payload);
-                }
+                sendPublishOnSessionAtQos(topic, qos, targetSession, payload);
             } else {
                 if (!targetSession.isClean()) {
                     LOG.debug("Storing pending PUBLISH inactive message. CId={}, topicFilter: {}, qos: {}",
@@ -214,6 +211,20 @@ class PostOffice {
                     enqueueToClient(sub.getClientId(), new PublishedMessage(topic, publishingQos, origPayload));
                 }
             }
+        }
+    }
+
+    private void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, Session targetSession, ByteBuf payload) {
+        if (qos != MqttQoS.AT_MOST_ONCE) {
+            // QoS 1 or 2
+            // TODO create a packetIdGenerator but on Connection
+//                    int messageId = targetSession.inFlightAckWaiting(pubMsg);
+            int messageId = 1;
+            // set the PacketIdentifier only for QoS > 0
+//                    publishMsg = notRetainedPublishWithMessageId(topic.toString(), qos, payload, messageId);
+            targetSession.sendPublishNotRetainedWithMessageId(topic, qos, payload, messageId);
+        } else {
+            targetSession.sendPublishNotRetained(topic, qos, payload);
         }
     }
 

@@ -1,6 +1,5 @@
 package io.moquette.broker;
 
-import io.moquette.interception.messages.InterceptAcknowledgedMessage;
 import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.impl.DebugUtils;
 import io.moquette.spi.impl.subscriptions.Topic;
@@ -18,9 +17,7 @@ import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 import static io.netty.channel.ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
-import static io.netty.handler.codec.mqtt.MqttQoS.AT_LEAST_ONCE;
-import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
-import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
+import static io.netty.handler.codec.mqtt.MqttQoS.*;
 
 final class MQTTConnection {
 
@@ -156,7 +153,7 @@ final class MQTTConnection {
             sessionRegistry.bindToSession(this, msg, clientId);
             NettyUtils.clientID(channel, clientId);
             LOG.trace("CONNACK sent, channel: {}", channel);
-        } catch (/*SessionCorrupted*/Exception scex) {
+        } catch (SessionCorruptedException scex) {
             LOG.warn("MQTT session for client ID {} cannot be created, channel: {}", clientId, channel);
             abortConnection(CONNECTION_REFUSED_SERVER_UNAVAILABLE);
         }

@@ -134,26 +134,27 @@ public class ProtocolProcessor_VariousUseCases_Test extends AbstractProtocolProc
 //        verifyPublishIsReceived(AT_LEAST_ONCE);
 //    }
 
-    @Test
-    public void testPublishWithQoS1_notCleanSession() {
-        connect();
-        subscribe("/topic", AT_LEAST_ONCE);
-        disconnect();
+    // Moved to PostOfficePublishTest.forwardQoS1PublishesWhenNotCleanSessionReconnects
+//    @Test
+//    public void testPublishWithQoS1_notCleanSession() {
+//        connect();
+//        subscribe("/topic", AT_LEAST_ONCE);
+//        disconnect();
+//
+//        // publish a QoS 1 message another client publish a message on the topic
+//        publishFromAnotherClient("/topic", AT_LEAST_ONCE);
+//
+//        this.m_channel = new EmbeddedChannel();
+//        connect();
+//        verifyPublishIsReceived();
+//    }
 
-        // publish a QoS 1 message another client publish a message on the topic
-        publishFromAnotherClient("/topic", AT_LEAST_ONCE);
-
-        this.m_channel = new EmbeddedChannel();
-        connect();
-        verifyPublishIsReceived();
-    }
-
-    private void publishFromAnotherClient(String topic, MqttQoS qos) {
-        EmbeddedChannel anotherChannel = new EmbeddedChannel();
-        connectAsClient(anotherChannel, "AnotherClient");
-        publishToAs(anotherChannel, "AnotherClient", topic, qos, 67, false);
-        disconnect(anotherChannel);
-    }
+//    private void publishFromAnotherClient(String topic, MqttQoS qos) {
+//        EmbeddedChannel anotherChannel = new EmbeddedChannel();
+//        connectAsClient(anotherChannel, "AnotherClient");
+//        publishToAs(anotherChannel, "AnotherClient", topic, qos, 67, false);
+//        disconnect(anotherChannel);
+//    }
 
     private void publishFromAnotherClient(String topic, String payload, MqttQoS qos) {
         EmbeddedChannel anotherChannel = new EmbeddedChannel();
@@ -162,43 +163,43 @@ public class ProtocolProcessor_VariousUseCases_Test extends AbstractProtocolProc
         disconnect(anotherChannel);
     }
 
-    private void publishQoS2FromAnotherClient(String topic) {
-        EmbeddedChannel anotherChannel = new EmbeddedChannel();
-        connectAsClient(anotherChannel, "AnotherClient");
-        publishQoS2ToAs(anotherChannel, "AnotherClient", topic, 67, false);
-        disconnect(anotherChannel);
-    }
+//    private void publishQoS2FromAnotherClient(String topic) {
+//        EmbeddedChannel anotherChannel = new EmbeddedChannel();
+//        connectAsClient(anotherChannel, "AnotherClient");
+//        publishQoS2ToAs(anotherChannel, "AnotherClient", topic, 67, false);
+//        disconnect(anotherChannel);
+//    }
 
-    @Test
-    public void checkReceivePublishedMessage_after_a_reconnect_with_notCleanSession() {
-        connect();
-        subscribe("/topic", AT_LEAST_ONCE);
-        disconnect();
+//    @Test
+//    public void checkReceivePublishedMessage_after_a_reconnect_with_notCleanSession() {
+//        connect();
+//        subscribe("/topic", AT_LEAST_ONCE);
+//        disconnect();
+//
+//        this.m_channel = new EmbeddedChannel();
+//        connect();
+//        subscribe("/topic", AT_LEAST_ONCE);
+//
+//        // publish a QoS 1 message another client publish a message on the topic
+//        publishFromAnotherClient("/topic", AT_LEAST_ONCE);
+//
+//        // Verify that after a reconnection the client receive the message
+//        verifyPublishIsReceived();
+//    }
 
-        this.m_channel = new EmbeddedChannel();
-        connect();
-        subscribe("/topic", AT_LEAST_ONCE);
-
-        // publish a QoS 1 message another client publish a message on the topic
-        publishFromAnotherClient("/topic", AT_LEAST_ONCE);
-
-        // Verify that after a reconnection the client receive the message
-        verifyPublishIsReceived();
-    }
-
-    @Test
-    public void testPublishWithQoS2() {
-        connect();
-        subscribe("/topic", EXACTLY_ONCE);
-        disconnect();
-
-        publishQoS2FromAnotherClient("/topic");
-
-        this.m_channel = new EmbeddedChannel();
-        connect();
-
-        verifyPublishIsReceived(EXACTLY_ONCE);
-    }
+//    @Test
+//    public void testPublishWithQoS2() {
+//        connect();
+//        subscribe("/topic", EXACTLY_ONCE);
+//        disconnect();
+//
+//        publishQoS2FromAnotherClient("/topic");
+//
+//        this.m_channel = new EmbeddedChannel();
+//        connect();
+//
+//        verifyPublishIsReceived(EXACTLY_ONCE);
+//    }
 
     @Test
     public void avoidMultipleNotificationsAfterMultipleReconnection_cleanSessionFalseQoS1() {

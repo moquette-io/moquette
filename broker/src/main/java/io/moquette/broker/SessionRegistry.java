@@ -12,6 +12,10 @@ import java.util.concurrent.ConcurrentMap;
 
 class SessionRegistry {
 
+    private enum PostConnectAction {
+        NONE, SEND_STORED_MESSAGES
+    }
+
     private static final Logger LOG = LoggerFactory.getLogger(SessionRegistry.class);
 
     private final ConcurrentMap<String, Session> pool = new ConcurrentHashMap<>();
@@ -25,6 +29,7 @@ class SessionRegistry {
 
     void bindToSession(MQTTConnection mqttConnection, MqttConnectMessage msg, String clientId) {
         boolean isSessionAlreadyStored = false;
+        PostConnectAction postConnectAction = PostConnectAction.NONE;
         if (!pool.containsKey(clientId)) {
             // case 1
             final Session newSession = createNewSession(mqttConnection, msg);
@@ -36,22 +41,29 @@ class SessionRegistry {
             if (success) {
                 LOG.trace("case 1, not existing session with CId {}", clientId);
             } else {
-                isSessionAlreadyStored = bindToExistingSession(mqttConnection, msg, clientId, newSession);
+                postConnectAction = bindToExistingSession(mqttConnection, msg, clientId, newSession);
+                isSessionAlreadyStored = true;
             }
         } else {
             final Session newSession = createNewSession(mqttConnection, msg);
-            isSessionAlreadyStored = bindToExistingSession(mqttConnection, msg, clientId, newSession);
+            postConnectAction = bindToExistingSession(mqttConnection, msg, clientId, newSession);
+            isSessionAlreadyStored = true;
         }
         final boolean msgCleanSessionFlag = msg.variableHeader().isCleanSession();
         boolean isSessionAlreadyPresent = (!msgCleanSessionFlag && isSessionAlreadyStored);
         mqttConnection.sendConnAck(isSessionAlreadyPresent);
+
+        if (postConnectAction == PostConnectAction.SEND_STORED_MESSAGES) {
+            final Session session = pool.get(clientId);
+            postOffice.sendQueuedMessagesWhileOffline(clientId, session);
+        }
     }
 
-    private boolean bindToExistingSession(MQTTConnection mqttConnection, MqttConnectMessage msg, String clientId, Session newSession) {
-        boolean isSessionAlreadyStored;
+    private PostConnectAction bindToExistingSession(MQTTConnection mqttConnection, MqttConnectMessage msg,
+                                                    String clientId, Session newSession) {
+        PostConnectAction postConnectAction = PostConnectAction.NONE;
         final boolean newIsClean = msg.variableHeader().isCleanSession();
         final Session oldSession = pool.get(clientId);
-        isSessionAlreadyStored = true;
         if (newIsClean && oldSession.disconnected()) {
             // case 2
             postOffice.dropQueuesForClient(clientId);
@@ -76,7 +88,6 @@ class SessionRegistry {
             LOG.trace("case 2, oldSession with same CId {} disconnected", clientId);
         } else if (!newIsClean && oldSession.disconnected()) {
             // case 3
-            postOffice.sendQueuedMessagesWhileOffline(clientId);
             reactivateSubscriptions(oldSession);
 
             // mark as connected
@@ -96,6 +107,7 @@ class SessionRegistry {
             if (!published) {
                 throw new SessionCorruptedException("old session was already removed");
             }
+            postConnectAction = PostConnectAction.SEND_STORED_MESSAGES;
             LOG.trace("case 3, oldSession with same CId {} disconnected", clientId);
         } else if (oldSession.connected()) {
             // case 4
@@ -109,7 +121,7 @@ class SessionRegistry {
             }
         }
         // case not covered new session is clean true/false and old session not in CONNECTED/DISCONNECTED
-        return isSessionAlreadyStored;
+        return postConnectAction;
     }
 
     private void reactivateSubscriptions(Session session) {

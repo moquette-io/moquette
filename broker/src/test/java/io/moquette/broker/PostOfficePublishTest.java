@@ -139,7 +139,9 @@ public class PostOfficePublishTest {
         assertEquals("Connect must be accepted", CONNECTION_ACCEPTED, connAckReturnCode);
     }
 
-    protected void subscribe(EmbeddedChannel channel, String topic, MqttQoS desiredQos, String clientID) {
+    protected void subscribe(MQTTConnection connection, String topic, MqttQoS desiredQos,
+                             String clientID) {
+        EmbeddedChannel channel = (EmbeddedChannel) connection.channel;
         MqttSubscribeMessage subscribe = MqttMessageBuilders.subscribe()
             .addSubscription(desiredQos, topic)
             .messageId(1)
@@ -216,7 +218,7 @@ public class PostOfficePublishTest {
     public void testPublishWithQoS1() {
         connection.processConnect(connectMessage);
         assertConnectAccepted(channel);
-        subscribe(channel, NEWS_TOPIC, AT_LEAST_ONCE, FAKE_CLIENT_ID);
+        subscribe(connection, NEWS_TOPIC, AT_LEAST_ONCE, FAKE_CLIENT_ID);
 
         // Exercise
         final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
@@ -231,10 +233,14 @@ public class PostOfficePublishTest {
         verifyPublishIsReceived(AT_LEAST_ONCE, "Any payload");
     }
 
-    private void verifyPublishIsReceived(MqttQoS expectedQos, String ExpectedPayload) {
-        final MqttPublishMessage publishReceived = channel.readOutbound();
+    private void verifyPublishIsReceived(MqttQoS expectedQos, String expectedPayload) {
+        verifyPublishIsReceived(channel, expectedQos, expectedPayload);
+    }
+
+    private void verifyPublishIsReceived(EmbeddedChannel embCh, MqttQoS expectedQos, String expectedPayload) {
+        final MqttPublishMessage publishReceived = embCh.readOutbound();
         final String payloadMessage = DebugUtils.payload2Str(publishReceived.payload());
-        assertEquals("Sent and received payload must be identical", ExpectedPayload, payloadMessage);
+        assertEquals("Sent and received payload must be identical", expectedPayload, payloadMessage);
         assertEquals("Expected QoS don't match", expectedQos, publishReceived.fixedHeader().qosLevel());
     }
 
@@ -242,7 +248,7 @@ public class PostOfficePublishTest {
     public void testPublishWithQoS2() {
         connection.processConnect(connectMessage);
         assertConnectAccepted(channel);
-        subscribe(channel, NEWS_TOPIC, EXACTLY_ONCE, FAKE_CLIENT_ID);
+        subscribe(connection, NEWS_TOPIC, EXACTLY_ONCE, FAKE_CLIENT_ID);
 
         // Exercise
         final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
@@ -256,12 +262,75 @@ public class PostOfficePublishTest {
         verifyPublishIsReceived(EXACTLY_ONCE, "Any payload");
     }
 
+    // aka testPublishWithQoS1_notCleanSession
     @Test
-    public void publishNoPublishToInactiveSession() {
+    public void forwardQoS1PublishesWhenNotCleanSessionReconnects() {
+        connection.processConnect(buildConnectNotClean(FAKE_CLIENT_ID));
+        assertConnectAccepted(channel);
+        subscribe(connection, NEWS_TOPIC, AT_LEAST_ONCE, FAKE_CLIENT_ID);
+        connection.processDisconnect(null);
+
+        // publish a QoS 1 message from another client publish a message on the topic
+        EmbeddedChannel pubChannel = new EmbeddedChannel();
+        MQTTConnection pubConn = createMQTTConnection(ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID, pubChannel);
+        pubConn.processConnect(buildConnect(PUBLISHER_ID));
+        assertConnectAccepted(pubChannel);
+
+        final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
+        sut.receivedPublishQos1(pubConn, new Topic(NEWS_TOPIC), TEST_USER, anyPayload, 1,true,
+            MqttMessageBuilders.publish()
+                .payload(anyPayload.retainedDuplicate())
+                .qos(MqttQoS.AT_LEAST_ONCE)
+                .topicName(NEWS_TOPIC).build());
+
+        // simulate a reconnection from the other client
+        connection = createMQTTConnection(ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID);
+        connectMessage = buildConnectNotClean(FAKE_CLIENT_ID);
+        connection.processConnect(connectMessage);
+        assertConnectAccepted(channel);
+
+        // Verify
+        verifyPublishIsReceived(AT_LEAST_ONCE, "Any payload");
+    }
+
+    @Test
+    public void checkReceivePublishedMessage_after_a_reconnect_with_notCleanSession() {
+        // first connect - subscribe -disconnect
+        connection.processConnect(buildConnectNotClean(FAKE_CLIENT_ID));
+        assertConnectAccepted(channel);
+        subscribe(connection, NEWS_TOPIC, AT_LEAST_ONCE, FAKE_CLIENT_ID);
+        connection.processDisconnect(null);
+
+        // connect - subscribe from another connection but with same ClientID
+        EmbeddedChannel secondChannel = new EmbeddedChannel();
+        MQTTConnection secondConn = createMQTTConnection(ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID, secondChannel);
+        secondConn.processConnect(buildConnect(FAKE_CLIENT_ID));
+        assertConnectAccepted(secondChannel);
+        subscribe(secondConn, NEWS_TOPIC, AT_LEAST_ONCE, FAKE_CLIENT_ID);
+
+        // publish a QoS 1 message another client publish a message on the topic
+        EmbeddedChannel pubChannel = new EmbeddedChannel();
+        MQTTConnection pubConn = createMQTTConnection(ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID, pubChannel);
+        pubConn.processConnect(buildConnect(PUBLISHER_ID));
+        assertConnectAccepted(pubChannel);
+
+        final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
+        sut.receivedPublishQos1(pubConn, new Topic(NEWS_TOPIC), TEST_USER, anyPayload, 1,true,
+            MqttMessageBuilders.publish()
+                .payload(anyPayload.retainedDuplicate())
+                .qos(MqttQoS.AT_LEAST_ONCE)
+                .topicName(NEWS_TOPIC).build());
+
+        // Verify that after a reconnection the client receive the message
+        verifyPublishIsReceived(secondChannel, AT_LEAST_ONCE, "Any payload");
+    }
+
+    @Test
+    public void noPublishToInactiveSession() {
         // create an inactive session for Subscriber
         connection.processConnect(buildConnectNotClean(SUBSCRIBER_ID));
         assertConnectAccepted(channel);
-        subscribe(channel, NEWS_TOPIC, AT_LEAST_ONCE, SUBSCRIBER_ID);
+        subscribe(connection, NEWS_TOPIC, AT_LEAST_ONCE, SUBSCRIBER_ID);
         connection.processDisconnect(null);
 
         // Exercise
