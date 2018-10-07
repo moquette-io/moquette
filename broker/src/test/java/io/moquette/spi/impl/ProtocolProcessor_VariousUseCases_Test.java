@@ -97,33 +97,33 @@ public class ProtocolProcessor_VariousUseCases_Test extends AbstractProtocolProc
 //        verifyPublishIsReceived();
 //    }
 
-    @Test
-    public void testUnsubscribe_do_not_notify_anymore_same_session() {
-        connect();
-        subscribe("/topic", AT_MOST_ONCE);
-        publishToAs(FAKE_CLIENT_ID, "/topic", AT_MOST_ONCE, false);
-        verifyPublishIsReceived();
+//    @Test
+//    public void testUnsubscribe_do_not_notify_anymore_same_session() {
+//        connect();
+//        subscribe("/topic", AT_MOST_ONCE);
+//        publishToAs(FAKE_CLIENT_ID, "/topic", AT_MOST_ONCE, false);
+//        verifyPublishIsReceived();
+//
+//        unsubscribeAndVerifyAck("/topic");
+//        publishToAs(FAKE_CLIENT_ID, "/topic", AT_MOST_ONCE, false);
+//        verifyNoPublishIsReceived();
+//    }
 
-        unsubscribeAndVerifyAck("/topic");
-        publishToAs(FAKE_CLIENT_ID, "/topic", AT_MOST_ONCE, false);
-        verifyNoPublishIsReceived();
-    }
-
-    @Test
-    public void testUnsubscribe_do_not_notify_anymore_new_session() {
-        connect();
-        subscribe("/topic", AT_MOST_ONCE);
-        publishToAs(FAKE_CLIENT_ID, "/topic", AT_MOST_ONCE, false);
-        verifyPublishIsReceived();
-
-        unsubscribeAndVerifyAck("/topic");
-        disconnect();
-
-        this.m_channel = new EmbeddedChannel();
-        connect();
-        publishToAs(FAKE_CLIENT_ID, "/topic", AT_MOST_ONCE, false);
-        verifyNoPublishIsReceived();
-    }
+//    @Test
+//    public void testUnsubscribe_do_not_notify_anymore_new_session() {
+//        connect();
+//        subscribe("/topic", AT_MOST_ONCE);
+//        publishToAs(FAKE_CLIENT_ID, "/topic", AT_MOST_ONCE, false);
+//        verifyPublishIsReceived();
+//
+//        unsubscribeAndVerifyAck("/topic");
+//        disconnect();
+//
+//        this.m_channel = new EmbeddedChannel();
+//        connect();
+//        publishToAs(FAKE_CLIENT_ID, "/topic", AT_MOST_ONCE, false);
+//        verifyNoPublishIsReceived();
+//    }
 // Moved to PostOfficePublishTest
 //    @Test
 //    public void testPublishWithQoS1() {

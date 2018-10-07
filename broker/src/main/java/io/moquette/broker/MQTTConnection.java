@@ -255,14 +255,10 @@ final class MQTTConnection {
         String clientID = NettyUtils.clientID(channel);
 
         LOG.trace("Processing UNSUBSCRIBE message. CId={}, topics: {}", clientID, topics);
-        postOffice.unsubscribe(topics, this);
-
-        // ack the client
-        sendUnsubAckMessage(msg, topics, clientID);
+        postOffice.unsubscribe(topics, this, msg.variableHeader().messageId());
     }
 
-    private void sendUnsubAckMessage(MqttUnsubscribeMessage msg, List<String> topics, String clientID) {
-        int messageID = msg.variableHeader().messageId();
+    void sendUnsubAckMessage(List<String> topics, String clientID, int messageID) {
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.UNSUBACK, false, AT_MOST_ONCE,
             false, 0);
         MqttUnsubAckMessage ackMessage = new MqttUnsubAckMessage(fixedHeader, from(messageID));

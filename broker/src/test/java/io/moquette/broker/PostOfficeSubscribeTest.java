@@ -27,7 +27,6 @@ import java.util.Set;
 import static io.moquette.broker.PostOfficePublishTest.ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID;
 import static io.moquette.broker.PostOfficePublishTest.SUBSCRIBER_ID;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
-import static io.netty.handler.codec.mqtt.MqttQoS.AT_LEAST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
 import static java.util.Collections.singleton;
@@ -101,16 +100,10 @@ public class PostOfficeSubscribeTest {
     @Test
     public void testSubscribe() {
         connection.processConnect(connectMessage);
-        assertConnectAccepted(channel);
+        ConnectionTestUtils.assertConnectAccepted(channel);
 
         // Exercise & verify
         subscribe(channel, NEWS_TOPIC, AT_MOST_ONCE);
-    }
-
-    private void assertConnectAccepted(EmbeddedChannel channel) {
-        MqttConnAckMessage connAck = channel.readOutbound();
-        final MqttConnectReturnCode connAckReturnCode = connAck.variableHeader().connectReturnCode();
-        assertEquals("Connect must be accepted", CONNECTION_ACCEPTED, connAckReturnCode);
     }
 
     protected void subscribe(EmbeddedChannel channel, String topic, MqttQoS desiredQos) {
@@ -164,7 +157,7 @@ public class PostOfficeSubscribeTest {
         sut.init(sessionRegistry);
 
         connection.processConnect(connectMessage);
-        assertConnectAccepted(channel);
+        ConnectionTestUtils.assertConnectAccepted(channel);
 
         //Exercise
         MqttSubscribeMessage subscribe = MqttMessageBuilders.subscribe()
@@ -188,7 +181,7 @@ public class PostOfficeSubscribeTest {
     @Test
     public void testDoubleSubscribe() {
         connection.processConnect(connectMessage);
-        assertConnectAccepted(channel);
+        ConnectionTestUtils.assertConnectAccepted(channel);
         assertEquals("After CONNECT subscription MUST be empty", 0, subscriptions.size());
         subscribe(channel, NEWS_TOPIC, AT_MOST_ONCE);
         assertEquals("After /news subscribe, subscription MUST contain it",1, subscriptions.size());
@@ -200,7 +193,7 @@ public class PostOfficeSubscribeTest {
     @Test
     public void testSubscribeWithBadFormattedTopic() {
         connection.processConnect(connectMessage);
-        assertConnectAccepted(channel);
+        ConnectionTestUtils.assertConnectAccepted(channel);
         assertEquals("After CONNECT subscription MUST be empty", 0, subscriptions.size());
 
         //Exercise
@@ -218,7 +211,7 @@ public class PostOfficeSubscribeTest {
     @Test
     public void testCleanSession_maintainClientSubscriptions() {
         connection.processConnect(connectMessage);
-        assertConnectAccepted(channel);
+        ConnectionTestUtils.assertConnectAccepted(channel);
         assertEquals("After CONNECT subscription MUST be empty", 0, subscriptions.size());
 
         subscribe(channel, NEWS_TOPIC, AT_MOST_ONCE);
@@ -248,7 +241,7 @@ public class PostOfficeSubscribeTest {
     @Test
     public void testCleanSession_correctlyClientSubscriptions() {
         connection.processConnect(connectMessage);
-        assertConnectAccepted(channel);
+        ConnectionTestUtils.assertConnectAccepted(channel);
         assertEquals("After CONNECT subscription MUST be empty", 0, subscriptions.size());
 
         //subscribe(channel, NEWS_TOPIC, AT_MOST_ONCE);
@@ -270,7 +263,7 @@ public class PostOfficeSubscribeTest {
         channel = new EmbeddedChannel();
         connection = createMQTTConnection(CONFIG, channel);
         connection.processConnect(connectMessage);
-        assertConnectAccepted(channel);
+        ConnectionTestUtils.assertConnectAccepted(channel);
         assertEquals("After CONNECT with clean, subscription MUST be empty", 0, subscriptions.size());
 
         // publish on /news

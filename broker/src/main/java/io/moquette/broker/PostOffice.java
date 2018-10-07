@@ -144,7 +144,7 @@ class PostOffice {
         return new MqttSubAckMessage(fixedHeader, from(messageId), payload);
     }
 
-    public void unsubscribe(List<String> topics, MQTTConnection mqttConnection) {
+    public void unsubscribe(List<String> topics, MQTTConnection mqttConnection, int messageId) {
         final String clientID = mqttConnection.getClientId();
         for (String t : topics) {
             Topic topic = new Topic(t);
@@ -167,6 +167,9 @@ class PostOffice {
 //            String username = NettyUtils.userName(channel);
 //            m_interceptor.notifyTopicUnsubscribed(topic.toString(), clientID, username);
         }
+
+        // ack the client
+        mqttConnection.sendUnsubAckMessage(topics, clientID, messageId);
     }
 
     void receivedPublishQos0(Topic topic, String username, String clientID, ByteBuf payload, boolean retain) {

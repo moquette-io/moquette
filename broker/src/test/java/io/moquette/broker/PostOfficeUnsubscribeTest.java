@@ -1,7 +1,6 @@
 package io.moquette.broker;
 
 import io.moquette.persistence.MemoryStorageService;
-import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.ISessionsStore;
 import io.moquette.spi.impl.MockAuthenticator;
 import io.moquette.spi.impl.SessionsRepository;
@@ -20,11 +19,10 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.nio.charset.Charset;
+import java.util.Collections;
 import java.util.Set;
 
-import static io.moquette.broker.PostOfficePublishTest.ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID;
-import static io.moquette.broker.PostOfficePublishTest.SUBSCRIBER_ID;
-import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
+import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static java.util.Collections.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -44,6 +42,7 @@ public class PostOfficeUnsubscribeTest {
     private MqttConnectMessage connectMessage;
     private IAuthenticator mockAuthenticator;
     private SessionRegistry sessionRegistry;
+    public static final BrokerConfiguration CONFIG = new BrokerConfiguration(true, true, false);
 
     @Before
     public void setUp() {
@@ -51,9 +50,8 @@ public class PostOfficeUnsubscribeTest {
             .clientId(FAKE_CLIENT_ID)
             .build();
 
-        BrokerConfiguration config = new BrokerConfiguration(true, true, false);
         prepareSUT();
-        createMQTTConnection(config);
+        createMQTTConnection(CONFIG);
     }
 
     private void createMQTTConnection(BrokerConfiguration config) {
@@ -84,8 +82,7 @@ public class PostOfficeUnsubscribeTest {
             .clientId(FAKE_CLIENT_ID)
             .build();
         connection.processConnect(connectMessage);
-        MqttConnAckMessage connAck = channel.readOutbound();
-        assertEquals("Connect must be accepted", CONNECTION_ACCEPTED, connAck.variableHeader().connectReturnCode());
+        ConnectionTestUtils.assertConnectAccepted(channel);
     }
 
     protected void subscribe(MQTTConnection connection, String topic, MqttQoS desiredQos) {
@@ -110,15 +107,67 @@ public class PostOfficeUnsubscribeTest {
 
     @Test
     public void testUnsubscribeWithBadFormattedTopic() {
-        connection.processConnect(connectMessage);
-        MqttConnAckMessage connAck = channel.readOutbound();
-        final MqttConnectReturnCode connAckReturnCode = connAck.variableHeader().connectReturnCode();
-        assertEquals("Connect must be accepted", CONNECTION_ACCEPTED, connAckReturnCode);
+        connect();
 
         // Exercise
-        sut.unsubscribe(singletonList(BAD_FORMATTED_TOPIC), connection);
+        sut.unsubscribe(singletonList(BAD_FORMATTED_TOPIC), connection, 1);
 
         // Verify
         assertFalse("Unsubscribe with bad topic MUST close drop the connection, (issue 68)", channel.isOpen());
+    }
+
+    @Test
+    public void testDontNotifyClientSubscribedToTopicAfterDisconnectedAndReconnectOnSameChannel() {
+        connect();
+        subscribe(connection, NEWS_TOPIC, AT_MOST_ONCE);
+
+        // publish on /news
+        final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD, payload, false);
+
+        ConnectionTestUtils.verifyPublishIsReceived(channel, AT_MOST_ONCE, "Hello world!");
+
+        unsubscribeAndVerifyAck(NEWS_TOPIC);
+
+        // publish on /news
+        final ByteBuf payload2 = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD, payload2, false);
+
+        ConnectionTestUtils.verifyNoPublishIsReceived(channel);
+    }
+
+    protected void unsubscribeAndVerifyAck(String topic) {
+        final int messageId = 1;
+
+        sut.unsubscribe(Collections.singletonList(topic), connection, messageId);
+
+        MqttUnsubAckMessage unsubAckMessageAck = channel.readOutbound();
+        assertEquals("Unsubscribe must be accepted", messageId, unsubAckMessageAck.variableHeader().messageId());
+    }
+
+    @Test
+    public void testDontNotifyClientSubscribedToTopicAfterDisconnectedAndReconnectOnNewChannel() {
+        connect();
+        subscribe(connection, NEWS_TOPIC, AT_MOST_ONCE);
+        // publish on /news
+        final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD, payload, false);
+
+        ConnectionTestUtils.verifyPublishIsReceived(channel, AT_MOST_ONCE, "Hello world!");
+
+        unsubscribeAndVerifyAck(NEWS_TOPIC);
+        connection.processDisconnect(null);
+
+        // connect on another channel
+        EmbeddedChannel anotherChannel = new EmbeddedChannel();
+        MQTTConnection anotherConnection = createMQTTConnection(CONFIG, anotherChannel);
+        anotherConnection.processConnect(connectMessage);
+        ConnectionTestUtils.assertConnectAccepted(anotherChannel);
+
+        // publish on /news
+        final ByteBuf payload2 = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD, payload2, false);
+
+        ConnectionTestUtils.verifyNoPublishIsReceived(anotherChannel);
     }
 }
