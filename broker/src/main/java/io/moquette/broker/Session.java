@@ -69,6 +69,10 @@ class Session {
         return new ArrayList<>(subscriptions);
     }
 
+    public void addSubscriptions(List<Subscription> newSubscriptions) {
+        subscriptions.addAll(newSubscriptions);
+    }
+
     public Will getWill() {
         return will;
     }

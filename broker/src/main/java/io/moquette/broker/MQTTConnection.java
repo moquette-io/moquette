@@ -234,7 +234,7 @@ final class MQTTConnection {
         LOG.trace("Processed DISCONNECT CId={}, channel: {}", clientID, channel);
     }
 
-    private void processSubscribe(MqttSubscribeMessage msg) {
+    void processSubscribe(MqttSubscribeMessage msg) {
         final String clientID = NettyUtils.clientID(channel);
         if (!connected) {
             LOG.warn("SUBSCRIBE received on already closed connection, CId={}, channel: {}", clientID, channel);
@@ -242,8 +242,6 @@ final class MQTTConnection {
             return;
         }
         postOffice.subscribeClientToTopics(msg, clientID, NettyUtils.userName(channel), this);
-
-        // TODO add the subscriptions to Session
     }
 
     void sendSubAckMessage(int messageID, MqttSubAckMessage ackMessage) {

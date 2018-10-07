@@ -5,9 +5,7 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.*;
 
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 class ConnectionTestUtils {
 
@@ -41,6 +39,18 @@ class ConnectionTestUtils {
         assertEquals(receivedPublish.fixedHeader().qosLevel(), expectedQos);
         assertPublishIsCorrect(expectedTopic, expectedContent, receivedPublish);
         assertTrue("MUST be retained publish", receivedPublish.fixedHeader().isRetain());
+    }
+
+    static void verifyPublishIsReceived(EmbeddedChannel embCh, MqttQoS expectedQos, String expectedPayload) {
+        final MqttPublishMessage publishReceived = embCh.readOutbound();
+        final String payloadMessage = DebugUtils.payload2Str(publishReceived.payload());
+        assertEquals("Sent and received payload must be identical", expectedPayload, payloadMessage);
+        assertEquals("Expected QoS don't match", expectedQos, publishReceived.fixedHeader().qosLevel());
+    }
+
+    static void verifyNoPublishIsReceived(EmbeddedChannel channel) {
+        final Object messageReceived = channel.readOutbound();
+        assertNull("Received an out message from processor while not expected", messageReceived);
     }
 
     static MqttConnectMessage buildConnect(String clientId) {

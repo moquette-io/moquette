@@ -94,6 +94,10 @@ class PostOffice {
             subscriptions.add(subscription);
         }
 
+        // add the subscriptions to Session
+        Session session = sessionRegistry.retrieve(clientID);
+        session.addSubscriptions(newSubscriptions);
+
         // send ack message
         mqttConnection.sendSubAckMessage(messageID, ackMessage);
 

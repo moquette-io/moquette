@@ -1,9 +1,7 @@
 package io.moquette.broker;
 
 import io.moquette.persistence.MemoryStorageService;
-import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.ISessionsStore;
-import io.moquette.spi.impl.DebugUtils;
 import io.moquette.spi.impl.MockAuthenticator;
 import io.moquette.spi.impl.SessionsRepository;
 import io.moquette.spi.impl.security.PermitAllAuthorizatorPolicy;
@@ -202,18 +200,7 @@ public class PostOfficePublishTest {
                 .topicName(NEWS_TOPIC).build());
 
         // Verify
-        verifyPublishIsReceived(AT_LEAST_ONCE, "Any payload");
-    }
-
-    private void verifyPublishIsReceived(MqttQoS expectedQos, String expectedPayload) {
-        verifyPublishIsReceived(channel, expectedQos, expectedPayload);
-    }
-
-    private void verifyPublishIsReceived(EmbeddedChannel embCh, MqttQoS expectedQos, String expectedPayload) {
-        final MqttPublishMessage publishReceived = embCh.readOutbound();
-        final String payloadMessage = DebugUtils.payload2Str(publishReceived.payload());
-        assertEquals("Sent and received payload must be identical", expectedPayload, payloadMessage);
-        assertEquals("Expected QoS don't match", expectedQos, publishReceived.fixedHeader().qosLevel());
+        ConnectionTestUtils.verifyPublishIsReceived(channel, AT_LEAST_ONCE, "Any payload");
     }
 
     @Test
@@ -231,7 +218,7 @@ public class PostOfficePublishTest {
                 .topicName(NEWS_TOPIC).build(), 1);
 
         // Verify
-        verifyPublishIsReceived(EXACTLY_ONCE, "Any payload");
+        ConnectionTestUtils.verifyPublishIsReceived(channel, EXACTLY_ONCE, "Any payload");
     }
 
     // aka testPublishWithQoS1_notCleanSession
@@ -262,7 +249,7 @@ public class PostOfficePublishTest {
         ConnectionTestUtils.assertConnectAccepted(channel);
 
         // Verify
-        verifyPublishIsReceived(AT_LEAST_ONCE, "Any payload");
+        ConnectionTestUtils.verifyPublishIsReceived(channel, AT_LEAST_ONCE, "Any payload");
     }
 
     @Test
@@ -294,7 +281,7 @@ public class PostOfficePublishTest {
                 .topicName(NEWS_TOPIC).build());
 
         // Verify that after a reconnection the client receive the message
-        verifyPublishIsReceived(secondChannel, AT_LEAST_ONCE, "Any payload");
+        ConnectionTestUtils.verifyPublishIsReceived(secondChannel, AT_LEAST_ONCE, "Any payload");
     }
 
     @Test

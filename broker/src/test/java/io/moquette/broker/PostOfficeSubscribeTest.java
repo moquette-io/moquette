@@ -27,6 +27,7 @@ import java.util.Set;
 import static io.moquette.broker.PostOfficePublishTest.ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID;
 import static io.moquette.broker.PostOfficePublishTest.SUBSCRIBER_ID;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
+import static io.netty.handler.codec.mqtt.MqttQoS.AT_LEAST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
 import static java.util.Collections.singleton;
@@ -53,6 +54,7 @@ public class PostOfficeSubscribeTest {
     private MqttConnectMessage connectMessage;
     private IAuthenticator mockAuthenticator;
     private SessionRegistry sessionRegistry;
+    public static final BrokerConfiguration CONFIG = new BrokerConfiguration(true, true, false);
 
     @Before
     public void setUp() {
@@ -60,10 +62,8 @@ public class PostOfficeSubscribeTest {
             .clientId(FAKE_CLIENT_ID)
             .build();
 
-        BrokerConfiguration config = new BrokerConfiguration(true, true, false);
-
         prepareSUT();
-        createMQTTConnection(config);
+        createMQTTConnection(CONFIG);
     }
 
     private void createMQTTConnection(BrokerConfiguration config) {
@@ -213,6 +213,72 @@ public class PostOfficeSubscribeTest {
 
         assertEquals("Bad topic CAN'T add any subscription",0, subscriptions.size());
         verifyFailureQos(subAckMsg);
+    }
+
+    @Test
+    public void testCleanSession_maintainClientSubscriptions() {
+        connection.processConnect(connectMessage);
+        assertConnectAccepted(channel);
+        assertEquals("After CONNECT subscription MUST be empty", 0, subscriptions.size());
+
+        subscribe(channel, NEWS_TOPIC, AT_MOST_ONCE);
+
+        assertEquals("Subscribe MUST contain one subscription", 1, subscriptions.size());
+
+        connection.processDisconnect(null);
+        assertEquals("Disconnection MUSTN'T clear subscriptions", 1, subscriptions.size());
+
+        EmbeddedChannel anotherChannel = new EmbeddedChannel();
+        MQTTConnection anotherConn = createMQTTConnection(ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID, anotherChannel);
+        anotherConn.processConnect(ConnectionTestUtils.buildConnect(FAKE_CLIENT_ID));
+        ConnectionTestUtils.assertConnectAccepted(anotherChannel);
+        assertEquals("After a reconnect, subscription MUST be still present", 1, subscriptions.size());
+
+        final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD, payload, false);
+
+        ConnectionTestUtils.verifyPublishIsReceived(anotherChannel, AT_MOST_ONCE, "Hello world!");
+    }
+
+    /**
+     * Check that after a client has connected with clean session false, subscribed to some topic
+     * and exited, if it reconnects with clean session true, the broker correctly cleanup every
+     * previous subscription
+     */
+    @Test
+    public void testCleanSession_correctlyClientSubscriptions() {
+        connection.processConnect(connectMessage);
+        assertConnectAccepted(channel);
+        assertEquals("After CONNECT subscription MUST be empty", 0, subscriptions.size());
+
+        //subscribe(channel, NEWS_TOPIC, AT_MOST_ONCE);
+        final MqttSubscribeMessage subscribeMsg = MqttMessageBuilders
+            .subscribe()
+            .addSubscription(AT_MOST_ONCE, NEWS_TOPIC)
+            .messageId(1)
+            .build();
+        connection.processSubscribe(subscribeMsg);
+        assertEquals("Subscribe MUST contain one subscription", 1, subscriptions.size());
+
+        connection.processDisconnect(null);
+        assertEquals("Disconnection MUSTN'T clear subscriptions", 1, subscriptions.size());
+
+        connectMessage = MqttMessageBuilders.connect()
+            .clientId(FAKE_CLIENT_ID)
+            .cleanSession(true)
+            .build();
+        channel = new EmbeddedChannel();
+        connection = createMQTTConnection(CONFIG, channel);
+        connection.processConnect(connectMessage);
+        assertConnectAccepted(channel);
+        assertEquals("After CONNECT with clean, subscription MUST be empty", 0, subscriptions.size());
+
+        // publish on /news
+        final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD, payload, false);
+
+        // verify no publish is fired
+        ConnectionTestUtils.verifyNoPublishIsReceived(channel);
     }
 
     @Test

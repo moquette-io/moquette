@@ -31,70 +31,71 @@ public class ProtocolProcessor_VariousUseCases_Test extends AbstractProtocolProc
         initializeProcessorAndSubsystems();
     }
 
-    @Test
-    public void testCleanSession_maintainClientSubscriptions() {
-        connectAsClient(this.m_channel, "TestClient");
-        subscribe("/topic", AT_MOST_ONCE);
-        disconnect();
+//    @Test
+//    public void testCleanSession_maintainClientSubscriptions() {
+//        connectAsClient(this.m_channel, "TestClient");
+//        subscribe("/topic", AT_MOST_ONCE);
+//        disconnect();
+//
+//        // reconnect and publish
+//        EmbeddedChannel anotherChannel = new EmbeddedChannel();
+//        connectAsClient(anotherChannel, "TestClient");
+//
+//        publishToAs(anotherChannel, "TestClient", "/topic", AT_MOST_ONCE, false);
+//
+//        verifyPublishIsReceived(anotherChannel);
+//    }
+//
+//    @Ignore("At the end it's equal to testCleanSession_maintainClientSubscriptions")
+//    @Test
+//    public void testCleanSession_maintainClientSubscriptions_againstClientDestruction() {
+//        connectAsClient("TestClient");
+//        subscribe("/topic", AT_MOST_ONCE);
+//        disconnect();
+//
+//        this.m_channel = new EmbeddedChannel();
+//        // reconnect and publish
+//        connectAsClient("TestClient");
+//
+//        publishToAs("TestClient", "/topic", AT_MOST_ONCE, false);
+//
+//        verifyPublishIsReceived();
+//    }
 
-        // reconnect and publish
-        EmbeddedChannel anotherChannel = new EmbeddedChannel();
-        connectAsClient(anotherChannel, "TestClient");
+//    /**
+//     * Check that after a client has connected with clean session false, subscribed to some topic
+//     * and exited, if it reconnects with clean session true, the broker correctly cleanup every
+//     * previous subscription
+//     */
+//    @Test
+//    public void testCleanSession_correctlyClientSubscriptions() {
+//        connectAsClient("TestClient");
+//        subscribe("/topic", AT_MOST_ONCE);
+//        disconnect();
+//
+//        this.m_channel = new EmbeddedChannel();
+//        // reconnect and publish
+//        connectWithCleanSession("TestClient");
+//
+//        publishToAs("TestClient", "/topic", AT_MOST_ONCE, false);
+//
+//        verifyNoPublishIsReceived();
+//    }
 
-        publishToAs(anotherChannel, "TestClient", "/topic", AT_MOST_ONCE, false);
-
-        verifyPublishIsReceived(anotherChannel);
-    }
-
-    @Ignore("At the end it's equal to testCleanSession_maintainClientSubscriptions")
-    @Test
-    public void testCleanSession_maintainClientSubscriptions_againstClientDestruction() {
-        connectAsClient("TestClient");
-        subscribe("/topic", AT_MOST_ONCE);
-        disconnect();
-
-        this.m_channel = new EmbeddedChannel();
-        // reconnect and publish
-        connectAsClient("TestClient");
-
-        publishToAs("TestClient", "/topic", AT_MOST_ONCE, false);
-
-        verifyPublishIsReceived();
-    }
-
-    /**
-     * Check that after a client has connected with clean session false, subscribed to some topic
-     * and exited, if it reconnects with clean session true, the broker correctly cleanup every
-     * previous subscription
-     */
-    @Test
-    public void testCleanSession_correctlyClientSubscriptions() {
-        connectAsClient("TestClient");
-        subscribe("/topic", AT_MOST_ONCE);
-        disconnect();
-
-        this.m_channel = new EmbeddedChannel();
-        // reconnect and publish
-        connectWithCleanSession("TestClient");
-
-        publishToAs("TestClient", "/topic", AT_MOST_ONCE, false);
-
-        verifyNoPublishIsReceived();
-    }
-
-    @Test
-    public void testRetain_maintainMessage_againstClientDestruction() {
-        connect();
-        publishToAs(FAKE_CLIENT_ID, "/topic", AT_LEAST_ONCE, 66, true);
-        disconnect();
-
-        // reconnect and publish
-        this.m_channel = new EmbeddedChannel();
-        connect();
-        subscribe("/topic", AT_MOST_ONCE);
-
-        verifyPublishIsReceived();
-    }
+// Duplicated, just verify retain works correctly
+//    @Test
+//    public void testRetain_maintainMessage_againstClientDestruction() {
+//        connect();
+//        publishToAs(FAKE_CLIENT_ID, "/topic", AT_LEAST_ONCE, 66, true);
+//        disconnect();
+//
+//        // reconnect and publish
+//        this.m_channel = new EmbeddedChannel();
+//        connect();
+//        subscribe("/topic", AT_MOST_ONCE);
+//
+//        verifyPublishIsReceived();
+//    }
 
     @Test
     public void testUnsubscribe_do_not_notify_anymore_same_session() {
