@@ -103,6 +103,21 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
         return recursiveMatch(topic, this.root);
     }
 
+    @Override
+    public Set<Subscription> matchQosSharpening(Topic topic) {
+        final Set<Subscription> subscriptions = matchWithoutQosSharpening(topic);
+
+        Map<String, Subscription> subsGroupedByClient = new HashMap<>();
+        for (Subscription sub : subscriptions) {
+            Subscription existingSub = subsGroupedByClient.get(sub.clientId);
+            // update the selected subscriptions if not present or if has a greater qos
+            if (existingSub == null || existingSub.qosLessThan(sub)) {
+                subsGroupedByClient.put(sub.clientId, sub);
+            }
+        }
+        return new HashSet<>(subsGroupedByClient.values());
+    }
+
     /**
      * Given a topic string return the clients subscriptions that matches it. Topic string can't
      * contain character # and + because they are reserved to listeners subscriptions, and not topic

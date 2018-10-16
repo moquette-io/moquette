@@ -268,7 +268,7 @@ final class MQTTConnection {
         LOG.trace("Client <{}> unsubscribed from topics <{}>", clientID, topics);
     }
 
-    private void processPublish(MqttPublishMessage msg) {
+    void processPublish(MqttPublishMessage msg) {
         final MqttQoS qos = msg.fixedHeader().qosLevel();
         final String username = NettyUtils.userName(channel);
         final String topicName = msg.variableHeader().topicName();
@@ -278,6 +278,10 @@ final class MQTTConnection {
         ByteBuf payload = msg.payload();
         final boolean retain = msg.fixedHeader().isRetain();
         final Topic topic = new Topic(topicName);
+        if (!topic.isValid()) {
+            LOG.debug("Drop connection because of invalid topic format");
+            dropConnection();
+        }
         switch (qos) {
             case AT_MOST_ONCE:
                 postOffice.receivedPublishQos0(topic, username, clientId, payload, retain);

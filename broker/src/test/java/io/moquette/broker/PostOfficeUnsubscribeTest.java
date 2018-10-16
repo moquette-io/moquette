@@ -22,7 +22,8 @@ import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.Set;
 
-import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
+import static io.moquette.broker.PostOfficePublishTest.PUBLISHER_ID;
+import static io.netty.handler.codec.mqtt.MqttQoS.*;
 import static java.util.Collections.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -77,12 +78,14 @@ public class PostOfficeUnsubscribeTest {
         return new MQTTConnection(channel, config, mockAuthenticator, sessionRegistry, sut);
     }
 
-    protected void connect() {
-        MqttConnectMessage connectMessage = MqttMessageBuilders.connect()
-            .clientId(FAKE_CLIENT_ID)
-            .build();
+    protected void connect(MQTTConnection connection, String clientId) {
+        MqttConnectMessage connectMessage = ConnectionTestUtils.buildConnect(clientId);
+        connect(connectMessage, connection);
+    }
+
+    protected void connect(MqttConnectMessage connectMessage, MQTTConnection connection) {
         connection.processConnect(connectMessage);
-        ConnectionTestUtils.assertConnectAccepted(channel);
+        ConnectionTestUtils.assertConnectAccepted((EmbeddedChannel) connection.channel);
     }
 
     protected void subscribe(MQTTConnection connection, String topic, MqttQoS desiredQos) {
@@ -99,15 +102,18 @@ public class PostOfficeUnsubscribeTest {
         final String clientId = connection.getClientId();
         Subscription expectedSubscription = new Subscription(clientId, new Topic(topic), desiredQos);
 
-        final Set<Subscription> matchedSubscriptions = subscriptions.matchWithoutQosSharpening(new Topic(topic));
+        final Set<Subscription> matchedSubscriptions = subscriptions.matchQosSharpening(new Topic(topic));
         assertEquals(1, matchedSubscriptions.size());
+        //assertTrue(matchedSubscriptions.size() >=1);
         final Subscription onlyMatchedSubscription = matchedSubscriptions.iterator().next();
         assertEquals(expectedSubscription, onlyMatchedSubscription);
+
+//        assertTrue(matchedSubscriptions.contains(expectedSubscription));
     }
 
     @Test
     public void testUnsubscribeWithBadFormattedTopic() {
-        connect();
+        connect(this.connection, FAKE_CLIENT_ID);
 
         // Exercise
         sut.unsubscribe(singletonList(BAD_FORMATTED_TOPIC), connection, 1);
@@ -118,7 +124,7 @@ public class PostOfficeUnsubscribeTest {
 
     @Test
     public void testDontNotifyClientSubscribedToTopicAfterDisconnectedAndReconnectOnSameChannel() {
-        connect();
+        connect(this.connection, FAKE_CLIENT_ID);
         subscribe(connection, NEWS_TOPIC, AT_MOST_ONCE);
 
         // publish on /news
@@ -147,7 +153,7 @@ public class PostOfficeUnsubscribeTest {
 
     @Test
     public void testDontNotifyClientSubscribedToTopicAfterDisconnectedAndReconnectOnNewChannel() {
-        connect();
+        connect(this.connection, FAKE_CLIENT_ID);
         subscribe(connection, NEWS_TOPIC, AT_MOST_ONCE);
         // publish on /news
         final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
@@ -169,5 +175,179 @@ public class PostOfficeUnsubscribeTest {
         sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD, payload2, false);
 
         ConnectionTestUtils.verifyNoPublishIsReceived(anotherChannel);
+    }
+
+    @Test
+    public void avoidMultipleNotificationsAfterMultipleReconnection_cleanSessionFalseQoS1() {
+        final MqttConnectMessage notCleanConnect = ConnectionTestUtils.buildConnectNotClean(FAKE_CLIENT_ID);
+        connect(notCleanConnect, this.connection);
+        subscribe(connection, NEWS_TOPIC, AT_LEAST_ONCE);
+        connection.processDisconnect(null);
+
+        // connect on another channel
+        final String firstPayload = "Hello MQTT 1";
+        connectPublishDisconnectFromAnotherClient(firstPayload, NEWS_TOPIC);
+
+        // reconnect FAKE_CLIENT on another channel
+        EmbeddedChannel anotherChannel2 = new EmbeddedChannel();
+        MQTTConnection anotherConnection2 = createMQTTConnection(CONFIG, anotherChannel2);
+        anotherConnection2.processConnect(notCleanConnect);
+        ConnectionTestUtils.assertConnectAccepted(anotherChannel2);
+
+        ConnectionTestUtils.verifyPublishIsReceived(anotherChannel2, MqttQoS.AT_LEAST_ONCE, firstPayload);
+
+        anotherConnection2.processDisconnect(null);
+
+        final String secondPayload = "Hello MQTT 2";
+        connectPublishDisconnectFromAnotherClient(secondPayload, NEWS_TOPIC);
+
+        EmbeddedChannel anotherChannel3 = new EmbeddedChannel();
+        MQTTConnection anotherConnection3 = createMQTTConnection(CONFIG, anotherChannel3);
+        anotherConnection3.processConnect(notCleanConnect);
+        ConnectionTestUtils.assertConnectAccepted(anotherChannel3);
+
+        ConnectionTestUtils.verifyPublishIsReceived(anotherChannel3, MqttQoS.AT_LEAST_ONCE, firstPayload);
+    }
+
+    private void connectPublishDisconnectFromAnotherClient(String firstPayload, String topic) {
+        MQTTConnection anotherConnection = connectNotCleanAs(PUBLISHER_ID);
+
+        // publish from another channel
+        final ByteBuf anyPayload = Unpooled.copiedBuffer(firstPayload, Charset.defaultCharset());
+        sut.receivedPublishQos1(anotherConnection, new Topic(topic), TEST_USER, anyPayload, 1,false,
+            MqttMessageBuilders.publish()
+                .payload(Unpooled.copiedBuffer(firstPayload, Charset.defaultCharset()))
+                .qos(MqttQoS.AT_LEAST_ONCE)
+                .retained(false)
+                .topicName(topic).build());
+
+        // disconnect the other channel
+        anotherConnection.processDisconnect(null);
+    }
+
+    private MQTTConnection connectNotCleanAs(String clientId) {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        MQTTConnection connection = createMQTTConnection(CONFIG, channel);
+        connection.processConnect(ConnectionTestUtils.buildConnectNotClean(clientId));
+        ConnectionTestUtils.assertConnectAccepted(channel);
+        return connection;
+    }
+
+    private MQTTConnection connectAs(String clientId) {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        MQTTConnection connection = createMQTTConnection(CONFIG, channel);
+        connection.processConnect(ConnectionTestUtils.buildConnect(clientId));
+        ConnectionTestUtils.assertConnectAccepted(channel);
+        return connection;
+    }
+
+    @Test
+    public void testConnectSubPub_cycle_getTimeout_on_second_disconnect_issue142() {
+        connect(connection, FAKE_CLIENT_ID);
+        subscribe(connection, NEWS_TOPIC, AT_MOST_ONCE);
+        // publish on /news
+        final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD, payload, false);
+
+        ConnectionTestUtils.verifyPublishIsReceived((EmbeddedChannel) connection.channel, AT_MOST_ONCE, "Hello world!");
+
+        connection.processDisconnect(null);
+
+        final MqttConnectMessage notCleanConnect = ConnectionTestUtils.buildConnect(FAKE_CLIENT_ID);
+        EmbeddedChannel subscriberChannel = new EmbeddedChannel();
+        MQTTConnection subscriberConnection = createMQTTConnection(CONFIG, subscriberChannel);
+        subscriberConnection.processConnect(notCleanConnect);
+        ConnectionTestUtils.assertConnectAccepted(subscriberChannel);
+
+        subscribe(subscriberConnection, NEWS_TOPIC, AT_MOST_ONCE);
+        // publish on /news
+        final ByteBuf payload2 = Unpooled.copiedBuffer("Hello world2!", Charset.defaultCharset());
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD, payload2, false);
+
+        ConnectionTestUtils.verifyPublishIsReceived(subscriberChannel, AT_MOST_ONCE, "Hello world2!");
+
+        subscriberConnection.processDisconnect(null);
+
+        assertFalse("after a disconnect the client should be disconnected", subscriberChannel.isOpen());
+    }
+
+    @Test
+    public void checkReplayofStoredPublishResumeAfter_a_disconnect_cleanSessionFalseQoS1() {
+        final MQTTConnection publisher = connectAs("Publisher");
+
+        connect(this.connection, FAKE_CLIENT_ID);
+        subscribe(connection, NEWS_TOPIC, AT_LEAST_ONCE);
+
+        // publish from another channel
+        publishQos1(publisher, NEWS_TOPIC, "Hello world MQTT!!-1", 99);
+        ConnectionTestUtils.verifyPublishIsReceived(channel, AT_LEAST_ONCE, "Hello world MQTT!!-1");
+        connection.processDisconnect(null);
+
+        publishQos1(publisher, NEWS_TOPIC, "Hello world MQTT!!-2", 100);
+        publishQos1(publisher, NEWS_TOPIC, "Hello world MQTT!!-3", 101);
+
+        createMQTTConnection(CONFIG);
+        connect(this.connection, FAKE_CLIENT_ID);
+        ConnectionTestUtils.verifyPublishIsReceived(channel, AT_LEAST_ONCE, "Hello world MQTT!!-2");
+        ConnectionTestUtils.verifyPublishIsReceived(channel, AT_LEAST_ONCE, "Hello world MQTT!!-3");
+    }
+
+    private void publishQos1(MQTTConnection publisher, String topic, String payload, int messageID) {
+        final ByteBuf bytePayload = Unpooled.copiedBuffer(payload, Charset.defaultCharset());
+        sut.receivedPublishQos1(publisher, new Topic(topic), TEST_USER, bytePayload, messageID,false,
+            MqttMessageBuilders.publish()
+                .payload(Unpooled.copiedBuffer(payload, Charset.defaultCharset()))
+                .qos(MqttQoS.AT_LEAST_ONCE)
+                .retained(false)
+                .topicName(NEWS_TOPIC).build());
+    }
+
+    private void publishQos2(MQTTConnection connection, String topic, String payload, int messageID) {
+        final ByteBuf bytePayload = Unpooled.copiedBuffer(payload, Charset.defaultCharset());
+        sut.receivedPublishRelQos2(connection, MqttMessageBuilders.publish()
+            .payload(bytePayload)
+            .qos(MqttQoS.EXACTLY_ONCE)
+            .retained(true)
+            .topicName(NEWS_TOPIC).build(), messageID);
+    }
+
+    /**
+     * subscriber connect and subscribe on "topic" subscriber disconnects publisher connects and
+     * send two message "hello1" "hello2" to "topic" subscriber connects again and receive "hello1"
+     * "hello2"
+     */
+    @Test
+    public void checkQoS2SubscriberDisconnectReceivePersistedPublishes() {
+        connect(this.connection, FAKE_CLIENT_ID);
+        subscribe(connection, NEWS_TOPIC, EXACTLY_ONCE);
+        connection.processDisconnect(null);
+
+        final MQTTConnection publisher = connectAs("Publisher");
+        publishQos2(publisher, NEWS_TOPIC, "Hello world MQTT!!-1", 100);
+        publishQos2(publisher, NEWS_TOPIC, "Hello world MQTT!!-2", 101);
+
+        createMQTTConnection(CONFIG);
+        connect(this.connection, FAKE_CLIENT_ID);
+        ConnectionTestUtils.verifyPublishIsReceived(channel, EXACTLY_ONCE, "Hello world MQTT!!-1");
+        ConnectionTestUtils.verifyPublishIsReceived(channel, EXACTLY_ONCE, "Hello world MQTT!!-2");
+    }
+
+    /**
+     * subscriber connect and subscribe on "a/b" QoS 1 and "a/+" QoS 2 publisher connects and send a
+     * message "hello" on "a/b" subscriber must receive only a single message not twice
+     */
+    @Test
+    public void checkSinglePublishOnOverlappingSubscriptions() {
+        final MQTTConnection publisher = connectAs("Publisher");
+
+        connect(this.connection, FAKE_CLIENT_ID);
+        subscribe(connection, "a/b", AT_LEAST_ONCE);
+        subscribe(connection, "a/+", EXACTLY_ONCE);
+
+        // force the publisher to send
+        publishQos1(publisher, "a/b", "Hello world MQTT!!", 60);
+
+        ConnectionTestUtils.verifyPublishIsReceived(channel, AT_LEAST_ONCE, "Hello world MQTT!!");
+        ConnectionTestUtils.verifyNoPublishIsReceived(channel);
     }
 }

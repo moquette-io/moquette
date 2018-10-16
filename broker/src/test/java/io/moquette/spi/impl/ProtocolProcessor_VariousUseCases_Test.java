@@ -157,12 +157,12 @@ public class ProtocolProcessor_VariousUseCases_Test extends AbstractProtocolProc
 //        disconnect(anotherChannel);
 //    }
 
-    private void publishFromAnotherClient(String topic, String payload, MqttQoS qos) {
-        EmbeddedChannel anotherChannel = new EmbeddedChannel();
-        connectAsClient(anotherChannel, "AnotherClient");
-        publishToAs(anotherChannel, "AnotherClient", topic, payload, qos, 68, false);
-        disconnect(anotherChannel);
-    }
+//    private void publishFromAnotherClient(String topic, String payload, MqttQoS qos) {
+//        EmbeddedChannel anotherChannel = new EmbeddedChannel();
+//        connectAsClient(anotherChannel, "AnotherClient");
+//        publishToAs(anotherChannel, "AnotherClient", topic, payload, qos, 68, false);
+//        disconnect(anotherChannel);
+//    }
 
 //    private void publishQoS2FromAnotherClient(String topic) {
 //        EmbeddedChannel anotherChannel = new EmbeddedChannel();
@@ -201,163 +201,163 @@ public class ProtocolProcessor_VariousUseCases_Test extends AbstractProtocolProc
 //
 //        verifyPublishIsReceived(EXACTLY_ONCE);
 //    }
+//
+//    @Test
+//    public void avoidMultipleNotificationsAfterMultipleReconnection_cleanSessionFalseQoS1() {
+//        connect();
+//        subscribe("/topic", AT_LEAST_ONCE);
+//        disconnect();
+//
+//        publishFromAnotherClient("/topic", "Hello MQTT 1", AT_LEAST_ONCE);
+//
+//        this.m_channel = new EmbeddedChannel();
+//        connect();
+//        verifyPublishIsReceived("Hello MQTT 1", AT_LEAST_ONCE);
+//        disconnect();
+//
+//        // publish other message
+//        publishFromAnotherClient("/topic", "Hello MQTT 2", AT_LEAST_ONCE);
+//
+//        this.m_channel = new EmbeddedChannel();
+//        connect();
+//        verifyPublishIsReceived("Hello MQTT 2", AT_LEAST_ONCE);
+//    }
 
-    @Test
-    public void avoidMultipleNotificationsAfterMultipleReconnection_cleanSessionFalseQoS1() {
-        connect();
-        subscribe("/topic", AT_LEAST_ONCE);
-        disconnect();
+//    @Test
+//    public void testConnectSubPub_cycle_getTimeout_on_second_disconnect_issue142() {
+//        connect();
+//        subscribe("/topic", AT_MOST_ONCE);
+//        publishToAs(FAKE_CLIENT_ID, "/topic", AT_MOST_ONCE, true);
+//        disconnect();
+//
+//        // second loop
+//        this.m_channel = new EmbeddedChannel();
+//        connect();
+//        subscribe("/topic", AT_MOST_ONCE);
+//        publishToAs(FAKE_CLIENT_ID, "/topic", AT_MOST_ONCE, true);
+//        disconnect();
+//
+//        assertFalse("after a disconnect the client should be disconnected", this.m_channel.isOpen());
+//    }
+//
+//    @Test
+//    public void checkReplayofStoredPublishResumeAfter_a_disconnect_cleanSessionFalseQoS1() {
+//        EmbeddedChannel publisher = new EmbeddedChannel();
+//        connectAsClient(publisher, "Publisher");
+//
+//        connect();
+//        subscribe("/topic", AT_LEAST_ONCE);
+//
+//        publishToAs(publisher, "Publisher", "/topic", "Hello world MQTT!!-1", AT_LEAST_ONCE, 99, false);
+//        verifyPublishIsReceived("Hello world MQTT!!-1", AT_LEAST_ONCE);
+//        disconnect();
+//
+//        publishToAs(publisher, "Publisher", "/topic", "Hello world MQTT!!-2", AT_LEAST_ONCE, 100, false);
+//        publishToAs(publisher, "Publisher", "/topic", "Hello world MQTT!!-3", AT_LEAST_ONCE, 101, false);
+//
+//        this.m_channel = new EmbeddedChannel();
+//        connect();
+//        verifyPublishIsReceived("Hello world MQTT!!-2", AT_LEAST_ONCE);
+//        verifyPublishIsReceived("Hello world MQTT!!-3", AT_LEAST_ONCE);
+//    }
+//
+//    @Test
+//    public void checkReplayStoredPublish_forNoCleanSession_qos1() {
+//        EmbeddedChannel publisher = new EmbeddedChannel();
+//        connectAsClient(publisher, "Publisher");
+//
+//        connect();
+//        subscribe("/topic", AT_LEAST_ONCE);
+//        disconnect();
+//
+//        publishToAs(publisher, "Publisher", "/topic", "Hello world MQTT!!-1", AT_LEAST_ONCE, 99, false);
+//
+//        this.m_channel = new EmbeddedChannel();
+//        connect();
+//        subscribeAndNotReadResponse("/topic", AT_LEAST_ONCE);
+//        verifyPublishIsReceived("Hello world MQTT!!-1", AT_LEAST_ONCE);
+//    }
+//
+//    /**
+//     * subscriber connect and subscribe on "topic" subscriber disconnects publisher connects and
+//     * send two message "hello1" "hello2" to "topic" subscriber connects again and receive "hello1"
+//     * "hello2"
+//     */
+//    @Test
+//    public void checkQoS2SubscriberDisconnectReceivePersistedPublishes() {
+//        connect();
+//        subscribe("topic", EXACTLY_ONCE);
+//        disconnect();
+//
+//        EmbeddedChannel publisher = new EmbeddedChannel();
+//        connectAsClient(publisher, "Publisher");
+//        publishQoS2ToAs(publisher, "Publisher", "topic", "Hello1", 101, true);
+//        publishQoS2ToAs(publisher, "Publisher", "topic", "Hello2", 102, true);
+//        disconnect(publisher);
+//
+//        this.m_channel = new EmbeddedChannel();
+//        connect();
+//        verifyPublishIsReceived("Hello1", EXACTLY_ONCE);
+//        verifyPublishIsReceived("Hello2", EXACTLY_ONCE);
+//    }
 
-        publishFromAnotherClient("/topic", "Hello MQTT 1", AT_LEAST_ONCE);
+//    /**
+//     * subscriber connect and subscribe on "a/b" QoS 1 and "a/+" QoS 2 publisher connects and send a
+//     * message "hello" on "a/b" subscriber must receive only a single message not twice
+//     */
+//    @Test
+//    public void checkSinglePublishOnOverlappingSubscriptions() {
+//        EmbeddedChannel publisher = new EmbeddedChannel();
+//        connectAsClient(publisher, "Publisher");
+//
+//        connect();
+//        subscribe("a/+", EXACTLY_ONCE);
+//        subscribe("a/b", AT_LEAST_ONCE);
+//
+//        // force the publisher to send
+//        publishToAs(publisher, "Publisher", "a/b", "Hello world MQTT!!", AT_LEAST_ONCE, 60, false);
+//
+//        verifyPublishIsReceived("Hello world MQTT!!", AT_LEAST_ONCE);
+//        // try to listen a second publish
+//        verifyNoPublishIsReceived();
+//    }
 
-        this.m_channel = new EmbeddedChannel();
-        connect();
-        verifyPublishIsReceived("Hello MQTT 1", AT_LEAST_ONCE);
-        disconnect();
+//    @Test
+//    public void testForceClientDisconnection_issue116() {
+//        EmbeddedChannel clientXA = new EmbeddedChannel();
+//        connectAsClient(clientXA, "subscriber");
+//        subscribe(clientXA, "topic", AT_MOST_ONCE);
+//
+//        EmbeddedChannel clientXB = new EmbeddedChannel();
+//        connectAsClient(clientXB, "publisher");
+//        publishQoS2ToAs(clientXB, "publisher", "topic", "Hello", 20, false);
+//
+//        EmbeddedChannel clientYA = new EmbeddedChannel();
+//        connectAsClient(clientYA, "subscriber");
+//        subscribe(clientYA, "topic", AT_MOST_ONCE);
+//
+//        EmbeddedChannel clientYB = new EmbeddedChannel();
+//        connectAsClient(clientYB, "publisher");
+//        publishQoS2ToAs(clientYB, "publisher", "topic", "Hello 2", 20, true);
+//
+//        assertFalse("First 'subscriber' channel MUST be closed by the broker", clientXA.isOpen());
+//        verifyPublishIsReceived(clientYA, "Hello 2", AT_MOST_ONCE);
+//    }
 
-        // publish other message
-        publishFromAnotherClient("/topic", "Hello MQTT 2", AT_LEAST_ONCE);
-
-        this.m_channel = new EmbeddedChannel();
-        connect();
-        verifyPublishIsReceived("Hello MQTT 2", AT_LEAST_ONCE);
-    }
-
-    @Test
-    public void testConnectSubPub_cycle_getTimeout_on_second_disconnect_issue142() {
-        connect();
-        subscribe("/topic", AT_MOST_ONCE);
-        publishToAs(FAKE_CLIENT_ID, "/topic", AT_MOST_ONCE, true);
-        disconnect();
-
-        // second loop
-        this.m_channel = new EmbeddedChannel();
-        connect();
-        subscribe("/topic", AT_MOST_ONCE);
-        publishToAs(FAKE_CLIENT_ID, "/topic", AT_MOST_ONCE, true);
-        disconnect();
-
-        assertFalse("after a disconnect the client should be disconnected", this.m_channel.isOpen());
-    }
-
-    @Test
-    public void checkReplayofStoredPublishResumeAfter_a_disconnect_cleanSessionFalseQoS1() {
-        EmbeddedChannel publisher = new EmbeddedChannel();
-        connectAsClient(publisher, "Publisher");
-
-        connect();
-        subscribe("/topic", AT_LEAST_ONCE);
-
-        publishToAs(publisher, "Publisher", "/topic", "Hello world MQTT!!-1", AT_LEAST_ONCE, 99, false);
-        verifyPublishIsReceived("Hello world MQTT!!-1", AT_LEAST_ONCE);
-        disconnect();
-
-        publishToAs(publisher, "Publisher", "/topic", "Hello world MQTT!!-2", AT_LEAST_ONCE, 100, false);
-        publishToAs(publisher, "Publisher", "/topic", "Hello world MQTT!!-3", AT_LEAST_ONCE, 101, false);
-
-        this.m_channel = new EmbeddedChannel();
-        connect();
-        verifyPublishIsReceived("Hello world MQTT!!-2", AT_LEAST_ONCE);
-        verifyPublishIsReceived("Hello world MQTT!!-3", AT_LEAST_ONCE);
-    }
-
-    @Test
-    public void checkReplayStoredPublish_forNoCleanSession_qos1() {
-        EmbeddedChannel publisher = new EmbeddedChannel();
-        connectAsClient(publisher, "Publisher");
-
-        connect();
-        subscribe("/topic", AT_LEAST_ONCE);
-        disconnect();
-
-        publishToAs(publisher, "Publisher", "/topic", "Hello world MQTT!!-1", AT_LEAST_ONCE, 99, false);
-
-        this.m_channel = new EmbeddedChannel();
-        connect();
-        subscribeAndNotReadResponse("/topic", AT_LEAST_ONCE);
-        verifyPublishIsReceived("Hello world MQTT!!-1", AT_LEAST_ONCE);
-    }
-
-    /**
-     * subscriber connect and subscribe on "topic" subscriber disconnects publisher connects and
-     * send two message "hello1" "hello2" to "topic" subscriber connects again and receive "hello1"
-     * "hello2"
-     */
-    @Test
-    public void checkQoS2SubscriberDisconnectReceivePersistedPublishes() {
-        connect();
-        subscribe("topic", EXACTLY_ONCE);
-        disconnect();
-
-        EmbeddedChannel publisher = new EmbeddedChannel();
-        connectAsClient(publisher, "Publisher");
-        publishQoS2ToAs(publisher, "Publisher", "topic", "Hello1", 101, true);
-        publishQoS2ToAs(publisher, "Publisher", "topic", "Hello2", 102, true);
-        disconnect(publisher);
-
-        this.m_channel = new EmbeddedChannel();
-        connect();
-        verifyPublishIsReceived("Hello1", EXACTLY_ONCE);
-        verifyPublishIsReceived("Hello2", EXACTLY_ONCE);
-    }
-
-    /**
-     * subscriber connect and subscribe on "a/b" QoS 1 and "a/+" QoS 2 publisher connects and send a
-     * message "hello" on "a/b" subscriber must receive only a single message not twice
-     */
-    @Test
-    public void checkSinglePublishOnOverlappingSubscriptions() {
-        EmbeddedChannel publisher = new EmbeddedChannel();
-        connectAsClient(publisher, "Publisher");
-
-        connect();
-        subscribe("a/+", EXACTLY_ONCE);
-        subscribe("a/b", AT_LEAST_ONCE);
-
-        // force the publisher to send
-        publishToAs(publisher, "Publisher", "a/b", "Hello world MQTT!!", AT_LEAST_ONCE, 60, false);
-
-        verifyPublishIsReceived("Hello world MQTT!!", AT_LEAST_ONCE);
-        // try to listen a second publish
-        verifyNoPublishIsReceived();
-    }
-
-    @Test
-    public void testForceClientDisconnection_issue116() {
-        EmbeddedChannel clientXA = new EmbeddedChannel();
-        connectAsClient(clientXA, "subscriber");
-        subscribe(clientXA, "topic", AT_MOST_ONCE);
-
-        EmbeddedChannel clientXB = new EmbeddedChannel();
-        connectAsClient(clientXB, "publisher");
-        publishQoS2ToAs(clientXB, "publisher", "topic", "Hello", 20, false);
-
-        EmbeddedChannel clientYA = new EmbeddedChannel();
-        connectAsClient(clientYA, "subscriber");
-        subscribe(clientYA, "topic", AT_MOST_ONCE);
-
-        EmbeddedChannel clientYB = new EmbeddedChannel();
-        connectAsClient(clientYB, "publisher");
-        publishQoS2ToAs(clientYB, "publisher", "topic", "Hello 2", 20, true);
-
-        assertFalse("First 'subscriber' channel MUST be closed by the broker", clientXA.isOpen());
-        verifyPublishIsReceived(clientYA, "Hello 2", AT_MOST_ONCE);
-    }
-
-    @Test
-    public void testPublishToEmptyTopic() {
-        EmbeddedChannel subscriber = new EmbeddedChannel();
-        connectAsClient(subscriber, "Subscriber");
-
-        subscribe(subscriber, "#", AT_LEAST_ONCE);
-
-        // Exercise
-        connect();
-        publishToAs(FAKE_CLIENT_ID, "", AT_LEAST_ONCE, 1, false);
-
-        // Verify
-        verifyNoPublishIsReceived(subscriber);
-        assertFalse("On empty topic subscription the channel MUST be closed", m_channel.isOpen());
-    }
+//    @Test
+//    public void testPublishToEmptyTopic() {
+//        EmbeddedChannel subscriber = new EmbeddedChannel();
+//        connectAsClient(subscriber, "Subscriber");
+//
+//        subscribe(subscriber, "#", AT_LEAST_ONCE);
+//
+//        // Exercise
+//        connect();
+//        publishToAs(FAKE_CLIENT_ID, "", AT_LEAST_ONCE, 1, false);
+//
+//        // Verify
+//        verifyNoPublishIsReceived(subscriber);
+//        assertFalse("On empty topic subscription the channel MUST be closed", m_channel.isOpen());
+//    }
 
 }

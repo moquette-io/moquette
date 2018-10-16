@@ -113,7 +113,7 @@ class SessionRegistry {
             // case 4
             LOG.trace("case 4, oldSession with same CId {} still connected, force to close", clientId);
             oldSession.closeImmediatly();
-            remove(clientId);
+            //remove(clientId);
             // publish new session
             final boolean published = pool.replace(clientId, oldSession, newSession);
             if (!published) {

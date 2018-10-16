@@ -34,32 +34,35 @@ public class MQTTConnectionConnectTest {
     private EmbeddedChannel channel;
     private SessionRegistry sessionRegistry;
     private MqttMessageBuilders.ConnectBuilder connMsg;
+    private static final BrokerConfiguration CONFIG = new BrokerConfiguration(true, true, false);
+    private IAuthenticator mockAuthenticator;
+    private PostOffice postOffice;
 
     @Before
     public void setUp() {
         connMsg = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_3_1).cleanSession(true);
 
-        BrokerConfiguration config = new BrokerConfiguration(true, true, false);
-
-        createMQTTConnection(config);
-    }
-
-    private void createMQTTConnection(BrokerConfiguration config) {
-        channel = new EmbeddedChannel();
-        sut = createMQTTConnection(config, channel);
-    }
-
-    private MQTTConnection createMQTTConnection(BrokerConfiguration config, Channel channel) {
         MemoryStorageService memStorage = new MemoryStorageService(null, null);
         ISessionsStore sessionStore = memStorage.sessionsStore();
-        IAuthenticator mockAuthenticator = new MockAuthenticator(singleton(FAKE_CLIENT_ID), singletonMap(TEST_USER, TEST_PWD));
+        mockAuthenticator = new MockAuthenticator(singleton(FAKE_CLIENT_ID), singletonMap(TEST_USER, TEST_PWD));
 
         ISubscriptionsDirectory subscriptions = new CTrieSubscriptionDirectory();
         SessionsRepository sessionsRepository = new SessionsRepository(sessionStore, null);
         subscriptions.init(sessionsRepository);
 
-        final PostOffice postOffice = new PostOffice(subscriptions, new PermitAllAuthorizatorPolicy(), new MemoryRetainedRepository());
+        postOffice = new PostOffice(subscriptions, new PermitAllAuthorizatorPolicy(), new MemoryRetainedRepository());
         sessionRegistry = new SessionRegistry(subscriptions, postOffice);
+
+        sut = createMQTTConnection(CONFIG);
+        channel = (EmbeddedChannel) sut.channel;
+    }
+
+    private MQTTConnection createMQTTConnection(BrokerConfiguration config) {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        return createMQTTConnection(config, channel);
+    }
+
+    private MQTTConnection createMQTTConnection(BrokerConfiguration config, Channel channel) {
         return new MQTTConnection(channel, config, mockAuthenticator, sessionRegistry, postOffice);
     }
 
@@ -252,5 +255,25 @@ public class MQTTConnectionConnectTest {
         // the good client remains connected
         assertTrue("Original connected client must remain connected", channel.isOpen());
         assertFalse("Channel trying to connect with bad credentials must be closed", evilChannel.isOpen());
+    }
+
+    @Test
+    public void testForceClientDisconnection_issue116() {
+        MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID)
+            .username(TEST_USER)
+            .password(TEST_PWD)
+            .build();
+        sut.processConnect(msg);
+        assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
+
+        // now create another connection and check the new one closes the older
+        MQTTConnection anotherConnection = createMQTTConnection(CONFIG);
+        anotherConnection.processConnect(msg);
+        EmbeddedChannel anotherChannel = (EmbeddedChannel) anotherConnection.channel;
+        assertEqualsConnAck(CONNECTION_ACCEPTED, anotherChannel.readOutbound());
+
+        // Verify
+        assertFalse("First 'FAKE_CLIENT_ID' channel MUST be closed by the broker", channel.isOpen());
+        assertTrue("Second 'FAKE_CLIENT_ID' channel MUST be still open", anotherChannel.isOpen());
     }
 }

@@ -22,21 +22,20 @@ import org.junit.Test;
 import java.nio.charset.Charset;
 import java.util.*;
 
+import static io.moquette.broker.PostOfficeUnsubscribeTest.CONFIG;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_LEAST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class PostOfficePublishTest {
 
     private static final String FAKE_CLIENT_ID = "FAKE_123";
     private static final String FAKE_CLIENT_ID2 = "FAKE_456";
     static final String SUBSCRIBER_ID = "Subscriber";
-    private static final String PUBLISHER_ID = "Publisher";
+    static final String PUBLISHER_ID = "Publisher";
     private static final String TEST_USER = "fakeuser";
     private static final String TEST_PWD = "fakepwd";
     private static final String NEWS_TOPIC = "/news";
@@ -94,9 +93,7 @@ public class PostOfficePublishTest {
         ConnectionTestUtils.assertConnectAccepted(channel);
 
         // subscribe
-        final MqttQoS qos = AT_MOST_ONCE;
-        final String newsTopic = NEWS_TOPIC;
-        subscribe(qos, newsTopic, connection);
+        subscribe(AT_MOST_ONCE, NEWS_TOPIC, connection);
 
         // Exercise
         final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
@@ -104,6 +101,43 @@ public class PostOfficePublishTest {
 
         // Verify
         ConnectionTestUtils.verifyReceivePublish(channel, NEWS_TOPIC, "Hello world!");
+    }
+
+    @Test
+    public void testForceClientDisconnection_issue116() {
+        final MQTTConnection clientXA = connectAs("subscriber");
+        subscribe(clientXA, NEWS_TOPIC, AT_MOST_ONCE);
+
+        final MQTTConnection clientXB = connectAs("publisher");
+        final ByteBuf anyPayload = Unpooled.copiedBuffer("Hello", Charset.defaultCharset());
+        sut.receivedPublishRelQos2(clientXB, MqttMessageBuilders.publish()
+            .payload(anyPayload)
+            .qos(MqttQoS.EXACTLY_ONCE)
+            .retained(false)
+            .topicName(NEWS_TOPIC).build(), 20);
+
+        final MQTTConnection clientYA = connectAs("subscriber");
+        subscribe(clientYA, NEWS_TOPIC, AT_MOST_ONCE);
+
+        final MQTTConnection clientYB = connectAs("publisher");
+        final ByteBuf anyPayload2 = Unpooled.copiedBuffer("Hello 2", Charset.defaultCharset());
+        sut.receivedPublishRelQos2(clientYB, MqttMessageBuilders.publish()
+            .payload(anyPayload2)
+            .qos(MqttQoS.EXACTLY_ONCE)
+            .retained(true)
+            .topicName(NEWS_TOPIC).build(), 20);
+
+        // Verify
+        assertFalse("First 'subscriber' channel MUST be closed by the broker", clientXA.channel.isOpen());
+        ConnectionTestUtils.verifyPublishIsReceived((EmbeddedChannel) clientYA.channel, AT_MOST_ONCE, "Hello 2");
+    }
+
+    private MQTTConnection connectAs(String clientId) {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        MQTTConnection connection = createMQTTConnection(CONFIG, channel);
+        connection.processConnect(ConnectionTestUtils.buildConnect(clientId));
+        ConnectionTestUtils.assertConnectAccepted(channel);
+        return connection;
     }
 
     private void subscribe(MqttQoS topic, String newsTopic, MQTTConnection connection) {

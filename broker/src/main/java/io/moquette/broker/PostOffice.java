@@ -219,7 +219,7 @@ class PostOffice {
     }
 
     private void publish2Subscribers(ByteBuf origPayload, Topic topic, MqttQoS publishingQos) {
-        Set<Subscription> topicMatchingSubscriptions = subscriptions.matchWithoutQosSharpening(topic);
+        Set<Subscription> topicMatchingSubscriptions = subscriptions.matchQosSharpening(topic);
 
         for (final Subscription sub : topicMatchingSubscriptions) {
             MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
@@ -230,7 +230,7 @@ class PostOffice {
             // that pull out of the queue.
             if (targetIsActive) {
                 LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
-                    sub.getClientId(), sub.getTopicFilter(), qos);
+                          sub.getClientId(), sub.getTopicFilter(), qos);
                 // we need to retain because duplicate only copy r/w indexes and don't retain() causing
                 // refCnt = 0
                 ByteBuf payload = origPayload.retainedDuplicate();
@@ -238,7 +238,7 @@ class PostOffice {
             } else {
                 if (!targetSession.isClean()) {
                     LOG.debug("Storing pending PUBLISH inactive message. CId={}, topicFilter: {}, qos: {}",
-                        sub.getClientId(), sub.getTopicFilter(), qos);
+                              sub.getClientId(), sub.getTopicFilter(), qos);
                     // store the message in targetSession queue to deliver
                     enqueueToClient(sub.getClientId(), new PublishedMessage(topic, publishingQos, origPayload));
                 }
