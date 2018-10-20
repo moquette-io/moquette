@@ -204,7 +204,9 @@ final class MQTTConnection {
         if (clientID != null && !clientID.isEmpty()) {
             LOG.info("Notifying connection lost event. CId = {}, channel: {}", clientID, channel);
             Session session = sessionRegistry.retrieve(clientID);
-            postOffice.fireWill(session.getWill());
+            if (session.hasWill()) {
+                postOffice.fireWill(session.getWill());
+            }
             sessionRegistry.remove(clientID);
         }
         channel.close().addListener(CLOSE_ON_FAILURE);

@@ -3,7 +3,10 @@ package io.moquette.broker;
 import io.moquette.broker.Session.SessionStatus;
 import io.moquette.spi.impl.subscriptions.ISubscriptionsDirectory;
 import io.moquette.spi.impl.subscriptions.Subscription;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
+import io.netty.handler.codec.mqtt.MqttQoS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -141,9 +144,14 @@ class SessionRegistry {
         final String clientId = msg.payload().clientIdentifier();
 
         final boolean clean = msg.variableHeader().isCleanSession();
-        final Session.Will will = createWill(msg);
+        final Session newSession;
+        if (msg.variableHeader().isWillFlag()) {
+            final Session.Will will = createWill(msg);
+            newSession = new Session(clientId, clean, will);
+        } else {
+            newSession = new Session(clientId, clean);
+        }
 
-        final Session newSession = new Session(clientId, clean, will);
         newSession.markConnected();
         newSession.bind(mqttConnection);
 
@@ -157,9 +165,11 @@ class SessionRegistry {
     }
 
     private Session.Will createWill(MqttConnectMessage msg) {
-        final byte[] willPayload = msg.payload().willMessageInBytes();
+        final ByteBuf willPayload = Unpooled.copiedBuffer(msg.payload().willMessageInBytes());
         final String willTopic = msg.payload().willTopic();
-        return new Session.Will(willTopic, willPayload);
+        final boolean retained = msg.variableHeader().isWillRetain();
+        final MqttQoS qos = MqttQoS.valueOf(msg.variableHeader().willQos());
+        return new Session.Will(willTopic, willPayload, qos, retained);
     }
 
     Session retrieve(String clientID) {

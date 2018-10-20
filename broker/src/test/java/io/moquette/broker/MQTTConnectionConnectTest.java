@@ -21,6 +21,9 @@ import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
 import static org.junit.Assert.*;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 public class MQTTConnectionConnectTest {
 
@@ -59,10 +62,15 @@ public class MQTTConnectionConnectTest {
 
     private MQTTConnection createMQTTConnection(BrokerConfiguration config) {
         EmbeddedChannel channel = new EmbeddedChannel();
-        return createMQTTConnection(config, channel);
+        return createMQTTConnection(config, channel, postOffice);
     }
 
-    private MQTTConnection createMQTTConnection(BrokerConfiguration config, Channel channel) {
+    private MQTTConnection createMQTTConnectionWithPostOffice(BrokerConfiguration config, PostOffice postOffice) {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        return createMQTTConnection(config, channel, postOffice);
+    }
+
+    private MQTTConnection createMQTTConnection(BrokerConfiguration config, Channel channel, PostOffice postOffice) {
         return new MQTTConnection(channel, config, mockAuthenticator, sessionRegistry, postOffice);
     }
 
@@ -109,7 +117,7 @@ public class MQTTConnectionConnectTest {
     }
 
     @Test
-    public void testWill() {
+    public void testWillIsAccepted() {
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).willFlag(true)
             .willTopic("topic").willMessage("Topic message").build();
 
@@ -120,6 +128,24 @@ public class MQTTConnectionConnectTest {
         // Verify
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
         assertTrue("Connection is accepted and therefore should remain open", channel.isOpen());
+    }
+
+    @Test
+    public void testWillIsFired() {
+        final PostOffice postOfficeMock = mock(PostOffice.class);
+        sut = createMQTTConnectionWithPostOffice(CONFIG, postOfficeMock);
+        channel = (EmbeddedChannel) sut.channel;
+
+        MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).willFlag(true)
+            .willTopic("topic").willMessage("Topic message").build();
+        sut.processConnect(msg);
+
+        // Exercise
+        sut.handleConnectionLost();
+
+        // Verify
+        verify(postOfficeMock).fireWill(any(Session.Will.class));
+        assertFalse("Connection is accepted and therefore should remain open", channel.isOpen());
     }
 
     @Test
@@ -248,7 +274,7 @@ public class MQTTConnectionConnectTest {
 
         // Exercise
         BrokerConfiguration config = new BrokerConfiguration(true, true, false);
-        final MQTTConnection evilConnection = createMQTTConnection(config, evilChannel);
+        final MQTTConnection evilConnection = createMQTTConnection(config, evilChannel, postOffice);
         evilConnection.processConnect(evilClientConnMsg);
 
         // Verify

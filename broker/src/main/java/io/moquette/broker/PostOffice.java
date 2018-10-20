@@ -61,7 +61,8 @@ class PostOffice {
     }
 
     public void fireWill(Session.Will will) {
-        // TODO
+        // MQTT 3.1.2.8-17
+        publish2Subscribers(will.payload, new Topic(will.topic), will.qos);
     }
 
     public void sendQueuedMessagesWhileOffline(String clientId, Session targetSession) {

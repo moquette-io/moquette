@@ -17,12 +17,16 @@ class Session {
 
     static final class Will {
 
-        private final String topic;
-        private final byte[] payload;
+        final String topic;
+        final ByteBuf payload;
+        final MqttQoS qos;
+        final boolean retained;
 
-        Will(String topic, byte[] payload) {
+        Will(String topic, ByteBuf payload, MqttQoS qos, boolean retained) {
             this.topic = topic;
             this.payload = payload;
+            this.qos = qos;
+            this.retained = retained;
         }
     }
 
@@ -38,6 +42,11 @@ class Session {
         this.clientId = clientId;
         this.clean = clean;
         this.will = will;
+    }
+
+    Session(String clientId, boolean clean) {
+        this.clientId = clientId;
+        this.clean = clean;
     }
 
     void update(boolean clean, Will will) {
@@ -71,6 +80,10 @@ class Session {
 
     public void addSubscriptions(List<Subscription> newSubscriptions) {
         subscriptions.addAll(newSubscriptions);
+    }
+
+    public boolean hasWill() {
+        return will != null;
     }
 
     public Will getWill() {
