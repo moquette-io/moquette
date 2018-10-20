@@ -166,7 +166,8 @@ public class MQTTConnectionConnectTest {
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).build();
         BrokerConfiguration config = new BrokerConfiguration(false, true, false);
 
-        createMQTTConnection(config);
+        sut = createMQTTConnection(config);
+        channel = (EmbeddedChannel) sut.channel;
 
         // Exercise
         sut.processConnect(msg);
@@ -197,7 +198,8 @@ public class MQTTConnectionConnectTest {
     public void testZeroByteClientIdNotAllowed() {
         BrokerConfiguration config = new BrokerConfiguration(false, false, false);
 
-        createMQTTConnection(config);
+        sut = createMQTTConnection(config);
+        channel = (EmbeddedChannel) sut.channel;
 
         // Connect message with clean session set to true and client id is null.
         MqttConnectMessage msg = connMsg.clientId(null)
