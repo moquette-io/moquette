@@ -160,7 +160,12 @@ class SessionRegistry {
 
     private void copySessionConfig(MqttConnectMessage msg, Session session) {
         final boolean clean = msg.variableHeader().isCleanSession();
-        final Session.Will will = createWill(msg);
+        final Session.Will will;
+        if (msg.variableHeader().isWillFlag()) {
+            will = createWill(msg);
+        } else {
+            will = null;
+        }
         session.update(clean, will);
     }
 

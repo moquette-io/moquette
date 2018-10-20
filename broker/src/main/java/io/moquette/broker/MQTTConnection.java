@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 import static io.netty.channel.ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE;
@@ -33,6 +34,7 @@ final class MQTTConnection {
     private final Map<Integer, MqttPublishMessage> qos1Sending = new HashMap<>();
     private final Map<Integer, MqttPublishMessage> qos2SendingPhase1 = new HashMap<>();
     private final Set<Integer> qos2SendingPhase2 = new HashSet<>();
+    private final AtomicInteger lastPacketId = new AtomicInteger(0);
 
     MQTTConnection(Channel channel, BrokerConfiguration brokerConfig, IAuthenticator authenticator,
                    SessionRegistry sessionRegistry, PostOffice postOffice) {
@@ -225,7 +227,6 @@ final class MQTTConnection {
     void processDisconnect(MqttMessage msg) {
         final String clientID = NettyUtils.clientID(channel);
         LOG.trace("Start DISCONNECT CId={}, channel: {}", clientID, channel);
-//        channel.flush();
         if (!connected) {
             LOG.info("DISCONNECT received on already closed connection, CId={}, channel: {}", clientID, channel);
             return;
@@ -333,12 +334,11 @@ final class MQTTConnection {
         } else {
             LOG.debug("Sending PUBLISH({}) message. MessageId={}, CId={}, topic={}", qos, messageId, clientId, topicName);
         }
+        final int packetId = lastPacketId.incrementAndGet();
         if (qos == AT_LEAST_ONCE) {
-            // TODO generate an incremental packetID for outbound in flight messages
-            qos1Sending.put(1, publishMsg);
+            qos1Sending.put(packetId, publishMsg);
         } else if (qos == EXACTLY_ONCE) {
-            // TODO generate an incremental packetID for outbound in flight messages
-            qos2SendingPhase1.put(1, publishMsg);
+            qos2SendingPhase1.put(packetId, publishMsg);
         }
 
         rawSend(publishMsg, messageId, clientId);
@@ -353,18 +353,6 @@ final class MQTTConnection {
             LOG.error("Unable to send {} message. CId=<{}>, messageId={}", msg.fixedHeader().messageType(),
                 clientId, messageId, th);
         }
-        // TODO improve this for in-flight messages (qos != 0)
-//
-//        if (!messageDelivered) {
-//            if (qos != AT_MOST_ONCE && !clientsession.isCleanSession()) {
-//                LOG.warn("PUBLISH message could not be delivered. It will be stored. MessageId={}, CId={}, topic={}, " +
-//                    "qos={}, removeTemporaryQoS2={}", messageId, clientId, topicName, qos, false);
-//                clientsession.enqueue(asStoredMessage(pubMessage));
-//            } else {
-//                LOG.warn("PUBLISH message could not be delivered. It will be discarded. MessageId={}, CId={}, " +
-//                    "topic={}, qos={}, removeTemporaryQoS2={}", messageId, clientId, topicName, qos, true);
-//            }
-//        }
     }
 
     void sendPubAck(int messageID) {
