@@ -277,7 +277,6 @@ class PostOffice {
     void receivedPublishRelQos2(MQTTConnection connection, MqttPublishMessage mqttPublishMessage, int messageID) {
         LOG.trace("Processing PUBREL message on connection: {}", connection);
         final Topic topic = new Topic(mqttPublishMessage.variableHeader().topicName());
-
         final ByteBuf payload = mqttPublishMessage.payload();
         publish2Subscribers(payload, topic, EXACTLY_ONCE);
 
@@ -302,5 +301,42 @@ class PostOffice {
             qos = sub.getRequestedQos();
         }
         return qos;
+    }
+
+    /**
+     * Intended usage is only for embedded versions of the broker, where the hosting application
+     * want to use the broker to send a publish message. Like normal external publish message but
+     * with some changes to avoid security check, and the handshake phases for Qos1 and Qos2. It
+     * also doesn't notifyTopicPublished because using internally the owner should already know
+     * where it's publishing.
+     *
+     * @param msg
+     *            the message to publish.
+     * @param clientId
+     *            the clientID
+     */
+    public void internalPublish(MqttPublishMessage msg, final String clientId) {
+        final MqttQoS qos = msg.fixedHeader().qosLevel();
+        final Topic topic = new Topic(msg.variableHeader().topicName());
+        final ByteBuf payload = msg.payload();
+        LOG.info("Sending internal PUBLISH message Topic={}, qos={}", topic, qos);
+
+//        IMessagesStore.StoredMessage toStoreMsg = asStoredMessage(msg);
+//        if (clientId == null || clientId.isEmpty()) {
+//            toStoreMsg.setClientID("BROKER_SELF");
+//        } else {
+//            toStoreMsg.setClientID(clientId);
+//        }
+        publish2Subscribers(payload, topic, qos);
+
+        if (!msg.fixedHeader().isRetain()) {
+            return;
+        }
+        if (qos == AT_MOST_ONCE || msg.payload().readableBytes() == 0) {
+            // QoS == 0 && retain => clean old retained
+            retainedRepository.cleanRetained(topic);
+            return;
+        }
+        retainedRepository.retain(topic, msg);
     }
 }
