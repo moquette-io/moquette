@@ -250,12 +250,7 @@ class PostOffice {
     private void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, Session targetSession, ByteBuf payload) {
         if (qos != MqttQoS.AT_MOST_ONCE) {
             // QoS 1 or 2
-            // TODO create a packetIdGenerator but on Connection
-//                    int messageId = targetSession.inFlightAckWaiting(pubMsg);
-            int messageId = 1;
-            // set the PacketIdentifier only for QoS > 0
-//                    publishMsg = notRetainedPublishWithMessageId(topic.toString(), qos, payload, messageId);
-            targetSession.sendPublishNotRetainedWithMessageId(topic, qos, payload, messageId);
+            targetSession.sendPublishNotRetainedWithMessageId(topic, qos, payload);
         } else {
             targetSession.sendPublishNotRetained(topic, qos, payload);
         }
@@ -264,12 +259,7 @@ class PostOffice {
     private void sendRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, Session targetSession, ByteBuf payload) {
         if (qos != MqttQoS.AT_MOST_ONCE) {
             // QoS 1 or 2
-            // TODO create a packetIdGenerator but on Connection
-//                    int messageId = targetSession.inFlightAckWaiting(pubMsg);
-            int messageId = 1;
-            // set the PacketIdentifier only for QoS > 0
-//                    publishMsg = notRetainedPublishWithMessageId(topic.toString(), qos, payload, messageId);
-            targetSession.sendRetainedPublishWithMessageId(topic, qos, payload, messageId);
+            targetSession.sendRetainedPublishWithMessageId(topic, qos, payload);
         } else {
             targetSession.sendRetainedPublish(topic, qos, payload);
         }

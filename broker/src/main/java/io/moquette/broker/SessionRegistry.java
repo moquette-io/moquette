@@ -115,7 +115,7 @@ class SessionRegistry {
         } else if (oldSession.connected()) {
             // case 4
             LOG.trace("case 4, oldSession with same CId {} still connected, force to close", clientId);
-            oldSession.closeImmediatly();
+            oldSession.closeImmediately();
             //remove(clientId);
             // publish new session
             final boolean published = pool.replace(clientId, oldSession, newSession);

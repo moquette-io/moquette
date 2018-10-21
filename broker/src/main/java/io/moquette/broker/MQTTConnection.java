@@ -323,35 +323,33 @@ final class MQTTConnection {
         mqttPublishMessage.release();
     }
 
-    void sendPublish(MqttPublishMessage publishMsg) {
-        final int messageId = publishMsg.variableHeader().packetId();
+    private void sendPublish(MqttPublishMessage publishMsg) {
+        final int packetId = publishMsg.variableHeader().packetId();
         final String topicName = publishMsg.variableHeader().topicName();
         final String clientId = getClientId();
         MqttQoS qos = publishMsg.fixedHeader().qosLevel();
         if (LOG.isTraceEnabled()) {
-            LOG.trace("Sending PUBLISH({}) message. MessageId={}, CId={}, topic={}, payload={}", qos, messageId,
+            LOG.trace("Sending PUBLISH({}) message. MessageId={}, CId={}, topic={}, payload={}", qos, packetId,
                       clientId, topicName, DebugUtils.payload2Str(publishMsg.payload()));
         } else {
-            LOG.debug("Sending PUBLISH({}) message. MessageId={}, CId={}, topic={}", qos, messageId, clientId, topicName);
+            LOG.debug("Sending PUBLISH({}) message. MessageId={}, CId={}, topic={}", qos, packetId, clientId,
+                      topicName);
         }
-        final int packetId = lastPacketId.incrementAndGet();
         if (qos == AT_LEAST_ONCE) {
             qos1Sending.put(packetId, publishMsg);
         } else if (qos == EXACTLY_ONCE) {
             qos2SendingPhase1.put(packetId, publishMsg);
         }
 
-        rawSend(publishMsg, messageId, clientId);
+        rawSend(publishMsg, packetId, clientId);
     }
 
     private void rawSend(MqttMessage msg, int messageId, String clientId) {
-        boolean messageDelivered = false;
         try {
             channel.writeAndFlush(msg);
-            messageDelivered = true;
         } catch (Throwable th) {
-            LOG.error("Unable to send {} message. CId=<{}>, messageId={}", msg.fixedHeader().messageType(),
-                clientId, messageId, th);
+            LOG.error("Unable to send {} message. CId=<{}>, messageId={}", msg.fixedHeader().messageType(), clientId,
+                      messageId, th);
         }
     }
 
@@ -376,11 +374,52 @@ final class MQTTConnection {
         return NettyUtils.clientID(channel);
     }
 
+    public void sendPublishRetained(Topic topic, MqttQoS qos, ByteBuf payload) {
+        MqttPublishMessage publishMsg = retainedPublish(topic.toString(), qos, payload);
+        sendPublish(publishMsg);
+    }
+
+    public void sendPublishRetainedWithPacketId(Topic topic, MqttQoS qos, ByteBuf payload) {
+        final int packetId = lastPacketId.incrementAndGet();
+        MqttPublishMessage publishMsg = retainedPublishWithMessageId(topic.toString(), qos, payload, packetId);
+        sendPublish(publishMsg);
+    }
+
+    private static MqttPublishMessage retainedPublish(String topic, MqttQoS qos, ByteBuf message) {
+        return retainedPublishWithMessageId(topic, qos, message, 0);
+    }
+
+    private static MqttPublishMessage retainedPublishWithMessageId(String topic, MqttQoS qos, ByteBuf message,
+                                                                   int messageId) {
+        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, true, 0);
+        MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId);
+        return new MqttPublishMessage(fixedHeader, varHeader, message);
+    }
+
+    void sendPublishNotRetained(Topic topic, MqttQoS qos, ByteBuf payload) {
+        MqttPublishMessage publishMsg = notRetainedPublish(topic.toString(), qos, payload);
+        sendPublish(publishMsg);
+    }
+
+    private static MqttPublishMessage notRetainedPublish(String topic, MqttQoS qos, ByteBuf message) {
+        return notRetainedPublishWithMessageId(topic, qos, message, 0);
+    }
+
+    private static MqttPublishMessage notRetainedPublishWithMessageId(String topic, MqttQoS qos, ByteBuf message,
+                                                                      int messageId) {
+        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, false, 0);
+        MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId);
+        return new MqttPublishMessage(fixedHeader, varHeader, message);
+    }
+
+    void sendPublishNotRetainedWithMessageId(Topic topic, MqttQoS qos, ByteBuf payload) {
+        final int packetId = lastPacketId.incrementAndGet();
+        MqttPublishMessage publishMsg = notRetainedPublishWithMessageId(topic.toString(), qos, payload, packetId);
+        sendPublish(publishMsg);
+    }
+
     @Override
     public String toString() {
-        return "MQTTConnection{" +
-            "channel=" + channel +
-            ", connected=" + connected +
-            '}';
+        return "MQTTConnection{channel=" + channel + ", connected=" + connected + '}';
     }
 }

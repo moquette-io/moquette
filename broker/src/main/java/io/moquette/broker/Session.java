@@ -33,7 +33,6 @@ class Session {
     private final String clientId;
     private boolean clean;
     private Will will;
-//    private volatile SessionStatus status;
     private final AtomicReference<SessionStatus> status = new AtomicReference<>(SessionStatus.DISCONNECTED);
     private MQTTConnection mqttConnection;
     private List<Subscription> subscriptions = new ArrayList<>();
@@ -94,7 +93,7 @@ class Session {
         return status.compareAndSet(expected, newState);
     }
 
-    public void closeImmediatly() {
+    public void closeImmediately() {
         mqttConnection.dropConnection();
     }
 
@@ -117,44 +116,18 @@ class Session {
     }
 
     void sendPublishNotRetained(Topic topic, MqttQoS qos, ByteBuf payload) {
-        MqttPublishMessage publishMsg = notRetainedPublish(topic.toString(), qos, payload);
-        mqttConnection.sendPublish(publishMsg);
+        mqttConnection.sendPublishNotRetained(topic, qos, payload);
     }
 
-    private static MqttPublishMessage notRetainedPublish(String topic, MqttQoS qos, ByteBuf message) {
-        return notRetainedPublishWithMessageId(topic, qos, message, 0);
-    }
-
-    private static MqttPublishMessage retainedPublish(String topic, MqttQoS qos, ByteBuf message) {
-        return retainedPublishWithMessageId(topic, qos, message, 0);
-    }
-
-    private static MqttPublishMessage notRetainedPublishWithMessageId(String topic, MqttQoS qos, ByteBuf message,
-                                                                      int messageId) {
-        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, false, 0);
-        MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId);
-        return new MqttPublishMessage(fixedHeader, varHeader, message);
-    }
-
-    private static MqttPublishMessage retainedPublishWithMessageId(String topic, MqttQoS qos, ByteBuf message,
-                                                                   int messageId) {
-        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, true, 0);
-        MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId);
-        return new MqttPublishMessage(fixedHeader, varHeader, message);
-    }
-
-    void sendPublishNotRetainedWithMessageId(Topic topic, MqttQoS qos, ByteBuf payload, int messageId) {
-        MqttPublishMessage publishMsg = notRetainedPublishWithMessageId(topic.toString(), qos, payload, messageId);
-        mqttConnection.sendPublish(publishMsg);
+    void sendPublishNotRetainedWithMessageId(Topic topic, MqttQoS qos, ByteBuf payload) {
+        mqttConnection.sendPublishNotRetainedWithMessageId(topic, qos, payload);
     }
 
     void sendRetainedPublish(Topic topic, MqttQoS qos, ByteBuf payload) {
-        MqttPublishMessage publishMsg = retainedPublish(topic.toString(), qos, payload);
-        mqttConnection.sendPublish(publishMsg);
+        mqttConnection.sendPublishRetained(topic, qos, payload);
     }
 
-    void sendRetainedPublishWithMessageId(Topic topic, MqttQoS qos, ByteBuf payload, int messageId) {
-        MqttPublishMessage publishMsg = notRetainedPublishWithMessageId(topic.toString(), qos, payload, messageId);
-        mqttConnection.sendPublish(publishMsg);
+    void sendRetainedPublishWithMessageId(Topic topic, MqttQoS qos, ByteBuf payload) {
+        mqttConnection.sendPublishRetainedWithPacketId(topic, qos, payload);
     }
 }
