@@ -11,11 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 import static io.moquette.spi.impl.Utils.messageId;
@@ -24,56 +20,28 @@ import static io.netty.handler.codec.mqtt.MqttQoS.*;
 
 class PostOffice {
 
-    private static final class PublishedMessage {
-
-        private final Topic topic;
-        private final MqttQoS publishingQos;
-        private final ByteBuf payload;
-
-        PublishedMessage(Topic topic, MqttQoS publishingQos, ByteBuf payload) {
-            this.topic = topic;
-            this.publishingQos = publishingQos;
-            this.payload = payload;
-        }
-    }
-
     private static final Logger LOG = LoggerFactory.getLogger(PostOffice.class);
 
-    private final ConcurrentMap<String, Queue> queues = new ConcurrentHashMap<>();
     private final Authorizator authorizator;
     private final ISubscriptionsDirectory subscriptions;
     private final IRetainedRepository retainedRepository;
     private SessionRegistry sessionRegistry;
 
     PostOffice(ISubscriptionsDirectory subscriptions, IAuthorizatorPolicy authorizatorPolicy,
-               IRetainedRepository retainedRepository) {
+               IRetainedRepository retainedRepository, SessionRegistry sessionRegistry) {
         this.authorizator = new Authorizator(authorizatorPolicy);
         this.subscriptions = subscriptions;
         this.retainedRepository = retainedRepository;
+        this.sessionRegistry = sessionRegistry;
     }
 
     public void init(SessionRegistry sessionRegistry) {
         this.sessionRegistry = sessionRegistry;
     }
 
-    void dropQueuesForClient(String clientId) {
-        queues.remove(clientId);
-    }
-
     public void fireWill(Session.Will will) {
         // MQTT 3.1.2.8-17
         publish2Subscribers(will.payload, new Topic(will.topic), will.qos);
-    }
-
-    public void sendQueuedMessagesWhileOffline(String clientId, Session targetSession) {
-        LOG.trace("Republishing all saved messages for session {} on CId={}", targetSession, clientId);
-        if (!queues.containsKey(clientId)) {
-            return;
-        }
-        final Queue<PublishedMessage> queue = queues.get(clientId);
-        for (PublishedMessage msgToPublish : queue) {
-            sendPublishOnSessionAtQos(msgToPublish.topic, msgToPublish.publishingQos, targetSession, msgToPublish.payload);
-        }
     }
 
     public void subscribeClientToTopics(MqttSubscribeMessage msg, String clientID, String username,
@@ -227,32 +195,20 @@ class PostOffice {
             Session targetSession = this.sessionRegistry.retrieve(sub.getClientId());
 
             boolean targetIsActive = targetSession != null && targetSession.connected();
-            // TODO move all this logic into messageSender, which puts into the flightZone only the messages
-            // that pull out of the queue.
             if (targetIsActive) {
                 LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
                           sub.getClientId(), sub.getTopicFilter(), qos);
-                // we need to retain because duplicate only copy r/w indexes and don't retain() causing
-                // refCnt = 0
+                // we need to retain because duplicate only copy r/w indexes and don't retain() causing refCnt = 0
                 ByteBuf payload = origPayload.retainedDuplicate();
-                sendPublishOnSessionAtQos(topic, qos, targetSession, payload);
+                targetSession.sendPublishOnSessionAtQos(topic, qos, payload);
             } else {
                 if (!targetSession.isClean()) {
                     LOG.debug("Storing pending PUBLISH inactive message. CId={}, topicFilter: {}, qos: {}",
                               sub.getClientId(), sub.getTopicFilter(), qos);
                     // store the message in targetSession queue to deliver
-                    enqueueToClient(sub.getClientId(), new PublishedMessage(topic, publishingQos, origPayload));
+                   sessionRegistry.enqueueToClient(sub.getClientId(), origPayload, topic, publishingQos);
                 }
             }
-        }
-    }
-
-    private void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, Session targetSession, ByteBuf payload) {
-        if (qos != MqttQoS.AT_MOST_ONCE) {
-            // QoS 1 or 2
-            targetSession.sendPublishNotRetainedWithMessageId(topic, qos, payload);
-        } else {
-            targetSession.sendPublishNotRetained(topic, qos, payload);
         }
     }
 
@@ -263,11 +219,6 @@ class PostOffice {
         } else {
             targetSession.sendRetainedPublish(topic, qos, payload);
         }
-    }
-
-    private void enqueueToClient(String clientId, PublishedMessage msg) {
-        queues.computeIfAbsent(clientId, (String cli) -> new ConcurrentLinkedQueue());
-        queues.get(clientId).add(msg);
     }
 
     /**

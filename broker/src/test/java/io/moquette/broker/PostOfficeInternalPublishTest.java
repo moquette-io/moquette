@@ -1,7 +1,6 @@
 package io.moquette.broker;
 
 import io.moquette.persistence.MemoryStorageService;
-import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.ISessionsStore;
 import io.moquette.spi.impl.MockAuthenticator;
 import io.moquette.spi.impl.SessionsRepository;
@@ -10,23 +9,16 @@ import io.moquette.spi.impl.subscriptions.CTrieSubscriptionDirectory;
 import io.moquette.spi.impl.subscriptions.ISubscriptionsDirectory;
 import io.moquette.spi.impl.subscriptions.Subscription;
 import io.moquette.spi.impl.subscriptions.Topic;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
-import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.*;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.nio.charset.Charset;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Set;
 
 import static io.moquette.broker.PostOfficeUnsubscribeTest.CONFIG;
-import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singleton;
@@ -82,9 +74,8 @@ public class PostOfficeInternalPublishTest {
         subscriptions.init(sessionsRepository);
         retainedRepository = new MemoryRetainedRepository();
 
-        sut = new PostOffice(subscriptions, new PermitAllAuthorizatorPolicy(), retainedRepository);
-        SessionRegistry sessionRegistry = new SessionRegistry(subscriptions, sut);
-        sut.init(sessionRegistry);
+        SessionRegistry sessionRegistry = new SessionRegistry(subscriptions);
+        sut = new PostOffice(subscriptions, new PermitAllAuthorizatorPolicy(), retainedRepository, sessionRegistry);
         return sessionRegistry;
     }
 

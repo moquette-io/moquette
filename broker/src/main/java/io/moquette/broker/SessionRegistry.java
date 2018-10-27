@@ -3,6 +3,7 @@ package io.moquette.broker;
 import io.moquette.broker.Session.SessionStatus;
 import io.moquette.spi.impl.subscriptions.ISubscriptionsDirectory;
 import io.moquette.spi.impl.subscriptions.Subscription;
+import io.moquette.spi.impl.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
@@ -10,10 +11,25 @@ import io.netty.handler.codec.mqtt.MqttQoS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 
 class SessionRegistry {
+
+    private static final class PublishedMessage {
+
+        private final Topic topic;
+        private final MqttQoS publishingQos;
+        private final ByteBuf payload;
+
+        PublishedMessage(Topic topic, MqttQoS publishingQos, ByteBuf payload) {
+            this.topic = topic;
+            this.publishingQos = publishingQos;
+            this.payload = payload;
+        }
+    }
 
     private enum PostConnectAction {
         NONE, SEND_STORED_MESSAGES
@@ -22,12 +38,11 @@ class SessionRegistry {
     private static final Logger LOG = LoggerFactory.getLogger(SessionRegistry.class);
 
     private final ConcurrentMap<String, Session> pool = new ConcurrentHashMap<>();
-    private final PostOffice postOffice;
     private final ISubscriptionsDirectory subscriptionsDirectory;
+    private final ConcurrentMap<String, Queue> queues = new ConcurrentHashMap<>();
 
-    SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory, PostOffice postOffice) {
+    SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory) {
         this.subscriptionsDirectory = subscriptionsDirectory;
-        this.postOffice = postOffice;
     }
 
     void bindToSession(MQTTConnection mqttConnection, MqttConnectMessage msg, String clientId) {
@@ -58,7 +73,18 @@ class SessionRegistry {
 
         if (postConnectAction == PostConnectAction.SEND_STORED_MESSAGES) {
             final Session session = pool.get(clientId);
-            postOffice.sendQueuedMessagesWhileOffline(clientId, session);
+            sendQueuedMessagesWhileOffline(clientId, session);
+        }
+    }
+
+    private void sendQueuedMessagesWhileOffline(String clientId, Session targetSession) {
+        LOG.trace("Republishing all saved messages for session {} on CId={}", targetSession, clientId);
+        if (!queues.containsKey(clientId)) {
+            return;
+        }
+        final Queue<PublishedMessage> queue = queues.get(clientId);
+        for (PublishedMessage msgToPublish : queue) {
+            targetSession.sendPublishOnSessionAtQos(msgToPublish.topic, msgToPublish.publishingQos, msgToPublish.payload);
         }
     }
 
@@ -69,7 +95,7 @@ class SessionRegistry {
         final Session oldSession = pool.get(clientId);
         if (newIsClean && oldSession.disconnected()) {
             // case 2
-            postOffice.dropQueuesForClient(clientId);
+            dropQueuesForClient(clientId);
             unsubscribe(oldSession);
 
             // publish new session
@@ -192,5 +218,15 @@ class SessionRegistry {
             return;
         }
         session.disconnect();
+    }
+
+    private void dropQueuesForClient(String clientId) {
+        queues.remove(clientId);
+    }
+
+    void enqueueToClient(String clientId, ByteBuf origPayload, Topic topic, MqttQoS publishingQos) {
+        final PublishedMessage msg = new PublishedMessage(topic, publishingQos, origPayload);
+        queues.computeIfAbsent(clientId, (String cli) -> new ConcurrentLinkedQueue());
+        queues.get(clientId).add(msg);
     }
 }

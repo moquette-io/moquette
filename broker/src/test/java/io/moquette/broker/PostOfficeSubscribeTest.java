@@ -79,9 +79,9 @@ public class PostOfficeSubscribeTest {
         SessionsRepository sessionsRepository = new SessionsRepository(sessionStore, null);
         subscriptions.init(sessionsRepository);
 
-        sut = new PostOffice(subscriptions, new PermitAllAuthorizatorPolicy(), new MemoryRetainedRepository());
-        sessionRegistry = new SessionRegistry(subscriptions, sut);
-        sut.init(sessionRegistry);
+        sessionRegistry = new SessionRegistry(subscriptions);
+        sut = new PostOffice(subscriptions, new PermitAllAuthorizatorPolicy(), new MemoryRetainedRepository(),
+                             sessionRegistry);
     }
 
     private MQTTConnection createMQTTConnection(BrokerConfiguration config, Channel channel) {
@@ -153,8 +153,7 @@ public class PostOfficeSubscribeTest {
         when(prohibitReadOnNewsTopic.canRead(eq(new Topic(NEWS_TOPIC)), eq(FAKE_USER_NAME), eq(FAKE_CLIENT_ID)))
             .thenReturn(false);
 
-        sut = new PostOffice(subscriptions, prohibitReadOnNewsTopic, new MemoryRetainedRepository());
-        sut.init(sessionRegistry);
+        sut = new PostOffice(subscriptions, prohibitReadOnNewsTopic, new MemoryRetainedRepository(), sessionRegistry);
 
         connection.processConnect(connectMessage);
         ConnectionTestUtils.assertConnectAccepted(channel);
