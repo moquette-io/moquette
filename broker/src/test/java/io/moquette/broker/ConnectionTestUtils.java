@@ -16,7 +16,7 @@ class ConnectionTestUtils {
     }
 
     static void verifyReceivePublish(EmbeddedChannel embeddedChannel, String expectedTopic, String expectedContent) {
-        MqttPublishMessage receivedPublish = embeddedChannel.readOutbound();
+        MqttPublishMessage receivedPublish = embeddedChannel.flushOutbound().readOutbound();
         assertPublishIsCorrect(expectedTopic, expectedContent, receivedPublish);
     }
 
@@ -35,14 +35,14 @@ class ConnectionTestUtils {
 
     static void verifyReceiveRetainedPublish(EmbeddedChannel embeddedChannel, String expectedTopic,
                                              String expectedContent, MqttQoS expectedQos) {
-        MqttPublishMessage receivedPublish = embeddedChannel.readOutbound();
+        MqttPublishMessage receivedPublish = embeddedChannel.flushOutbound().readOutbound();
         assertEquals(receivedPublish.fixedHeader().qosLevel(), expectedQos);
         assertPublishIsCorrect(expectedTopic, expectedContent, receivedPublish);
         assertTrue("MUST be retained publish", receivedPublish.fixedHeader().isRetain());
     }
 
     static void verifyPublishIsReceived(EmbeddedChannel embCh, MqttQoS expectedQos, String expectedPayload) {
-        final MqttPublishMessage publishReceived = embCh.readOutbound();
+        final MqttPublishMessage publishReceived = embCh.flushOutbound().readOutbound();
         final String payloadMessage = DebugUtils.payload2Str(publishReceived.payload());
         assertEquals("Sent and received payload must be identical", expectedPayload, payloadMessage);
         assertEquals("Expected QoS don't match", expectedQos, publishReceived.fixedHeader().qosLevel());

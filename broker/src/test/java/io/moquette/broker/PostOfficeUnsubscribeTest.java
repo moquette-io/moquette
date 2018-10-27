@@ -302,13 +302,13 @@ public class PostOfficeUnsubscribeTest {
                 .topicName(NEWS_TOPIC).build());
     }
 
-    private void publishQos2(MQTTConnection connection, String topic, String payload, int messageID) {
+    private void publishQos2(MQTTConnection connection, String topic, String payload) {
         final ByteBuf bytePayload = Unpooled.copiedBuffer(payload, Charset.defaultCharset());
         sut.receivedPublishRelQos2(connection, MqttMessageBuilders.publish()
             .payload(bytePayload)
             .qos(MqttQoS.EXACTLY_ONCE)
             .retained(true)
-            .topicName(NEWS_TOPIC).build(), messageID);
+            .topicName(NEWS_TOPIC).build());
     }
 
     /**
@@ -323,8 +323,8 @@ public class PostOfficeUnsubscribeTest {
         connection.processDisconnect(null);
 
         final MQTTConnection publisher = connectAs("Publisher");
-        publishQos2(publisher, NEWS_TOPIC, "Hello world MQTT!!-1", 100);
-        publishQos2(publisher, NEWS_TOPIC, "Hello world MQTT!!-2", 101);
+        publishQos2(publisher, NEWS_TOPIC, "Hello world MQTT!!-1");
+        publishQos2(publisher, NEWS_TOPIC, "Hello world MQTT!!-2");
 
         createMQTTConnection(CONFIG);
         connect(this.connection, FAKE_CLIENT_ID);

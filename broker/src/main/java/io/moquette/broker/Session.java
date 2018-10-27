@@ -6,7 +6,9 @@ import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.mqtt.*;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 class Session {
@@ -36,6 +38,7 @@ class Session {
     private final AtomicReference<SessionStatus> status = new AtomicReference<>(SessionStatus.DISCONNECTED);
     private MQTTConnection mqttConnection;
     private List<Subscription> subscriptions = new ArrayList<>();
+    private final Map<Integer, MqttPublishMessage> qos2Receiving = new HashMap<>();
 
     Session(String clientId, boolean clean, Will will) {
         this.clientId = clientId;
@@ -129,5 +132,15 @@ class Session {
 
     void sendRetainedPublishWithMessageId(Topic topic, MqttQoS qos, ByteBuf payload) {
         mqttConnection.sendPublishRetainedWithPacketId(topic, qos, payload);
+    }
+
+    public void receivedPublishQos2(int messageID, MqttPublishMessage msg) {
+        qos2Receiving.put(messageID, msg);
+        msg.retain();
+        mqttConnection.sendPublishReceived(messageID);
+    }
+
+    public void receivedPubRelQos2(int messageID) {
+        qos2Receiving.remove(messageID);
     }
 }

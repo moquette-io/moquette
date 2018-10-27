@@ -114,7 +114,7 @@ public class PostOfficePublishTest {
             .payload(anyPayload)
             .qos(MqttQoS.EXACTLY_ONCE)
             .retained(false)
-            .topicName(NEWS_TOPIC).build(), 20);
+            .topicName(NEWS_TOPIC).build());
 
         final MQTTConnection clientYA = connectAs("subscriber");
         subscribe(clientYA, NEWS_TOPIC, AT_MOST_ONCE);
@@ -125,7 +125,7 @@ public class PostOfficePublishTest {
             .payload(anyPayload2)
             .qos(MqttQoS.EXACTLY_ONCE)
             .retained(true)
-            .topicName(NEWS_TOPIC).build(), 20);
+            .topicName(NEWS_TOPIC).build());
 
         // Verify
         assertFalse("First 'subscriber' channel MUST be closed by the broker", clientXA.channel.isOpen());
@@ -249,7 +249,7 @@ public class PostOfficePublishTest {
                 .payload(anyPayload)
                 .qos(MqttQoS.EXACTLY_ONCE)
                 .retained(true)
-                .topicName(NEWS_TOPIC).build(), 1);
+                .topicName(NEWS_TOPIC).build());
 
         // Verify
         ConnectionTestUtils.verifyPublishIsReceived(channel, EXACTLY_ONCE, "Any payload");

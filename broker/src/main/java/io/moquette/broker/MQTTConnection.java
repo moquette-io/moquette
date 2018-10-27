@@ -30,7 +30,6 @@ final class MQTTConnection {
     private SessionRegistry sessionRegistry;
     private final PostOffice postOffice;
     private boolean connected;
-    private final Map<Integer, MqttPublishMessage> qos2Receiving = new HashMap<>();
     private final Map<Integer, MqttPublishMessage> qos1Sending = new HashMap<>();
     private final Map<Integer, MqttPublishMessage> qos2SendingPhase1 = new HashMap<>();
     private final Set<Integer> qos2SendingPhase2 = new HashSet<>();
@@ -296,9 +295,10 @@ final class MQTTConnection {
             }
             case EXACTLY_ONCE: {
                 final int messageID = msg.variableHeader().packetId();
-                qos2Receiving.put(messageID, msg);
-                msg.retain();
-                sendPublishReceived(messageID);
+                final Session session = sessionRegistry.retrieve(clientId);
+                session.receivedPublishQos2(messageID, msg);
+                postOffice.receivedPublishRelQos2(this, msg);
+//                msg.release();
                 break;
             }
             default:
@@ -307,20 +307,20 @@ final class MQTTConnection {
         }
     }
 
-    private void sendPublishReceived(int messageID) {
+    void sendPublishReceived(int messageID) {
         LOG.trace("sendPubRec invoked on channel: {}", channel);
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBREC, false, AT_MOST_ONCE,
             false, 0);
         MqttPubAckMessage pubRecMessage = new MqttPubAckMessage(fixedHeader, from(messageID));
         rawSend(pubRecMessage, messageID, getClientId());
+        sendIfWritableElseDrop(pubRecMessage);
     }
 
     private void processPubRel(MqttMessage msg) {
+        final Session session = sessionRegistry.retrieve(getClientId());
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        final MqttPublishMessage mqttPublishMessage = qos2Receiving.get(messageID);
-        postOffice.receivedPublishRelQos2(this, mqttPublishMessage, messageID);
-        qos2Receiving.remove(messageID);
-        mqttPublishMessage.release();
+        session.receivedPubRelQos2(messageID);
+        sendPubCompMessage(messageID);
     }
 
     private void sendPublish(MqttPublishMessage publishMsg) {
@@ -341,7 +341,18 @@ final class MQTTConnection {
             qos2SendingPhase1.put(packetId, publishMsg);
         }
 
-        rawSend(publishMsg, packetId, clientId);
+        if (qos == AT_MOST_ONCE) {
+            // QoS0, best effort, if channel is writable do it, else drop it
+            sendIfWritableElseDrop(publishMsg);
+        } else {
+            rawSend(publishMsg, packetId, clientId);
+        }
+    }
+
+    private void sendIfWritableElseDrop(MqttMessage msg) {
+        if (channel.isWritable()) {
+            channel.write(msg);
+        }
     }
 
     private void rawSend(MqttMessage msg, int messageId, String clientId) {
@@ -353,21 +364,27 @@ final class MQTTConnection {
         }
     }
 
+    public void writabilityChanged() {
+        if (channel.isWritable()) {
+            LOG.debug("Channel {} is again writable", channel);
+            //channel.flush();
+            // TODO bring messages from queue and send them
+        }
+    }
+
     void sendPubAck(int messageID) {
         LOG.trace("sendPubAck invoked");
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBACK, false, AT_MOST_ONCE,
                                                   false, 0);
         MqttPubAckMessage pubAckMessage = new MqttPubAckMessage(fixedHeader, from(messageID));
-        final String clientId = getClientId();
-        rawSend(pubAckMessage, messageID, clientId);
+        sendIfWritableElseDrop(pubAckMessage);
     }
 
-    void sendPubCompMessage(int messageID) {
+    private void sendPubCompMessage(int messageID) {
         LOG.trace("Sending PUBCOMP message on channel: {}, messageId: {}", channel, messageID);
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBCOMP, false, AT_MOST_ONCE, false, 0);
         MqttMessage pubCompMessage = new MqttMessage(fixedHeader, from(messageID));
-        final String clientId = getClientId();
-        rawSend(pubCompMessage, messageID, clientId);
+        sendIfWritableElseDrop(pubCompMessage);
     }
 
     String getClientId() {

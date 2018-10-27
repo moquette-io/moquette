@@ -98,6 +98,8 @@ public class NewNettyMQTTHandler extends ChannelInboundHandlerAdapter {
 //        if (ctx.channel().isWritable()) {
 //            m_processor.notifyChannelWritable(ctx.channel());
 //        }
+        final MQTTConnection mqttConnection = mqttConnection(ctx.channel());
+        mqttConnection.writabilityChanged();
         ctx.fireChannelWritabilityChanged();
     }
 
