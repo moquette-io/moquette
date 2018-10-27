@@ -94,7 +94,7 @@ class PostOffice {
 
             final ByteBuf origPayload = retainedMsg.payload();
             ByteBuf payload = origPayload.retainedDuplicate();
-            sendRetainedPublishOnSessionAtQos(subscription.getTopicFilter(), qos, targetSession, payload);
+            targetSession.sendRetainedPublishOnSessionAtQos(subscription.getTopicFilter(), qos, payload);
         }
     }
 
@@ -209,15 +209,6 @@ class PostOffice {
                    sessionRegistry.enqueueToClient(sub.getClientId(), origPayload, topic, publishingQos);
                 }
             }
-        }
-    }
-
-    private void sendRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, Session targetSession, ByteBuf payload) {
-        if (qos != MqttQoS.AT_MOST_ONCE) {
-            // QoS 1 or 2
-            targetSession.sendRetainedPublishWithMessageId(topic, qos, payload);
-        } else {
-            targetSession.sendRetainedPublish(topic, qos, payload);
         }
     }
 

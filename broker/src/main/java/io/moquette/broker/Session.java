@@ -118,20 +118,21 @@ class Session {
         return clean;
     }
 
-    void sendRetainedPublish(Topic topic, MqttQoS qos, ByteBuf payload) {
-        mqttConnection.sendPublishRetained(topic, qos, payload);
-    }
-
-    void sendRetainedPublishWithMessageId(Topic topic, MqttQoS qos, ByteBuf payload) {
-        mqttConnection.sendPublishRetainedWithPacketId(topic, qos, payload);
-    }
-
     public void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload) {
         if (qos != MqttQoS.AT_MOST_ONCE) {
             // QoS 1 or 2
             mqttConnection.sendPublishNotRetainedWithMessageId(topic, qos, payload);
         } else {
-            mqttConnection.sendPublishNotRetained(topic, qos, payload);
+            mqttConnection.sendPublishNotRetainedQos0(topic, qos, payload);
+        }
+    }
+
+    void sendRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload) {
+        if (qos != MqttQoS.AT_MOST_ONCE) {
+            // QoS 1 or 2
+            mqttConnection.sendPublishRetainedWithPacketId(topic, qos, payload);
+        } else {
+            mqttConnection.sendPublishRetainedQos0(topic, qos, payload);
         }
     }
 

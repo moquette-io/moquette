@@ -391,7 +391,7 @@ final class MQTTConnection {
         return NettyUtils.clientID(channel);
     }
 
-    public void sendPublishRetained(Topic topic, MqttQoS qos, ByteBuf payload) {
+    public void sendPublishRetainedQos0(Topic topic, MqttQoS qos, ByteBuf payload) {
         MqttPublishMessage publishMsg = retainedPublish(topic.toString(), qos, payload);
         sendPublish(publishMsg);
     }
@@ -413,7 +413,7 @@ final class MQTTConnection {
         return new MqttPublishMessage(fixedHeader, varHeader, message);
     }
 
-    void sendPublishNotRetained(Topic topic, MqttQoS qos, ByteBuf payload) {
+    void sendPublishNotRetainedQos0(Topic topic, MqttQoS qos, ByteBuf payload) {
         MqttPublishMessage publishMsg = notRetainedPublish(topic.toString(), qos, payload);
         sendPublish(publishMsg);
     }
