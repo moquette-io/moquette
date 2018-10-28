@@ -18,11 +18,11 @@ import java.util.concurrent.ConcurrentMap;
 
 class SessionRegistry {
 
-    private static final class PublishedMessage {
+    static final class PublishedMessage {
 
-        private final Topic topic;
-        private final MqttQoS publishingQos;
-        private final ByteBuf payload;
+        final Topic topic;
+        final MqttQoS publishingQos;
+        final ByteBuf payload;
 
         PublishedMessage(Topic topic, MqttQoS publishingQos, ByteBuf payload) {
             this.topic = topic;
@@ -39,7 +39,7 @@ class SessionRegistry {
 
     private final ConcurrentMap<String, Session> pool = new ConcurrentHashMap<>();
     private final ISubscriptionsDirectory subscriptionsDirectory;
-    private final ConcurrentMap<String, Queue> queues = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Queue<SessionRegistry.PublishedMessage>> queues = new ConcurrentHashMap<>();
 
     SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory) {
         this.subscriptionsDirectory = subscriptionsDirectory;
@@ -50,7 +50,7 @@ class SessionRegistry {
         PostConnectAction postConnectAction = PostConnectAction.NONE;
         if (!pool.containsKey(clientId)) {
             // case 1
-            final Session newSession = createNewSession(mqttConnection, msg);
+            final Session newSession = createNewSession(mqttConnection, msg, clientId);
 
             // publish the session
             final Session previous = pool.putIfAbsent(clientId, newSession);
@@ -63,7 +63,7 @@ class SessionRegistry {
                 isSessionAlreadyStored = true;
             }
         } else {
-            final Session newSession = createNewSession(mqttConnection, msg);
+            final Session newSession = createNewSession(mqttConnection, msg, clientId);
             postConnectAction = bindToExistingSession(mqttConnection, msg, clientId, newSession);
             isSessionAlreadyStored = true;
         }
@@ -73,18 +73,7 @@ class SessionRegistry {
 
         if (postConnectAction == PostConnectAction.SEND_STORED_MESSAGES) {
             final Session session = pool.get(clientId);
-            sendQueuedMessagesWhileOffline(clientId, session);
-        }
-    }
-
-    private void sendQueuedMessagesWhileOffline(String clientId, Session targetSession) {
-        LOG.trace("Republishing all saved messages for session {} on CId={}", targetSession, clientId);
-        if (!queues.containsKey(clientId)) {
-            return;
-        }
-        final Queue<PublishedMessage> queue = queues.get(clientId);
-        for (PublishedMessage msgToPublish : queue) {
-            targetSession.sendPublishOnSessionAtQos(msgToPublish.topic, msgToPublish.publishingQos, msgToPublish.payload);
+            session.sendQueuedMessagesWhileOffline();
         }
     }
 
@@ -166,16 +155,15 @@ class SessionRegistry {
         }
     }
 
-    private Session createNewSession(MQTTConnection mqttConnection, MqttConnectMessage msg) {
-        final String clientId = msg.payload().clientIdentifier();
-
+    private Session createNewSession(MQTTConnection mqttConnection, MqttConnectMessage msg, String clientId) {
+        final Queue sessionQueue = queues.computeIfAbsent(clientId, (String cli) -> new ConcurrentLinkedQueue<>());
         final boolean clean = msg.variableHeader().isCleanSession();
         final Session newSession;
         if (msg.variableHeader().isWillFlag()) {
             final Session.Will will = createWill(msg);
-            newSession = new Session(clientId, clean, will);
+            newSession = new Session(clientId, clean, will, sessionQueue);
         } else {
-            newSession = new Session(clientId, clean);
+            newSession = new Session(clean, clientId, sessionQueue);
         }
 
         newSession.markConnected();
@@ -226,7 +214,7 @@ class SessionRegistry {
 
     void enqueueToClient(String clientId, ByteBuf origPayload, Topic topic, MqttQoS publishingQos) {
         final PublishedMessage msg = new PublishedMessage(topic, publishingQos, origPayload);
-        queues.computeIfAbsent(clientId, (String cli) -> new ConcurrentLinkedQueue());
+//        queues.computeIfAbsent(clientId, (String cli) -> new ConcurrentLinkedQueue());
         queues.get(clientId).add(msg);
     }
 }

@@ -30,6 +30,7 @@ final class MQTTConnection {
     private SessionRegistry sessionRegistry;
     private final PostOffice postOffice;
     private boolean connected;
+    @Deprecated // TODO move to Session
     private final Map<Integer, MqttPublishMessage> qos1Sending = new HashMap<>();
     private final Map<Integer, MqttPublishMessage> qos2SendingPhase1 = new HashMap<>();
     private final Set<Integer> qos2SendingPhase2 = new HashSet<>();
@@ -110,7 +111,8 @@ final class MQTTConnection {
     private void processPubAck(MqttMessage msg) {
         // TODO remain to invoke in somehow m_interceptor.notifyMessageAcknowledged
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        qos1Sending.remove(messageID);
+        Session session = sessionRegistry.retrieve(getClientId());
+        session.pubAckReceived(messageID);
     }
 
     void processConnect(MqttConnectMessage msg) {
@@ -323,7 +325,7 @@ final class MQTTConnection {
         sendPubCompMessage(messageID);
     }
 
-    private void sendPublish(MqttPublishMessage publishMsg) {
+    void sendPublish(MqttPublishMessage publishMsg) {
         final int packetId = publishMsg.variableHeader().packetId();
         final String topicName = publishMsg.variableHeader().topicName();
         final String clientId = getClientId();
@@ -335,13 +337,11 @@ final class MQTTConnection {
             LOG.debug("Sending PUBLISH({}) message. MessageId={}, CId={}, topic={}", qos, packetId, clientId,
                       topicName);
         }
-        if (qos == AT_LEAST_ONCE) {
-            qos1Sending.put(packetId, publishMsg);
-        } else if (qos == EXACTLY_ONCE) {
+        if (qos == EXACTLY_ONCE) {
             qos2SendingPhase1.put(packetId, publishMsg);
         }
 
-        if (qos == AT_MOST_ONCE) {
+        if (qos == AT_MOST_ONCE || qos == AT_LEAST_ONCE) {
             // QoS0, best effort, if channel is writable do it, else drop it
             sendIfWritableElseDrop(publishMsg);
         } else {
@@ -367,8 +367,8 @@ final class MQTTConnection {
     public void writabilityChanged() {
         if (channel.isWritable()) {
             LOG.debug("Channel {} is again writable", channel);
-            //channel.flush();
-            // TODO bring messages from queue and send them
+            final Session session = sessionRegistry.retrieve(getClientId());
+            session.writabilityChanged();
         }
     }
 
@@ -397,7 +397,7 @@ final class MQTTConnection {
     }
 
     public void sendPublishRetainedWithPacketId(Topic topic, MqttQoS qos, ByteBuf payload) {
-        final int packetId = lastPacketId.incrementAndGet();
+        final int packetId = nextPacketId();
         MqttPublishMessage publishMsg = retainedPublishWithMessageId(topic.toString(), qos, payload, packetId);
         sendPublish(publishMsg);
     }
@@ -422,17 +422,21 @@ final class MQTTConnection {
         return notRetainedPublishWithMessageId(topic, qos, message, 0);
     }
 
-    private static MqttPublishMessage notRetainedPublishWithMessageId(String topic, MqttQoS qos, ByteBuf message,
-                                                                      int messageId) {
+    static MqttPublishMessage notRetainedPublishWithMessageId(String topic, MqttQoS qos, ByteBuf message,
+                                                              int messageId) {
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, false, 0);
         MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId);
         return new MqttPublishMessage(fixedHeader, varHeader, message);
     }
 
     void sendPublishNotRetainedWithMessageId(Topic topic, MqttQoS qos, ByteBuf payload) {
-        final int packetId = lastPacketId.incrementAndGet();
+        final int packetId = nextPacketId();
         MqttPublishMessage publishMsg = notRetainedPublishWithMessageId(topic.toString(), qos, payload, packetId);
         sendPublish(publishMsg);
+    }
+
+    int nextPacketId() {
+        return lastPacketId.incrementAndGet();
     }
 
     @Override

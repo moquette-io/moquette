@@ -79,10 +79,10 @@ public class PostOfficeUnsubscribeTest {
 
     protected void connect(MQTTConnection connection, String clientId) {
         MqttConnectMessage connectMessage = ConnectionTestUtils.buildConnect(clientId);
-        connect(connectMessage, connection);
+        connect(connection, connectMessage);
     }
 
-    protected void connect(MqttConnectMessage connectMessage, MQTTConnection connection) {
+    protected void connect(MQTTConnection connection, MqttConnectMessage connectMessage) {
         connection.processConnect(connectMessage);
         ConnectionTestUtils.assertConnectAccepted((EmbeddedChannel) connection.channel);
     }
@@ -179,7 +179,7 @@ public class PostOfficeUnsubscribeTest {
     @Test
     public void avoidMultipleNotificationsAfterMultipleReconnection_cleanSessionFalseQoS1() {
         final MqttConnectMessage notCleanConnect = ConnectionTestUtils.buildConnectNotClean(FAKE_CLIENT_ID);
-        connect(notCleanConnect, this.connection);
+        connect(connection, notCleanConnect);
         subscribe(connection, NEWS_TOPIC, AT_LEAST_ONCE);
         connection.processDisconnect(null);
 
@@ -205,7 +205,7 @@ public class PostOfficeUnsubscribeTest {
         anotherConnection3.processConnect(notCleanConnect);
         ConnectionTestUtils.assertConnectAccepted(anotherChannel3);
 
-        ConnectionTestUtils.verifyPublishIsReceived(anotherChannel3, MqttQoS.AT_LEAST_ONCE, firstPayload);
+        ConnectionTestUtils.verifyPublishIsReceived(anotherChannel3, MqttQoS.AT_LEAST_ONCE, secondPayload);
     }
 
     private void connectPublishDisconnectFromAnotherClient(String firstPayload, String topic) {
