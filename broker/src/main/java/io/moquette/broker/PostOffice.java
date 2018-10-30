@@ -213,10 +213,10 @@ class PostOffice {
     }
 
     /**
-     * Second phase of a publish QoS2 protocol, sent by publisher to the broker. Search the stored
-     * message and publish to all interested subscribers.
+     * First phase of a publish QoS2 protocol, sent by publisher to the broker. Publish to all interested
+     * subscribers.
      */
-    void receivedPublishRelQos2(MQTTConnection connection, MqttPublishMessage mqttPublishMessage) {
+    void receivedPublishQos2(MQTTConnection connection, MqttPublishMessage mqttPublishMessage) {
         LOG.trace("Processing PUBREL message on connection: {}", connection);
         final Topic topic = new Topic(mqttPublishMessage.variableHeader().topicName());
         final ByteBuf payload = mqttPublishMessage.payload();

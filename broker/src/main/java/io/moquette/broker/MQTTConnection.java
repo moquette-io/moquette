@@ -30,10 +30,6 @@ final class MQTTConnection {
     private SessionRegistry sessionRegistry;
     private final PostOffice postOffice;
     private boolean connected;
-    @Deprecated // TODO move to Session
-    private final Map<Integer, MqttPublishMessage> qos1Sending = new HashMap<>();
-    private final Map<Integer, MqttPublishMessage> qos2SendingPhase1 = new HashMap<>();
-    private final Set<Integer> qos2SendingPhase2 = new HashSet<>();
     private final AtomicInteger lastPacketId = new AtomicInteger(0);
 
     MQTTConnection(Channel channel, BrokerConfiguration brokerConfig, IAuthenticator authenticator,
@@ -91,21 +87,19 @@ final class MQTTConnection {
 
     private void processPubComp(MqttMessage msg) {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        qos2SendingPhase2.remove(messageID);
-        // TODO notify the interceptor
-//                final InterceptAcknowledgedMessage interceptAckMsg = new InterceptAcknowledgedMessage(inflightMsg, topic,
-//                    username, messageID);
-//                m_interceptor.notifyMessageAcknowledged(interceptAckMsg);
+        final Session session = sessionRegistry.retrieve(getClientId());
+        session.processPubComp(messageID);
     }
 
     private void processPubRec(MqttMessage msg) {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        qos2SendingPhase1.remove(messageID);
-        qos2SendingPhase2.add(messageID);
+        final Session session = sessionRegistry.retrieve(getClientId());
+        session.processPubRec(messageID);
+    }
 
+    static MqttMessage pubrel(int messageID) {
         MqttFixedHeader pubRelHeader = new MqttFixedHeader(MqttMessageType.PUBREL, false, AT_LEAST_ONCE, false, 0);
-        MqttMessage pubRelMessage = new MqttMessage(pubRelHeader, from(messageID));
-        rawSend(pubRelMessage, messageID, getClientId());
+        return new MqttMessage(pubRelHeader, from(messageID));
     }
 
     private void processPubAck(MqttMessage msg) {
@@ -299,7 +293,7 @@ final class MQTTConnection {
                 final int messageID = msg.variableHeader().packetId();
                 final Session session = sessionRegistry.retrieve(clientId);
                 session.receivedPublishQos2(messageID, msg);
-                postOffice.receivedPublishRelQos2(this, msg);
+                postOffice.receivedPublishQos2(this, msg);
 //                msg.release();
                 break;
             }
@@ -314,7 +308,6 @@ final class MQTTConnection {
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBREC, false, AT_MOST_ONCE,
             false, 0);
         MqttPubAckMessage pubRecMessage = new MqttPubAckMessage(fixedHeader, from(messageID));
-        rawSend(pubRecMessage, messageID, getClientId());
         sendIfWritableElseDrop(pubRecMessage);
     }
 
@@ -337,30 +330,12 @@ final class MQTTConnection {
             LOG.debug("Sending PUBLISH({}) message. MessageId={}, CId={}, topic={}", qos, packetId, clientId,
                       topicName);
         }
-        if (qos == EXACTLY_ONCE) {
-            qos2SendingPhase1.put(packetId, publishMsg);
-        }
-
-        if (qos == AT_MOST_ONCE || qos == AT_LEAST_ONCE) {
-            // QoS0, best effort, if channel is writable do it, else drop it
-            sendIfWritableElseDrop(publishMsg);
-        } else {
-            rawSend(publishMsg, packetId, clientId);
-        }
+        sendIfWritableElseDrop(publishMsg);
     }
 
-    private void sendIfWritableElseDrop(MqttMessage msg) {
+    void sendIfWritableElseDrop(MqttMessage msg) {
         if (channel.isWritable()) {
             channel.write(msg);
-        }
-    }
-
-    private void rawSend(MqttMessage msg, int messageId, String clientId) {
-        try {
-            channel.writeAndFlush(msg);
-        } catch (Throwable th) {
-            LOG.error("Unable to send {} message. CId=<{}>, messageId={}", msg.fixedHeader().messageType(), clientId,
-                      messageId, th);
         }
     }
 
@@ -427,12 +402,6 @@ final class MQTTConnection {
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, false, 0);
         MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId);
         return new MqttPublishMessage(fixedHeader, varHeader, message);
-    }
-
-    void sendPublishNotRetainedWithMessageId(Topic topic, MqttQoS qos, ByteBuf payload) {
-        final int packetId = nextPacketId();
-        MqttPublishMessage publishMsg = notRetainedPublishWithMessageId(topic.toString(), qos, payload, packetId);
-        sendPublish(publishMsg);
     }
 
     int nextPacketId() {

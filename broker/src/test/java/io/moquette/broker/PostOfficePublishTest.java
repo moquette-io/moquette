@@ -109,7 +109,7 @@ public class PostOfficePublishTest {
 
         final MQTTConnection clientXB = connectAs("publisher");
         final ByteBuf anyPayload = Unpooled.copiedBuffer("Hello", Charset.defaultCharset());
-        sut.receivedPublishRelQos2(clientXB, MqttMessageBuilders.publish()
+        sut.receivedPublishQos2(clientXB, MqttMessageBuilders.publish()
             .payload(anyPayload)
             .qos(MqttQoS.EXACTLY_ONCE)
             .retained(false)
@@ -120,7 +120,7 @@ public class PostOfficePublishTest {
 
         final MQTTConnection clientYB = connectAs("publisher");
         final ByteBuf anyPayload2 = Unpooled.copiedBuffer("Hello 2", Charset.defaultCharset());
-        sut.receivedPublishRelQos2(clientYB, MqttMessageBuilders.publish()
+        sut.receivedPublishQos2(clientYB, MqttMessageBuilders.publish()
             .payload(anyPayload2)
             .qos(MqttQoS.EXACTLY_ONCE)
             .retained(true)
@@ -244,7 +244,7 @@ public class PostOfficePublishTest {
 
         // Exercise
         final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
-        sut.receivedPublishRelQos2(connection, MqttMessageBuilders.publish()
+        sut.receivedPublishQos2(connection, MqttMessageBuilders.publish()
                 .payload(anyPayload)
                 .qos(MqttQoS.EXACTLY_ONCE)
                 .retained(true)

@@ -37,22 +37,22 @@ class Session {
     private final String clientId;
     private boolean clean;
     private Will will;
-    private Queue<SessionRegistry.PublishedMessage> sessionQueue;
+    private Queue<SessionRegistry.EnqueuedMessage> sessionQueue;
     private final AtomicReference<SessionStatus> status = new AtomicReference<>(SessionStatus.DISCONNECTED);
     private MQTTConnection mqttConnection;
     private List<Subscription> subscriptions = new ArrayList<>();
-    private final Map<Integer, SessionRegistry.PublishedMessage> qos1Sending = new HashMap<>();
+    private final Map<Integer, SessionRegistry.EnqueuedMessage> inflightWindow = new HashMap<>();
     private final Map<Integer, MqttPublishMessage> qos2Receiving = new HashMap<>();
     private final AtomicInteger inflightSlots = new AtomicInteger(10); // this should be configurable
 
-    Session(String clientId, boolean clean, Will will, Queue<SessionRegistry.PublishedMessage> sessionQueue) {
+    Session(String clientId, boolean clean, Will will, Queue<SessionRegistry.EnqueuedMessage> sessionQueue) {
         this.clientId = clientId;
         this.clean = clean;
         this.will = will;
         this.sessionQueue = sessionQueue;
     }
 
-    Session(boolean clean, String clientId, Queue<SessionRegistry.PublishedMessage> sessionQueue) {
+    Session(boolean clean, String clientId, Queue<SessionRegistry.EnqueuedMessage> sessionQueue) {
         this.clientId = clientId;
         this.clean = clean;
         this.sessionQueue = sessionQueue;
@@ -125,53 +125,107 @@ class Session {
         return clean;
     }
 
-    public void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload) {
-        if (qos == MqttQoS.AT_MOST_ONCE) {
-            mqttConnection.sendPublishNotRetainedQos0(topic, qos, payload);
-            return;
-        }
-        // QoS 1 or 2
-        if (qos == MqttQoS.AT_LEAST_ONCE) {
-            sendPublishQos1(topic, qos, payload);
+    public void processPubRec(int packetId) {
+        inflightWindow.remove(packetId);
+        inflightSlots.incrementAndGet();
+        if (canSkipQueue()) {
+            inflightSlots.decrementAndGet();
+            int pubRelPacketId = mqttConnection.nextPacketId();
+            inflightWindow.put(pubRelPacketId, new SessionRegistry.PubRelMarker());
+            MqttMessage pubRel = MQTTConnection.pubrel(pubRelPacketId);
+            mqttConnection.sendIfWritableElseDrop(pubRel);
+
+            drainQueueToConnection();
         } else {
-            mqttConnection.sendPublishNotRetainedWithMessageId(topic, qos, payload);
+            sessionQueue.add(new SessionRegistry.PubRelMarker());
+        }
+    }
+
+    public void processPubComp(int messageID) {
+        inflightWindow.remove(messageID);
+        inflightSlots.incrementAndGet();
+
+        drainQueueToConnection();
+
+        // TODO notify the interceptor
+//                final InterceptAcknowledgedMessage interceptAckMsg = new InterceptAcknowledgedMessage(inflightMsg, topic,
+//                    username, messageID);
+//                m_interceptor.notifyMessageAcknowledged(interceptAckMsg);
+    }
+
+    public void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload) {
+        switch (qos) {
+            case AT_MOST_ONCE:
+                mqttConnection.sendPublishNotRetainedQos0(topic, qos, payload);
+                break;
+            case AT_LEAST_ONCE:
+                sendPublishQos1(topic, qos, payload);
+                break;
+            case EXACTLY_ONCE:
+                sendPublishQos2(topic, qos, payload);
+                break;
+            case FAILURE:
+                LOG.error("Not admissible");
         }
     }
 
     private void sendPublishQos1(Topic topic, MqttQoS qos, ByteBuf payload) {
-        if (connectionCanDrain()) {
+        if (canSkipQueue()) {
             inflightSlots.decrementAndGet();
             int packetId = mqttConnection.nextPacketId();
-            qos1Sending.put(packetId, new SessionRegistry.PublishedMessage(topic, qos, payload));
+            inflightWindow.put(packetId, new SessionRegistry.PublishedMessage(topic, qos, payload));
             MqttPublishMessage publishMsg = MQTTConnection.notRetainedPublishWithMessageId(topic.toString(), qos, payload, packetId);
             mqttConnection.sendPublish(publishMsg);
+
+            // TODO drainQueueToConnection();?
         } else {
             final SessionRegistry.PublishedMessage msg = new SessionRegistry.PublishedMessage(topic, qos, payload);
             sessionQueue.add(msg);
         }
     }
 
-    private boolean connectionCanDrain() {
+    private void sendPublishQos2(Topic topic, MqttQoS qos, ByteBuf payload) {
+        if (canSkipQueue()) {
+            inflightSlots.decrementAndGet();
+            int packetId = mqttConnection.nextPacketId();
+            inflightWindow.put(packetId, new SessionRegistry.PublishedMessage(topic, qos, payload));
+            MqttPublishMessage publishMsg = MQTTConnection.notRetainedPublishWithMessageId(topic.toString(), qos, payload, packetId);
+            mqttConnection.sendPublish(publishMsg);
+
+            drainQueueToConnection();
+        } else {
+            final SessionRegistry.PublishedMessage msg = new SessionRegistry.PublishedMessage(topic, qos, payload);
+            sessionQueue.add(msg);
+        }
+    }
+
+    private boolean canSkipQueue() {
         return sessionQueue.isEmpty() && inflightSlots.get() > 0 && mqttConnection.channel.isWritable();
     }
 
     void pubAckReceived(int ackPacketId) {
-        qos1Sending.remove(ackPacketId);
+        inflightWindow.remove(ackPacketId);
         inflightSlots.incrementAndGet();
         drainQueueToConnection();
     }
 
     private void drainQueueToConnection() {
         // consume the queue
-        while (!connectionCanDrain()) {
-            final SessionRegistry.PublishedMessage msg = sessionQueue.remove();
+        while (!canSkipQueue()) {
+            final SessionRegistry.EnqueuedMessage msg = sessionQueue.remove();
             inflightSlots.decrementAndGet();
             int sendPacketId = mqttConnection.nextPacketId();
-            qos1Sending.put(sendPacketId, msg);
-            MqttPublishMessage publishMsg = MQTTConnection.notRetainedPublishWithMessageId(msg.topic.toString(),
-                                                                                           msg.publishingQos,
-                                                                                           msg.payload, sendPacketId);
-            mqttConnection.sendPublish(publishMsg);
+            inflightWindow.put(sendPacketId, msg);
+            if (msg instanceof SessionRegistry.PubRelMarker) {
+                MqttMessage pubRel = MQTTConnection.pubrel(sendPacketId);
+                mqttConnection.sendIfWritableElseDrop(pubRel);
+            } else {
+                final SessionRegistry.PublishedMessage msgPub = (SessionRegistry.PublishedMessage) msg;
+                MqttPublishMessage publishMsg = MQTTConnection.notRetainedPublishWithMessageId(msgPub.topic.toString(),
+                    msgPub.publishingQos,
+                    msgPub.payload, sendPacketId);
+                mqttConnection.sendPublish(publishMsg);
+            }
         }
     }
 

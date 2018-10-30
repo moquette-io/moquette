@@ -303,7 +303,7 @@ public class PostOfficeUnsubscribeTest {
 
     private void publishQos2(MQTTConnection connection, String topic, String payload) {
         final ByteBuf bytePayload = Unpooled.copiedBuffer(payload, Charset.defaultCharset());
-        sut.receivedPublishRelQos2(connection, MqttMessageBuilders.publish()
+        sut.receivedPublishQos2(connection, MqttMessageBuilders.publish()
             .payload(bytePayload)
             .qos(MqttQoS.EXACTLY_ONCE)
             .retained(true)

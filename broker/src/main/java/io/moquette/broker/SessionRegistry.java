@@ -18,7 +18,10 @@ import java.util.concurrent.ConcurrentMap;
 
 class SessionRegistry {
 
-    static final class PublishedMessage {
+    static abstract class EnqueuedMessage {
+    }
+
+    static class PublishedMessage extends EnqueuedMessage {
 
         final Topic topic;
         final MqttQoS publishingQos;
@@ -29,6 +32,9 @@ class SessionRegistry {
             this.publishingQos = publishingQos;
             this.payload = payload;
         }
+    }
+
+    static final class PubRelMarker extends EnqueuedMessage {
     }
 
     private enum PostConnectAction {
