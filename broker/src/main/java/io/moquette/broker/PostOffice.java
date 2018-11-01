@@ -122,7 +122,7 @@ class PostOffice {
                 // close the connection, not valid topicFilter is a protocol violation
                 mqttConnection.dropConnection();
                 LOG.warn("Topic filter is not valid. CId={}, topics: {}, offending topic filter: {}", clientID,
-                    topics, topic);
+                         topics, topic);
                 return;
             }
 
@@ -194,20 +194,18 @@ class PostOffice {
             MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
             Session targetSession = this.sessionRegistry.retrieve(sub.getClientId());
 
-            boolean targetIsActive = targetSession != null && targetSession.connected();
-            if (targetIsActive) {
+            boolean isSessionPresent = targetSession != null;
+            if (isSessionPresent) {
                 LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
                           sub.getClientId(), sub.getTopicFilter(), qos);
                 // we need to retain because duplicate only copy r/w indexes and don't retain() causing refCnt = 0
                 ByteBuf payload = origPayload.retainedDuplicate();
                 targetSession.sendPublishOnSessionAtQos(topic, qos, payload);
             } else {
-                if (!targetSession.isClean()) {
-                    LOG.debug("Storing pending PUBLISH inactive message. CId={}, topicFilter: {}, qos: {}",
-                              sub.getClientId(), sub.getTopicFilter(), qos);
-                    // store the message in targetSession queue to deliver
-                   sessionRegistry.enqueueToClient(sub.getClientId(), origPayload, topic, publishingQos);
-                }
+                // If we are, the subscriber disconnected after the subscriptions tree selected that session as a
+                // destination.
+                LOG.debug("PUBLISH to not yet present session. CId: {}, topicFilter: {}, qos: {}", sub.getClientId(),
+                          sub.getTopicFilter(), qos);
             }
         }
     }
@@ -261,12 +259,6 @@ class PostOffice {
         final ByteBuf payload = msg.payload();
         LOG.info("Sending internal PUBLISH message Topic={}, qos={}", topic, qos);
 
-//        IMessagesStore.StoredMessage toStoreMsg = asStoredMessage(msg);
-//        if (clientId == null || clientId.isEmpty()) {
-//            toStoreMsg.setClientID("BROKER_SELF");
-//        } else {
-//            toStoreMsg.setClientID(clientId);
-//        }
         publish2Subscribers(payload, topic, qos);
 
         if (!msg.fixedHeader().isRetain()) {

@@ -156,7 +156,9 @@ class Session {
     public void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload) {
         switch (qos) {
             case AT_MOST_ONCE:
-                mqttConnection.sendPublishNotRetainedQos0(topic, qos, payload);
+                if (connected()) {
+                    mqttConnection.sendPublishNotRetainedQos0(topic, qos, payload);
+                }
                 break;
             case AT_LEAST_ONCE:
                 sendPublishQos1(topic, qos, payload);
@@ -170,6 +172,11 @@ class Session {
     }
 
     private void sendPublishQos1(Topic topic, MqttQoS qos, ByteBuf payload) {
+        if (!connected() && isClean()) {
+            //pushing messages to disconnected not clean session
+            return;
+        }
+
         if (canSkipQueue()) {
             inflightSlots.decrementAndGet();
             int packetId = mqttConnection.nextPacketId();
@@ -200,7 +207,10 @@ class Session {
     }
 
     private boolean canSkipQueue() {
-        return sessionQueue.isEmpty() && inflightSlots.get() > 0 && mqttConnection.channel.isWritable();
+        return sessionQueue.isEmpty() &&
+            inflightSlots.get() > 0 &&
+            connected() &&
+            mqttConnection.channel.isWritable();
     }
 
     void pubAckReceived(int ackPacketId) {

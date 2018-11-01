@@ -45,7 +45,7 @@ class SessionRegistry {
 
     private final ConcurrentMap<String, Session> pool = new ConcurrentHashMap<>();
     private final ISubscriptionsDirectory subscriptionsDirectory;
-    private final ConcurrentMap<String, Queue<SessionRegistry.PublishedMessage>> queues = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Queue<SessionRegistry.EnqueuedMessage>> queues = new ConcurrentHashMap<>();
 
     SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory) {
         this.subscriptionsDirectory = subscriptionsDirectory;
@@ -162,7 +162,7 @@ class SessionRegistry {
     }
 
     private Session createNewSession(MQTTConnection mqttConnection, MqttConnectMessage msg, String clientId) {
-        final Queue sessionQueue = queues.computeIfAbsent(clientId, (String cli) -> new ConcurrentLinkedQueue<>());
+        final Queue<SessionRegistry.EnqueuedMessage> sessionQueue = queues.computeIfAbsent(clientId, (String cli) -> new ConcurrentLinkedQueue<>());
         final boolean clean = msg.variableHeader().isCleanSession();
         final Session newSession;
         if (msg.variableHeader().isWillFlag()) {
@@ -216,11 +216,5 @@ class SessionRegistry {
 
     private void dropQueuesForClient(String clientId) {
         queues.remove(clientId);
-    }
-
-    void enqueueToClient(String clientId, ByteBuf origPayload, Topic topic, MqttQoS publishingQos) {
-        final PublishedMessage msg = new PublishedMessage(topic, publishingQos, origPayload);
-//        queues.computeIfAbsent(clientId, (String cli) -> new ConcurrentLinkedQueue());
-        queues.get(clientId).add(msg);
     }
 }

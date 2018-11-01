@@ -204,7 +204,12 @@ final class MQTTConnection {
             if (session.hasWill()) {
                 postOffice.fireWill(session.getWill());
             }
-            sessionRegistry.remove(clientID);
+            if (session.isClean()) {
+                sessionRegistry.remove(clientID);
+            } else {
+                sessionRegistry.disconnect(clientID);
+            }
+            connected = false;
         }
         channel.close().addListener(CLOSE_ON_FAILURE);
     }
