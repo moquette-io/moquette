@@ -1,5 +1,6 @@
 package io.moquette.broker;
 
+import io.moquette.server.netty.AutoFlushHandler;
 import io.moquette.server.netty.NettyUtils;
 import io.moquette.spi.impl.DebugUtils;
 import io.moquette.spi.impl.subscriptions.Topic;
@@ -12,6 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
@@ -103,7 +105,6 @@ final class MQTTConnection {
     }
 
     private void processPubAck(MqttMessage msg) {
-        // TODO remain to invoke in somehow m_interceptor.notifyMessageAcknowledged
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
         Session session = sessionRegistry.retrieve(getClientId());
         session.pubAckReceived(messageID);
@@ -148,12 +149,20 @@ final class MQTTConnection {
         try {
             LOG.trace("Binding MQTTConnection (channel: {}) to session", channel);
             sessionRegistry.bindToSession(this, msg, clientId);
+
+            setupInflightResender(channel);
+
             NettyUtils.clientID(channel, clientId);
             LOG.trace("CONNACK sent, channel: {}", channel);
         } catch (SessionCorruptedException scex) {
             LOG.warn("MQTT session for client ID {} cannot be created, channel: {}", clientId, channel);
             abortConnection(CONNECTION_REFUSED_SERVER_UNAVAILABLE);
         }
+    }
+
+    private void setupInflightResender(Channel channel) {
+        channel.pipeline()
+            .addFirst("inflightResender", new InflightResender(5_000, TimeUnit.MILLISECONDS));
     }
 
     private boolean isNotProtocolVersion(MqttConnectMessage msg, MqttVersion version) {
@@ -393,12 +402,13 @@ final class MQTTConnection {
         return new MqttPublishMessage(fixedHeader, varHeader, message);
     }
 
+    // TODO move this method in Session
     void sendPublishNotRetainedQos0(Topic topic, MqttQoS qos, ByteBuf payload) {
         MqttPublishMessage publishMsg = notRetainedPublish(topic.toString(), qos, payload);
         sendPublish(publishMsg);
     }
 
-    private static MqttPublishMessage notRetainedPublish(String topic, MqttQoS qos, ByteBuf message) {
+    static MqttPublishMessage notRetainedPublish(String topic, MqttQoS qos, ByteBuf message) {
         return notRetainedPublishWithMessageId(topic, qos, message, 0);
     }
 
@@ -407,6 +417,11 @@ final class MQTTConnection {
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, false, 0);
         MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId);
         return new MqttPublishMessage(fixedHeader, varHeader, message);
+    }
+
+    public void resendNotAckedPublishes() {
+        final Session session = sessionRegistry.retrieve(getClientId());
+        session.resendInflightNotAcked();
     }
 
     int nextPacketId() {
