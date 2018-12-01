@@ -448,7 +448,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_acl_customization">ACL customization</a>
 <ul class="sectlevel2">
 <li><a href="#_customize_authenticator">Customize authenticator</a></li>
-<li><a href="#_customize_authorizator">Customize authorizator</a></li>
+<li><a href="#_customize_authorizator_policy">Customize authorizator policy</a></li>
 </ul>
 </li>
 </ul>
@@ -468,12 +468,12 @@ configuration file format with Eclipse Mosquitto.</p>
 <div class="sectionbody">
 <div class="paragraph">
 <p>Start play with it, download the self distribution tar from
-<a href="https://bintray.com/artifact/download/andsel/generic/distribution-0.9-bundle-tar.tar.gz">BinTray</a>
-then un <code><code>tar zxf distribution-0.9-bundle-tar.tar.gz</code></code> and start the broker listening on 1883 port and enjoy!</p>
+<a href="https://bintray.com/artifact/download/andsel/generic/moquette-0.12.tar.gz">BinTray</a>
+then un <code><code>tar zxf moquette-0.12.tar.gz</code></code> and start the broker listening on 1883 port and enjoy!</p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="highlightjs highlight"><code>tar zxf distribution-0.9-bundle-tar.tar.gz
+<pre class="highlightjs highlight"><code>tar zxf moquette-0.12.tar.gz
 cd bin
 ./moquette.sh</code></pre>
 </div>
@@ -516,7 +516,7 @@ cd bin
 <pre class="highlightjs highlight"><code>&lt;dependency&gt;
       &lt;groupId&gt;io.moquette&lt;/groupId&gt;
       &lt;artifactId&gt;moquette-broker&lt;/artifactId&gt;
-      &lt;version&gt;0.10-SNAPSHOT&lt;/version&gt;
+      &lt;version&gt;0.12&lt;/version&gt;
 &lt;/dependency&gt;</code></pre>
 </div>
 </div>
@@ -762,14 +762,14 @@ to be correctly instantiated or defined a static no arg instantiation method nam
 </div>
 </div>
 <div class="sect2">
-<h3 id="_customize_authorizator">Customize authorizator</h3>
+<h3 id="_customize_authorizator_policy">Customize authorizator policy</h3>
 <div class="paragraph">
-<p>To create your custom authorizator you need to extend the class <code><code>io.moquette.spi.security.IAuthorizator</code></code>:</p>
+<p>To create your custom authorizator policy you need to extend the class <code><code>io.moquette.broker.security.IAuthorizatorPolicy</code></code>:</p>
 </div>
 <div id="src-listing" class="listingblock">
 <div class="title">IAuthorizator.java</div>
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-java" data-lang="java">public interface IAuthorizator {
+<pre class="highlightjs highlight"><code class="language-java" data-lang="java">public interface IAuthorizatorPolicy {
 
     boolean canWrite(String topic, String user, String client);
 
@@ -797,7 +797,7 @@ subscriptions it the authorization is not anymore granted.</p>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2018-07-19 11:40:08 CEST
+Last updated 2018-12-01 15:37:32 CET
 </div>
 </div>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/8.9.1/styles/github.min.css">

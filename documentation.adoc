@@ -11,10 +11,10 @@ configuration file format with Eclipse Mosquitto.
 == Installation
 
 Start play with it, download the self distribution tar from
-https://bintray.com/artifact/download/andsel/generic/distribution-0.9-bundle-tar.tar.gz[BinTray]
-then un ```tar zxf distribution-0.9-bundle-tar.tar.gz``` and start the broker listening on 1883 port and enjoy!
+https://bintray.com/artifact/download/andsel/generic/moquette-0.12.tar.gz[BinTray]
+then un ```tar zxf moquette-0.12.tar.gz``` and start the broker listening on 1883 port and enjoy!
 ```
-tar zxf distribution-0.9-bundle-tar.tar.gz
+tar zxf moquette-0.12.tar.gz
 cd bin
 ./moquette.sh
 ```
@@ -49,7 +49,7 @@ Include dependency in your project:
 <dependency>
       <groupId>io.moquette</groupId>
       <artifactId>moquette-broker</artifactId>
-      <version>0.10-SNAPSHOT</version>
+      <version>0.12</version>
 </dependency>
 ```
 
@@ -228,14 +228,14 @@ remember to define the variable ```authenticator_class```, also take care that t
 to be correctly instantiated or defined a static no arg instantiation method named ```getInstance```.
 
 
-=== Customize authorizator
-To create your custom authorizator you need to extend the class ```io.moquette.spi.security.IAuthorizator```:
+=== Customize authorizator policy
+To create your custom authorizator policy you need to extend the class ```io.moquette.broker.security.IAuthorizatorPolicy```:
 
 [[src-listing]]
 [source,java]
 .IAuthorizator.java
 ----
-public interface IAuthorizator {
+public interface IAuthorizatorPolicy {
 
     boolean canWrite(String topic, String user, String client);
 
