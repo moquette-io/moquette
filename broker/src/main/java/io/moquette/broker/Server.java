@@ -24,6 +24,7 @@ import io.moquette.interception.BrokerInterceptor;
 import io.moquette.broker.security.*;
 import io.moquette.broker.subscriptions.CTrieSubscriptionDirectory;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
+import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.security.IAuthenticator;
 import io.moquette.broker.security.IAuthorizatorPolicy;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
@@ -53,6 +54,7 @@ public class Server {
     private PostOffice dispatcher;
     private BrokerInterceptor interceptor;
     private H2Builder h2Builder;
+    private ISubscriptionsRepository subscriptionsRepository;
 
     public static void main(String[] args) throws IOException {
         final Server server = new Server();
@@ -160,7 +162,6 @@ public class Server {
         authenticator = initializeAuthenticator(authenticator, config);
         authorizatorPolicy = initializeAuthorizatorPolicy(authorizatorPolicy, config);
 
-        final ISubscriptionsRepository subscriptionsRepository;
         final IQueueRepository queueRepository;
         final IRetainedRepository retainedRepository;
         if (persistencePath != null && !persistencePath.isEmpty()) {
@@ -347,12 +348,12 @@ public class Server {
      * @return list of subscriptions.
      */
 // TODO reimplement this
-//    public List<Subscription> getSubscriptions() {
-//        if (m_processorBootstrapper == null) {
-//            return null;
-//        }
-//        return this.subscriptionsStore.listAllSubscriptions();
-//    }
+    public List<Subscription> getSubscriptions() {
+        if (subscriptionsRepository == null) {
+            return null;
+        }
+        return this.subscriptionsRepository.listAllSubscriptions();
+    }
 
     /**
      * SPI method used by Broker embedded applications to add intercept handlers.
