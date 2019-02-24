@@ -11,10 +11,10 @@ configuration file format with Eclipse Mosquitto.
 == Installation
 
 Start play with it, download the self distribution tar from
-https://bintray.com/artifact/download/andsel/generic/moquette-0.12.tar.gz[BinTray]
-then un ```tar zxf moquette-0.12.tar.gz``` and start the broker listening on 1883 port and enjoy!
+https://bintray.com/artifact/download/andsel/generic/moquette-0.12.1.tar.gz[BinTray]
+then un ```tar zxf moquette-0.12.1.tar.gz``` and start the broker listening on 1883 port and enjoy!
 ```
-tar zxf moquette-0.12.tar.gz
+tar zxf moquette-0.12.1.tar.gz
 cd bin
 ./moquette.sh
 ```
@@ -49,7 +49,7 @@ Include dependency in your project:
 <dependency>
       <groupId>io.moquette</groupId>
       <artifactId>moquette-broker</artifactId>
-      <version>0.12</version>
+      <version>0.12.1</version>
 </dependency>
 ```
 
