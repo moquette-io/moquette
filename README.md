@@ -1,9 +1,9 @@
 
 ## What is Moquette?
 
-[![Build Status](https://api.travis-ci.org/andsel/moquette.svg?branch=master)](https://travis-ci.org/andsel/moquette)
+[![Build Status](https://api.travis-ci.org/moquette-io/moquette.svg?branch=master)](https://travis-ci.org/moquette-io/moquette)
 
-* [Documentation reference guide](http://andsel.github.io/moquette/) Guide on how to use and configure Moquette
+* [Documentation reference guide](http://moquette-io.github.io/moquette/) Guide on how to use and configure Moquette
 * [Google Group](https://groups.google.com/forum/#!forum/moquette-mqtt) Google Group to participate in development discussions.
 
 Moquette aims to be a MQTT compliant broker. The broker supports QoS 0, QoS 1 and QoS 2.
@@ -25,11 +25,11 @@ Point your browser to [cloud instance](http://broker.moquette.io), request an ac
 
 ## 1 minute set up
 
-Start play with it, download the self distribution tar from [BinTray](https://bintray.com/artifact/download/andsel/generic/moquette-distribution-0.11.tar) ,
+Start play with it, download the self distribution tar from [BinTray](https://bintray.com/artifact/download/andsel/generic/moquette-0.12.1.tar.gz) ,
 the un untar and start the broker listening on `1883` port and enjoy!
 
 ```
-tar xvf moquette-distribution-0.11.tar
+tar xvf moquette-distribution-0.12.1.tar.gz
 cd bin
 ./moquette.sh
 ```
@@ -66,7 +66,7 @@ Include dependency in your project:
 <dependency>
       <groupId>io.moquette</groupId>
       <artifactId>moquette-broker</artifactId>
-      <version>0.11</version>
+      <version>0.12.1</version>
 </dependency>
 ```
 

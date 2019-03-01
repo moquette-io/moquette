@@ -17,7 +17,7 @@
 package io.moquette.interception;
 
 import io.moquette.interception.messages.*;
-import io.moquette.spi.impl.subscriptions.Subscription;
+import io.moquette.broker.subscriptions.Subscription;
 import io.netty.handler.codec.mqtt.MqttMessage;
 
 /**
@@ -36,17 +36,13 @@ public interface InterceptHandler {
             InterceptUnsubscribeMessage.class, InterceptAcknowledgedMessage.class};
 
     /**
-     * Returns the identifier of this intercept handler.
-     *
-     * @return
+     * @return the identifier of this intercept handler.
      */
     String getID();
 
     /**
-     * Returns the InterceptMessage subtypes that this handler can process. If the result is null or
+     * @return the InterceptMessage subtypes that this handler can process. If the result is null or
      * equal to ALL_MESSAGE_TYPES, all the message types will be processed.
-     *
-     * @return
      */
     Class<?>[] getInterceptedMessageTypes();
 

@@ -4,12 +4,10 @@ description = 'Moquette - distribution'
 apply plugin: 'com.github.johnrengelman.shadow'
 
 
-mainClassName = "io.moquette.server.Server"
+mainClassName = "io.moquette.integration.Server"
 
 dependencies {
   compile project(':moquette-broker')
-  compile project(':moquette-h2-storage')
-  compile project(':moquette-mapdb-storage')
 
   compile group: 'org.slf4j', name: 'slf4j-log4j12', version:'1.7.5'
 }
@@ -34,7 +32,6 @@ def packageSet = project.copySpec {
   into ('config') {
     from 'src/main/resources/moquette.conf'
     from 'src/main/resources/password_file.conf'
-    from 'src/main/resources/hazelcast.xml'
     // from 'src/main/resources/acl.conf'
   }
 

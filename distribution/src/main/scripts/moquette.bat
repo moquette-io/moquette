@@ -13,7 +13,7 @@ echo "  \_|  |_/\___/ \__, |\__,_|\___|\__|\__\___| \_|  |_/\_/\_\ \_/   \_/   "
 echo "                   | |                                                   "
 echo "                   |_|                                                   "
 echo "                                                                         "
-echo "                                               version: 0.12-SNAPSHOT    "
+echo "                                               version: 0.12.1           "
 
 set "CURRENT_DIR=%cd%"
 if not "%MOQUETTE_HOME%" == "" goto gotHome
@@ -85,4 +85,4 @@ set JAVA_OPTS=%JAVA_OPTS% -XX:+UseGCLogFileRotation
 set JAVA_OPTS=%JAVA_OPTS% -XX:NumberOfGCLogFiles=10
 set JAVA_OPTS=%JAVA_OPTS% -XX:GCLogFileSize=10M"
 
-%JAVA% -server %JAVA_OPTS% %JAVA_OPTS_SCRIPT% -Dlog4j.configuration=file:%LOG_FILE% -Dmoquette.path=%MOQUETTE_PATH% -cp %MOQUETTE_HOME%\lib\* io.moquette.server.Server
+%JAVA% -server %JAVA_OPTS% %JAVA_OPTS_SCRIPT% -Dlog4j.configuration=file:%LOG_FILE% -Dmoquette.path=%MOQUETTE_PATH% -cp %MOQUETTE_HOME%\lib\* io.moquette.broker.Server
