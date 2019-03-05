@@ -402,7 +402,7 @@ final class MQTTConnection {
             LOG.debug("OUT {} on channel {}", msg.fixedHeader().messageType(), channel);
         }
         if (channel.isWritable()) {
-            channel.write(msg).addListener(FIRE_EXCEPTION_ON_FAILURE);
+            channel.writeAndFlush(msg).addListener(FIRE_EXCEPTION_ON_FAILURE);
         }
     }
 
