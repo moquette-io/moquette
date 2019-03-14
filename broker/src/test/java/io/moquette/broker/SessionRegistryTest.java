@@ -46,7 +46,7 @@ public class SessionRegistryTest {
     private SessionRegistry sut;
     private MqttMessageBuilders.ConnectBuilder connMsg;
     private static final BrokerConfiguration ALLOW_ANONYMOUS_AND_ZEROBYTE_CLIENT_ID =
-        new BrokerConfiguration(true, true, false);
+        new BrokerConfiguration(true, true, false, false);
     private MemoryQueueRepository queueRepository;
 
     @Before

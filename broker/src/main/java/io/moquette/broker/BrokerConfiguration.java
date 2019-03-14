@@ -23,18 +23,21 @@ class BrokerConfiguration {
     private final boolean allowAnonymous;
     private final boolean allowZeroByteClientId;
     private final boolean reauthorizeSubscriptionsOnConnect;
+    private final boolean immediateBufferFlush;
 
     BrokerConfiguration(IConfig props) {
         allowAnonymous = props.boolProp(BrokerConstants.ALLOW_ANONYMOUS_PROPERTY_NAME, true);
         allowZeroByteClientId = props.boolProp(BrokerConstants.ALLOW_ZERO_BYTE_CLIENT_ID_PROPERTY_NAME, false);
         reauthorizeSubscriptionsOnConnect = props.boolProp(BrokerConstants.REAUTHORIZE_SUBSCRIPTIONS_ON_CONNECT, false);
+        immediateBufferFlush = props.boolProp(BrokerConstants.IMMEDIATE_BUFFER_FLUSH_PROPERTY_NAME, false);
     }
 
     public BrokerConfiguration(boolean allowAnonymous, boolean allowZeroByteClientId,
-                               boolean reauthorizeSubscriptionsOnConnect) {
+                               boolean reauthorizeSubscriptionsOnConnect, boolean immediateBufferFlush) {
         this.allowAnonymous = allowAnonymous;
         this.allowZeroByteClientId = allowZeroByteClientId;
         this.reauthorizeSubscriptionsOnConnect = reauthorizeSubscriptionsOnConnect;
+        this.immediateBufferFlush = immediateBufferFlush;
     }
 
     public boolean isAllowAnonymous() {
@@ -47,5 +50,9 @@ class BrokerConfiguration {
 
     public boolean isReauthorizeSubscriptionsOnConnect() {
         return reauthorizeSubscriptionsOnConnect;
+    }
+
+    public boolean isImmediateBufferFlush() {
+        return immediateBufferFlush;
     }
 }

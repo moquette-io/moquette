@@ -19,6 +19,7 @@ import io.moquette.broker.subscriptions.Topic;
 import io.moquette.broker.security.IAuthenticator;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.mqtt.*;
 import io.netty.handler.timeout.IdleStateHandler;
@@ -402,7 +403,14 @@ final class MQTTConnection {
             LOG.debug("OUT {} on channel {}", msg.fixedHeader().messageType(), channel);
         }
         if (channel.isWritable()) {
-            channel.writeAndFlush(msg).addListener(FIRE_EXCEPTION_ON_FAILURE);
+            ChannelFuture channelFuture;
+            if (brokerConfig.isImmediateBufferFlush()) {
+                channelFuture = channel.writeAndFlush(msg);
+            }
+            else {
+                channelFuture = channel.write(msg);
+            }
+            channelFuture.addListener(FIRE_EXCEPTION_ON_FAILURE);
         }
     }
 
