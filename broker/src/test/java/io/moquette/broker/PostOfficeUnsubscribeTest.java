@@ -55,7 +55,7 @@ public class PostOfficeUnsubscribeTest {
     private MqttConnectMessage connectMessage;
     private IAuthenticator mockAuthenticator;
     private SessionRegistry sessionRegistry;
-    public static final BrokerConfiguration CONFIG = new BrokerConfiguration(true, true, false);
+    public static final BrokerConfiguration CONFIG = new BrokerConfiguration(true, true, false, false);
     private MemoryQueueRepository queueRepository;
 
     @Before

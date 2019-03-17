@@ -20,7 +20,8 @@ public class SessionTest {
         final Queue<SessionRegistry.EnqueuedMessage> queuedMessages = new ConcurrentLinkedQueue<>();
         final Session client = new Session("Subscriber", true, null, queuedMessages);
         final EmbeddedChannel testChannel = new EmbeddedChannel();
-        MQTTConnection mqttConnection = new MQTTConnection(testChannel, null, null, null, null);
+        BrokerConfiguration brokerConfiguration = new BrokerConfiguration(true, false, false, false);
+        MQTTConnection mqttConnection = new MQTTConnection(testChannel, brokerConfiguration, null, null, null);
         client.markConnected();
         client.bind(mqttConnection);
 
