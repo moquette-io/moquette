@@ -24,8 +24,6 @@ import java.util.Properties;
  */
 public class MemoryConfig extends IConfig {
 
-    private final Properties m_properties = new Properties();
-
     public MemoryConfig(Properties properties) {
         assignDefaults();
         for (Map.Entry<Object, Object> entrySet : properties.entrySet()) {
@@ -45,21 +43,6 @@ public class MemoryConfig extends IConfig {
     // m_properties.put(BrokerConstants.AUTHENTICATOR_CLASS_NAME, "");
     // m_properties.put(BrokerConstants.AUTHORIZATOR_CLASS_NAME, "");
     // }
-
-    @Override
-    public void setProperty(String name, String value) {
-        m_properties.setProperty(name, value);
-    }
-
-    @Override
-    public String getProperty(String name) {
-        return m_properties.getProperty(name);
-    }
-
-    @Override
-    public String getProperty(String name, String defaultValue) {
-        return m_properties.getProperty(name, defaultValue);
-    }
 
     @Override
     public IResourceLoader getResourceLoader() {

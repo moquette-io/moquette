@@ -18,6 +18,8 @@ package io.moquette.broker.config;
 
 import io.moquette.BrokerConstants;
 
+import java.util.Properties;
+
 /**
  * Base interface for all configuration implementations (filesystem, memory or classpath)
  */
@@ -25,24 +27,37 @@ public abstract class IConfig {
 
     public static final String DEFAULT_CONFIG = "config/moquette.conf";
 
-    public abstract void setProperty(String name, String value);
+    final Properties m_properties = new Properties();
 
     /**
-     * Same semantic of Properties
+     * Same interface as {@link Properties}
+     * @param name property name
+     * @param value property value
+     */
+    public void setProperty(String name, String value) {
+        m_properties.setProperty(name, value);
+    }
+
+    /**
+     * Same interface as {@link Properties}
      *
      * @param name property name.
      * @return property value.
      * */
-    public abstract String getProperty(String name);
+    public String getProperty(String name) {
+        return m_properties.getProperty(name);
+    }
 
     /**
-     * Same semantic of Properties
+     * Same interface as {@link Properties}
      *
      * @param name property name.
      * @param defaultValue default value to return in case the property doesn't exists.
      * @return property value.
      * */
-    public abstract String getProperty(String name, String defaultValue);
+    public String getProperty(String name, String defaultValue) {
+        return m_properties.getProperty(name, defaultValue);
+    }
 
     void assignDefaults() {
         setProperty(BrokerConstants.PORT_PROPERTY_NAME, Integer.toString(BrokerConstants.PORT));
@@ -59,8 +74,6 @@ public abstract class IConfig {
             String.valueOf(BrokerConstants.DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE));
     }
 
-    public abstract IResourceLoader getResourceLoader();
-
     public int intProp(String propertyName, int defaultValue) {
         String propertyValue = getProperty(propertyName);
         if (propertyValue == null) {
@@ -76,4 +89,6 @@ public abstract class IConfig {
         }
         return Boolean.parseBoolean(propertyValue);
     }
+
+    public abstract IResourceLoader getResourceLoader();
 }

@@ -18,9 +18,9 @@ package io.moquette.broker.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
 import java.io.Reader;
-import java.text.ParseException;
-import java.util.Properties;
 
 /**
  * Configuration that loads config stream from a {@link IResourceLoader} instance.
@@ -29,7 +29,6 @@ public class ResourceLoaderConfig extends IConfig {
 
     private static final Logger LOG = LoggerFactory.getLogger(ResourceLoaderConfig.class);
 
-    private final Properties m_properties;
     private final IResourceLoader resourceLoader;
 
     public ResourceLoaderConfig(IResourceLoader resourceLoader) {
@@ -64,35 +63,18 @@ public class ResourceLoaderConfig extends IConfig {
                 "Parsing configuration properties. ResourceLoader = {}, configName = {}.",
                 resourceLoader.getName(),
                 configName);
-        ConfigurationParser confParser = new ConfigurationParser();
-        m_properties = confParser.getProperties();
         assignDefaults();
         try {
-            confParser.parse(configReader);
-        } catch (ParseException pex) {
+            m_properties.load(configReader);
+        } catch (IOException ex) {
             LOG.warn(
                     "Unable to parse configuration properties. Using default configuration. "
                     + "ResourceLoader = {}, configName = {}, cause = {}, errorMessage = {}.",
                     resourceLoader.getName(),
                     configName,
-                    pex.getCause(),
-                    pex.getMessage());
+                    ex.getCause(),
+                    ex.getMessage());
         }
-    }
-
-    @Override
-    public void setProperty(String name, String value) {
-        m_properties.setProperty(name, value);
-    }
-
-    @Override
-    public String getProperty(String name) {
-        return m_properties.getProperty(name);
-    }
-
-    @Override
-    public String getProperty(String name, String defaultValue) {
-        return m_properties.getProperty(name, defaultValue);
     }
 
     @Override
