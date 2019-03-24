@@ -18,6 +18,7 @@ package io.moquette.broker;
 
 import io.moquette.BrokerConstants;
 import io.moquette.broker.config.IConfig;
+import io.moquette.broker.config.INettyChannelPipelineConfigurer;
 import io.moquette.broker.metrics.*;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
@@ -95,7 +96,6 @@ class NewNettyAcceptor {
         abstract void init(SocketChannel channel) throws Exception;
     }
 
-
     private class LocalPortReaderFutureListener implements ChannelFutureListener {
         private String transportName;
 
@@ -126,6 +126,7 @@ class NewNettyAcceptor {
     private MessageMetricsCollector metricsCollector = new MessageMetricsCollector();
     private Optional<? extends ChannelInboundHandler> metrics;
     private Optional<? extends ChannelInboundHandler> errorsCather;
+    private final INettyChannelPipelineConfigurer pipelineConfigurer;
 
     private int nettySoBacklog;
     private boolean nettySoReuseaddr;
@@ -135,6 +136,10 @@ class NewNettyAcceptor {
     private int maxBytesInMessage;
 
     private Class<? extends ServerSocketChannel> channelClass;
+
+    NewNettyAcceptor(INettyChannelPipelineConfigurer pipelineConfigurer) {
+        this.pipelineConfigurer = pipelineConfigurer == null ? new INettyChannelPipelineConfigurer() {} : pipelineConfigurer;
+    }
 
     public void initialize(NewNettyMQTTHandler mqttHandler, IConfig props, ISslContextCreator sslCtxCreator) {
         LOG.debug("Initializing Netty acceptor");
@@ -271,6 +276,7 @@ class NewNettyAcceptor {
             pipeline.addLast("wizardMetrics", metrics.get());
         }
         pipeline.addLast("handler", handler);
+        pipelineConfigurer.configure(pipeline);
     }
 
     private void initializeWebSocketTransport(final NewNettyMQTTHandler handler, IConfig props) {

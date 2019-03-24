@@ -135,6 +135,11 @@ public class Server {
 
     public void startServer(IConfig config, List<? extends InterceptHandler> handlers, ISslContextCreator sslCtxCreator,
                             IAuthenticator authenticator, IAuthorizatorPolicy authorizatorPolicy) {
+        startServer(config, handlers, sslCtxCreator, authenticator, authorizatorPolicy, null);
+    }
+
+    public void startServer(IConfig config, List<? extends InterceptHandler> handlers, ISslContextCreator sslCtxCreator,
+                            IAuthenticator authenticator, IAuthorizatorPolicy authorizatorPolicy, INettyChannelPipelineConfigurer pipelineConfigurer) {
         final long start = System.currentTimeMillis();
         if (handlers == null) {
             handlers = Collections.emptyList();
@@ -184,7 +189,7 @@ public class Server {
                                                                             dispatcher);
 
         final NewNettyMQTTHandler mqttHandler = new NewNettyMQTTHandler(connectionFactory);
-        acceptor = new NewNettyAcceptor();
+        acceptor = new NewNettyAcceptor(pipelineConfigurer);
         acceptor.initialize(mqttHandler, config, sslCtxCreator);
 
         final long startTime = System.currentTimeMillis() - start;
