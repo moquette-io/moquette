@@ -70,7 +70,7 @@ public class ServerIntegrationWebSocketTest {
     @Test
     public void checkPlainConnect() throws Exception {
         LOG.info("*** checkPlainConnect ***");
-        String destUri = "ws://localhost:" + BrokerConstants.WEBSOCKET_PORT + "/mqtt";
+        String destUri = "ws://localhost:" + BrokerConstants.WEBSOCKET_PORT + BrokerConstants.WEBSOCKET_PATH;
 
         MQTTWebSocket socket = new MQTTWebSocket();
         client.start();
