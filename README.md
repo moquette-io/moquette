@@ -79,3 +79,11 @@ After a git clone of the repository, cd into the cloned sources and: `./gradlew 
 
 In distribution/build directory will be produced the selfcontained file for the broker with all dependencies and a running script. 
   
+
+---
+
+If you like Moquette you can support us by donating.
+
+<a href="https://paypal.me/andsel">
+  <img src="https://cloud.githubusercontent.com/assets/743833/23549988/02d66ccc-000f-11e7-8764-a257b21377bd.gif">
+</a>
