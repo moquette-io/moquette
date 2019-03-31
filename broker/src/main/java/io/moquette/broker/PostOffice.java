@@ -218,6 +218,8 @@ class PostOffice {
                           sub.getClientId(), sub.getTopicFilter(), qos);
                 // we need to retain because duplicate only copy r/w indexes and don't retain() causing refCnt = 0
                 ByteBuf payload = origPayload.retainedDuplicate();
+                // without this retain(), Session.resendInflightNotAcked() fails because it tries to handle a freed ByteBuf
+                payload.retain();
                 targetSession.sendPublishOnSessionAtQos(topic, qos, payload);
             } else {
                 // If we are, the subscriber disconnected after the subscriptions tree selected that session as a

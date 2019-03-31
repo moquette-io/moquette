@@ -33,6 +33,8 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.*;
@@ -174,24 +176,23 @@ public class ServerLowlevelMessagesIntegrationTests {
             subscriber.connect();
             publisher.connect();
 
-            CountDownLatch countDownLatch = new CountDownLatch(1);
-            subscriber.subscribe(topic, 1, new IMqttMessageListener()
-            {
+            AtomicBoolean isFirst = new AtomicBoolean(true);
+            CountDownLatch countDownLatch = new CountDownLatch(2);
+            subscriber.subscribe(topic, 1, new IMqttMessageListener() {
                 @Override
                 public void messageArrived(String topic, org.eclipse.paho.client.mqttv3.MqttMessage message)
                         throws Exception
                 {
-                    LOG.debug("messageArrived: start");
-                    TimeUnit.SECONDS.sleep(20);
-                    LOG.debug("messageArrived: end");
+                    if (isFirst.getAndSet(false)) {
+                        // wait to trigger resending PUBLISH
+                        TimeUnit.SECONDS.sleep(12);
+                    }
                     countDownLatch.countDown();
                 }
             });
 
-            LOG.debug("publish: start");
             publisher.publish(topic, "hello".getBytes(), 1, false);
-            LOG.debug("publish: end");
-            countDownLatch.await();
+            assertTrue(countDownLatch.await(30, TimeUnit.SECONDS));
         }
         finally {
             try {

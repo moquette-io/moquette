@@ -276,7 +276,10 @@ class Session {
 
     void pubAckReceived(int ackPacketId) {
         // TODO remain to invoke in somehow m_interceptor.notifyMessageAcknowledged
-        inflightWindow.remove(ackPacketId);
+        SessionRegistry.EnqueuedMessage message = inflightWindow.remove(ackPacketId);
+        if (message instanceof SessionRegistry.PublishedMessage) {
+            ((SessionRegistry.PublishedMessage) message).payload.release();
+        }
         inflightSlots.incrementAndGet();
         drainQueueToConnection();
     }
