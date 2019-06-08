@@ -120,6 +120,15 @@ public final class BrokerInterceptor implements Interceptor {
     }
 
     @Override
+    public void notifyClientPing(String clientID) {
+        for (final InterceptHandler handler : this.handlers.get(InterceptPingRequestMessage.class)) {
+            LOG.debug("Notifying MQTT client ping request to interceptor CId={}" +
+                "interceptorId={}", clientID, handler.getID());
+            executor.execute(() -> handler.onPingRequest(new InterceptPingRequestMessage(clientID)));
+        }
+    }
+
+    @Override
     public void notifyTopicPublished(final MqttPublishMessage msg, final String clientID, final String username) {
         msg.retain();
 

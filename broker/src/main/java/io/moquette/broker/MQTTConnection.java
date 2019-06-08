@@ -96,6 +96,7 @@ final class MQTTConnection {
                                                                 false, 0);
                 MqttMessage pingResp = new MqttMessage(pingHeader);
                 channel.writeAndFlush(pingResp).addListener(CLOSE_ON_FAILURE);
+                postOffice.receivePingReq(this, msg);
                 break;
             default:
                 LOG.error("Unknown MessageType: {}, channel: {}", messageType, channel);

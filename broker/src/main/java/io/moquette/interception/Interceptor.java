@@ -39,6 +39,8 @@ public interface Interceptor {
 
     void notifyClientConnectionLost(String clientID, String username);
 
+    void notifyClientPing(String ClientID);
+
     void notifyTopicPublished(MqttPublishMessage msg, String clientID, String username);
 
     void notifyTopicSubscribed(Subscription sub, String username);

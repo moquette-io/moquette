@@ -15,10 +15,10 @@
  */
 package io.moquette.broker;
 
-import io.moquette.interception.BrokerInterceptor;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
 import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.Topic;
+import io.moquette.interception.BrokerInterceptor;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.*;
@@ -141,7 +141,7 @@ class PostOffice {
                 // close the connection, not valid topicFilter is a protocol violation
                 mqttConnection.dropConnection();
                 LOG.warn("Topic filter is not valid. CId={}, topics: {}, offending topic filter: {}", clientID,
-                         topics, topic);
+                    topics, topic);
                 return;
             }
 
@@ -157,6 +157,11 @@ class PostOffice {
 
         // ack the client
         mqttConnection.sendUnsubAckMessage(topics, clientID, messageId);
+    }
+
+    void receivePingReq(MQTTConnection mqttConnection, MqttMessage msg) {
+        LOG.trace("Received PINGREQ");
+        interceptor.notifyClientPing(mqttConnection.getClientId());
     }
 
     void receivedPublishQos0(Topic topic, String username, String clientID, ByteBuf payload, boolean retain,
@@ -197,7 +202,8 @@ class PostOffice {
         if (retain) {
             if (!payload.isReadable()) {
                 retainedRepository.cleanRetained(topic);
-            } else {
+            }
+            else {
                 // before wasn't stored
                 retainedRepository.retain(topic, msg);
             }
@@ -215,15 +221,16 @@ class PostOffice {
             boolean isSessionPresent = targetSession != null;
             if (isSessionPresent) {
                 LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
-                          sub.getClientId(), sub.getTopicFilter(), qos);
+                    sub.getClientId(), sub.getTopicFilter(), qos);
                 // we need to retain because duplicate only copy r/w indexes and don't retain() causing refCnt = 0
                 ByteBuf payload = origPayload.retainedDuplicate();
                 targetSession.sendPublishOnSessionAtQos(topic, qos, payload);
-            } else {
+            }
+            else {
                 // If we are, the subscriber disconnected after the subscriptions tree selected that session as a
                 // destination.
                 LOG.debug("PUBLISH to not yet present session. CId: {}, topicFilter: {}, qos: {}", sub.getClientId(),
-                          sub.getTopicFilter(), qos);
+                    sub.getTopicFilter(), qos);
             }
         }
     }
@@ -249,7 +256,8 @@ class PostOffice {
         if (retained) {
             if (!payload.isReadable()) {
                 retainedRepository.cleanRetained(topic);
-            } else {
+            }
+            else {
                 // before wasn't stored
                 retainedRepository.retain(topic, mqttPublishMessage);
             }
@@ -273,8 +281,7 @@ class PostOffice {
      * also doesn't notifyTopicPublished because using internally the owner should already know
      * where it's publishing.
      *
-     * @param msg
-     *            the message to publish
+     * @param msg the message to publish
      */
     public void internalPublish(MqttPublishMessage msg) {
         final MqttQoS qos = msg.fixedHeader().qosLevel();
@@ -297,17 +304,18 @@ class PostOffice {
 
     /**
      * notify MqttConnectMessage after connection established (already pass login).
+     *
      * @param msg
      */
-    void dispatchConnection(MqttConnectMessage msg){
+    void dispatchConnection(MqttConnectMessage msg) {
         interceptor.notifyClientConnected(msg);
     }
 
-    void dispatchDisconnection(String clientId,String userName){
-        interceptor.notifyClientDisconnected(clientId,userName);
+    void dispatchDisconnection(String clientId, String userName) {
+        interceptor.notifyClientDisconnected(clientId, userName);
     }
 
-    void dispatchConnectionLost(String clientId,String userName){
-        interceptor.notifyClientConnectionLost(clientId,userName);
+    void dispatchConnectionLost(String clientId, String userName) {
+        interceptor.notifyClientConnectionLost(clientId, userName);
     }
 }

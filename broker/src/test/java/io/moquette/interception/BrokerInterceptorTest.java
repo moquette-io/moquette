@@ -69,6 +69,11 @@ public class BrokerInterceptorTest {
         }
 
         @Override
+        public void onPingRequest(InterceptPingRequestMessage msg) {
+            n.set(100);
+        }
+
+        @Override
         public void onPublish(InterceptPublishMessage msg) {
             n.set(60);
         }
