@@ -51,7 +51,7 @@ public class MQTTConnectionPublishTest {
     public void setUp() {
         connMsg = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_3_1).cleanSession(true);
 
-        BrokerConfiguration config = new BrokerConfiguration(true, true, false);
+        BrokerConfiguration config = new BrokerConfiguration(true, true, false, false);
 
         createMQTTConnection(config);
     }

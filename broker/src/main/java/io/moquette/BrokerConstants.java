@@ -32,6 +32,8 @@ public final class BrokerConstants {
             + DEFAULT_MOQUETTE_STORE_H2_DB_FILENAME;
     public static final String WEB_SOCKET_PORT_PROPERTY_NAME = "websocket_port";
     public static final String WSS_PORT_PROPERTY_NAME = "secure_websocket_port";
+    public static final String WEB_SOCKET_PATH_PROPERTY_NAME = "websocket_path";
+    public static final String WEB_SOCKET_MAX_FRAME_SIZE_PROPERTY_NAME = "websocket_max_frame_size";
 
     /**
      * Defines the SSL implementation to use, default to "JDK".
@@ -57,6 +59,7 @@ public final class BrokerConstants {
     public static final String DB_AUTHENTICATOR_DIGEST = "authenticator.db.digest";
     public static final int PORT = 1883;
     public static final int WEBSOCKET_PORT = 8080;
+    public static final String WEBSOCKET_PATH = "/mqtt";
     public static final String DISABLED_PORT_BIND = "disabled";
     public static final String HOST = "0.0.0.0";
     public static final String NEED_CLIENT_AUTH = "need_client_auth";
@@ -68,6 +71,7 @@ public final class BrokerConstants {
     public static final String NETTY_EPOLL_PROPERTY_NAME = "netty.epoll";
     public static final String NETTY_MAX_BYTES_PROPERTY_NAME = "netty.mqtt.message_size";
     public static final int DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE = 8092;
+    public static final String IMMEDIATE_BUFFER_FLUSH_PROPERTY_NAME = "immediate_buffer_flush";
     public static final String METRICS_ENABLE_PROPERTY_NAME = "use_metrics";
     public static final String METRICS_LIBRATO_EMAIL_PROPERTY_NAME = "metrics.librato.email";
     public static final String METRICS_LIBRATO_TOKEN_PROPERTY_NAME = "metrics.librato.token";

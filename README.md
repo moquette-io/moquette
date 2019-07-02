@@ -12,7 +12,7 @@ Its designed to be evented, uses Netty for the protocol encoding and decoding pa
  
 ## Embeddable
 
-[Freedomotic](http://www.freedomotic.com/) Is an home automation framework, uses Moquette embedded to interface with MQTT world.
+[Freedomotic](https://www.freedomotic-iot.com/) is an home automation framework and uses Moquette embedded to interface with MQTT by a specific [plugin](https://freedomotic-user-manual.readthedocs.io/en/latest/plugins/mqtt-broker.html). 
 
 Moquette is also used into [Atomize Spin](http://atomizesoftware.com/spin) a software solution for the logistic field.
 
@@ -79,3 +79,11 @@ After a git clone of the repository, cd into the cloned sources and: `./gradlew 
 
 In distribution/build directory will be produced the selfcontained file for the broker with all dependencies and a running script. 
   
+
+---
+
+If you like Moquette you can support us by donating.
+
+<a href="https://paypal.me/andsel">
+  <img src="https://cloud.githubusercontent.com/assets/743833/23549988/02d66ccc-000f-11e7-8764-a257b21377bd.gif">
+</a>

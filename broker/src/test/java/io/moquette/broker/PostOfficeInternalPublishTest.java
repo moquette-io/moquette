@@ -52,7 +52,7 @@ public class PostOfficeInternalPublishTest {
     private SessionRegistry sessionRegistry;
     private MockAuthenticator mockAuthenticator;
     private static final BrokerConfiguration ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID =
-        new BrokerConfiguration(true, true, false);
+        new BrokerConfiguration(true, true, false, false);
     private MemoryRetainedRepository retainedRepository;
     private MemoryQueueRepository queueRepository;
 
