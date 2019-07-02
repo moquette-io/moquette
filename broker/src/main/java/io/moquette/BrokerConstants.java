@@ -21,6 +21,7 @@ import java.io.File;
 public final class BrokerConstants {
 
     public static final String INTERCEPT_HANDLER_PROPERTY_NAME = "intercept.handler";
+    public static final String INTERCEPT_PINGREQ_PROPERTY_NAME = "intercept.pingreq";
     public static final String BROKER_INTERCEPTOR_THREAD_POOL_SIZE = "intercept.thread_pool.size";
     public static final String PERSISTENT_STORE_PROPERTY_NAME = "persistent_store";
     public static final String AUTOSAVE_INTERVAL_PROPERTY_NAME = "autosave_interval";

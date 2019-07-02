@@ -57,6 +57,7 @@ public abstract class IConfig {
         setProperty(BrokerConstants.AUTHORIZATOR_CLASS_NAME, "");
         setProperty(BrokerConstants.NETTY_MAX_BYTES_PROPERTY_NAME,
             String.valueOf(BrokerConstants.DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE));
+        setProperty(BrokerConstants.INTERCEPT_PINGREQ_PROPERTY_NAME, Boolean.FALSE.toString());
     }
 
     public abstract IResourceLoader getResourceLoader();

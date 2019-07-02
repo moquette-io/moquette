@@ -16,9 +16,12 @@
 
 package io.moquette.interception;
 
-import io.moquette.interception.messages.*;
+import io.moquette.BrokerConstants;
+import io.moquette.broker.config.IConfig;
+import io.moquette.broker.config.MemoryConfig;
 import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.Topic;
+import io.moquette.interception.messages.*;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttQoS;
@@ -27,10 +30,12 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.util.Collections;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotSame;
 import static org.mockito.Matchers.refEq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -130,10 +135,10 @@ public class BrokerInterceptorTest {
     @Test
     public void testNotifyTopicPublished() throws Exception {
         interceptor.notifyTopicPublished(
-                MqttMessageBuilders.publish().qos(MqttQoS.AT_MOST_ONCE)
-                    .payload(Unpooled.copiedBuffer("Hello".getBytes(UTF_8))).build(),
-                "cli1234",
-                "cli1234");
+            MqttMessageBuilders.publish().qos(MqttQoS.AT_MOST_ONCE)
+                .payload(Unpooled.copiedBuffer("Hello".getBytes(UTF_8))).build(),
+            "cli1234",
+            "cli1234");
         interval();
         assertEquals(60, n.get());
     }
@@ -150,6 +155,29 @@ public class BrokerInterceptorTest {
         interceptor.notifyTopicUnsubscribed("o2", "cli1234", "cli1234");
         interval();
         assertEquals(80, n.get());
+    }
+
+    @Test
+    public void testNotifyPingReq() throws Exception {
+        interceptor.notifyClientPing("cli1234");
+        interval();
+        assertNotSame(100, n.get());
+
+        // Now repeat the test with a new interceptor configured to not acknowledge PINGREQ
+        IConfig props = new MemoryConfig(new Properties());
+        props.setProperty(BrokerConstants.INTERCEPT_PINGREQ_PROPERTY_NAME, "false");
+        BrokerInterceptor pingInterceptor = new BrokerInterceptor(props, Collections.<InterceptHandler>singletonList(new MockObserver()));
+        pingInterceptor.notifyClientPing("cli1234");
+        interval();
+        assertNotSame(100, n.get());
+
+        // Finally with a new interceptor configured to acknowledge PINGREQ
+        props = new MemoryConfig(new Properties());
+        props.setProperty(BrokerConstants.INTERCEPT_PINGREQ_PROPERTY_NAME, "true");
+        pingInterceptor = new BrokerInterceptor(props, Collections.<InterceptHandler>singletonList(new MockObserver()));
+        pingInterceptor.notifyClientPing("cli1234");
+        interval();
+        assertEquals(100, n.get());
     }
 
     @Test
