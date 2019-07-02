@@ -12,7 +12,7 @@ Its designed to be evented, uses Netty for the protocol encoding and decoding pa
  
 ## Embeddable
 
-[Freedomotic](http://www.freedomotic.com/) Is an home automation framework, uses Moquette embedded to interface with MQTT world.
+[Freedomotic](https://www.freedomotic-iot.com/) is an home automation framework and uses Moquette embedded to interface with MQTT by a specific [plugin](https://freedomotic-user-manual.readthedocs.io/en/latest/plugins/mqtt-broker.html). 
 
 Moquette is also used into [Atomize Spin](http://atomizesoftware.com/spin) a software solution for the logistic field.
 
