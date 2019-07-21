@@ -109,10 +109,8 @@ class PostOffice {
                 final MqttQoS retainedQos = retainedMsg.qosLevel();
                 MqttQoS qos = lowerQosToTheSubscriptionDesired(subscription, retainedQos);
 
-//                final ByteBuf origPayload = retainedMsg.getPayload();
                 final ByteBuf payloadBuf = Unpooled.wrappedBuffer(retainedMsg.getPayload());
-//                ByteBuf payload = origPayload.retainedDuplicate();
-                targetSession.sendRetainedPublishOnSessionAtQos(subscription.getTopicFilter(), qos, payloadBuf);
+                targetSession.sendRetainedPublishOnSessionAtQos(retainedMsg.getTopic(), qos, payloadBuf);
             }
         }
     }
