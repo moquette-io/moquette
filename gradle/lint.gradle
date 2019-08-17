@@ -3,7 +3,8 @@ apply plugin: 'com.github.spotbugs'
 apply plugin: 'net.ltgt.errorprone'
 
 dependencies {
-    errorprone "com.google.errorprone:error_prone_core:2.2.0"
+    errorprone "com.google.errorprone:error_prone_core:2.3.3"
+    errorproneJavac("com.google.errorprone:javac:1.8")
 }
 
 checkstyle {
@@ -14,7 +15,7 @@ checkstyle {
 }
 
 spotbugs {
-    toolVersion = '3.1.1'
+    toolVersion = '3.1.12'
     ignoreFailures true
     omitVisitors = ['RuntimeExceptionCapture']
 }
