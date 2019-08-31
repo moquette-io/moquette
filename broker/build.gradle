@@ -1,4 +1,3 @@
-
 description = 'Moquette - broker'
 
 dependencies {
@@ -11,7 +10,6 @@ dependencies {
     compile group: 'io.netty', name: 'netty-codec-mqtt', version: nettyVersion
 
     compile group: 'io.netty', name: 'netty-transport-native-epoll', version: nettyVersion, classifier: 'linux-x86_64'
-    // <classifier>${os.detected.name}-${os.detected.arch}</classifier>
 
     compile group: 'com.h2database', name: 'h2-mvstore', version: '1.4.199'
 
@@ -36,4 +34,17 @@ dependencies {
     testCompile group: 'com.h2database', name: 'h2', version:'1.4.199'
 
     testRuntime group: 'io.netty', name: 'netty-tcnative', version: '2.0.10.Final', classifier: 'linux-x86_64'
+}
+
+jar {
+    bnd('Automatic-Module-Name': 'moquette-broker',
+            'Bundle-Name': 'Moquette Broker',
+            'Bundle-SymbolicName': 'moquette-broker',
+            'Bundle-Description': 'OSGi-ified and customized version of Moquette broker',
+            'Bundle-License': 'Apache-2.0;description="The Apache License, Version 2.0";link="http://www.apache.org/licenses/LICENSE-2.0.txt"',
+            'Bundle-SCM': 'url="https://github.com/J-N-K/moquette";connection="scm:git:git://github.com/J-N-K/moquette.git";developerConnection="scm:git:ssh://git@github.com/J-N-K/moquette.git"',
+            'Export-Package': 'io.moquette.*',
+            'Import-Package' : 'com.bugsnag.*;resolution:="optional",com.codahale.metrics.*;resolution:="optional",com.librato.metrics.reporter.*;resolution:="optional",com.zaxxer.hikari.*;resolution:="optional",io.netty.channel.epoll.*;resolution:="optional",io.netty.handler.codec.http.*;resolution:="optional", *',
+            '-consumer-policy': '${range;[==,=+)}'
+    )
 }

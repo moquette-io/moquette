@@ -2,12 +2,13 @@ allprojects  {
   apply plugin: 'maven'
   apply plugin: 'maven-publish'
 
-  group = 'io.moquette'
-  version = '0.13-SNAPSHOT'
+  group = 'com.github.j-n-k'
+  version = '0.13.0.OH2'
 }
 
 buildscript {
   repositories {
+    mavenCentral()
     maven {
       url "https://plugins.gradle.org/m2/"
     }
@@ -16,7 +17,8 @@ buildscript {
     classpath 'net.ltgt.gradle:gradle-errorprone-plugin:0.8.1'
     classpath 'gradle.plugin.com.github.spotbugs:spotbugs-gradle-plugin:2.0.0'
     classpath 'com.github.jengelman.gradle.plugins:shadow:5.1.0'
-    classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7.3'
+    classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.4'
+    classpath 'biz.aQute.bnd:biz.aQute.bnd.gradle:4.2.0'
   }
 }
 
@@ -35,9 +37,10 @@ subprojects {
   apply from: new File(rootDir, 'gradle/lint.gradle')
   apply plugin: 'com.jfrog.bintray'
   apply plugin: 'eclipse'
+  apply plugin: 'biz.aQute.bnd.builder'
 
   ext {
-    nettyVersion = '4.1.22.Final'
+    nettyVersion = '4.1.34.Final'
   }
 
   task packageTests(type: Jar) {
@@ -90,9 +93,11 @@ subprojects {
     publications {
       bintrayPublication(MavenPublication) {
         from components.java
-        groupId "$project.group"
+        artifact sourceJar
+        artifact javadocJar
+        groupId "${project.group}"
         artifactId "${project.name}"
-        version '0.13-SNAPSHOT'
+        version "${project.version}"
       }
     }
   }
@@ -102,11 +107,11 @@ subprojects {
     user = System.getenv('BINTRAY_USER')
     key = System.getenv('BINTRAY_KEY')
     pkg {
-      repo = 'maven'//"${project.group}"
+      repo = 'moquette'
       name = "${project.group}.${project.name}"
-      userOrg = 'andsel'
+      userOrg = 'j-n-k'
       licenses = ['Apache-2.0']
-      vcsUrl = "https://api.bintray.com/maven/andsel/maven/${project.group}.${project.name}"
+      vcsUrl = 'https://github.com/j-n-k/moquette.git'
       publications = ['bintrayPublication']
     }
   }

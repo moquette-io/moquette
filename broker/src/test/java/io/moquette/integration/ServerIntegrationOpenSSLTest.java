@@ -24,12 +24,14 @@ import io.moquette.broker.Server;
 import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslProvider;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Check that Moquette could also handle SSL with OpenSSL provider.
  */
+@Ignore
 public class ServerIntegrationOpenSSLTest extends ServerIntegrationSSLTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(ServerIntegrationOpenSSLTest.class);
