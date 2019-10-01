@@ -308,4 +308,9 @@ class PostOffice {
     void dispatchConnectionLost(String clientId,String userName){
         interceptor.notifyClientConnectionLost(clientId,userName);
     }
+
+    void flushInFlight(MQTTConnection mqttConnection) {
+        Session targetSession = sessionRegistry.retrieve(mqttConnection.getClientId());
+        targetSession.flushAllQueuedMessages();
+    }
 }

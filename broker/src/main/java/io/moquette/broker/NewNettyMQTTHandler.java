@@ -71,6 +71,12 @@ public class NewNettyMQTTHandler extends ChannelInboundHandlerAdapter {
     }
 
     @Override
+    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
+        final MQTTConnection mqttConnection = mqttConnection(ctx.channel());
+        mqttConnection.readCompleted();
+    }
+
+    @Override
     public void channelActive(ChannelHandlerContext ctx) {
         MQTTConnection connection = connectionFactory.create(ctx.channel());
         mqttConnection(ctx.channel(), connection);

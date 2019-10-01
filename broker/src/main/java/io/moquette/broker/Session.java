@@ -281,6 +281,10 @@ class Session {
         drainQueueToConnection();
     }
 
+    public void flushAllQueuedMessages() {
+        drainQueueToConnection();
+    }
+
     public void resendInflightNotAcked() {
         Collection<InFlightPacket> expired = new ArrayList<>(INFLIGHT_WINDOW_SIZE);
         inflightTimeouts.drainTo(expired);
