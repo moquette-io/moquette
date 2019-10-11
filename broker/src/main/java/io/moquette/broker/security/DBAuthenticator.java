@@ -18,6 +18,7 @@ package io.moquette.broker.security;
 
 import com.zaxxer.hikari.HikariDataSource;
 import io.moquette.BrokerConstants;
+import io.moquette.broker.Utils;
 import io.moquette.broker.config.IConfig;
 import org.apache.commons.codec.binary.Hex;
 import org.slf4j.Logger;
@@ -29,6 +30,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Load user credentials from a SQL database. sql driver must be provided at runtime
@@ -38,6 +42,7 @@ public class DBAuthenticator implements IAuthenticator {
     private static final Logger LOG = LoggerFactory.getLogger(DBAuthenticator.class);
 
     private final MessageDigest messageDigest;
+    private final ExecutorService executor;
     private HikariDataSource dataSource;
     private String sqlQuery;
 
@@ -45,7 +50,8 @@ public class DBAuthenticator implements IAuthenticator {
         this(conf.getProperty(BrokerConstants.DB_AUTHENTICATOR_DRIVER, ""),
              conf.getProperty(BrokerConstants.DB_AUTHENTICATOR_URL, ""),
              conf.getProperty(BrokerConstants.DB_AUTHENTICATOR_QUERY, ""),
-             conf.getProperty(BrokerConstants.DB_AUTHENTICATOR_DIGEST, ""));
+             conf.getProperty(BrokerConstants.DB_AUTHENTICATOR_DIGEST, ""),
+             Integer.parseInt(conf.getProperty(BrokerConstants.AUTH_THREAD_POOL_SIZE, "1")));
     }
 
     /**
@@ -59,11 +65,14 @@ public class DBAuthenticator implements IAuthenticator {
      *            : sql query like : "SELECT PASSWORD FROM USER WHERE LOGIN=?"
      * @param digestMethod
      *            : password encoding algorithm : "MD5", "SHA-1", "SHA-256"
+     * @param authExecutorPoolSize
+     *            : auth executor pool size. Defaults to 1.
      */
-    public DBAuthenticator(String driver, String jdbcUrl, String sqlQuery, String digestMethod) {
+    public DBAuthenticator(String driver, String jdbcUrl, String sqlQuery, String digestMethod, int authExecutorPoolSize) {
         this.sqlQuery = sqlQuery;
         this.dataSource = new HikariDataSource();
         this.dataSource.setJdbcUrl(jdbcUrl);
+        this.executor = Executors.newFixedThreadPool(authExecutorPoolSize);
 
         try {
             this.messageDigest = MessageDigest.getInstance(digestMethod);
@@ -74,46 +83,52 @@ public class DBAuthenticator implements IAuthenticator {
     }
 
     @Override
-    public synchronized boolean checkValid(String clientId, String username, byte[] password) {
-        // Check Username / Password in DB using sqlQuery
-        if (username == null || password == null) {
-            LOG.info("username or password was null");
-            return false;
-        }
-
-        ResultSet resultSet = null;
-        PreparedStatement preparedStatement = null;
-        Connection conn = null;
-        try {
-            conn = this.dataSource.getConnection();
-
-            preparedStatement = conn.prepareStatement(this.sqlQuery);
-            preparedStatement.setString(1, username);
-            resultSet = preparedStatement.executeQuery();
-            if (resultSet.next()) {
-                final String foundPwq = resultSet.getString(1);
-                messageDigest.update(password);
-                byte[] digest = messageDigest.digest();
-                String encodedPasswd = new String(Hex.encodeHex(digest));
-                return foundPwq.equals(encodedPasswd);
+    public synchronized CompletableFuture<Boolean> checkValid(String clientId, String username, byte[] password) {
+        return CompletableFuture.supplyAsync(() -> {
+            // Check Username / Password in DB using sqlQuery
+            if (username == null || password == null) {
+                LOG.info("username or password was null");
+                return false;
             }
-        } catch (SQLException sqlex) {
-            LOG.error("Error quering DB for username: {}", username, sqlex);
-        } finally {
+
+            ResultSet resultSet = null;
+            PreparedStatement preparedStatement = null;
+            Connection conn = null;
             try {
-                if (resultSet != null) {
-                    resultSet.close();
+                conn = this.dataSource.getConnection();
+
+                preparedStatement = conn.prepareStatement(this.sqlQuery);
+                preparedStatement.setString(1, username);
+                resultSet = preparedStatement.executeQuery();
+                if (resultSet.next()) {
+                    final String foundPwq = resultSet.getString(1);
+                    messageDigest.update(password);
+                    byte[] digest = messageDigest.digest();
+                    String encodedPasswd = new String(Hex.encodeHex(digest));
+                    return foundPwq.equals(encodedPasswd);
                 }
-                if (preparedStatement != null) {
-                    preparedStatement.close();
+            } catch (SQLException sqlex) {
+                LOG.error("Error quering DB for username: {}", username, sqlex);
+            } finally {
+                try {
+                    if (resultSet != null) {
+                        resultSet.close();
+                    }
+                    if (preparedStatement != null) {
+                        preparedStatement.close();
+                    }
+                    if (conn != null) {
+                        conn.close();
+                    }
+                } catch (SQLException e) {
+                    LOG.error("Error releasing connection to the datasource", username, e);
                 }
-                if (conn != null) {
-                    conn.close();
-                }
-            } catch (SQLException e) {
-                LOG.error("Error releasing connection to the datasource", username, e);
             }
-        }
-        return false;
+            return false;
+        }, executor);
+    }
+
+    public void cleanup() {
+        Utils.shutdownAndAwaitTermination(executor);
     }
 }

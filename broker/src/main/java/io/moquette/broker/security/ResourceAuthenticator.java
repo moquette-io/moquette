@@ -16,6 +16,8 @@
 
 package io.moquette.broker.security;
 
+import io.moquette.BrokerConstants;
+import io.moquette.broker.config.IConfig;
 import io.moquette.broker.config.IResourceLoader;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.Logger;
@@ -28,6 +30,9 @@ import java.security.NoSuchAlgorithmException;
 import java.text.ParseException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Load user credentials from a text resource. Each line of the file is formatted as
@@ -48,13 +53,18 @@ public class ResourceAuthenticator implements IAuthenticator {
 
     private Map<String, String> m_identities = new HashMap<>();
 
-    public ResourceAuthenticator(IResourceLoader resourceLoader, String resourceName) {
+    private final ExecutorService executor;
+
+    public ResourceAuthenticator(IResourceLoader resourceLoader, String resourceName, IConfig conf) {
         try {
             MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException nsaex) {
             LOG.error("Can't find SHA-256 for password encoding", nsaex);
             throw new RuntimeException(nsaex);
         }
+
+        int authExecutorPoolSize = Integer.parseInt(conf.getProperty(BrokerConstants.AUTH_THREAD_POOL_SIZE, "1"));
+        this.executor = Executors.newFixedThreadPool(authExecutorPoolSize);
 
         LOG.info(String.format("Loading password %s %s", resourceLoader.getName(), resourceName));
         Reader reader = null;
@@ -112,17 +122,18 @@ public class ResourceAuthenticator implements IAuthenticator {
     }
 
     @Override
-    public boolean checkValid(String clientId, String username, byte[] password) {
-        if (username == null || password == null) {
-            LOG.info("username or password was null");
-            return false;
-        }
-        String foundPwq = m_identities.get(username);
-        if (foundPwq == null) {
-            return false;
-        }
-        String encodedPasswd = DigestUtils.sha256Hex(password);
-        return foundPwq.equals(encodedPasswd);
+    public CompletableFuture<Boolean> checkValid(String clientId, String username, byte[] password) {
+        return CompletableFuture.supplyAsync(() -> {
+            if (username == null || password == null) {
+                LOG.info("username or password was null");
+                return false;
+            }
+            String foundPwq = m_identities.get(username);
+            if (foundPwq == null) {
+                return false;
+            }
+            String encodedPasswd = DigestUtils.sha256Hex(password);
+            return foundPwq.equals(encodedPasswd);
+        }, executor);
     }
-
 }

@@ -16,10 +16,12 @@
 
 package io.moquette.broker.security;
 
+import java.util.concurrent.CompletableFuture;
+
 /**
  * username and password checker
  */
 public interface IAuthenticator {
 
-    boolean checkValid(String clientId, String username, byte[] password);
+    CompletableFuture<Boolean> checkValid(String clientId, String username, byte[] password);
 }

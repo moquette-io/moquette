@@ -22,11 +22,15 @@ import io.moquette.broker.security.IAuthenticator;
 import io.moquette.persistence.MemorySubscriptionsRepository;
 import io.netty.channel.Channel;
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.mqtt.MqttConnAckMessage;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttVersion;
 import org.junit.Before;
 import org.junit.Test;
+
+import java.util.Objects;
+import java.util.Optional;
 
 import static io.moquette.broker.NettyChannelAssertions.assertEqualsConnAck;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
@@ -116,7 +120,8 @@ public class MQTTConnectionConnectTest {
         sut.processConnect(msg);
 
         // Verify
-        assertEqualsConnAck(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD, channel.readOutbound());
+        Optional<MqttConnAckMessage> connAckMessage = NettyChannelAssertions.retry(() -> channel.readOutbound(), Objects::nonNull, 5);
+        assertEqualsConnAck(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD, connAckMessage.orElse(null));
         assertFalse("Connection should be closed by the broker.", channel.isOpen());
     }
 
@@ -184,7 +189,8 @@ public class MQTTConnectionConnectTest {
         sut.processConnect(msg);
 
         // Verify
-        assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
+        Optional<MqttConnAckMessage> connAckMessage = NettyChannelAssertions.retry(() -> channel.readOutbound(), Objects::nonNull, 5);
+        assertEqualsConnAck(CONNECTION_ACCEPTED, connAckMessage.orElse(null));
         assertTrue("Connection is accepted and therefore must remain open", channel.isOpen());
     }
 
@@ -198,7 +204,8 @@ public class MQTTConnectionConnectTest {
         sut.processConnect(msg);
 
         // Verify
-        assertEqualsConnAck(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD, channel.readOutbound());
+        Optional<MqttConnAckMessage> connAckMessage = NettyChannelAssertions.retry(() -> channel.readOutbound(), Objects::nonNull, 5);
+        assertEqualsConnAck(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD, connAckMessage.orElse(null));
         assertFalse("Connection must be closed by the broker", channel.isOpen());
     }
 
@@ -231,7 +238,8 @@ public class MQTTConnectionConnectTest {
         sut.processConnect(msg);
 
         // Verify
-        assertEqualsConnAck(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD, channel.readOutbound());
+        Optional<MqttConnAckMessage> connAckMessage = NettyChannelAssertions.retry(() -> channel.readOutbound(), Objects::nonNull, 5);
+        assertEqualsConnAck(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD, connAckMessage.orElse(null));
         assertFalse("Connection should be closed by the broker.", channel.isOpen());
     }
 
@@ -250,7 +258,7 @@ public class MQTTConnectionConnectTest {
 
         sut.processConnect(msg);
         assertEqualsConnAck("Zero byte client identifiers are not allowed",
-                            CONNECTION_REFUSED_IDENTIFIER_REJECTED, channel.readOutbound());
+            CONNECTION_REFUSED_IDENTIFIER_REJECTED, channel.readOutbound());
         assertFalse("Connection must closed", channel.isOpen());
     }
 
@@ -263,7 +271,7 @@ public class MQTTConnectionConnectTest {
 
         sut.processConnect(msg);
         assertEqualsConnAck("Identifier must be rejected due to having clean session set to false",
-                            CONNECTION_REFUSED_IDENTIFIER_REJECTED, channel.readOutbound());
+            CONNECTION_REFUSED_IDENTIFIER_REJECTED, channel.readOutbound());
         assertFalse("Connection must be closed by the broker", channel.isOpen());
     }
 
@@ -275,7 +283,9 @@ public class MQTTConnectionConnectTest {
             .password(TEST_PWD)
             .build();
         sut.processConnect(msg);
-        assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
+
+        Optional<MqttConnAckMessage> connAckMessage = NettyChannelAssertions.retry(() -> channel.readOutbound(), Objects::nonNull, 5);
+        assertEqualsConnAck(CONNECTION_ACCEPTED, connAckMessage.orElse(null));
 
         // create another connect same clientID but with bad credentials
         MqttConnectMessage evilClientConnMsg = MqttMessageBuilders.connect()
@@ -294,7 +304,8 @@ public class MQTTConnectionConnectTest {
 
         // Verify
         // the evil client gets a not auth notification
-        assertEqualsConnAck(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD, evilChannel.readOutbound());
+        Optional<MqttConnAckMessage> connAckMessage2 = NettyChannelAssertions.retry(evilChannel::readOutbound, Objects::nonNull, 5);
+        assertEqualsConnAck(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD, connAckMessage2.orElse(null));
         // the good client remains connected
         assertTrue("Original connected client must remain connected", channel.isOpen());
         assertFalse("Channel trying to connect with bad credentials must be closed", evilChannel.isOpen());
@@ -307,13 +318,17 @@ public class MQTTConnectionConnectTest {
             .password(TEST_PWD)
             .build();
         sut.processConnect(msg);
-        assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
+
+        Optional<MqttConnAckMessage> connAckMessage = NettyChannelAssertions.retry(() -> channel.readOutbound(), Objects::nonNull, 5);
+        assertEqualsConnAck(CONNECTION_ACCEPTED, connAckMessage.orElse(null));
 
         // now create another connection and check the new one closes the older
         MQTTConnection anotherConnection = createMQTTConnection(CONFIG);
         anotherConnection.processConnect(msg);
         EmbeddedChannel anotherChannel = (EmbeddedChannel) anotherConnection.channel;
-        assertEqualsConnAck(CONNECTION_ACCEPTED, anotherChannel.readOutbound());
+
+        Optional<MqttConnAckMessage> connAckMessage2 = NettyChannelAssertions.retry(anotherChannel::readOutbound, Objects::nonNull, 5);
+        assertEqualsConnAck(CONNECTION_ACCEPTED, connAckMessage2.orElse(null));
 
         // Verify
         assertFalse("First 'FAKE_CLIENT_ID' channel MUST be closed by the broker", channel.isOpen());

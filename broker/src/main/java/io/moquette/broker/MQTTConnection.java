@@ -15,8 +15,8 @@
  */
 package io.moquette.broker;
 
-import io.moquette.broker.subscriptions.Topic;
 import io.moquette.broker.security.IAuthenticator;
+import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -28,7 +28,9 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -36,7 +38,8 @@ import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 import static io.netty.channel.ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
-import static io.netty.handler.codec.mqtt.MqttQoS.*;
+import static io.netty.handler.codec.mqtt.MqttQoS.AT_LEAST_ONCE;
+import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 
 final class MQTTConnection {
 
@@ -158,27 +161,36 @@ final class MQTTConnection {
                       username, channel);
         }
 
-        if (!login(msg, clientId)) {
-            abortConnection(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD);
-            channel.close().addListener(CLOSE_ON_FAILURE);
-            return;
-        }
+        final String newClientId = clientId;
+        CompletableFuture<Boolean> future = login(msg, newClientId);
+        future.whenComplete((status, t) -> {
+            if (t == null) {
+                if (status) {
+                    try {
+                        LOG.trace("Binding MQTTConnection (channel: {}) to session", channel);
+                        sessionRegistry.bindToSession(this, msg, newClientId);
 
-        try {
-            LOG.trace("Binding MQTTConnection (channel: {}) to session", channel);
-            sessionRegistry.bindToSession(this, msg, clientId);
+                        initializeKeepAliveTimeout(channel, msg, newClientId);
+                        setupInflightResender(channel);
 
-            initializeKeepAliveTimeout(channel, msg, clientId);
-            setupInflightResender(channel);
-
-            NettyUtils.clientID(channel, clientId);
-            LOG.trace("CONNACK sent, channel: {}", channel);
-            postOffice.dispatchConnection(msg);
-            LOG.trace("dispatch connection: {}", msg.toString());
-        } catch (SessionCorruptedException scex) {
-            LOG.warn("MQTT session for client ID {} cannot be created, channel: {}", clientId, channel);
-            abortConnection(CONNECTION_REFUSED_SERVER_UNAVAILABLE);
-        }
+                        NettyUtils.clientID(channel, newClientId);
+                        LOG.trace("CONNACK sent, channel: {}", channel);
+                        postOffice.dispatchConnection(msg);
+                        LOG.trace("dispatch connection: {}", msg.toString());
+                    } catch (SessionCorruptedException scex) {
+                        LOG.warn("MQTT session for client ID {} cannot be created, channel: {}", newClientId, channel);
+                        abortConnection(CONNECTION_REFUSED_SERVER_UNAVAILABLE);
+                    }
+                } else {
+                    abortConnection(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD);
+                    channel.close().addListener(CLOSE_ON_FAILURE);
+                }
+            } else {
+                LOG.warn("MQTT connection for client ID {} cannot be created, channel: {}. Error message {}", newClientId, channel, t.getMessage());
+                abortConnection(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD);
+                channel.close().addListener(CLOSE_ON_FAILURE);
+            }
+        });
     }
 
     private void setupInflightResender(Channel channel) {
@@ -222,7 +234,7 @@ final class MQTTConnection {
         return new MqttConnAckMessage(mqttFixedHeader, mqttConnAckVariableHeader);
     }
 
-    private boolean login(MqttConnectMessage msg, final String clientId) {
+    private CompletableFuture<Boolean> login(MqttConnectMessage msg, final String clientId) {
         // handle user authentication
         if (msg.variableHeader().hasUserName()) {
             byte[] pwd = null;
@@ -230,19 +242,27 @@ final class MQTTConnection {
                 pwd = msg.payload().password().getBytes(StandardCharsets.UTF_8);
             } else if (!brokerConfig.isAllowAnonymous()) {
                 LOG.error("Client didn't supply any password and MQTT anonymous mode is disabled CId={}", clientId);
-                return false;
+                return CompletableFuture.completedFuture(false);
             }
             final String login = msg.payload().userName();
-            if (!authenticator.checkValid(clientId, login, pwd)) {
-                LOG.error("Authenticator has rejected the MQTT credentials CId={}, username={}", clientId, login);
-                return false;
-            }
-            NettyUtils.userName(channel, login);
+
+            return authenticator.checkValid(clientId, login, pwd).handleAsync((status, t) -> {
+                if (t == null) {
+                    if (status) NettyUtils.userName(channel, login);
+                    else
+                        LOG.error("Authenticator has rejected the MQTT credentials CId={}, username={}", clientId, login);
+
+                    return status;
+                } else {
+                    LOG.error("Authenticator has rejected the MQTT credentials CId={}, username={}. Error message: {}", clientId, login, t.getMessage());
+                    return false;
+                }
+            });
         } else if (!brokerConfig.isAllowAnonymous()) {
             LOG.error("Client didn't supply any credentials and MQTT anonymous mode is disabled. CId={}", clientId);
-            return false;
+            return CompletableFuture.completedFuture(false);
         }
-        return true;
+        return CompletableFuture.completedFuture(true);
     }
 
     void handleConnectionLost() {

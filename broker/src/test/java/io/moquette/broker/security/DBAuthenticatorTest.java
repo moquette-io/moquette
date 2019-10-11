@@ -17,13 +17,19 @@
 package io.moquette.broker.security;
 
 import org.apache.commons.codec.binary.Hex;
-import org.junit.*;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertFalse;
@@ -71,8 +77,9 @@ public class DBAuthenticatorTest {
                 ORG_H2_DRIVER,
                 JDBC_H2_MEM_TEST,
                 "SELECT PASSWORD FROM ACCOUNT WHERE LOGIN=?",
-                SHA_256);
-        assertTrue(dbAuthenticator.checkValid(null, "dbuser", "password".getBytes(UTF_8)));
+                SHA_256,
+                1);
+        assertTrue(dbAuthenticator.checkValid(null, "dbuser", "password".getBytes(UTF_8)).join());
     }
 
     @Test
@@ -81,8 +88,9 @@ public class DBAuthenticatorTest {
                 ORG_H2_DRIVER,
                 JDBC_H2_MEM_TEST,
                 "SELECT PASSWORD FROM ACCOUNT WHERE LOGIN=?",
-                SHA_256);
-        assertFalse(dbAuthenticator.checkValid(null, "dbuser2", "password".getBytes(UTF_8)));
+                SHA_256,
+                1);
+        assertFalse(dbAuthenticator.checkValid(null, "dbuser2", "password".getBytes(UTF_8)).join());
     }
 
     @Test
@@ -91,8 +99,9 @@ public class DBAuthenticatorTest {
                 ORG_H2_DRIVER,
                 JDBC_H2_MEM_TEST,
                 "SELECT PASSWORD FROM ACCOUNT WHERE LOGIN=?",
-                SHA_256);
-        assertFalse(dbAuthenticator.checkValid(null, "dbuser", "wrongPassword".getBytes(UTF_8)));
+                SHA_256,
+                1);
+        assertFalse(dbAuthenticator.checkValid(null, "dbuser", "wrongPassword".getBytes(UTF_8)).join());
     }
 
     @After

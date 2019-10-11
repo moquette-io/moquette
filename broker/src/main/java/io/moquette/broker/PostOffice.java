@@ -310,7 +310,9 @@ class PostOffice {
     }
 
     void flushInFlight(MQTTConnection mqttConnection) {
-        Session targetSession = sessionRegistry.retrieve(mqttConnection.getClientId());
-        targetSession.flushAllQueuedMessages();
+        if(mqttConnection.getClientId() != null) {
+            Session targetSession = sessionRegistry.retrieve(mqttConnection.getClientId());
+            targetSession.flushAllQueuedMessages();
+        }
     }
 }
