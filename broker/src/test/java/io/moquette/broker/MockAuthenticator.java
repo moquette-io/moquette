@@ -16,9 +16,11 @@
 
 package io.moquette.broker;
 
+import io.moquette.broker.security.IAuthenticator;
+
 import java.util.Map;
 import java.util.Set;
-import io.moquette.broker.security.IAuthenticator;
+import java.util.concurrent.CompletableFuture;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -36,7 +38,11 @@ public class MockAuthenticator implements IAuthenticator {
     }
 
     @Override
-    public boolean checkValid(String clientId, String username, byte[] password) {
+    public CompletableFuture<Boolean> checkValid(String clientId, String username, byte[] password) {
+        return CompletableFuture.supplyAsync(() -> check(clientId, username, password));
+    }
+
+    private boolean check(String clientId, String username, byte[] password) {
         if (!m_clientIds.contains(clientId)) {
             return false;
         }
@@ -48,5 +54,4 @@ public class MockAuthenticator implements IAuthenticator {
         }
         return m_userPwds.get(username).equals(new String(password, UTF_8));
     }
-
 }

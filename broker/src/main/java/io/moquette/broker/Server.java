@@ -232,7 +232,7 @@ public class Server {
             if (passwdPath.isEmpty()) {
                 authenticator = new AcceptAllAuthenticator();
             } else {
-                authenticator = new ResourceAuthenticator(resourceLoader, passwdPath);
+                authenticator = new ResourceAuthenticator(resourceLoader, passwdPath, props);
             }
             LOG.info("An {} authenticator instance will be used", authenticator.getClass().getName());
         }

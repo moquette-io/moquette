@@ -16,10 +16,12 @@
 
 package io.moquette.broker.security;
 
+import java.util.concurrent.CompletableFuture;
+
 public class AcceptAllAuthenticator implements IAuthenticator {
 
     @Override
-    public boolean checkValid(String clientId, String username, byte[] password) {
-        return true;
+    public CompletableFuture<Boolean> checkValid(String clientId, String username, byte[] password) {
+        return CompletableFuture.completedFuture(true);
     }
 }

@@ -16,7 +16,11 @@
 
 package io.moquette.broker.security;
 
+import io.moquette.broker.config.IConfig;
+import io.moquette.broker.config.MemoryConfig;
 import org.junit.Test;
+
+import java.util.Properties;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertFalse;
@@ -25,27 +29,29 @@ import static org.junit.Assert.assertTrue;
 @SuppressWarnings("deprecation")
 public class FileAuthenticatorTest {
 
+    private IConfig config = new MemoryConfig(new Properties());
+
     @Test
     public void loadPasswordFile_verifyValid() {
         String file = getClass().getResource("/password_file.conf").getPath();
-        IAuthenticator auth = new FileAuthenticator(null, file);
+        IAuthenticator auth = new FileAuthenticator(null, file, config);
 
-        assertTrue(auth.checkValid(null, "testuser", "passwd".getBytes(UTF_8)));
+        assertTrue(auth.checkValid(null, "testuser", "passwd".getBytes(UTF_8)).join());
     }
 
     @Test
     public void loadPasswordFile_verifyInvalid() {
         String file = getClass().getResource("/password_file.conf").getPath();
-        IAuthenticator auth = new FileAuthenticator(null, file);
+        IAuthenticator auth = new FileAuthenticator(null, file, config);
 
-        assertFalse(auth.checkValid(null, "testuser2", "passwd".getBytes(UTF_8)));
+        assertFalse(auth.checkValid(null, "testuser2", "passwd".getBytes(UTF_8)).join());
     }
 
     @Test
     public void loadPasswordFile_verifyDirectoryRef() {
-        IAuthenticator auth = new FileAuthenticator("", "");
+        IAuthenticator auth = new FileAuthenticator("", "", config);
 
-        assertFalse(auth.checkValid(null, "testuser2", "passwd".getBytes(UTF_8)));
+        assertFalse(auth.checkValid(null, "testuser2", "passwd".getBytes(UTF_8)).join());
     }
 
 }

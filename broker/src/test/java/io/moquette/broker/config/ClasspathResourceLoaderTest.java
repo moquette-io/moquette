@@ -20,16 +20,30 @@ import io.moquette.BrokerConstants;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 public class ClasspathResourceLoaderTest {
 
     @Test
     public void testSetProperties() {
-        IResourceLoader classpathLoader = new ClasspathResourceLoader();
-        final IConfig classPathConfig = new ResourceLoaderConfig(classpathLoader);
+        IConfig classPathConfig = initConfig();
+
         assertEquals("" + BrokerConstants.PORT, classPathConfig.getProperty(BrokerConstants.PORT_PROPERTY_NAME));
         classPathConfig.setProperty(BrokerConstants.PORT_PROPERTY_NAME, "9999");
         assertEquals("9999", classPathConfig.getProperty(BrokerConstants.PORT_PROPERTY_NAME));
     }
 
+    @Test
+    public void testSetAuthThreadPoolSize() {
+        IConfig classPathConfig = initConfig();
+
+        assertNull(classPathConfig.getProperty(BrokerConstants.AUTH_THREAD_POOL_SIZE));
+        classPathConfig.setProperty(BrokerConstants.AUTH_THREAD_POOL_SIZE, "2");
+        assertEquals("2", classPathConfig.getProperty(BrokerConstants.AUTH_THREAD_POOL_SIZE));
+    }
+
+
+    private IConfig initConfig() {
+        return new ResourceLoaderConfig(new ClasspathResourceLoader());
+    }
 }

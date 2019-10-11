@@ -17,6 +17,7 @@
 package io.moquette.broker.security;
 
 import io.moquette.broker.config.FileResourceLoader;
+import io.moquette.broker.config.IConfig;
 
 /**
  * Load user credentials from a text file. Each line of the file is formatted as
@@ -35,7 +36,7 @@ import io.moquette.broker.config.FileResourceLoader;
  */
 public class FileAuthenticator extends ResourceAuthenticator {
 
-    public FileAuthenticator(String parent, String filePath) {
-        super(new FileResourceLoader(parent), filePath);
+    public FileAuthenticator(String parent, String filePath, IConfig config) {
+        super(new FileResourceLoader(parent), filePath, config);
     }
 }

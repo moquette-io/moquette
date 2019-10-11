@@ -28,6 +28,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
 
 import static org.junit.Assert.assertTrue;
 
@@ -64,8 +65,8 @@ public class ConfigurationClassLoaderTest implements IAuthenticator, IAuthorizat
     }
 
     @Override
-    public boolean checkValid(String clientID, String username, byte[] password) {
-        return true;
+    public CompletableFuture<Boolean> checkValid(String clientID, String username, byte[] password) {
+        return CompletableFuture.completedFuture(true);
     }
 
     @Override
