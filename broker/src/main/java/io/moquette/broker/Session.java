@@ -292,9 +292,9 @@ class Session {
         debugLogPacketIds(expired);
 
         for (InFlightPacket notAckPacketId : expired) {
-            if (inflightWindow.containsKey(notAckPacketId.packetId)) {
-                final SessionRegistry.PublishedMessage msg =
-                    (SessionRegistry.PublishedMessage) inflightWindow.get(notAckPacketId.packetId);
+            final SessionRegistry.PublishedMessage msg =
+                (SessionRegistry.PublishedMessage) inflightWindow.get(notAckPacketId.packetId);
+            if (msg!=null) {
                 final Topic topic = msg.topic;
                 final MqttQoS qos = msg.publishingQos;
                 final ByteBuf payload = msg.payload;
