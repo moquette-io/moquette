@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2012-2015 Andrea Selva
+# Copyright (c) 2012-2020 Andrea Selva
 #
 
 echo "                                                                         "
@@ -13,7 +13,7 @@ echo "  \_|  |_/\___/ \__, |\__,_|\___|\__|\__\___| \_|  |_/\_/\_\ \_/   \_/   "
 echo "                   | |                                                   "
 echo "                   |_|                                                   "
 echo "                                                                         "
-echo "                                               version: 0..13-SNAPSHOT   "
+echo "                                               version: 0.13             "
 
 
 cd "$(dirname "$0")"
