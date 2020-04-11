@@ -1,3 +1,7 @@
+Version 0.13:
+   Fixed issue #454 to avoid 1 second pause in flushing
+   Updated Travis build to JDK 12
+
 Version 0.12:
    Fixed issue #415
    Dropped Hazelcast because at the moment Moquette is not designed to be clusterizable
