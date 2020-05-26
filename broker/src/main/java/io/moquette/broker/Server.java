@@ -320,6 +320,8 @@ public class Server {
         // and SessionsRepository does not stop its tasks. Thus shutdownNow().
         scheduler.shutdownNow();
 
+        interceptor.stop();
+
         if (h2Builder != null) {
             LOG.trace("Shutting down H2 persistence {}");
             h2Builder.closeStore();
