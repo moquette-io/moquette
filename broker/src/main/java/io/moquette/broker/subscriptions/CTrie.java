@@ -74,15 +74,15 @@ public class CTrie {
         if (action == NavigationAction.STOP) {
             return Collections.emptySet();
         }
-        if (cnode instanceof TNode) {
-            return Collections.emptySet();
-        }
         Topic remainingTopic = (ROOT.equals(cnode.token)) ? topic : topic.exceptHeadToken();
         Set<Subscription> subscriptions = new HashSet<>();
         if (remainingTopic.isEmpty()) {
             subscriptions.addAll(cnode.subscriptions);
         }
         for (INode subInode : cnode.allChildren()) {
+            if (subInode.mainNode() instanceof TNode) {
+                continue;
+            }
             subscriptions.addAll(recursiveMatch(remainingTopic, subInode));
         }
         return subscriptions;
