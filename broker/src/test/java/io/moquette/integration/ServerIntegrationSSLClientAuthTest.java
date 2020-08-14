@@ -65,7 +65,7 @@ import org.slf4j.LoggerFactory;
  * keytool -certreq -alias signedtestserver_sub -keystore signedserverkeystore.jks -keypass passw0rdsrv \
  * -storepass passw0rdsrv | \
  * keytool -gencert -alias signedtestserver -keystore signedserverkeystore.jks -keypass passw0rdsrv \
- * -storepass passw0rdsrv -validity 10000 | \
+ * -storepass passw0rdsrv -validity 10000 -ext BC=ca:true | \
  * keytool -importcert -alias signedtestserver_sub -keystore signedserverkeystore.jks -keypass passw0rdsrv \
  * -storepass passw0rdsrv
  *
