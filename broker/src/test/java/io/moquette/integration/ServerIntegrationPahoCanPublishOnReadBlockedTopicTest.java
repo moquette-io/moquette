@@ -112,6 +112,7 @@ public class ServerIntegrationPahoCanPublishOnReadBlockedTopicTest {
         }
 
         stopServer();
+        IntegrationUtils.clearTestStorage();
     }
 
     private void stopServer() {
