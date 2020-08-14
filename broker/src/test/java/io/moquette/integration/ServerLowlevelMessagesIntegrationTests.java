@@ -70,6 +70,7 @@ public class ServerLowlevelMessagesIntegrationTests {
         Thread.sleep(300); // to let the close event pass before integration stop event
         m_server.stopServer();
         LOG.debug("After asked integration to stop");
+        IntegrationUtils.clearTestStorage();
     }
 
     @Test
