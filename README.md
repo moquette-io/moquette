@@ -1,5 +1,5 @@
 
-## What is Moquette?
+## Moquette Project
 
 [![Build Status](https://api.travis-ci.org/moquette-io/moquette.svg?branch=master)](https://travis-ci.org/moquette-io/moquette)
 
