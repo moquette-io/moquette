@@ -140,13 +140,13 @@ final class MQTTConnection {
         final boolean cleanSession = msg.variableHeader().isCleanSession();
         if (clientId == null || clientId.length() == 0) {
             if (!brokerConfig.isAllowZeroByteClientId()) {
-                LOG.warn("Broker doesn't permit MQTT empty client ID. Username: {}, channel: {}", username, channel);
+                LOG.info("Broker doesn't permit MQTT empty client ID. Username: {}, channel: {}", username, channel);
                 abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
                 return;
             }
 
             if (!cleanSession) {
-                LOG.warn("MQTT client ID cannot be empty for persistent session. Username: {}, channel: {}",
+                LOG.info("MQTT client ID cannot be empty for persistent session. Username: {}, channel: {}",
                          username, channel);
                 abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
                 return;
@@ -229,17 +229,17 @@ final class MQTTConnection {
             if (msg.variableHeader().hasPassword()) {
                 pwd = msg.payload().password().getBytes(StandardCharsets.UTF_8);
             } else if (!brokerConfig.isAllowAnonymous()) {
-                LOG.error("Client didn't supply any password and MQTT anonymous mode is disabled CId={}", clientId);
+                LOG.info("Client didn't supply any password and MQTT anonymous mode is disabled CId={}", clientId);
                 return false;
             }
             final String login = msg.payload().userName();
             if (!authenticator.checkValid(clientId, login, pwd)) {
-                LOG.error("Authenticator has rejected the MQTT credentials CId={}, username={}", clientId, login);
+                LOG.info("Authenticator has rejected the MQTT credentials CId={}, username={}", clientId, login);
                 return false;
             }
             NettyUtils.userName(channel, login);
         } else if (!brokerConfig.isAllowAnonymous()) {
-            LOG.error("Client didn't supply any credentials and MQTT anonymous mode is disabled. CId={}", clientId);
+            LOG.info("Client didn't supply any credentials and MQTT anonymous mode is disabled. CId={}", clientId);
             return false;
         }
         return true;
