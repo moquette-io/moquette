@@ -13,9 +13,9 @@ buildscript {
     }
   }
   dependencies {
-    classpath 'net.ltgt.gradle:gradle-errorprone-plugin:0.0.13'
-    classpath 'gradle.plugin.com.github.spotbugs:gradlePlugin:1.6.0'
-    classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.3'
+    classpath 'net.ltgt.gradle:gradle-errorprone-plugin:0.8.1'
+    classpath 'gradle.plugin.com.github.spotbugs:spotbugs-gradle-plugin:2.0.0'
+    classpath 'com.github.jengelman.gradle.plugins:shadow:5.1.0'
     classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7.3'
   }
 }
@@ -110,8 +110,4 @@ subprojects {
       publications = ['bintrayPublication']
     }
   }
-}
-
-task wrapper(type: Wrapper) {
-  gradleVersion = '4.6'
 }
