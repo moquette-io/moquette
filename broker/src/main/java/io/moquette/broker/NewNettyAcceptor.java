@@ -219,8 +219,10 @@ class NewNettyAcceptor {
             f.sync()
                 .addListener(new LocalPortReaderFutureListener(protocol))
                 .addListener(FIRE_EXCEPTION_ON_FAILURE);
-        } catch (InterruptedException ex) {
+            //TODO java.net.BindException
+        } catch (Exception ex) {
             LOG.error("An interruptedException was caught while initializing integration. Protocol={}", protocol, ex);
+            throw new RuntimeException(ex);
         }
     }
 
