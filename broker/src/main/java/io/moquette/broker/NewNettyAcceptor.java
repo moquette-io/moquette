@@ -46,6 +46,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLEngine;
+import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.HashMap;
@@ -219,10 +220,14 @@ class NewNettyAcceptor {
             f.sync()
                 .addListener(new LocalPortReaderFutureListener(protocol))
                 .addListener(FIRE_EXCEPTION_ON_FAILURE);
-            //TODO java.net.BindException
         } catch (Exception ex) {
-            LOG.error("An interruptedException was caught while initializing integration. Protocol={}", protocol, ex);
-            throw new RuntimeException(ex);
+            if (ex instanceof BindException) {
+               LOG.error("Cannot bind to port: " + port, ex);
+               System.exit(1);
+            } else {
+                LOG.error("An interruptedException was caught while initializing integration. Protocol={}", protocol, ex);
+                throw new RuntimeException(ex);
+            }
         }
     }
 
