@@ -51,6 +51,39 @@ import org.slf4j.LoggerFactory;
 /**
  * Check that Moquette could also handle SSL with client authentication.
  *
+ * This test verifies client's autentication on server, so the server certificate has to be imported into the
+ * client's keystore and the client's certificate must be imported into server's keystore.
+ *
+ *  the first way is done by:
+ *  <pre>
+ *  keytool -genkeypair -alias testserver -keyalg RSA -validity 3650 -keysize 2048 -dname cn=moquette.io -keystore serverkeystore.jks -keypass passw0rdsrv -storepass passw0rdsrv
+ *  </pre>
+ *  and
+ *  <pre>
+ *  keytool -exportcert -alias testserver -keystore serverkeystore.jks -keypass passw0rdsrv -storepass passw0rdsrv | keytool -importcert -trustcacerts -noprompt -alias testserver -keystore signedclientkeystore.jks -keypass passw0rd -storepass passw0rd
+ *  </pre>
+ *
+ *  to create the key in the client side:
+ *  <pre>
+ *  keytool -genkeypair -alias signedtestclient -dname cn=client.moquette.io -validity 10000 -keyalg RSA -keysize 2048 -keystore signedclientkeystore.jks -keypass passw0rd -storepass passw0rd
+ *  </pre>
+ *
+ *  to import the client's certificate into server:
+ *  <pre>
+ *  keytool -exportcert -alias signedtestclient -keystore signedclientkeystore.jks -keypass passw0rd -storepass passw0rd | keytool -importcert -trustcacerts -noprompt -alias signedtestclient -keystore serverkeystore.jks -keypass passw0rdsrv -storepass passw0rdsrv
+ *  </pre>
+ *
+ *  To verify that a client's certficate not imported into server, it's necessary to create a client's key:
+ *  <pre>
+ *  keytool -genkeypair -alias unsignedtestclient -dname cn=unverifiedclient.moquette.io -validity 10000 -keyalg RSA -keysize 2048 -keystore unsignedclientkeystore.jks -keypass passw0rd -storepass passw0rd
+ *  </pre>
+ *  and import into it the server's certificate:
+ *  <pre>
+ *  keytool -exportcert -alias testserver -keystore serverkeystore.jks -keypass passw0rdsrv -storepass passw0rdsrv | \
+ *  keytool -importcert -trustcacerts -noprompt -alias testserver -keystore unsignedclientkeystore.jks -keypass passw0rd -storepass passw0rd
+ *  </pre>
+ *
+ *
  * <p>
  * Create certificates needed for client authentication
  *
@@ -139,7 +172,7 @@ public class ServerIntegrationSSLClientAuthTest {
 
         Properties sslProps = new Properties();
         sslProps.put(BrokerConstants.SSL_PORT_PROPERTY_NAME, "8883");
-        sslProps.put(BrokerConstants.JKS_PATH_PROPERTY_NAME, "signedserverkeystore.jks");
+        sslProps.put(BrokerConstants.JKS_PATH_PROPERTY_NAME, "src/test/resources/serverkeystore.jks");
         sslProps.put(BrokerConstants.KEY_STORE_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
         sslProps.put(BrokerConstants.KEY_MANAGER_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
         sslProps.put(BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME, IntegrationUtils.localH2MvStoreDBPath());

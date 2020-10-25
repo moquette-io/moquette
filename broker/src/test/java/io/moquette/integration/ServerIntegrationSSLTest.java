@@ -52,6 +52,25 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Check that Moquette could also handle SSL.
+ *
+ * This test is based on a server's keystore that contains a keypair, export a certificate for the server and import it in
+ * the client's keystore.
+ *
+ * Command executed to create the key on server's keystore:
+ * <pre>
+ * keytool -genkeypair -alias testserver -keyalg RSA -validity 3650 -keysize 2048 -dname cn=moquette.io -keystore serverkeystore.jks -keypass passw0rdsrv -storepass passw0rdsrv
+ * </pre>
+ *
+ * Command executed to export the certificate from the server's keystore and import directly in client's keystore:
+ * <pre>
+ * keytool -exportcert -alias testserver -keystore serverkeystore.jks -keypass passw0rdsrv -storepass passw0rdsrv | \
+ * keytool -importcert -trustcacerts -noprompt -alias testserver -keystore clientkeystore.jks -keypass passw0rd -storepass passw0rd
+ * </pre>
+ *
+ * Tip: to verify keystore contents:
+ * <pre>
+ * keytool -list -v -keystore clientkeystore.jks
+ * </pre>
  */
 public class ServerIntegrationSSLTest {
 
@@ -87,7 +106,7 @@ public class ServerIntegrationSSLTest {
 
         Properties sslProps = new Properties();
         sslProps.put(BrokerConstants.SSL_PORT_PROPERTY_NAME, "8883");
-        sslProps.put(BrokerConstants.JKS_PATH_PROPERTY_NAME, "serverkeystore.jks");
+        sslProps.put(BrokerConstants.JKS_PATH_PROPERTY_NAME, "src/test/resources/serverkeystore.jks");
         sslProps.put(BrokerConstants.KEY_STORE_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
         sslProps.put(BrokerConstants.KEY_MANAGER_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
         sslProps.put(BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME, IntegrationUtils.localH2MvStoreDBPath());
@@ -153,20 +172,6 @@ public class ServerIntegrationSSLTest {
         m_client.disconnect();
     }
 
-    /**
-     * keystore generated into test/resources with command:
-     *
-     * keytool -keystore clientkeystore.jks -alias testclient -genkey -keyalg RSA -> mandatory to
-     * put the name surname -> password is passw0rd -> type yes at the end
-     *
-     * to generate the crt file from the keystore -- keytool -certreq -alias testclient -keystore
-     * clientkeystore.jks -file testclient.csr
-     *
-     * keytool -export -alias testclient -keystore clientkeystore.jks -file testclient.crt
-     *
-     * to import an existing certificate: keytool -keystore clientkeystore.jks -import -alias
-     * testclient -file testclient.crt -trustcacerts
-     */
     private SSLSocketFactory configureSSLSocketFactory() throws KeyManagementException, NoSuchAlgorithmException,
             UnrecoverableKeyException, IOException, CertificateException, KeyStoreException {
         KeyStore ks = KeyStore.getInstance("JKS");

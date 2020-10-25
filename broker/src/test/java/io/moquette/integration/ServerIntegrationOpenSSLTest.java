@@ -49,10 +49,10 @@ public class ServerIntegrationOpenSSLTest extends ServerIntegrationSSLTest {
         Properties sslProps = new Properties();
 
         sslProps.put(BrokerConstants.SSL_PROVIDER, SslProvider.OPENSSL.name());
-        sslProps.put(BrokerConstants.NEED_CLIENT_AUTH, "true");
+//        sslProps.put(BrokerConstants.NEED_CLIENT_AUTH, "true");
 
         sslProps.put(BrokerConstants.SSL_PORT_PROPERTY_NAME, "8883");
-        sslProps.put(BrokerConstants.JKS_PATH_PROPERTY_NAME, "serverkeystore.jks");
+        sslProps.put(BrokerConstants.JKS_PATH_PROPERTY_NAME, "src/test/resources/serverkeystore.jks");
         sslProps.put(BrokerConstants.KEY_STORE_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
         sslProps.put(BrokerConstants.KEY_MANAGER_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
         sslProps.put(BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME, IntegrationUtils.localH2MvStoreDBPath());
