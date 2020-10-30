@@ -502,7 +502,9 @@ final class MQTTConnection {
     }
 
     public void readCompleted() {
-        // TODO drain all messages in target's session in-flight message queue
-        postOffice.flushInFlight(this);
+        if (getClientId() != null) {
+            // TODO drain all messages in target's session in-flight message queue
+            postOffice.flushInFlight(this);
+        }
     }
 }
