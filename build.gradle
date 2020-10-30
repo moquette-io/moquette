@@ -15,7 +15,7 @@ buildscript {
   dependencies {
     classpath 'net.ltgt.gradle:gradle-errorprone-plugin:0.0.13'
     classpath 'gradle.plugin.com.github.spotbugs:gradlePlugin:1.6.0'
-    classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.3'
+    classpath 'com.github.jengelman.gradle.plugins:shadow:5.2.0'
     classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7.3'
   }
 }
@@ -31,8 +31,8 @@ subprojects {
   }
 
   apply from: new File(rootDir, 'gradle/java.gradle')
-  apply from: new File(rootDir, 'gradle/test.gradle')
-  apply from: new File(rootDir, 'gradle/lint.gradle')
+//  apply from: new File(rootDir, 'gradle/test.gradle')
+//  apply from: new File(rootDir, 'gradle/lint.gradle')
   apply plugin: 'com.jfrog.bintray'
   apply plugin: 'eclipse'
 
@@ -112,6 +112,6 @@ subprojects {
   }
 }
 
-task wrapper(type: Wrapper) {
-  gradleVersion = '4.6'
-}
+//task wrapper(type: Wrapper) {
+//  gradleVersion = '5.6'
+//}
