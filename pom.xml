@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <netty.version>4.1.12.Final</netty.version>
+        <!--<netty.version>4.1.12.Final</netty.version>-->
         <source.version>1.8</source.version>
         <target.version>1.8</target.version>
         <bintray.repo>andsel/maven</bintray.repo>
@@ -190,6 +190,11 @@
     </profiles>
 
     <repositories>
+        <repository>
+            <id>Maven repo</id>
+            <url>https://repo1.maven.org/maven2/</url>
+        </repository>
+
         <repository>
             <id>Paho Releases</id>
             <url>https://repo.eclipse.org/content/repositories/paho-releases/</url>
