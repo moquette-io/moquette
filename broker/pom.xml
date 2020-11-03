@@ -15,7 +15,9 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <bintray.package>io.moquette.moquette-broker</bintray.package>
-        <netty.version>4.1.22.Final</netty.version>
+        <netty.version>4.1.53.Final</netty.version>
+        <netty.tcnative.version>2.0.34.Final</netty.tcnative.version>
+        <paho.version>1.2.1</paho.version>
         <h2.version>1.4.199</h2.version>
     </properties>
 
@@ -160,7 +162,7 @@
         <dependency>
             <groupId>org.eclipse.paho</groupId>
             <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
-            <version>1.2.0</version>
+            <version>${paho.version}</version>
             <scope>test</scope>
         </dependency>
 
@@ -182,7 +184,7 @@
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-tcnative</artifactId>
-            <version>2.0.10.Final</version>
+            <version>${netty.tcnative.version}</version>
             <classifier>linux-x86_64</classifier>
             <scope>test</scope>
         </dependency>
