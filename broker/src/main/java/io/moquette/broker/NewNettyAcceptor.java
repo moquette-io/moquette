@@ -133,6 +133,7 @@ class NewNettyAcceptor {
     private boolean nettyTcpNodelay;
     private boolean nettySoKeepalive;
     private int nettyChannelTimeoutSeconds;
+    private int nettyChannelHandshakeTimeoutSeconds;
     private int maxBytesInMessage;
 
     private Class<? extends ServerSocketChannel> channelClass;
@@ -145,6 +146,8 @@ class NewNettyAcceptor {
         nettyTcpNodelay = props.boolProp(BrokerConstants.NETTY_TCP_NODELAY_PROPERTY_NAME, true);
         nettySoKeepalive = props.boolProp(BrokerConstants.NETTY_SO_KEEPALIVE_PROPERTY_NAME, true);
         nettyChannelTimeoutSeconds = props.intProp(BrokerConstants.NETTY_CHANNEL_TIMEOUT_SECONDS_PROPERTY_NAME, 10);
+        nettyChannelHandshakeTimeoutSeconds = props.intProp(
+                BrokerConstants.NETTY_CHANNEL_HANDSHAKE_TIMEOUT_SECONDS_PROPERTY_NAME, 10);
         maxBytesInMessage = props.intProp(BrokerConstants.NETTY_MAX_BYTES_PROPERTY_NAME,
                 BrokerConstants.DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE);
 
@@ -414,6 +417,7 @@ class NewNettyAcceptor {
     }
 
     private ChannelHandler createSslHandler(SocketChannel channel, SslContext sslContext, boolean needsClientAuth) {
+        SslHandler handler;
         SSLEngine sslEngine = sslContext.newEngine(
                 channel.alloc(),
                 channel.remoteAddress().getHostString(),
@@ -422,6 +426,10 @@ class NewNettyAcceptor {
         if (needsClientAuth) {
             sslEngine.setNeedClientAuth(true);
         }
-        return new SslHandler(sslEngine);
+
+        handler = new SslHandler(sslEngine);
+        handler.setHandshakeTimeoutMillis(nettyChannelHandshakeTimeoutSeconds * 1000);
+
+        return handler;
     }
 }
