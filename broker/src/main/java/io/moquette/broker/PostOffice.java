@@ -297,16 +297,16 @@ class PostOffice {
      * notify MqttConnectMessage after connection established (already pass login).
      * @param msg
      */
-    void dispatchConnection(MqttConnectMessage msg){
+    void dispatchConnection(MqttConnectMessage msg) {
         interceptor.notifyClientConnected(msg);
     }
 
-    void dispatchDisconnection(String clientId,String userName){
-        interceptor.notifyClientDisconnected(clientId,userName);
+    void dispatchDisconnection(String clientId,String userName) {
+        interceptor.notifyClientDisconnected(clientId, userName);
     }
 
-    void dispatchConnectionLost(String clientId,String userName){
-        interceptor.notifyClientConnectionLost(clientId,userName);
+    void dispatchConnectionLost(String clientId,String userName) {
+        interceptor.notifyClientConnectionLost(clientId, userName);
     }
 
     void flushInFlight(MQTTConnection mqttConnection) {

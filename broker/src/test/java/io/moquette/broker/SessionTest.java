@@ -22,8 +22,9 @@ public class SessionTest {
         final EmbeddedChannel testChannel = new EmbeddedChannel();
         BrokerConfiguration brokerConfiguration = new BrokerConfiguration(true, false, false, false);
         MQTTConnection mqttConnection = new MQTTConnection(testChannel, brokerConfiguration, null, null, null);
-        client.markConnected();
+        client.markConnecting();
         client.bind(mqttConnection);
+        client.completeConnection();
 
         final Topic destinationTopic = new Topic("/a/b");
         sendQoS1To(client, destinationTopic, "Hello World!");
