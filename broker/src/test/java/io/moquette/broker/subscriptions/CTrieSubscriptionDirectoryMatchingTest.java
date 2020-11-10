@@ -56,6 +56,10 @@ public class CTrieSubscriptionDirectoryMatchingTest {
 
         assertThat(sut.matchWithoutQosSharpening(asTopic("/finance"))).contains(slashFinanceSub);
         assertThat(sut.matchWithoutQosSharpening(asTopic("/"))).contains(slashSub);
+
+        Subscription rootSub = clientSubOnTopic("TempSensor1", "root");
+        sut.add(rootSub);
+        assertThat(sut.matchWithoutQosSharpening(asTopic("root"))).contains(rootSub);
     }
 
     @Test
@@ -67,6 +71,10 @@ public class CTrieSubscriptionDirectoryMatchingTest {
         Subscription financeAnySub = clientSubOnTopic("TempSensor1", "finance/#");
         sut.add(financeAnySub);
         assertThat(sut.matchWithoutQosSharpening(asTopic("finance"))).containsExactlyInAnyOrder(financeAnySub, anySub);
+
+        Subscription rootSub = clientSubOnTopic("TempSensor1", "root/#");
+        sut.add(rootSub);
+        assertThat(sut.matchWithoutQosSharpening(asTopic("root/test"))).contains(rootSub);
     }
 
     @Test
@@ -168,6 +176,11 @@ public class CTrieSubscriptionDirectoryMatchingTest {
         assertMatch("foo//+", "foo//bar");
         assertMatch("foo/+/+/baz", "foo///baz");
         assertMatch("foo/bar/+", "foo/bar/");
+
+        assertMatch("root//bar", "root//bar");
+        assertMatch("root//+", "root//bar");
+        assertMatch("foo/+/+/root", "foo///root");
+        assertMatch("foo/root/+", "foo/root/");
     }
 
     private void assertMatch(String s, String t) {

@@ -13,10 +13,8 @@ echo "  \_|  |_/\___/ \__, |\__,_|\___|\__|\__\___| \_|  |_/\_/\_\ \_/   \_/   "
 echo "                   | |                                                   "
 echo "                   |_|                                                   "
 echo "                                                                         "
-echo "                                               version: 0..13-SNAPSHOT   "
+echo "                                                version: 0.13-SNAPSHOT   "
 
-
-cd "$(dirname "$0")"
 
 # resolve links - $0 may be a softlink
 PRG="$0"
@@ -39,7 +37,7 @@ PRGDIR=`dirname "$PRG"`
 export MOQUETTE_HOME
 
 # Set JavaHome if it exists
-if [ -f "${JAVA_HOME}/bin/java" ]; then 
+if [ -f "${JAVA_HOME}/bin/java" ]; then
    JAVA=${JAVA_HOME}/bin/java
 else
    JAVA=java

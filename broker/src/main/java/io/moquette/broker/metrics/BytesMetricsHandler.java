@@ -54,7 +54,7 @@ public class BytesMetricsHandler extends ChannelDuplexHandler {
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
         BytesMetrics metrics = ctx.channel().attr(ATTR_KEY_METRICS).get();
-        metrics.incrementWrote(((ByteBuf) msg).writableBytes());
+        metrics.incrementWrote(((ByteBuf) msg).readableBytes());
         ctx.write(msg, promise).addListener(CLOSE_ON_FAILURE);
     }
 

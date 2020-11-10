@@ -14,7 +14,7 @@ public class CTrie {
         T getResult();
     }
 
-    private static final Token ROOT = new Token("root");
+    private static final Token ROOT = new Token("+root");
     private static final INode NO_PARENT = null;
 
     private enum Action {
