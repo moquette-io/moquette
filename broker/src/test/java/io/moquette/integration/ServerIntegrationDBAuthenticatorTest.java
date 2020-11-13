@@ -25,6 +25,7 @@ import io.moquette.broker.security.DBAuthenticatorTest;
 import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
 import org.junit.*;
+import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.File;
@@ -40,8 +41,6 @@ public class ServerIntegrationDBAuthenticatorTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(ServerIntegrationDBAuthenticatorTest.class);
 
-    static MqttClientPersistence s_dataStore;
-    static MqttClientPersistence s_pubDataStore;
     static DBAuthenticatorTest dbAuthenticatorTest;
 
     Server m_server;
@@ -50,18 +49,19 @@ public class ServerIntegrationDBAuthenticatorTest {
     MessageCollector m_messagesCollector;
     IConfig m_config;
 
+    @Rule
+    public TemporaryFolder tempFolder = new TemporaryFolder();
+    private MqttClientPersistence pubDataStore;
+
     @BeforeClass
     public static void beforeTests() throws NoSuchAlgorithmException, SQLException, ClassNotFoundException {
-        String tmpDir = System.getProperty("java.io.tmpdir");
-        s_dataStore = new MqttDefaultFilePersistence(tmpDir);
-        s_pubDataStore = new MqttDefaultFilePersistence(tmpDir + File.separator + "publisher");
         dbAuthenticatorTest = new DBAuthenticatorTest();
         dbAuthenticatorTest.setup();
     }
 
-    protected void startServer() throws IOException {
+    protected void startServer(String dbPath) throws IOException {
         m_server = new Server();
-        final Properties configProps = addDBAuthenticatorConf(IntegrationUtils.prepareTestProperties());
+        final Properties configProps = addDBAuthenticatorConf(IntegrationUtils.prepareTestProperties(dbPath));
         m_config = new MemoryConfig(configProps);
         m_server.startServer(m_config);
     }
@@ -81,13 +81,17 @@ public class ServerIntegrationDBAuthenticatorTest {
 
     @Before
     public void setUp() throws Exception {
-        startServer();
+        String dbPath = IntegrationUtils.tempH2Path(tempFolder);
+        startServer(dbPath);
 
-        m_client = new MqttClient("tcp://localhost:1883", "TestClient", s_dataStore);
+        MqttClientPersistence dataStore = new MqttDefaultFilePersistence(tempFolder.newFolder("client").getAbsolutePath());
+        pubDataStore = new MqttDefaultFilePersistence(tempFolder.newFolder("publisher").getAbsolutePath());
+
+        m_client = new MqttClient("tcp://localhost:1883", "TestClient", dataStore);
         m_messagesCollector = new MessageCollector();
         m_client.setCallback(m_messagesCollector);
 
-        m_publisher = new MqttClient("tcp://localhost:1883", "Publisher", s_pubDataStore);
+        m_publisher = new MqttClient("tcp://localhost:1883", "Publisher", pubDataStore);
     }
 
     @After
@@ -102,7 +106,7 @@ public class ServerIntegrationDBAuthenticatorTest {
 
         stopServer();
 
-        IntegrationUtils.clearTestStorage();
+        tempFolder.delete();
     }
 
     @AfterClass
@@ -113,7 +117,7 @@ public class ServerIntegrationDBAuthenticatorTest {
     @Test
     public void connectWithValidCredentials() throws Exception {
         LOG.info("*** connectWithCredentials ***");
-        m_client = new MqttClient("tcp://localhost:1883", "Publisher", s_pubDataStore);
+        m_client = new MqttClient("tcp://localhost:1883", "Publisher", pubDataStore);
         MqttConnectOptions options = new MqttConnectOptions();
         options.setUserName("dbuser");
         options.setPassword("password".toCharArray());
@@ -125,7 +129,7 @@ public class ServerIntegrationDBAuthenticatorTest {
     public void connectWithWrongCredentials() {
         LOG.info("*** connectWithWrongCredentials ***");
         try {
-            m_client = new MqttClient("tcp://localhost:1883", "Publisher", s_pubDataStore);
+            m_client = new MqttClient("tcp://localhost:1883", "Publisher", pubDataStore);
             MqttConnectOptions options = new MqttConnectOptions();
             options.setUserName("dbuser");
             options.setPassword("wrongPassword".toCharArray());

@@ -32,7 +32,9 @@ import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,8 +52,8 @@ public class ServerIntegrationPahoCanPublishOnReadBlockedTopicTest {
     private static final Logger LOG =
         LoggerFactory.getLogger(ServerIntegrationPahoCanPublishOnReadBlockedTopicTest.class);
 
-    static MqttClientPersistence s_dataStore;
-    static MqttClientPersistence s_pubDataStore;
+//    static MqttClientPersistence s_dataStore;
+//    static MqttClientPersistence s_pubDataStore;
 
     Server m_server;
     IMqttClient m_client;
@@ -60,16 +62,12 @@ public class ServerIntegrationPahoCanPublishOnReadBlockedTopicTest {
     IConfig m_config;
     private boolean canRead;
 
-    @BeforeClass
-    public static void beforeTests() {
-        String tmpDir = System.getProperty("java.io.tmpdir");
-        s_dataStore = new MqttDefaultFilePersistence(tmpDir);
-        s_pubDataStore = new MqttDefaultFilePersistence(tmpDir + File.separator + "publisher");
-    }
+    @Rule
+    public TemporaryFolder tempFolder = new TemporaryFolder();
 
-    protected void startServer() throws IOException {
+    protected void startServer(String dbPath) {
         m_server = new Server();
-        final Properties configProps = IntegrationUtils.prepareTestProperties();
+        final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
         configProps.setProperty(BrokerConstants.REAUTHORIZE_SUBSCRIPTIONS_ON_CONNECT, "true");
         m_config = new MemoryConfig(configProps);
         canRead = true;
@@ -92,13 +90,17 @@ public class ServerIntegrationPahoCanPublishOnReadBlockedTopicTest {
 
     @Before
     public void setUp() throws Exception {
-        startServer();
+        String dbPath = IntegrationUtils.tempH2Path(tempFolder);
+        startServer(dbPath);
 
-        m_client = new MqttClient("tcp://localhost:1883", "TestClient", s_dataStore);
+        MqttClientPersistence dataStore = new MqttDefaultFilePersistence(tempFolder.newFolder("client").getAbsolutePath());
+        MqttClientPersistence pubDataStore = new MqttDefaultFilePersistence(tempFolder.newFolder("publisher").getAbsolutePath());
+
+        m_client = new MqttClient("tcp://localhost:1883", "TestClient", dataStore);
         m_messagesCollector = new MessageCollector();
         m_client.setCallback(m_messagesCollector);
 
-        m_publisher = new MqttClient("tcp://localhost:1883", "Publisher", s_pubDataStore);
+        m_publisher = new MqttClient("tcp://localhost:1883", "Publisher", pubDataStore);
     }
 
     @After
@@ -112,6 +114,8 @@ public class ServerIntegrationPahoCanPublishOnReadBlockedTopicTest {
         }
 
         stopServer();
+
+        tempFolder.delete();
     }
 
     private void stopServer() {

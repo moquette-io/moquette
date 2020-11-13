@@ -24,7 +24,9 @@ import org.eclipse.jetty.websocket.client.WebSocketClient;
 import io.moquette.broker.config.IConfig;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
@@ -44,18 +46,22 @@ public class ServerIntegrationWebSocketTest {
     WebSocketClient client;
     IConfig m_config;
 
-    protected void startServer() throws IOException {
+    @Rule
+    public TemporaryFolder tempFolder = new TemporaryFolder();
+
+    protected void startServer(String dbPath) throws IOException {
         m_server = new Server();
-        final Properties configProps = IntegrationUtils.prepareTestProperties();
-        configProps
-                .put(BrokerConstants.WEB_SOCKET_PORT_PROPERTY_NAME, Integer.toString(BrokerConstants.WEBSOCKET_PORT));
+        final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
+        configProps.put(BrokerConstants.WEB_SOCKET_PORT_PROPERTY_NAME, Integer.toString(BrokerConstants.WEBSOCKET_PORT));
+        configProps.put(BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME, dbPath);
         m_config = new MemoryConfig(configProps);
         m_server.startServer(m_config);
     }
 
     @Before
     public void setUp() throws Exception {
-        startServer();
+        String dbPath = IntegrationUtils.tempH2Path(tempFolder);
+        startServer(dbPath);
         client = new WebSocketClient();
     }
 
@@ -63,7 +69,7 @@ public class ServerIntegrationWebSocketTest {
     public void tearDown() throws Exception {
         client.stop();
         m_server.stopServer();
-        IntegrationUtils.clearTestStorage();
+        tempFolder.delete();
     }
 
     @SuppressWarnings("FutureReturnValueIgnored")

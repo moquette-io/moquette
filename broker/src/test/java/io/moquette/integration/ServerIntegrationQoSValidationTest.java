@@ -25,7 +25,9 @@ import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,16 +48,20 @@ public class ServerIntegrationQoSValidationTest {
     MessageCollector m_callback;
     IConfig m_config;
 
-    protected void startServer() throws IOException {
+    @Rule
+    public TemporaryFolder tempFolder = new TemporaryFolder();
+
+    protected void startServer(String dbPath) throws IOException {
         m_server = new Server();
-        final Properties configProps = IntegrationUtils.prepareTestProperties();
+        final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
         m_config = new MemoryConfig(configProps);
         m_server.startServer(m_config);
     }
 
     @Before
     public void setUp() throws Exception {
-        startServer();
+        String dbPath = IntegrationUtils.tempH2Path(tempFolder);
+        startServer(dbPath);
 
         m_subscriber = new MqttClient("tcp://localhost:1883", "Subscriber", new MemoryPersistence());
         m_callback = new MessageCollector();
@@ -77,7 +83,7 @@ public class ServerIntegrationQoSValidationTest {
         }
 
         m_server.stopServer();
-        IntegrationUtils.clearTestStorage();
+        tempFolder.delete();
     }
 
     @Test

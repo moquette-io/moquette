@@ -25,7 +25,9 @@ import io.netty.handler.codec.mqtt.MqttMessage;
 import org.eclipse.paho.client.mqttv3.*;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.awaitility.Awaitility;
@@ -47,16 +49,20 @@ public class ServerLowlevelMessagesIntegrationTests {
     IConfig m_config;
     MqttMessage receivedMsg;
 
-    protected void startServer() throws IOException {
+    @Rule
+    public TemporaryFolder tempFolder = new TemporaryFolder();
+
+    protected void startServer(String dbPath) throws IOException {
         m_server = new Server();
-        final Properties configProps = IntegrationUtils.prepareTestProperties();
+        final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
         m_config = new MemoryConfig(configProps);
         m_server.startServer(m_config);
     }
 
     @Before
     public void setUp() throws Exception {
-        startServer();
+        String dbPath = IntegrationUtils.tempH2Path(tempFolder);
+        startServer(dbPath);
         m_client = new Client("localhost");
         m_willSubscriber = new MqttClient("tcp://localhost:1883", "Subscriber", s_dataStore);
         m_messageCollector = new MessageCollector();
@@ -69,6 +75,7 @@ public class ServerLowlevelMessagesIntegrationTests {
         LOG.debug("After raw client close");
         Thread.sleep(300); // to let the close event pass before integration stop event
         m_server.stopServer();
+        tempFolder.delete();
         LOG.debug("After asked integration to stop");
     }
 

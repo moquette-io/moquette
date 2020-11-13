@@ -16,39 +16,30 @@
 
 package io.moquette.integration;
 
+import org.junit.rules.TemporaryFolder;
+
 import java.io.File;
 import java.util.Properties;
 import static io.moquette.BrokerConstants.DEFAULT_MOQUETTE_STORE_H2_DB_FILENAME;
 import static io.moquette.BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME;
 import static io.moquette.BrokerConstants.PORT_PROPERTY_NAME;
-import static org.junit.Assert.assertFalse;
 
 /**
  * Used to carry integration configurations.
  */
 public final class IntegrationUtils {
 
-    static String localH2MvStoreDBPath() {
-        String currentDir = System.getProperty("user.dir");
-        return currentDir + File.separator + "target" + File.separator + DEFAULT_MOQUETTE_STORE_H2_DB_FILENAME;
+    public static String tempH2Path(TemporaryFolder tempFolder) {
+        return tempFolder.getRoot().getAbsolutePath() + File.separator + DEFAULT_MOQUETTE_STORE_H2_DB_FILENAME;
     }
 
-    public static Properties prepareTestProperties() {
+    public static Properties prepareTestProperties(String dbPath) {
         Properties testProperties = new Properties();
-        testProperties.put(PERSISTENT_STORE_PROPERTY_NAME, IntegrationUtils.localH2MvStoreDBPath());
+        testProperties.put(PERSISTENT_STORE_PROPERTY_NAME, dbPath);
         testProperties.put(PORT_PROPERTY_NAME, "1883");
         return testProperties;
     }
 
     private IntegrationUtils() {
-    }
-
-    public static void clearTestStorage() {
-        String dbPath = localH2MvStoreDBPath();
-        File dbFile = new File(dbPath);
-        if (dbFile.exists()) {
-            dbFile.delete();
-        }
-        assertFalse(dbFile.exists());
     }
 }

@@ -21,30 +21,39 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.IOException;
+import java.util.Properties;
+
 import io.moquette.BrokerConstants;
 import io.moquette.integration.IntegrationUtils;
 import io.moquette.testclient.RawClient;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 public class ConnectionIT {
 
     Server m_server;
 
-    protected void startServer() throws IOException {
+    @Rule
+    public TemporaryFolder tempFolder = new TemporaryFolder();
+
+    protected void startServer(String dbPath) throws IOException {
+        final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
         m_server = new Server();
-        m_server.startServer();
+        m_server.startServer(configProps);
     }
 
     @Before
     public void setUp() throws Exception {
-        startServer();
+        String dbPath = IntegrationUtils.tempH2Path(tempFolder);
+        startServer(dbPath);
     }
 
     @After
-    public void tearDown() throws Exception {
+    public void tearDown() {
         m_server.stopServer();
 
         File dbFile = new File(BrokerConstants.DEFAULT_PERSISTENT_PATH);
@@ -54,7 +63,7 @@ public class ConnectionIT {
                     dbFile.delete());
         }
         assertFalse(dbFile.exists());
-        IntegrationUtils.clearTestStorage();
+        tempFolder.delete();
     }
 
     @Test(timeout = 3000)
