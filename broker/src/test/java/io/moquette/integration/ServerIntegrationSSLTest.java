@@ -62,7 +62,7 @@ import org.slf4j.LoggerFactory;
  *
  * Command executed to create the key on server's keystore:
  * <pre>
- * keytool -genkeypair -alias testserver -keyalg RSA -validity 3650 -keysize 2048 -dname cn=moquette.io -keystore serverkeystore.jks -keypass passw0rdsrv -storepass passw0rdsrv
+ * keytool -genkeypair -alias testserver -keyalg RSA -validity 3650 -keysize 2048 -dname cn=localhost -keystore serverkeystore.jks -keypass passw0rdsrv -storepass passw0rdsrv
  * </pre>
  *
  * Command executed to export the certificate from the server's keystore and import directly in client's keystore:

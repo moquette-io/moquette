@@ -53,16 +53,17 @@ import org.slf4j.LoggerFactory;
 /**
  * Check that Moquette could also handle SSL with client authentication.
  *
- * This test verifies client's autentication on server, so the server certificate has to be imported into the
+ * This test verifies client's authentication on server, so the server certificate has to be imported into the
  * client's keystore and the client's certificate must be imported into server's keystore.
  *
  *  the first way is done by:
  *  <pre>
- *  keytool -genkeypair -alias testserver -keyalg RSA -validity 3650 -keysize 2048 -dname cn=moquette.io -keystore serverkeystore.jks -keypass passw0rdsrv -storepass passw0rdsrv
+ *  keytool -genkeypair -alias testserver -keyalg RSA -validity 3650 -keysize 2048 -dname cn=localhost -keystore serverkeystore.jks -keypass passw0rdsrv -storepass passw0rdsrv
  *  </pre>
  *  and
  *  <pre>
- *  keytool -exportcert -alias testserver -keystore serverkeystore.jks -keypass passw0rdsrv -storepass passw0rdsrv | keytool -importcert -trustcacerts -noprompt -alias testserver -keystore signedclientkeystore.jks -keypass passw0rd -storepass passw0rd
+ *  keytool -exportcert -alias testserver -keystore serverkeystore.jks -keypass passw0rdsrv -storepass passw0rdsrv | \
+ *  keytool -importcert -trustcacerts -noprompt -alias testserver -keystore signedclientkeystore.jks -keypass passw0rd -storepass passw0rd
  *  </pre>
  *
  *  to create the key in the client side:
@@ -72,7 +73,8 @@ import org.slf4j.LoggerFactory;
  *
  *  to import the client's certificate into server:
  *  <pre>
- *  keytool -exportcert -alias signedtestclient -keystore signedclientkeystore.jks -keypass passw0rd -storepass passw0rd | keytool -importcert -trustcacerts -noprompt -alias signedtestclient -keystore serverkeystore.jks -keypass passw0rdsrv -storepass passw0rdsrv
+ *  keytool -exportcert -alias signedtestclient -keystore signedclientkeystore.jks -keypass passw0rd -storepass passw0rd | \
+ *  keytool -importcert -trustcacerts -noprompt -alias signedtestclient -keystore serverkeystore.jks -keypass passw0rdsrv -storepass passw0rdsrv
  *  </pre>
  *
  *  To verify that a client's certficate not imported into server, it's necessary to create a client's key:
