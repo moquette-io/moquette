@@ -178,14 +178,17 @@ final class MQTTConnection {
         final boolean msgCleanSessionFlag = msg.variableHeader().isCleanSession();
         boolean isSessionAlreadyPresent = !msgCleanSessionFlag && result.alreadyStored;
         final String clientIdUsed = clientId;
-        sendConnAck(isSessionAlreadyPresent).addListener(new ChannelFutureListener() {
+        final MqttConnAckMessage ackMessage = MqttMessageBuilders.connAck()
+            .returnCode(CONNECTION_ACCEPTED)
+            .sessionPresent(isSessionAlreadyPresent).build();
+        channel.writeAndFlush(ackMessage).addListener(new ChannelFutureListener() {
             @Override
             public void operationComplete(ChannelFuture future) throws Exception {
                 if (future.isSuccess()) {
                     LOG.trace("CONNACK sent, channel: {}", channel);
                     if (!result.session.completeConnection()) {
                         // send DISCONNECT and close the channel
-                        final MqttMessage disconnectMsg = disconnect();
+                        final MqttMessage disconnectMsg = MqttMessageBuilders.disconnect().build();
                         channel.writeAndFlush(disconnectMsg).addListener(CLOSE);
                         LOG.warn("CONNACK is sent but the session created can't transition in CONNECTED state");
                     } else {
@@ -243,22 +246,11 @@ final class MQTTConnection {
     }
 
     private void abortConnection(MqttConnectReturnCode returnCode) {
-        MqttConnAckMessage badProto = connAck(returnCode, false);
+        MqttConnAckMessage badProto = MqttMessageBuilders.connAck()
+            .returnCode(returnCode)
+            .sessionPresent(false).build();
         channel.writeAndFlush(badProto).addListener(FIRE_EXCEPTION_ON_FAILURE);
         channel.close().addListener(CLOSE_ON_FAILURE);
-    }
-
-    private MqttConnAckMessage connAck(MqttConnectReturnCode returnCode, boolean sessionPresent) {
-        MqttFixedHeader mqttFixedHeader = new MqttFixedHeader(MqttMessageType.CONNACK, false, MqttQoS.AT_MOST_ONCE,
-            false, 0);
-        MqttConnAckVariableHeader mqttConnAckVariableHeader = new MqttConnAckVariableHeader(returnCode, sessionPresent);
-        return new MqttConnAckMessage(mqttFixedHeader, mqttConnAckVariableHeader);
-    }
-
-    private MqttMessage disconnect() {
-        MqttFixedHeader mqttFixedHeader = new MqttFixedHeader(MqttMessageType.DISCONNECT, false, MqttQoS.AT_MOST_ONCE,
-            false, 0);
-        return new MqttMessage(mqttFixedHeader);
     }
 
     private boolean login(MqttConnectMessage msg, final String clientId) {
@@ -304,11 +296,6 @@ final class MQTTConnection {
         String userName = NettyUtils.userName(channel);
         postOffice.dispatchConnectionLost(clientID,userName);
         LOG.trace("dispatch disconnection: clientId={}, userName={}", clientID, userName);
-    }
-
-    private ChannelFuture sendConnAck(boolean isSessionAlreadyPresent) {
-        final MqttConnAckMessage ackMessage = connAck(CONNECTION_ACCEPTED, isSessionAlreadyPresent);
-        return channel.writeAndFlush(ackMessage);
     }
 
     boolean isConnected() {
