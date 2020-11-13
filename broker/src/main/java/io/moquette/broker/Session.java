@@ -113,8 +113,12 @@ class Session {
         this.will = will;
     }
 
-    void markConnected() {
-        assignState(SessionStatus.DISCONNECTED, SessionStatus.CONNECTED);
+    void markConnecting() {
+        assignState(SessionStatus.DISCONNECTED, SessionStatus.CONNECTING);
+    }
+
+    boolean completeConnection() {
+        return assignState(Session.SessionStatus.CONNECTING, Session.SessionStatus.CONNECTED);
     }
 
     void bind(MQTTConnection mqttConnection) {
