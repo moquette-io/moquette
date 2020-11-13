@@ -22,7 +22,9 @@ import io.moquette.broker.Server;
 import org.fusesource.mqtt.client.*;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
@@ -42,16 +44,20 @@ public class ServerIntegrationFuseTest {
     BlockingConnection m_publisher;
     IConfig m_config;
 
-    protected void startServer() throws IOException {
+    @Rule
+    public TemporaryFolder tempFolder = new TemporaryFolder();
+
+    protected void startServer(String dbPath) throws IOException {
         m_server = new Server();
-        final Properties configProps = IntegrationUtils.prepareTestProperties();
+        final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
         m_config = new MemoryConfig(configProps);
         m_server.startServer(m_config);
     }
 
     @Before
     public void setUp() throws Exception {
-        startServer();
+        String dbPath = IntegrationUtils.tempH2Path(tempFolder);
+        startServer(dbPath);
 
         m_mqtt = new MQTT();
         m_mqtt.setHost("localhost", 1883);
@@ -69,7 +75,7 @@ public class ServerIntegrationFuseTest {
 
         m_server.stopServer();
 
-        IntegrationUtils.clearTestStorage();
+        tempFolder.delete();
     }
 
     @Test

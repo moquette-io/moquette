@@ -24,7 +24,10 @@ import io.moquette.broker.security.IAuthenticator;
 import io.moquette.broker.security.IAuthorizatorPolicy;
 import io.moquette.broker.subscriptions.Topic;
 import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
 import java.util.Properties;
@@ -36,20 +39,30 @@ public class ConfigurationClassLoaderTest implements IAuthenticator, IAuthorizat
     Server m_server;
     IConfig m_config;
 
+    @Rule
+    public TemporaryFolder tempFolder = new TemporaryFolder();
+    private String dbPath;
+
     protected void startServer(Properties props) throws IOException {
         m_server = new Server();
         m_config = new MemoryConfig(props);
         m_server.startServer(m_config);
     }
 
+    @Before
+    public void setUp() {
+        dbPath = IntegrationUtils.tempH2Path(tempFolder);
+    }
+
     @After
     public void tearDown() {
         m_server.stopServer();
+        tempFolder.delete();
     }
 
     @Test
     public void loadAuthenticator() throws Exception {
-        Properties props = new Properties(IntegrationUtils.prepareTestProperties());
+        Properties props = new Properties(IntegrationUtils.prepareTestProperties(dbPath));
         props.setProperty(BrokerConstants.AUTHENTICATOR_CLASS_NAME, getClass().getName());
         startServer(props);
         assertTrue(true);
@@ -57,7 +70,7 @@ public class ConfigurationClassLoaderTest implements IAuthenticator, IAuthorizat
 
     @Test
     public void loadAuthorizator() throws Exception {
-        Properties props = new Properties(IntegrationUtils.prepareTestProperties());
+        Properties props = new Properties(IntegrationUtils.prepareTestProperties(dbPath));
         props.setProperty(BrokerConstants.AUTHORIZATOR_CLASS_NAME, getClass().getName());
         startServer(props);
         assertTrue(true);

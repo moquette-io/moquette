@@ -24,7 +24,10 @@ import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
@@ -35,8 +38,6 @@ import static org.junit.Assert.assertNull;
 
 public class ServerIntegrationRestartTest {
 
-    static MqttClientPersistence s_dataStore;
-    static MqttClientPersistence s_pubDataStore;
     static MqttConnectOptions CLEAN_SESSION_OPT = new MqttConnectOptions();
 
     Server m_server;
@@ -45,30 +46,37 @@ public class ServerIntegrationRestartTest {
     IConfig m_config;
     MessageCollector m_messageCollector;
 
-    protected void startServer() throws IOException {
+    @Rule
+    public TemporaryFolder tempFolder = new TemporaryFolder();
+    private String dbPath;
+    private MqttClientPersistence pubDataStore;
+    private MqttClientPersistence subDataStore;
+
+    protected void startServer(String dbPath) throws IOException {
         m_server = new Server();
-        final Properties configProps = IntegrationUtils.prepareTestProperties();
+        final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
         m_config = new MemoryConfig(configProps);
         m_server.startServer(m_config);
     }
 
     @BeforeClass
     public static void beforeTests() {
-        String tmpDir = System.getProperty("java.io.tmpdir");
-        s_dataStore = new MqttDefaultFilePersistence(tmpDir);
-        s_pubDataStore = new MqttDefaultFilePersistence(tmpDir + File.separator + "publisher");
         CLEAN_SESSION_OPT.setCleanSession(false);
     }
 
     @Before
     public void setUp() throws Exception {
-        startServer();
+        dbPath = IntegrationUtils.tempH2Path(tempFolder);
 
-        m_subscriber = new MqttClient("tcp://localhost:1883", "Subscriber", s_dataStore);
+        startServer(dbPath);
+
+        pubDataStore = new MqttDefaultFilePersistence(tempFolder.newFolder("publisher").getAbsolutePath());
+        subDataStore = new MqttDefaultFilePersistence(tempFolder.newFolder("subscriber").getAbsolutePath());
+        m_subscriber = new MqttClient("tcp://localhost:1883", "Subscriber", subDataStore);
         m_messageCollector = new MessageCollector();
         m_subscriber.setCallback(m_messageCollector);
 
-        m_publisher = new MqttClient("tcp://localhost:1883", "Publisher", s_pubDataStore);
+        m_publisher = new MqttClient("tcp://localhost:1883", "Publisher", pubDataStore);
     }
 
     @After
@@ -83,7 +91,7 @@ public class ServerIntegrationRestartTest {
 
         m_server.stopServer();
 
-        IntegrationUtils.clearTestStorage();
+        tempFolder.delete();
     }
 
     @Test
@@ -97,7 +105,7 @@ public class ServerIntegrationRestartTest {
         m_server.stopServer();
 
         // restart the integration
-        m_server.startServer(IntegrationUtils.prepareTestProperties());
+        m_server.startServer(IntegrationUtils.prepareTestProperties(dbPath));
 
         // reconnect the Subscriber subscribing to the same /topic but different QoS
         m_subscriber.connect(CLEAN_SESSION_OPT);
@@ -123,7 +131,7 @@ public class ServerIntegrationRestartTest {
         m_server.stopServer();
 
         // restart the integration
-        m_server.startServer(IntegrationUtils.prepareTestProperties());
+        m_server.startServer(IntegrationUtils.prepareTestProperties(dbPath));
 
         m_publisher.connect();
         m_publisher.publish("/topic", "Hello world MQTT!!".getBytes(UTF_8), 0, false);
@@ -143,14 +151,14 @@ public class ServerIntegrationRestartTest {
         m_server.stopServer();
 
         // restart the integration
-        m_server.startServer(IntegrationUtils.prepareTestProperties());
+        m_server.startServer(IntegrationUtils.prepareTestProperties(dbPath));
         // subscriber reconnects
-        m_subscriber = new MqttClient("tcp://localhost:1883", "Subscriber", s_dataStore);
+        m_subscriber = new MqttClient("tcp://localhost:1883", "Subscriber", subDataStore);
         m_subscriber.setCallback(m_messageCollector);
         m_subscriber.connect();
 
         // publisher publishes on /topic
-        m_publisher = new MqttClient("tcp://localhost:1883", "Publisher", s_pubDataStore);
+        m_publisher = new MqttClient("tcp://localhost:1883", "Publisher", pubDataStore);
         m_publisher.connect();
         m_publisher.publish("/topic", "Hello world MQTT!!".getBytes(UTF_8), 1, false);
 
