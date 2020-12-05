@@ -23,6 +23,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.mqtt.*;
+import io.netty.handler.codec.mqtt.MqttProperties.MqttPropertyType;
 import io.netty.handler.timeout.IdleStateHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +32,7 @@ import java.net.InetSocketAddress;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 import static io.netty.channel.ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE;
@@ -130,11 +132,22 @@ final class MQTTConnection {
         final String username = payload.userName();
         LOG.trace("Processing CONNECT message. CId={} username: {} channel: {}", clientId, username, channel);
 
-        if (isNotProtocolVersion(msg, MqttVersion.MQTT_3_1) && isNotProtocolVersion(msg, MqttVersion.MQTT_3_1_1)) {
+        if (isNotProtocolVersion(msg, MqttVersion.MQTT_3_1) &&
+            isNotProtocolVersion(msg, MqttVersion.MQTT_3_1_1) &&
+            isNotProtocolVersion(msg, MqttVersion.MQTT_5)
+        ) {
             LOG.warn("MQTT protocol version is not valid. CId={} channel: {}", clientId, channel);
             abortConnection(CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION);
             return;
         }
+        if (isNotProtocolVersion(msg, MqttVersion.MQTT_5)) {
+            handleConnect3(msg, clientId, username);
+        } else {
+            handleConnect5(msg, clientId, username);
+        }
+    }
+
+    private void handleConnect3(MqttConnectMessage msg, String clientId, String username) {
         final boolean cleanSession = msg.variableHeader().isCleanSession();
         if (clientId == null || clientId.length() == 0) {
             if (!brokerConfig.isAllowZeroByteClientId()) {
@@ -158,7 +171,7 @@ final class MQTTConnection {
 
         if (!login(msg, clientId)) {
             abortConnection(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD);
-            channel.close().addListener(CLOSE_ON_FAILURE);
+            channel.close();
             return;
         }
 
@@ -174,8 +187,11 @@ final class MQTTConnection {
             return;
         }
 
-        final boolean msgCleanSessionFlag = msg.variableHeader().isCleanSession();
-        boolean isSessionAlreadyPresent = !msgCleanSessionFlag && result.alreadyStored;
+        boolean isSessionAlreadyPresent;
+        if (cleanSession)
+            isSessionAlreadyPresent = false;
+        else
+            isSessionAlreadyPresent = result.alreadyStored;
         final String clientIdUsed = clientId;
         final MqttConnAckMessage ackMessage = MqttMessageBuilders.connAck()
             .returnCode(CONNECTION_ACCEPTED)
@@ -211,9 +227,39 @@ final class MQTTConnection {
                     LOG.error("CONNACK send failed, cleanup session and close the connection", future.cause());
                     channel.close();
                 }
-
             }
         });
+    }
+
+    private void handleConnect5(MqttConnectMessage msg, String clientId, String username) {
+        final boolean cleanStart = msg.variableHeader().isCleanSession();
+        final MqttMessageBuilders.ConnAckBuilder ackBuilder = MqttMessageBuilders.connAck();
+        if (clientId == null || clientId.length() == 0) {
+            if (!cleanStart) {
+                LOG.info("MQTT client ID cannot be empty for persistent session. Username: {}, channel: {}",
+                    username, channel);
+                abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
+                return;
+            }
+
+            // Generating client id.
+            clientId = UUID.randomUUID().toString().replace("-", "");
+            LOG.debug("Client has connected with integration generated id: {}, username: {}, channel: {}", clientId,
+                username, channel);
+            final String generatedClientId = clientId;
+            ackBuilder.properties(MessageBuilders.withConnAckProps(p -> {
+                p.assignedClientId(generatedClientId);
+            }));
+        }
+
+        boolean isSessionAlreadyPresent = false; //TODO
+        final MqttConnAckMessage ackMessage = ackBuilder
+            .returnCode(CONNECTION_ACCEPTED)
+            .sessionPresent(isSessionAlreadyPresent)
+            .properties(MessageBuilders.withConnAckProps(p -> {
+                p.retainAvailable(true);
+            }))
+            .build();
     }
 
     private void setupInflightResender(Channel channel) {
