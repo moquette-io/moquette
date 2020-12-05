@@ -1,6 +1,0 @@
-language: java
-jdk:
-  - openjdk12
-
-#script:
-#    - ./mvnw verify
