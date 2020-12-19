@@ -169,6 +169,7 @@ final class MQTTConnection {
             LOG.trace("Binding MQTTConnection (channel: {}) to session", channel);
             result = sessionRegistry.createOrReopenSession(msg, clientId, this.getUsername());
             result.session.bind(this);
+            sessionRegistry.storeInConnectionRegistry(this, result.session);
         } catch (SessionCorruptedException scex) {
             LOG.warn("MQTT session for client ID {} cannot be created, channel: {}", clientId, channel);
             abortConnection(CONNECTION_REFUSED_SERVER_UNAVAILABLE);
@@ -208,7 +209,7 @@ final class MQTTConnection {
                     }
                 } else {
                     sessionRegistry.disconnect(clientIdUsed);
-                    sessionRegistry.remove(clientIdUsed);
+                    sessionRegistry.remove(MQTTConnection.this, clientIdUsed);
                     LOG.error("CONNACK send failed, cleanup session and close the connection", future.cause());
                     channel.close();
                 }
@@ -288,7 +289,7 @@ final class MQTTConnection {
         }
         if (session.isClean()) {
             LOG.debug("Remove session for client CId: {}, channel: {}", clientID, channel);
-            sessionRegistry.remove(clientID);
+            sessionRegistry.remove(this, clientID);
         } else {
             sessionRegistry.disconnect(clientID);
         }
