@@ -88,9 +88,10 @@ public class SessionRegistryTest {
         NettyUtils.cleanSession(channel, false);
 
         // Connect a first time
-        sut.createOrReopenSession(msg, FAKE_CLIENT_ID, connection.getUsername());
+        final SessionRegistry.SessionCreationResult res = sut.createOrReopenSession(msg, FAKE_CLIENT_ID, connection.getUsername());
         // disconnect
-        sut.disconnect(FAKE_CLIENT_ID);
+        res.session.disconnect();
+//        sut.disconnect(FAKE_CLIENT_ID);
 
         // Exercise, reconnect
         EmbeddedChannel anotherChannel = new EmbeddedChannel();

@@ -152,8 +152,10 @@ public class SessionRegistry {
 
         final boolean published;
         if (creationResult.mode == CreationModeEnum.DROP_EXISTING) {
+            LOG.debug("Drop session of already connected client with same id");
             published = pool.replace(clientId, oldSession, newSession);
         } else {
+            LOG.debug("Replace session of client with same id");
             published = pool.replace(clientId, oldSession, oldSession);
         }
         if (!published) {
@@ -222,17 +224,8 @@ public class SessionRegistry {
         return pool.get(clientID);
     }
 
-    public void remove(String clientID) {
-        pool.remove(clientID);
-    }
-
-    public void disconnect(String clientID) {
-        final Session session = retrieve(clientID);
-        if (session == null) {
-            LOG.debug("Some other thread already removed the session CId={}", clientID);
-            return;
-        }
-        session.disconnect();
+    public void remove(Session session) {
+        pool.remove(session.getClientID(), session);
     }
 
     private void dropQueuesForClient(String clientId) {
