@@ -75,7 +75,6 @@ public class SessionRegistry {
     private static final Logger LOG = LoggerFactory.getLogger(SessionRegistry.class);
 
     private final ConcurrentMap<String, Session> pool = new ConcurrentHashMap<>();
-    private final ConcurrentMap<MQTTConnection, Session> bindedConnections = new ConcurrentHashMap<>();
     private final ISubscriptionsDirectory subscriptionsDirectory;
     private final IQueueRepository queueRepository;
     private final Authorizator authorizator;
@@ -225,23 +224,8 @@ public class SessionRegistry {
         return pool.get(clientID);
     }
 
-    void storeInConnectionRegistry(MQTTConnection mqttcOnnection, Session session) {
-        bindedConnections.put(mqttcOnnection, session);
-    }
-
-    public void remove(MQTTConnection connection, String clientID) {
-        final Session session = bindedConnections.get(connection);
-        pool.remove(clientID, session);
-        bindedConnections.remove(connection);
-    }
-
-    public void disconnect(String clientID) {
-        final Session session = retrieve(clientID);
-        if (session == null) {
-            LOG.debug("Some other thread already removed the session CId={}", clientID);
-            return;
-        }
-        session.disconnect();
+    public void remove(Session session) {
+        pool.remove(session.getClientID(), session);
     }
 
     private void dropQueuesForClient(String clientId) {

@@ -43,12 +43,13 @@ final class MQTTConnection {
     private static final Logger LOG = LoggerFactory.getLogger(MQTTConnection.class);
 
     final Channel channel;
-    private BrokerConfiguration brokerConfig;
-    private IAuthenticator authenticator;
-    private SessionRegistry sessionRegistry;
+    private final BrokerConfiguration brokerConfig;
+    private final IAuthenticator authenticator;
+    private final SessionRegistry sessionRegistry;
     private final PostOffice postOffice;
     private volatile boolean connected;
     private final AtomicInteger lastPacketId = new AtomicInteger(0);
+    private Session bindedSession;
 
     MQTTConnection(Channel channel, BrokerConfiguration brokerConfig, IAuthenticator authenticator,
                    SessionRegistry sessionRegistry, PostOffice postOffice) {
@@ -105,14 +106,12 @@ final class MQTTConnection {
 
     private void processPubComp(MqttMessage msg) {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        final Session session = sessionRegistry.retrieve(getClientId());
-        session.processPubComp(messageID);
+        bindedSession.processPubComp(messageID);
     }
 
     private void processPubRec(MqttMessage msg) {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        final Session session = sessionRegistry.retrieve(getClientId());
-        session.processPubRec(messageID);
+        bindedSession.processPubRec(messageID);
     }
 
     static MqttMessage pubrel(int messageID) {
@@ -122,8 +121,7 @@ final class MQTTConnection {
 
     private void processPubAck(MqttMessage msg) {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        Session session = sessionRegistry.retrieve(getClientId());
-        session.pubAckReceived(messageID);
+        bindedSession.pubAckReceived(messageID);
     }
 
     void processConnect(MqttConnectMessage msg) {
@@ -169,7 +167,7 @@ final class MQTTConnection {
             LOG.trace("Binding MQTTConnection (channel: {}) to session", channel);
             result = sessionRegistry.createOrReopenSession(msg, clientId, this.getUsername());
             result.session.bind(this);
-            sessionRegistry.storeInConnectionRegistry(this, result.session);
+            bindedSession = result.session;
         } catch (SessionCorruptedException scex) {
             LOG.warn("MQTT session for client ID {} cannot be created, channel: {}", clientId, channel);
             abortConnection(CONNECTION_REFUSED_SERVER_UNAVAILABLE);
@@ -208,8 +206,8 @@ final class MQTTConnection {
                         LOG.trace("dispatch connection: {}", msg.toString());
                     }
                 } else {
-                    sessionRegistry.disconnect(clientIdUsed);
-                    sessionRegistry.remove(MQTTConnection.this, clientIdUsed);
+                    bindedSession.disconnect();
+                    sessionRegistry.remove(bindedSession);
                     LOG.error("CONNACK send failed, cleanup session and close the connection", future.cause());
                     channel.close();
                 }
@@ -283,15 +281,14 @@ final class MQTTConnection {
             return;
         }
         LOG.info("Notifying connection lost event. CId: {}, channel: {}", clientID, channel);
-        Session session = sessionRegistry.retrieve(clientID);
-        if (session.hasWill()) {
-            postOffice.fireWill(session.getWill());
+        if (bindedSession.hasWill()) {
+            postOffice.fireWill(bindedSession.getWill());
         }
-        if (session.isClean()) {
+        if (bindedSession.isClean()) {
             LOG.debug("Remove session for client CId: {}, channel: {}", clientID, channel);
-            sessionRegistry.remove(this, clientID);
+            sessionRegistry.remove(bindedSession);
         } else {
-            sessionRegistry.disconnect(clientID);
+            bindedSession.disconnect();
         }
         connected = false;
         //dispatch connection lost to intercept.
@@ -310,12 +307,12 @@ final class MQTTConnection {
 
     void processDisconnect(MqttMessage msg) {
         final String clientID = NettyUtils.clientID(channel);
-        LOG.trace("Start DISCONNECT CId={}, channel: {}", clientID, channel);
+        LOG.trace("Start DISCONNECT CIInFlight(this)d={}, channel: {}", clientID, channel);
         if (!connected) {
             LOG.info("DISCONNECT received on already closed connection, CId={}, channel: {}", clientID, channel);
             return;
         }
-        sessionRegistry.disconnect(clientID);
+        bindedSession.disconnect();
         connected = false;
         channel.close().addListener(FIRE_EXCEPTION_ON_FAILURE);
         LOG.trace("Processed DISCONNECT CId={}, channel: {}", clientID, channel);
@@ -383,8 +380,7 @@ final class MQTTConnection {
             }
             case EXACTLY_ONCE: {
                 final int messageID = msg.variableHeader().packetId();
-                final Session session = sessionRegistry.retrieve(clientId);
-                session.receivedPublishQos2(messageID, msg);
+                bindedSession.receivedPublishQos2(messageID, msg);
                 postOffice.receivedPublishQos2(this, msg, username);
 //                msg.release();
                 break;
@@ -404,9 +400,8 @@ final class MQTTConnection {
     }
 
     private void processPubRel(MqttMessage msg) {
-        final Session session = sessionRegistry.retrieve(getClientId());
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        session.receivedPubRelQos2(messageID);
+        bindedSession.receivedPubRelQos2(messageID);
         sendPubCompMessage(messageID);
     }
 
@@ -443,8 +438,7 @@ final class MQTTConnection {
     public void writabilityChanged() {
         if (channel.isWritable()) {
             LOG.debug("Channel {} is again writable", channel);
-            final Session session = sessionRegistry.retrieve(getClientId());
-            session.writabilityChanged();
+            bindedSession.writabilityChanged();
         }
     }
 
@@ -511,8 +505,7 @@ final class MQTTConnection {
     }
 
     public void resendNotAckedPublishes() {
-        final Session session = sessionRegistry.retrieve(getClientId());
-        session.resendInflightNotAcked();
+        bindedSession.resendInflightNotAcked();
     }
 
     int nextPacketId() {
@@ -532,7 +525,7 @@ final class MQTTConnection {
         LOG.debug("readCompleted client CId: {}, channel: {}", getClientId(), channel);
         if (getClientId() != null) {
             // TODO drain all messages in target's session in-flight message queue
-            postOffice.flushInFlight(this);
+            bindedSession.flushAllQueuedMessages();
         }
     }
 }
