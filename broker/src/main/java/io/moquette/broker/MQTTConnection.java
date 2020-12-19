@@ -287,6 +287,7 @@ final class MQTTConnection {
             postOffice.fireWill(session.getWill());
         }
         if (session.isClean()) {
+            LOG.debug("Remove session for client CId: {}, channel: {}", clientID, channel);
             sessionRegistry.remove(clientID);
         } else {
             sessionRegistry.disconnect(clientID);
@@ -527,6 +528,7 @@ final class MQTTConnection {
     }
 
     public void readCompleted() {
+        LOG.debug("readCompleted client CId: {}, channel: {}", getClientId(), channel);
         if (getClientId() != null) {
             // TODO drain all messages in target's session in-flight message queue
             postOffice.flushInFlight(this);
