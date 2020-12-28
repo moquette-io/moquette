@@ -90,9 +90,10 @@ public class SessionRegistry {
 
     SessionCreationResult createOrReopenSession(MqttConnectMessage msg, String clientId, String username) {
         SessionCreationResult postConnectAction;
-        if (!pool.containsKey(clientId)) {
+        final Session newSession = createNewSession(msg, clientId);
+        final Session oldSession = pool.get(clientId);
+        if (oldSession == null) {
             // case 1
-            final Session newSession = createNewSession(msg, clientId);
             postConnectAction = new SessionCreationResult(newSession, CreationModeEnum.CREATED_CLEAN_NEW, false);
 
             // publish the session
@@ -102,19 +103,17 @@ public class SessionRegistry {
             if (success) {
                 LOG.trace("case 1, not existing session with CId {}", clientId);
             } else {
-                postConnectAction = reopenExistingSession(msg, clientId, newSession, username);
+                postConnectAction = reopenExistingSession(msg, clientId, previous, newSession, username);
             }
         } else {
-            final Session newSession = createNewSession(msg, clientId);
-            postConnectAction = reopenExistingSession(msg, clientId, newSession, username);
+            postConnectAction = reopenExistingSession(msg, clientId, oldSession, newSession, username);
         }
         return postConnectAction;
     }
 
     private SessionCreationResult reopenExistingSession(MqttConnectMessage msg, String clientId,
-                                                        Session newSession, String username) {
+                                                        Session oldSession, Session newSession, String username) {
         final boolean newIsClean = msg.variableHeader().isCleanSession();
-        final Session oldSession = pool.get(clientId);
         final SessionCreationResult creationResult;
         if (oldSession.disconnected()) {
             if (newIsClean) {
@@ -150,16 +149,17 @@ public class SessionRegistry {
             creationResult = new SessionCreationResult(newSession, CreationModeEnum.DROP_EXISTING, true);
         }
 
-        final boolean published;
         if (creationResult.mode == CreationModeEnum.DROP_EXISTING) {
             LOG.debug("Drop session of already connected client with same id");
-            published = pool.replace(clientId, oldSession, newSession);
+            if (!pool.replace(clientId, oldSession, newSession)) {
+                //the other client was disconnecting and removed it's own session
+                pool.put(clientId, newSession);
+            }
         } else {
             LOG.debug("Replace session of client with same id");
-            published = pool.replace(clientId, oldSession, oldSession);
-        }
-        if (!published) {
-            throw new SessionCorruptedException("old session was already removed");
+            if (!pool.replace(clientId, oldSession, oldSession)) {
+                throw new SessionCorruptedException("old session was already removed");
+            }
         }
 
         // case not covered new session is clean true/false and old session not in CONNECTED/DISCONNECTED
