@@ -27,6 +27,6 @@ jobs:
               uses: actions/setup-java@v1
               with:
                   java-version: ${{ matrix.java }}
-                  architechture: ${{ matrix.arch }}
+                  architecture: ${{ matrix.arch }}
             - name: Test with Maven
               run: mvn verify -B --file pom.xml
