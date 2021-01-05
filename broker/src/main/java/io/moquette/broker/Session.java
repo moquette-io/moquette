@@ -88,7 +88,7 @@ class Session {
     private final String clientId;
     private boolean clean;
     private Will will;
-    private Queue<SessionRegistry.EnqueuedMessage> sessionQueue;
+    private final Queue<SessionRegistry.EnqueuedMessage> sessionQueue;
     private final AtomicReference<SessionStatus> status = new AtomicReference<>(SessionStatus.DISCONNECTED);
     private MQTTConnection mqttConnection;
     private List<Subscription> subscriptions = new ArrayList<>();
@@ -103,6 +103,9 @@ class Session {
     }
 
     Session(String clientId, boolean clean, Queue<SessionRegistry.EnqueuedMessage> sessionQueue) {
+        if (sessionQueue == null) {
+            throw new IllegalArgumentException("sessionQueue parameter can't be null");
+        }
         this.clientId = clientId;
         this.clean = clean;
         this.sessionQueue = sessionQueue;

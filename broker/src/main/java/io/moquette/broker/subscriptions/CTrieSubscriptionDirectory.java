@@ -49,6 +49,19 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
         }
     }
 
+    /**
+     * @return the list of client ids that has a subscription stored.
+     */
+    @Override
+    public Set<String> listAllSessionIds() {
+        final List<Subscription> subscriptions = subscriptionsRepository.listAllSubscriptions();
+        final Set<String> clientIds = new HashSet<>(subscriptions.size());
+        for (Subscription subscription : subscriptions) {
+            clientIds.add(subscription.clientId);
+        }
+        return clientIds;
+    }
+
     Optional<CNode> lookup(Topic topic) {
         return ctrie.lookup(topic);
     }

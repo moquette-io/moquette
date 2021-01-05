@@ -25,6 +25,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -91,6 +92,27 @@ public class ServerIntegrationRestartTest {
         }
 
         m_server.stopServer();
+    }
+
+    @DisplayName("given not clean session then after a server restart the session should be present")
+    @Test
+    public void testNotCleanSessionIsVisibleAfterServerRestart() throws Exception {
+        m_subscriber.connect(CLEAN_SESSION_OPT);
+        m_subscriber.subscribe("/topic", 1);
+        m_subscriber.disconnect();
+
+        m_server.stopServer();
+        m_server.startServer(IntegrationUtils.prepareTestProperties(dbPath));
+
+        //publish a message
+        m_publisher.connect();
+        m_publisher.publish("/topic", "Hello world MQTT!!".getBytes(UTF_8), 1, false);
+
+        //reconnect subscriber and topic should be sent
+        m_subscriber.connect(CLEAN_SESSION_OPT);
+        // verify the sent message while offline is read
+        MqttMessage msg = m_messageCollector.waitMessage(1);
+        assertEquals("Hello world MQTT!!", new String(msg.getPayload(), UTF_8));
     }
 
     @Test

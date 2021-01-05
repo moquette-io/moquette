@@ -151,7 +151,6 @@ public class ServerIntegrationPahoTest {
 
     @Test
     public void testSubcriptionDoesntStayActiveAfterARestart() throws Exception {
-        LOG.info("*** testSubcriptionDoesntStayActiveAfterARestart ***");
         // clientForSubscribe1 connect and subscribe to /topic QoS2
         MqttClientPersistence dsSubscriberA = new MqttDefaultFilePersistence(
             IntegrationUtils.newFolder(tempFolder, "clientForSubscribe1").getAbsolutePath());
