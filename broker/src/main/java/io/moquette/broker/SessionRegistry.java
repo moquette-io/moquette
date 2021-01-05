@@ -28,6 +28,8 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -56,7 +58,7 @@ public class SessionRegistry {
     }
 
     public enum CreationModeEnum {
-        CREATED_CLEAN_NEW, REOPEN_EXISTING, DROP_EXISTING;
+        CREATED_CLEAN_NEW, REOPEN_EXISTING, DROP_EXISTING
     }
 
     public static class SessionCreationResult {
@@ -86,6 +88,24 @@ public class SessionRegistry {
         this.subscriptionsDirectory = subscriptionsDirectory;
         this.queueRepository = queueRepository;
         this.authorizator = authorizator;
+        reloadPersistentQueues();
+        recreateSessionPool();
+    }
+
+    private void reloadPersistentQueues() {
+        final Map<String, Queue<EnqueuedMessage>> persistentQueues = queueRepository.listAllQueues();
+        persistentQueues.forEach(queues::put);
+    }
+
+    private void recreateSessionPool() {
+        for (String clientId : subscriptionsDirectory.listAllSessionIds()) {
+            // if the subscriptions are present is obviously false
+            final Queue<EnqueuedMessage> persistentQueue = queues.get(clientId);
+            if (persistentQueue != null) {
+                Session rehydrated = new Session(clientId, false, persistentQueue);
+                pool.put(clientId, rehydrated);
+            }
+        }
     }
 
     SessionCreationResult createOrReopenSession(MqttConnectMessage msg, String clientId, String username) {
