@@ -19,23 +19,26 @@ package io.moquette.integration;
 import io.moquette.broker.Server;
 import io.moquette.broker.config.IConfig;
 import io.moquette.broker.config.MemoryConfig;
-import org.eclipse.paho.client.mqttv3.*;
+import org.awaitility.Awaitility;
+import org.awaitility.Durations;
+import org.eclipse.paho.client.mqttv3.IMqttClient;
+import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttClientPersistence;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
+import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Properties;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class ServerIntegrationRestartTest {
@@ -64,6 +67,7 @@ public class ServerIntegrationRestartTest {
     @BeforeAll
     public static void beforeTests() {
         CLEAN_SESSION_OPT.setCleanSession(false);
+        Awaitility.setDefaultTimeout(Durations.ONE_SECOND);
     }
 
     @BeforeEach
@@ -111,7 +115,8 @@ public class ServerIntegrationRestartTest {
         //reconnect subscriber and topic should be sent
         m_subscriber.connect(CLEAN_SESSION_OPT);
         // verify the sent message while offline is read
-        MqttMessage msg = m_messageCollector.waitMessage(1);
+        Awaitility.await().until(m_messageCollector::isMessageReceived);
+        MqttMessage msg = m_messageCollector.retrieveMessage();
         assertEquals("Hello world MQTT!!", new String(msg.getPayload(), UTF_8));
     }
 
@@ -137,10 +142,13 @@ public class ServerIntegrationRestartTest {
         m_publisher.publish("/topic", "Hello world MQTT!!".getBytes(UTF_8), 1, false);
 
         // read the messages
-        MqttMessage msg = m_messageCollector.waitMessage(1);
+        Awaitility.await().until(m_messageCollector::isMessageReceived);
+        MqttMessage msg = m_messageCollector.retrieveMessage();
         assertEquals("Hello world MQTT!!", new String(msg.getPayload(), UTF_8));
-        // no more messages on the same topic will be received
-        assertNull(m_messageCollector.waitMessage(1));
+        Awaitility.await("no more messages on the same topic will be received")
+            .during(Durations.ONE_SECOND)
+            .atMost(Durations.TWO_SECONDS)
+            .until(() -> !m_messageCollector.isMessageReceived());
     }
 
     @Test
@@ -184,8 +192,10 @@ public class ServerIntegrationRestartTest {
         m_publisher.publish("/topic", "Hello world MQTT!!".getBytes(UTF_8), 1, false);
 
         // Expected
-        // the subscriber doesn't get notified (it's fully unsubscribed)
-        assertNull(m_messageCollector.waitMessage(1));
+        Awaitility.await("the subscriber doesn't get notified (it's fully unsubscribed)")
+            .during(Durations.ONE_SECOND)
+            .atMost(Durations.TWO_SECONDS)
+            .until(() -> !m_messageCollector.isMessageReceived());
     }
 
     /**
@@ -198,7 +208,8 @@ public class ServerIntegrationRestartTest {
         client.connect();
         client.subscribe(topic, 1);
         client.publish(topic, "Hello world MQTT!!".getBytes(UTF_8), 0, false);
-        MqttMessage msg = collector.waitMessage(1);
+        Awaitility.await().until(collector::isMessageReceived);
+        MqttMessage msg = collector.retrieveMessage();
         assertEquals("Hello world MQTT!!", new String(msg.getPayload(), UTF_8));
         return client;
     }

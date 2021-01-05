@@ -19,9 +19,12 @@ package io.moquette.integration;
 import io.moquette.broker.Server;
 import io.moquette.broker.config.IConfig;
 import io.moquette.broker.config.MemoryConfig;
+import org.awaitility.Awaitility;
+import org.awaitility.Durations;
 import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -31,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.*;
@@ -54,6 +58,11 @@ public class ServerIntegrationPahoTest {
         final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
         m_config = new MemoryConfig(configProps);
         m_server.startServer(m_config);
+    }
+
+    @BeforeAll
+    public static void beforeTests() {
+        Awaitility.setDefaultTimeout(Durations.ONE_SECOND);
     }
 
     @BeforeEach
@@ -106,7 +115,8 @@ public class ServerIntegrationPahoTest {
         m_client.connect(options);
         m_client.publish("/topic", "Test my payload".getBytes(UTF_8), 0, false);
 
-        assertEquals("/topic", m_messagesCollector.getTopic());
+        Awaitility.await().until(m_messagesCollector::isMessageReceived);
+        assertEquals("/topic", m_messagesCollector.retrieveTopic());
     }
 
     /**
@@ -137,12 +147,14 @@ public class ServerIntegrationPahoTest {
         m_client.connect();
         m_client.publish("a/b", "Hello world MQTT!!".getBytes(UTF_8), 2, false);
 
-        MqttMessage messageOnA = cbSubscriberA.waitMessage(1);
+        Awaitility.await().until(cbSubscriberA::isMessageReceived);
+        MqttMessage messageOnA = cbSubscriberA.retrieveMessage();
         assertEquals("Hello world MQTT!!", new String(messageOnA.getPayload(), UTF_8));
         assertEquals(1, messageOnA.getQos());
         subscriberA.disconnect();
 
-        MqttMessage messageOnB = cbSubscriberB.waitMessage(1);
+        Awaitility.await().until(cbSubscriberB::isMessageReceived);
+        MqttMessage messageOnB = cbSubscriberB.retrieveMessage();
         assertNotNull(messageOnB, "MUST be a received message");
         assertEquals("Hello world MQTT!!", new String(messageOnB.getPayload(), UTF_8));
         assertEquals(2, messageOnB.getQos());
@@ -188,7 +200,9 @@ public class ServerIntegrationPahoTest {
         assertFalse(clientForSubscribe1.isConnected());
         assertTrue(clientForSubscribe2.isConnected());
         LOG.info("Waiting to receive 1 sec from {}", clientForSubscribe2.getClientId());
-        MqttMessage messageOnB = cbSubscriber2.waitMessage(1);
-        assertEquals("Hello", new String(messageOnB.getPayload(), UTF_8));
+        Awaitility.await()
+            .atMost(1, TimeUnit.SECONDS)
+            .until(cbSubscriber2::isMessageReceived);
+        assertEquals("Hello", new String(cbSubscriber2.retrieveMessage().getPayload(), UTF_8));
     }
 }

@@ -22,8 +22,10 @@ import io.moquette.broker.config.MemoryConfig;
 import io.moquette.testclient.Client;
 import io.netty.handler.codec.mqtt.*;
 import io.netty.handler.codec.mqtt.MqttMessage;
+import org.awaitility.Durations;
 import org.eclipse.paho.client.mqttv3.*;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -49,8 +51,6 @@ public class ServerLowlevelMessagesIntegrationTests {
     IConfig m_config;
     MqttMessage receivedMsg;
 
-//    @Rule
-//    public TemporaryFolder tempFolder = new TemporaryFolder();
     @TempDir
     Path tempFolder;
 
@@ -59,6 +59,11 @@ public class ServerLowlevelMessagesIntegrationTests {
         final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
         m_config = new MemoryConfig(configProps);
         m_server.startServer(m_config);
+    }
+
+    @BeforeAll
+    public static void beforeTests() {
+        Awaitility.setDefaultTimeout(Durations.ONE_SECOND);
     }
 
     @BeforeEach
@@ -74,10 +79,8 @@ public class ServerLowlevelMessagesIntegrationTests {
     @AfterEach
     public void tearDown() throws Exception {
         m_client.close();
-//        LOG.debug("After raw client close");
         Thread.sleep(300); // to let the close event pass before integration stop event
         m_server.stopServer();
-//        LOG.debug("After asked integration to stop");
     }
 
     @Test
@@ -162,7 +165,8 @@ public class ServerLowlevelMessagesIntegrationTests {
         m_client.close();
 
         // Verify will testament is published
-        org.eclipse.paho.client.mqttv3.MqttMessage receivedTestament = m_messageCollector.waitMessage(1);
+        Awaitility.await().until(m_messageCollector::isMessageReceived);
+        org.eclipse.paho.client.mqttv3.MqttMessage receivedTestament = m_messageCollector.retrieveMessage();
         assertEquals(willTestamentMsg, new String(receivedTestament.getPayload(), UTF_8));
         m_willSubscriber.disconnect();
     }

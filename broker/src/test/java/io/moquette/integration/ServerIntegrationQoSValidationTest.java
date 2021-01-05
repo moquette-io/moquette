@@ -19,11 +19,14 @@ package io.moquette.integration;
 import io.moquette.broker.Server;
 import io.moquette.broker.config.IConfig;
 import io.moquette.broker.config.MemoryConfig;
+import org.awaitility.Awaitility;
+import org.awaitility.Durations;
 import org.eclipse.paho.client.mqttv3.IMqttClient;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -56,6 +59,11 @@ public class ServerIntegrationQoSValidationTest {
         final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
         m_config = new MemoryConfig(configProps);
         m_server.startServer(m_config);
+    }
+
+    @BeforeAll
+    public static void beforeTests() {
+        Awaitility.setDefaultTimeout(Durations.ONE_SECOND);
     }
 
     @BeforeEach
@@ -91,7 +99,8 @@ public class ServerIntegrationQoSValidationTest {
         m_subscriber.subscribe("/topic", 0);
 
         m_publisher.publish("/topic", "Hello world MQTT QoS0".getBytes(UTF_8), 0, false);
-        MqttMessage message = m_callback.waitMessage(1);
+        Awaitility.await().until(m_callback::isMessageReceived);
+        MqttMessage message = m_callback.retrieveMessage();
         assertEquals("Hello world MQTT QoS0", message.toString());
         assertEquals(0, message.getQos());
     }
@@ -102,7 +111,8 @@ public class ServerIntegrationQoSValidationTest {
         m_subscriber.subscribe("/topic", 0);
 
         m_publisher.publish("/topic", "Hello world MQTT QoS1".getBytes(UTF_8), 1, false);
-        MqttMessage message = m_callback.waitMessage(1);
+        Awaitility.await().until(m_callback::isMessageReceived);
+        MqttMessage message = m_callback.retrieveMessage();
         assertEquals("Hello world MQTT QoS1", message.toString());
         assertEquals(0, message.getQos());
     }
@@ -113,7 +123,8 @@ public class ServerIntegrationQoSValidationTest {
         m_subscriber.subscribe("/topic", 0);
 
         m_publisher.publish("/topic", "Hello world MQTT QoS2".getBytes(UTF_8), 2, false);
-        MqttMessage message = m_callback.waitMessage(1);
+        Awaitility.await().until(m_callback::isMessageReceived);
+        MqttMessage message = m_callback.retrieveMessage();
         assertEquals("Hello world MQTT QoS2", message.toString());
         assertEquals(0, message.getQos());
     }
@@ -124,7 +135,8 @@ public class ServerIntegrationQoSValidationTest {
         m_subscriber.subscribe("/topic", 1);
 
         m_publisher.publish("/topic", "Hello world MQTT QoS0".getBytes(UTF_8), 0, false);
-        MqttMessage message = m_callback.waitMessage(1);
+        Awaitility.await().until(m_callback::isMessageReceived);
+        MqttMessage message = m_callback.retrieveMessage();
         assertEquals("Hello world MQTT QoS0", message.toString());
         assertEquals(0, message.getQos());
     }
@@ -135,7 +147,8 @@ public class ServerIntegrationQoSValidationTest {
         m_subscriber.subscribe("/topic", 1);
 
         m_publisher.publish("/topic", "Hello world MQTT QoS1".getBytes(UTF_8), 1, false);
-        MqttMessage message = m_callback.waitMessage(1);
+        Awaitility.await().until(m_callback::isMessageReceived);
+        MqttMessage message = m_callback.retrieveMessage();
         assertEquals("Hello world MQTT QoS1", message.toString());
         assertEquals(1, message.getQos());
     }
@@ -146,7 +159,8 @@ public class ServerIntegrationQoSValidationTest {
         m_subscriber.subscribe("/topic", 1);
 
         m_publisher.publish("/topic", "Hello world MQTT QoS2".getBytes(UTF_8), 2, false);
-        MqttMessage message = m_callback.waitMessage(1);
+        Awaitility.await().until(m_callback::isMessageReceived);
+        MqttMessage message = m_callback.retrieveMessage();
         assertEquals("Hello world MQTT QoS2", message.toString());
         assertEquals(1, message.getQos());
     }
@@ -157,7 +171,8 @@ public class ServerIntegrationQoSValidationTest {
         m_subscriber.subscribe("/topic", 2);
 
         m_publisher.publish("/topic", "Hello world MQTT QoS2".getBytes(UTF_8), 0, false);
-        MqttMessage message = m_callback.waitMessage(1);
+        Awaitility.await().until(m_callback::isMessageReceived);
+        MqttMessage message = m_callback.retrieveMessage();
         assertEquals("Hello world MQTT QoS2", message.toString());
         assertEquals(0, message.getQos());
     }
@@ -168,7 +183,8 @@ public class ServerIntegrationQoSValidationTest {
         m_subscriber.subscribe("/topic", 2);
 
         m_publisher.publish("/topic", "Hello world MQTT QoS2".getBytes(UTF_8), 1, false);
-        MqttMessage message = m_callback.waitMessage(1);
+        Awaitility.await().until(m_callback::isMessageReceived);
+        MqttMessage message = m_callback.retrieveMessage();
         assertEquals("Hello world MQTT QoS2", message.toString());
         assertEquals(1, message.getQos());
     }
@@ -179,7 +195,8 @@ public class ServerIntegrationQoSValidationTest {
         m_subscriber.subscribe("/topic", 2);
 
         m_publisher.publish("/topic", "Hello world MQTT QoS2".getBytes(UTF_8), 2, false);
-        MqttMessage message = m_callback.waitMessage(1);
+        Awaitility.await().until(m_callback::isMessageReceived);
+        MqttMessage message = m_callback.retrieveMessage();
         assertEquals("Hello world MQTT QoS2", message.toString());
         assertEquals(2, message.getQos());
     }

@@ -39,6 +39,7 @@ public class MessageCollector implements MqttCallback {
 
     private BlockingQueue<ReceivedMessage> m_messages = new LinkedBlockingQueue<>();
     private boolean m_connectionLost;
+    private volatile boolean messageReceived = false;
 
     /**
      * Return the message from the queue if not empty, else return null with wait period.
@@ -54,29 +55,26 @@ public class MessageCollector implements MqttCallback {
         }
     }
 
-    public MqttMessage waitMessage(int delay) {
-        try {
-            ReceivedMessage msg = m_messages.poll(delay, TimeUnit.SECONDS);
-            if (msg == null) {
-                return null;
-            }
-            return msg.message;
-        } catch (InterruptedException e) {
-            return null;
-        }
+    public MqttMessage retrieveMessage() throws InterruptedException {
+        final ReceivedMessage content = m_messages.take();
+        messageReceived = false;
+        return content.message;
     }
 
-    public String getTopic() {
-        try {
-            return m_messages.poll(5, TimeUnit.SECONDS).topic;
-        } catch (InterruptedException e) {
-            return null;
-        }
+    public String retrieveTopic() throws InterruptedException {
+        final ReceivedMessage content = m_messages.take();
+        messageReceived = false;
+        return content.topic;
+    }
+
+    public boolean isMessageReceived() {
+        return messageReceived;
     }
 
     void reinit() {
         m_messages = new LinkedBlockingQueue<>();
         m_connectionLost = false;
+        messageReceived = false;
     }
 
     public boolean connectionLost() {
@@ -91,6 +89,7 @@ public class MessageCollector implements MqttCallback {
     @Override
     public void messageArrived(String topic, MqttMessage message) {
         m_messages.offer(new ReceivedMessage(message, topic));
+        messageReceived = true;
     }
 
     /**
