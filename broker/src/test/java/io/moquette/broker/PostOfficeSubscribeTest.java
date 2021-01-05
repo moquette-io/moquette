@@ -28,8 +28,8 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.*;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.nio.charset.Charset;
 import java.util.List;
@@ -42,9 +42,9 @@ import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.eq;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -67,7 +67,7 @@ public class PostOfficeSubscribeTest {
     public static final BrokerConfiguration CONFIG = new BrokerConfiguration(true, true, false, false);
     private MemoryQueueRepository queueRepository;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         connectMessage = MqttMessageBuilders.connect()
             .clientId(FAKE_CLIENT_ID)
@@ -107,7 +107,7 @@ public class PostOfficeSubscribeTest {
             .build();
         connection.processConnect(connectMessage);
         MqttConnAckMessage connAck = channel.readOutbound();
-        assertEquals("Connect must be accepted", CONNECTION_ACCEPTED, connAck.variableHeader().connectReturnCode());
+        assertEquals(CONNECTION_ACCEPTED, connAck.variableHeader().connectReturnCode(), "Connect must be accepted");
     }
 
     @Test
@@ -194,9 +194,9 @@ public class PostOfficeSubscribeTest {
     public void testDoubleSubscribe() {
         connection.processConnect(connectMessage);
         ConnectionTestUtils.assertConnectAccepted(channel);
-        assertEquals("After CONNECT subscription MUST be empty", 0, subscriptions.size());
+        assertEquals(0, subscriptions.size(), "After CONNECT subscription MUST be empty");
         subscribe(channel, NEWS_TOPIC, AT_MOST_ONCE);
-        assertEquals("After /news subscribe, subscription MUST contain it", 1, subscriptions.size());
+        assertEquals(1, subscriptions.size(), "After /news subscribe, subscription MUST contain it");
 
         //Exercise & verify
         subscribe(channel, NEWS_TOPIC, AT_MOST_ONCE);
@@ -206,7 +206,7 @@ public class PostOfficeSubscribeTest {
     public void testSubscribeWithBadFormattedTopic() {
         connection.processConnect(connectMessage);
         ConnectionTestUtils.assertConnectAccepted(channel);
-        assertEquals("After CONNECT subscription MUST be empty", 0, subscriptions.size());
+        assertEquals(0, subscriptions.size(), "After CONNECT subscription MUST be empty");
 
         //Exercise
         MqttSubscribeMessage subscribe = MqttMessageBuilders.subscribe()
@@ -216,7 +216,7 @@ public class PostOfficeSubscribeTest {
         this.sut.subscribeClientToTopics(subscribe, FAKE_CLIENT_ID, FAKE_USER_NAME, connection);
         MqttSubAckMessage subAckMsg = channel.readOutbound();
 
-        assertEquals("Bad topic CAN'T add any subscription", 0, subscriptions.size());
+        assertEquals(0, subscriptions.size(), "Bad topic CAN'T add any subscription");
         verifyFailureQos(subAckMsg);
     }
 
@@ -224,20 +224,20 @@ public class PostOfficeSubscribeTest {
     public void testCleanSession_maintainClientSubscriptions() {
         connection.processConnect(connectMessage);
         ConnectionTestUtils.assertConnectAccepted(channel);
-        assertEquals("After CONNECT subscription MUST be empty", 0, subscriptions.size());
+        assertEquals(0, subscriptions.size(), "After CONNECT subscription MUST be empty");
 
         subscribe(channel, NEWS_TOPIC, AT_MOST_ONCE);
 
-        assertEquals("Subscribe MUST contain one subscription", 1, subscriptions.size());
+        assertEquals(1, subscriptions.size(), "Subscribe MUST contain one subscription");
 
         connection.processDisconnect(null);
-        assertEquals("Disconnection MUSTN'T clear subscriptions", 1, subscriptions.size());
+        assertEquals(1, subscriptions.size(), "Disconnection MUSTN'T clear subscriptions");
 
         EmbeddedChannel anotherChannel = new EmbeddedChannel();
         MQTTConnection anotherConn = createMQTTConnection(ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID, anotherChannel);
         anotherConn.processConnect(ConnectionTestUtils.buildConnect(FAKE_CLIENT_ID));
         ConnectionTestUtils.assertConnectAccepted(anotherChannel);
-        assertEquals("After a reconnect, subscription MUST be still present", 1, subscriptions.size());
+        assertEquals(1, subscriptions.size(), "After a reconnect, subscription MUST be still present");
 
         final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
         sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD, payload, false,
@@ -259,7 +259,7 @@ public class PostOfficeSubscribeTest {
     public void testCleanSession_correctlyClientSubscriptions() {
         connection.processConnect(connectMessage);
         ConnectionTestUtils.assertConnectAccepted(channel);
-        assertEquals("After CONNECT subscription MUST be empty", 0, subscriptions.size());
+        assertEquals(0, subscriptions.size(), "After CONNECT subscription MUST be empty");
 
         //subscribe(channel, NEWS_TOPIC, AT_MOST_ONCE);
         final MqttSubscribeMessage subscribeMsg = MqttMessageBuilders
@@ -268,10 +268,10 @@ public class PostOfficeSubscribeTest {
             .messageId(1)
             .build();
         connection.processSubscribe(subscribeMsg);
-        assertEquals("Subscribe MUST contain one subscription", 1, subscriptions.size());
+        assertEquals(1, subscriptions.size(), "Subscribe MUST contain one subscription");
 
         connection.processDisconnect(null);
-        assertEquals("Disconnection MUSTN'T clear subscriptions", 1, subscriptions.size());
+        assertEquals(1, subscriptions.size(), "Disconnection MUSTN'T clear subscriptions");
 
         connectMessage = MqttMessageBuilders.connect()
             .clientId(FAKE_CLIENT_ID)
@@ -281,7 +281,7 @@ public class PostOfficeSubscribeTest {
         connection = createMQTTConnection(CONFIG, channel);
         connection.processConnect(connectMessage);
         ConnectionTestUtils.assertConnectAccepted(channel);
-        assertEquals("After CONNECT with clean, subscription MUST be empty", 0, subscriptions.size());
+        assertEquals(0, subscriptions.size(), "After CONNECT with clean, subscription MUST be empty");
 
         // publish on /news
         final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());

@@ -25,24 +25,22 @@ import org.eclipse.paho.client.mqttv3.MqttClientPersistence;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.nio.file.Path;
+import java.security.SecureRandom;
 import java.util.Properties;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 public class ServerIntegrationMultiConnectTest {
 
@@ -54,8 +52,8 @@ public class ServerIntegrationMultiConnectTest {
     IConfig configuration;
     MessageCollector m_messageCollector;
 
-    @Rule
-    public TemporaryFolder tempFolder = new TemporaryFolder();
+    @TempDir
+    Path tempFolder;
     private String dbPath;
     private static ByteArrayOutputStream STRING_OUT;
 
@@ -66,7 +64,7 @@ public class ServerIntegrationMultiConnectTest {
         server.startServer(configuration);
     }
 
-    @BeforeClass
+    @BeforeAll
     public static void beforeTests() {
         STRING_OUT = new ByteArrayOutputStream();
         ORIG_OUT = System.out;
@@ -74,13 +72,13 @@ public class ServerIntegrationMultiConnectTest {
         CLEAN_SESSION_OPT.setCleanSession(true);
     }
 
-    @AfterClass
+    @AfterAll
     public static void afterTests() {
         // reset the System.out
         System.setOut(ORIG_OUT);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         dbPath = IntegrationUtils.tempH2Path(tempFolder);
 
@@ -91,27 +89,30 @@ public class ServerIntegrationMultiConnectTest {
         client = createNewClient("tcp://localhost:1883", "Client1");
     }
 
-    private MqttClient createNewClient(String host, String clientId) throws IOException, MqttException {
-        MqttClientPersistence clientDataStore = new MqttDefaultFilePersistence(tempFolder.newFolder().getAbsolutePath());
+    private MqttClient createNewClient(String host, String clientId, String persistenceSubfolder) throws IOException, MqttException {
+        final String clientDir = IntegrationUtils.newFolder(tempFolder, persistenceSubfolder).getAbsolutePath();
+        MqttClientPersistence clientDataStore = new MqttDefaultFilePersistence(clientDir);
         return new MqttClient(host, clientId, clientDataStore);
     }
 
-    @After
+    private MqttClient createNewClient(String host, String clientId) throws IOException, MqttException {
+        return createNewClient(host, clientId, "client");
+    }
+
+    @AfterEach
     public void tearDown() throws Exception {
         if (client != null && client.isConnected()) {
             client.disconnect();
         }
 
         server.stopServer();
-
-        tempFolder.delete();
     }
 
     @Test
     public void testMultipleClientConnectsWithSameClientId() throws MqttException, IOException, InterruptedException {
         for (int i = 0 ; i < 10; i++) {
             client.connect(CLEAN_SESSION_OPT);
-            MqttClient anotherClient = createNewClient("tcp://localhost:1883", "Client1");
+            MqttClient anotherClient = createNewClient("tcp://localhost:1883", "Client1", "client_" + i);
             anotherClient.connect(CLEAN_SESSION_OPT);
             Thread.sleep(250);
 
@@ -120,6 +121,6 @@ public class ServerIntegrationMultiConnectTest {
                 fail("Found NPE on logs");
             }
         }
-        assertTrue("No Exception raised in broker", true);
+        assertTrue(true, "No Exception raised in broker");
     }
 }

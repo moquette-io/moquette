@@ -17,7 +17,9 @@
 package io.moquette.broker.security;
 
 import org.apache.commons.codec.binary.Hex;
-import org.junit.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
@@ -26,8 +28,8 @@ import java.security.NoSuchAlgorithmException;
 import java.sql.*;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class DBAuthenticatorTest {
 
@@ -38,7 +40,7 @@ public class DBAuthenticatorTest {
     public static final String SHA_256 = "SHA-256";
     private Connection connection;
 
-    @Before
+    @BeforeEach
     public void setup() throws ClassNotFoundException, SQLException, NoSuchAlgorithmException {
         Class.forName(ORG_H2_DRIVER);
         this.connection = DriverManager.getConnection(JDBC_H2_MEM_TEST);
@@ -95,7 +97,7 @@ public class DBAuthenticatorTest {
         assertFalse(dbAuthenticator.checkValid(null, "dbuser", "wrongPassword".getBytes(UTF_8)));
     }
 
-    @After
+    @AfterEach
     public void teardown() {
         try {
             this.connection.close();

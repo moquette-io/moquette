@@ -25,16 +25,16 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttVersion;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import static io.moquette.broker.NettyChannelAssertions.assertEqualsConnAck;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class SessionRegistryTest {
 
@@ -50,8 +50,9 @@ public class SessionRegistryTest {
         new BrokerConfiguration(true, true, false, false);
     private MemoryQueueRepository queueRepository;
 
-    @Before
+    @BeforeEach
     public void setUp() {
+        System.out.println("setup invoked");
         connMsg = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_3_1).cleanSession(true);
 
         createMQTTConnection(ALLOW_ANONYMOUS_AND_ZEROBYTE_CLIENT_ID);
@@ -81,6 +82,7 @@ public class SessionRegistryTest {
 
     @Test
     public void testConnAckContainsSessionPresentFlag() {
+        System.out.println("testConnAckContainsSessionPresentFlag invoked");
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID)
                                         .protocolVersion(MqttVersion.MQTT_3_1_1)
                                         .build();
@@ -100,7 +102,7 @@ public class SessionRegistryTest {
 
         // Verify
         assertEquals(SessionRegistry.CreationModeEnum.CREATED_CLEAN_NEW, result.mode);
-        assertTrue("Connection is accepted and therefore should remain open", anotherChannel.isOpen());
+        assertTrue(anotherChannel.isOpen(), "Connection is accepted and therefore should remain open");
     }
 
     @Test

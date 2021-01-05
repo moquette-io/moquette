@@ -23,24 +23,24 @@ import io.moquette.broker.config.MemoryConfig;
 import io.moquette.broker.security.IAuthenticator;
 import io.moquette.broker.security.IAuthorizatorPolicy;
 import io.moquette.broker.subscriptions.Topic;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Properties;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ConfigurationClassLoaderTest implements IAuthenticator, IAuthorizatorPolicy {
 
     Server m_server;
     IConfig m_config;
 
-    @Rule
-    public TemporaryFolder tempFolder = new TemporaryFolder();
+    @TempDir
+    Path tempFolder;
     private String dbPath;
 
     protected void startServer(Properties props) throws IOException {
@@ -49,15 +49,14 @@ public class ConfigurationClassLoaderTest implements IAuthenticator, IAuthorizat
         m_server.startServer(m_config);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         dbPath = IntegrationUtils.tempH2Path(tempFolder);
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         m_server.stopServer();
-        tempFolder.delete();
     }
 
     @Test

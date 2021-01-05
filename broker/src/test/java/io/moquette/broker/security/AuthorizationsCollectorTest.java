@@ -16,11 +16,11 @@
 
 package io.moquette.broker.security;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import io.moquette.broker.subscriptions.Topic;
 import java.text.ParseException;
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class AuthorizationsCollectorTest {
 
@@ -34,7 +34,7 @@ public class AuthorizationsCollectorTest {
 
     private AuthorizationsCollector authorizator;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         authorizator = new AuthorizationsCollector();
     }
@@ -80,9 +80,9 @@ public class AuthorizationsCollectorTest {
         assertEquals(expected, authorization);
     }
 
-    @Test(expected = ParseException.class)
-    public void testParseAuthLineValid_invalid() throws ParseException {
-        authorizator.parseAuthLine("topic faker /weather/italy/anemometer");
+    @Test
+    public void testParseAuthLineValid_invalid() {
+        assertThrows(ParseException.class, () -> authorizator.parseAuthLine("topic faker /weather/italy/anemometer"));
     }
 
     @Test

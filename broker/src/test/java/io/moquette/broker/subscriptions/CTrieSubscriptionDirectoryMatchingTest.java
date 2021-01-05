@@ -19,8 +19,8 @@ package io.moquette.broker.subscriptions;
 import io.moquette.broker.ISubscriptionsRepository;
 import io.moquette.persistence.MemorySubscriptionsRepository;
 import io.netty.handler.codec.mqtt.MqttQoS;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
 import java.util.Set;
@@ -28,15 +28,15 @@ import java.util.Set;
 import static io.moquette.broker.subscriptions.CTrieTest.clientSubOnTopic;
 import static io.moquette.broker.subscriptions.Topic.asTopic;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class CTrieSubscriptionDirectoryMatchingTest {
 
     private CTrieSubscriptionDirectory sut;
     private ISubscriptionsRepository sessionsRepository;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         sut = new CTrieSubscriptionDirectory();
 

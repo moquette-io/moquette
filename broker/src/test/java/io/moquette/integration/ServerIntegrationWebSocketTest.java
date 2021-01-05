@@ -22,18 +22,18 @@ import io.moquette.broker.config.MemoryConfig;
 import org.eclipse.jetty.websocket.client.ClientUpgradeRequest;
 import org.eclipse.jetty.websocket.client.WebSocketClient;
 import io.moquette.broker.config.IConfig;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration test to check the function of Moquette with a WebSocket channel.
@@ -46,8 +46,8 @@ public class ServerIntegrationWebSocketTest {
     WebSocketClient client;
     IConfig m_config;
 
-    @Rule
-    public TemporaryFolder tempFolder = new TemporaryFolder();
+    @TempDir
+    Path tempFolder;
 
     protected void startServer(String dbPath) throws IOException {
         m_server = new Server();
@@ -58,18 +58,17 @@ public class ServerIntegrationWebSocketTest {
         m_server.startServer(m_config);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         String dbPath = IntegrationUtils.tempH2Path(tempFolder);
         startServer(dbPath);
         client = new WebSocketClient();
     }
 
-    @After
+    @AfterEach
     public void tearDown() throws Exception {
         client.stop();
         m_server.stopServer();
-        tempFolder.delete();
     }
 
     @SuppressWarnings("FutureReturnValueIgnored")

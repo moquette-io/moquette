@@ -27,13 +27,13 @@ import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttVersion;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
-import static org.junit.Assert.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 public class MQTTConnectionPublishTest {
 
@@ -47,7 +47,7 @@ public class MQTTConnectionPublishTest {
     private MqttMessageBuilders.ConnectBuilder connMsg;
     private MemoryQueueRepository queueRepository;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         connMsg = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_3_1).cleanSession(true);
 
@@ -90,7 +90,7 @@ public class MQTTConnectionPublishTest {
         sut.processPublish(publish);
 
         // Verify
-        assertFalse("Connection should be closed by the broker", channel.isOpen());
+        assertFalse(channel.isOpen(), "Connection should be closed by the broker");
     }
 
 }

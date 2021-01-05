@@ -27,8 +27,8 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.*;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.nio.charset.Charset;
 import java.util.Collections;
@@ -37,8 +37,8 @@ import java.util.Set;
 import static io.moquette.broker.PostOfficePublishTest.PUBLISHER_ID;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
 import static java.util.Collections.*;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 public class PostOfficeUnsubscribeTest {
 
@@ -58,7 +58,7 @@ public class PostOfficeUnsubscribeTest {
     public static final BrokerConfiguration CONFIG = new BrokerConfiguration(true, true, false, false);
     private MemoryQueueRepository queueRepository;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         connectMessage = MqttMessageBuilders.connect()
             .clientId(FAKE_CLIENT_ID)
@@ -133,7 +133,7 @@ public class PostOfficeUnsubscribeTest {
         sut.unsubscribe(singletonList(BAD_FORMATTED_TOPIC), connection, 1);
 
         // Verify
-        assertFalse("Unsubscribe with bad topic MUST close drop the connection, (issue 68)", channel.isOpen());
+        assertFalse(channel.isOpen(), "Unsubscribe with bad topic MUST close drop the connection, (issue 68)");
     }
 
     @Test
@@ -172,7 +172,7 @@ public class PostOfficeUnsubscribeTest {
         sut.unsubscribe(Collections.singletonList(topic), connection, messageId);
 
         MqttUnsubAckMessage unsubAckMessageAck = channel.readOutbound();
-        assertEquals("Unsubscribe must be accepted", messageId, unsubAckMessageAck.variableHeader().messageId());
+        assertEquals(messageId, unsubAckMessageAck.variableHeader().messageId(), "Unsubscribe must be accepted");
     }
 
     @Test
@@ -312,7 +312,7 @@ public class PostOfficeUnsubscribeTest {
 
         subscriberConnection.processDisconnect(null);
 
-        assertFalse("after a disconnect the client should be disconnected", subscriberChannel.isOpen());
+        assertFalse(subscriberChannel.isOpen(), "after a disconnect the client should be disconnected");
     }
 
     @Test
@@ -352,7 +352,7 @@ public class PostOfficeUnsubscribeTest {
             .payload(bytePayload)
             .qos(MqttQoS.EXACTLY_ONCE)
             .retained(true)
-            .topicName(NEWS_TOPIC).build(), "username");
+            .topicName(topic).build(), "username");
     }
 
     /**

@@ -6,12 +6,12 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.MqttQoS;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class SessionTest {
 
@@ -33,13 +33,12 @@ public class SessionTest {
             sendQoS1To(client, destinationTopic, "Hello World " + i + "!");
         }
 
-        assertEquals("Inflight zone must be full, and the 11th message must be queued",
-            1, queuedMessages.size());
+        assertEquals(1, queuedMessages.size(), "Inflight zone must be full, and the 11th message must be queued");
         // Exercise
         client.pubAckReceived(1);
 
         // Verify
-        assertTrue("Messages should be drained", queuedMessages.isEmpty());
+        assertTrue(queuedMessages.isEmpty(), "Messages should be drained");
     }
 
     private void sendQoS1To(Session client, Topic destinationTopic, String message) {

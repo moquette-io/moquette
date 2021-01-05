@@ -21,15 +21,19 @@ import io.moquette.broker.config.IConfig;
 import io.moquette.broker.config.MemoryConfig;
 import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
-import org.junit.*;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Properties;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class ServerIntegrationPahoTest {
 
@@ -41,8 +45,8 @@ public class ServerIntegrationPahoTest {
     MessageCollector m_messagesCollector;
     IConfig m_config;
 
-    @Rule
-    public TemporaryFolder tempFolder = new TemporaryFolder();
+    @TempDir
+    Path tempFolder;
     private String dbPath;
 
     protected void startServer(String dbPath) throws IOException {
@@ -52,13 +56,13 @@ public class ServerIntegrationPahoTest {
         m_server.startServer(m_config);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         dbPath = IntegrationUtils.tempH2Path(tempFolder);
         startServer(dbPath);
 
-        MqttClientPersistence dataStore = new MqttDefaultFilePersistence(tempFolder.newFolder("client").getAbsolutePath());
-        MqttClientPersistence pubDataStore = new MqttDefaultFilePersistence(tempFolder.newFolder("publisher").getAbsolutePath());
+        MqttClientPersistence dataStore = new MqttDefaultFilePersistence(IntegrationUtils.newFolder(tempFolder, "client").getAbsolutePath());
+        MqttClientPersistence pubDataStore = new MqttDefaultFilePersistence(IntegrationUtils.newFolder(tempFolder, "publisher").getAbsolutePath());
 
         m_client = new MqttClient("tcp://localhost:1883", "TestClient", dataStore);
         m_messagesCollector = new MessageCollector();
@@ -67,7 +71,7 @@ public class ServerIntegrationPahoTest {
         m_publisher = new MqttClient("tcp://localhost:1883", "Publisher", pubDataStore);
     }
 
-    @After
+    @AfterEach
     public void tearDown() throws Exception {
         if (m_client != null && m_client.isConnected()) {
             m_client.disconnect();
@@ -78,15 +82,13 @@ public class ServerIntegrationPahoTest {
         }
 
         stopServer();
-
-        tempFolder.delete();
     }
 
     private void stopServer() {
         m_server.stopServer();
     }
 
-    @Ignore("This test hasn't any meaning using in memory storage service")
+    @Disabled("This test hasn't any meaning using in memory storage service")
     @Test
     public void testCleanSession_maintainClientSubscriptions_withServerRestart() throws Exception {
         LOG.info("*** testCleanSession_maintainClientSubscriptions_withServerRestart ***");
@@ -116,7 +118,7 @@ public class ServerIntegrationPahoTest {
     public void checkSubscribersGetCorrectQosNotifications() throws Exception {
         LOG.info("*** checkSubscribersGetCorrectQosNotifications ***");
 
-        MqttClientPersistence dsSubscriberA = new MqttDefaultFilePersistence(tempFolder.newFolder("subscriberA").getAbsolutePath());
+        MqttClientPersistence dsSubscriberA = new MqttDefaultFilePersistence(IntegrationUtils.newFolder(tempFolder, "subscriberA").getAbsolutePath());
 
         MqttClient subscriberA = new MqttClient("tcp://localhost:1883", "SubscriberA", dsSubscriberA);
         MessageCollector cbSubscriberA = new MessageCollector();
@@ -124,7 +126,7 @@ public class ServerIntegrationPahoTest {
         subscriberA.connect();
         subscriberA.subscribe("a/b", 1);
 
-        MqttClientPersistence dsSubscriberB = new MqttDefaultFilePersistence(tempFolder.newFolder("subscriberB").getAbsolutePath());
+        MqttClientPersistence dsSubscriberB = new MqttDefaultFilePersistence(IntegrationUtils.newFolder(tempFolder, "subscriberB").getAbsolutePath());
 
         MqttClient subscriberB = new MqttClient("tcp://localhost:1883", "SubscriberB", dsSubscriberB);
         MessageCollector cbSubscriberB = new MessageCollector();
@@ -141,7 +143,7 @@ public class ServerIntegrationPahoTest {
         subscriberA.disconnect();
 
         MqttMessage messageOnB = cbSubscriberB.waitMessage(1);
-        assertNotNull("MUST be a received message", messageOnB);
+        assertNotNull(messageOnB, "MUST be a received message");
         assertEquals("Hello world MQTT!!", new String(messageOnB.getPayload(), UTF_8));
         assertEquals(2, messageOnB.getQos());
         subscriberB.disconnect();
@@ -152,7 +154,7 @@ public class ServerIntegrationPahoTest {
         LOG.info("*** testSubcriptionDoesntStayActiveAfterARestart ***");
         // clientForSubscribe1 connect and subscribe to /topic QoS2
         MqttClientPersistence dsSubscriberA = new MqttDefaultFilePersistence(
-                tempFolder.newFolder("clientForSubscribe1").getAbsolutePath());
+            IntegrationUtils.newFolder(tempFolder, "clientForSubscribe1").getAbsolutePath());
 
         MqttClient clientForSubscribe1 = new MqttClient("tcp://localhost:1883", "clientForSubscribe1", dsSubscriberA);
         MessageCollector cbSubscriber1 = new MessageCollector();
@@ -168,7 +170,7 @@ public class ServerIntegrationPahoTest {
 
         // clientForSubscribe2 connect and subscribe to /topic QoS2
         MqttClientPersistence dsSubscriberB = new MqttDefaultFilePersistence(
-            tempFolder.newFolder("clientForSubscribe2").getAbsolutePath());
+            IntegrationUtils.newFolder(tempFolder, "clientForSubscribe2").getAbsolutePath());
         MqttClient clientForSubscribe2 = new MqttClient("tcp://localhost:1883", "clientForSubscribe2", dsSubscriberB);
         MessageCollector cbSubscriber2 = new MessageCollector();
         clientForSubscribe2.setCallback(cbSubscriber2);
@@ -177,7 +179,7 @@ public class ServerIntegrationPahoTest {
 
         // clientForPublish publish on /topic with QoS2 a message
         MqttClientPersistence dsSubscriberPUB = new MqttDefaultFilePersistence(
-            tempFolder.newFolder("clientForPublish").getAbsolutePath());
+            IntegrationUtils.newFolder(tempFolder, "clientForPublish").getAbsolutePath());
         MqttClient clientForPublish = new MqttClient("tcp://localhost:1883", "clientForPublish", dsSubscriberPUB);
         clientForPublish.connect();
         clientForPublish.publish("topic", "Hello".getBytes(UTF_8), 2, true);

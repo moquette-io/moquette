@@ -25,15 +25,15 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttVersion;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import static io.moquette.broker.NettyChannelAssertions.assertEqualsConnAck;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
-import static org.junit.Assert.*;
-import static org.mockito.Matchers.any;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -54,7 +54,7 @@ public class MQTTConnectionConnectTest {
     private PostOffice postOffice;
     private MemoryQueueRepository queueRepository;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         connMsg = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_3_1).cleanSession(true);
 
@@ -101,8 +101,8 @@ public class MQTTConnectionConnectTest {
         sut.processConnect(msg);
         assertEqualsConnAck("Connection must be accepted", CONNECTION_ACCEPTED, channel.readOutbound());
         assertNotNull("unique clientid must be generated", sut.getClientId());
-        assertTrue("clean session flag must be true", sessionRegistry.retrieve(sut.getClientId()).isClean());
-        assertTrue("Connection must be open", channel.isOpen());
+        assertTrue(sessionRegistry.retrieve(sut.getClientId()).isClean(), "clean session flag must be true");
+        assertTrue(channel.isOpen(), "Connection must be open");
     }
 
     @Test
@@ -117,7 +117,7 @@ public class MQTTConnectionConnectTest {
 
         // Verify
         assertEqualsConnAck(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD, channel.readOutbound());
-        assertFalse("Connection should be closed by the broker.", channel.isOpen());
+        assertFalse(channel.isOpen(), "Connection should be closed by the broker.");
     }
 
     @Test
@@ -142,7 +142,7 @@ public class MQTTConnectionConnectTest {
 
         // Verify
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
-        assertTrue("Connection is accepted and therefore should remain open", channel.isOpen());
+        assertTrue(channel.isOpen(), "Connection is accepted and therefore should remain open");
     }
 
     @Test
@@ -160,7 +160,7 @@ public class MQTTConnectionConnectTest {
 
         // Verify
         verify(postOfficeMock).fireWill(any(Session.Will.class));
-        assertFalse("Connection MUST be disconnected", sut.isConnected());
+        assertFalse(sut.isConnected(), "Connection MUST be disconnected");
     }
 
     @Test
@@ -172,7 +172,7 @@ public class MQTTConnectionConnectTest {
 
         // Verify
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
-        assertTrue("Connection is accepted and therefore must remain open", channel.isOpen());
+        assertTrue(channel.isOpen(), "Connection is accepted and therefore must remain open");
     }
 
     @Test
@@ -185,7 +185,7 @@ public class MQTTConnectionConnectTest {
 
         // Verify
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
-        assertTrue("Connection is accepted and therefore must remain open", channel.isOpen());
+        assertTrue(channel.isOpen(), "Connection is accepted and therefore must remain open");
     }
 
     @Test
@@ -199,7 +199,7 @@ public class MQTTConnectionConnectTest {
 
         // Verify
         assertEqualsConnAck(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD, channel.readOutbound());
-        assertFalse("Connection must be closed by the broker", channel.isOpen());
+        assertFalse(channel.isOpen(), "Connection must be closed by the broker");
     }
 
     @Test
@@ -215,7 +215,7 @@ public class MQTTConnectionConnectTest {
 
         // Verify
         assertEqualsConnAck(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD, channel.readOutbound());
-        assertFalse("Connection must be closed by the broker", channel.isOpen());
+        assertFalse(channel.isOpen(), "Connection must be closed by the broker");
     }
 
     @Test
@@ -232,7 +232,7 @@ public class MQTTConnectionConnectTest {
 
         // Verify
         assertEqualsConnAck(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD, channel.readOutbound());
-        assertFalse("Connection should be closed by the broker.", channel.isOpen());
+        assertFalse(channel.isOpen(), "Connection should be closed by the broker.");
     }
 
     @Test
@@ -251,7 +251,7 @@ public class MQTTConnectionConnectTest {
         sut.processConnect(msg);
         assertEqualsConnAck("Zero byte client identifiers are not allowed",
                             CONNECTION_REFUSED_IDENTIFIER_REJECTED, channel.readOutbound());
-        assertFalse("Connection must closed", channel.isOpen());
+        assertFalse(channel.isOpen(), "Connection must closed");
     }
 
     @Test
@@ -264,7 +264,7 @@ public class MQTTConnectionConnectTest {
         sut.processConnect(msg);
         assertEqualsConnAck("Identifier must be rejected due to having clean session set to false",
                             CONNECTION_REFUSED_IDENTIFIER_REJECTED, channel.readOutbound());
-        assertFalse("Connection must be closed by the broker", channel.isOpen());
+        assertFalse(channel.isOpen(), "Connection must be closed by the broker");
     }
 
     @Test
@@ -296,8 +296,8 @@ public class MQTTConnectionConnectTest {
         // the evil client gets a not auth notification
         assertEqualsConnAck(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD, evilChannel.readOutbound());
         // the good client remains connected
-        assertTrue("Original connected client must remain connected", channel.isOpen());
-        assertFalse("Channel trying to connect with bad credentials must be closed", evilChannel.isOpen());
+        assertTrue(channel.isOpen(), "Original connected client must remain connected");
+        assertFalse(evilChannel.isOpen(), "Channel trying to connect with bad credentials must be closed");
     }
 
     @Test
@@ -316,7 +316,7 @@ public class MQTTConnectionConnectTest {
         assertEqualsConnAck(CONNECTION_ACCEPTED, anotherChannel.readOutbound());
 
         // Verify
-        assertFalse("First 'FAKE_CLIENT_ID' channel MUST be closed by the broker", channel.isOpen());
-        assertTrue("Second 'FAKE_CLIENT_ID' channel MUST be still open", anotherChannel.isOpen());
+        assertFalse(channel.isOpen(), "First 'FAKE_CLIENT_ID' channel MUST be closed by the broker");
+        assertTrue(anotherChannel.isOpen(), "Second 'FAKE_CLIENT_ID' channel MUST be still open");
     }
 }

@@ -17,20 +17,20 @@ package io.moquette.persistence;
 
 import io.moquette.BrokerConstants;
 import org.h2.mvstore.MVStore;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class H2PersistentQueueTest {
 
     private MVStore mvStore;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         this.mvStore = new MVStore.Builder()
             .fileName(BrokerConstants.DEFAULT_PERSISTENT_PATH)
@@ -38,7 +38,7 @@ public class H2PersistentQueueTest {
             .open();
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         File dbFile = new File(BrokerConstants.DEFAULT_PERSISTENT_PATH);
         if (dbFile.exists()) {
@@ -56,7 +56,7 @@ public class H2PersistentQueueTest {
 
         assertEquals("Hello", sut.peek());
         assertEquals("Hello", sut.peek());
-        assertEquals("peek just return elements, doesn't remove them", 2, sut.size());
+        assertEquals(2, sut.size(), "peek just return elements, doesn't remove them");
     }
 
     @Test
@@ -67,10 +67,10 @@ public class H2PersistentQueueTest {
 
         assertEquals("Hello", sut.poll());
         assertEquals("world", sut.poll());
-        assertTrue("after poll 2 elements inserted before, should be empty", sut.isEmpty());
+        assertTrue(sut.isEmpty(), "after poll 2 elements inserted before, should be empty");
     }
 
-    @Ignore
+    @Disabled
     @Test
     public void testPerformance() {
         H2PersistentQueue<String> sut = new H2PersistentQueue<>(this.mvStore, "test");
@@ -85,7 +85,7 @@ public class H2PersistentQueueTest {
             assertEquals("Hello", sut.poll());
         }
 
-        assertTrue("should be empty", sut.isEmpty());
+        assertTrue(sut.isEmpty(), "should be empty");
     }
 
     @Test
@@ -108,6 +108,6 @@ public class H2PersistentQueueTest {
 
         assertEquals("crazy", after.poll());
         assertEquals("world", after.poll());
-        assertTrue("should be empty", after.isEmpty());
+        assertTrue(after.isEmpty(), "should be empty");
     }
 }

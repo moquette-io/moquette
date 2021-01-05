@@ -17,22 +17,23 @@ package io.moquette.broker.subscriptions;
 
 
 import io.netty.handler.codec.mqtt.MqttQoS;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
 import java.util.Set;
 
 import static io.moquette.broker.subscriptions.Topic.asTopic;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class CTrieTest {
 
     private CTrie sut;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         sut = new CTrie();
     }
@@ -44,7 +45,7 @@ public class CTrieTest {
 
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/"));
-        assertTrue("Node on path / must be present", matchedNode.isPresent());
+        assertTrue(matchedNode.isPresent(), "Node on path / must be present");
         //verify structure, only root INode and the first CNode should be present
         assertThat(this.sut.root.mainNode().subscriptions).isEmpty();
         assertThat(this.sut.root.mainNode().allChildren()).isNotEmpty();
@@ -65,7 +66,7 @@ public class CTrieTest {
 
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/temp"));
-        assertTrue("Node on path /temp must be present", matchedNode.isPresent());
+        assertTrue(matchedNode.isPresent(), "Node on path /temp must be present");
         assertFalse(matchedNode.get().subscriptions.isEmpty());
     }
 
@@ -78,7 +79,7 @@ public class CTrieTest {
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/humidity"));
 
         //Verify
-        assertFalse("Node on path /humidity can't be present", matchedNode.isPresent());
+        assertFalse(matchedNode.isPresent(), "Node on path /humidity can't be present");
     }
 
     @Test
@@ -92,7 +93,7 @@ public class CTrieTest {
 
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/temp"));
-        assertTrue("Node on path /temp must be present", matchedNode.isPresent());
+        assertTrue(matchedNode.isPresent(), "Node on path /temp must be present");
         final Set<Subscription> subscriptions = matchedNode.get().subscriptions;
         assertTrue(subscriptions.contains(newSubscription));
     }
@@ -107,7 +108,7 @@ public class CTrieTest {
 
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/italy/happiness"));
-        assertTrue("Node on path /italy/happiness must be present", matchedNode.isPresent());
+        assertTrue(matchedNode.isPresent(), "Node on path /italy/happiness must be present");
         final Set<Subscription> subscriptions = matchedNode.get().subscriptions;
         assertTrue(subscriptions.contains(happinessSensor));
     }
@@ -125,7 +126,7 @@ public class CTrieTest {
 
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/temp"));
-        assertFalse("Node on path /temp can't be present", matchedNode.isPresent());
+        assertFalse(matchedNode.isPresent(), "Node on path /temp can't be present");
     }
 
     @Test
@@ -134,7 +135,7 @@ public class CTrieTest {
         sut.removeFromTree(asTopic("test"), "TempSensor1");
 
         sut.addToTree(clientSubOnTopic("TempSensor1", "test"));
-        assertTrue(sut.root.mainNode().allChildren().size() == 1);  // looking to see if TNode is cleaned up
+        assertEquals(1, sut.root.mainNode().allChildren().size());  // looking to see if TNode is cleaned up
     }
 
     @Test
@@ -149,7 +150,7 @@ public class CTrieTest {
 
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/temp"));
-        assertFalse("Node on path /temp can't be present", matchedNode.isPresent());
+        assertFalse(matchedNode.isPresent(), "Node on path /temp can't be present");
     }
 
     @Test
@@ -163,11 +164,11 @@ public class CTrieTest {
 
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/temp"));
-        assertFalse("Node on path /temp can't be present", matchedNode.isPresent());
+        assertFalse(matchedNode.isPresent(), "Node on path /temp can't be present");
     }
 
     @Test
-    public void givenTreeWithSomeNodeHierarchWhenRemoveContainedSubscriptionThenNodeIsUpdated() {
+    public void givenTreeWithSomeNodeHierarchyWhenRemoveContainedSubscriptionThenNodeIsUpdated() {
         sut.addToTree(clientSubOnTopic("TempSensor1", "/temp/1"));
         sut.addToTree(clientSubOnTopic("TempSensor1", "/temp/2"));
 
@@ -209,7 +210,7 @@ public class CTrieTest {
 
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/bah/bin/bash"));
-        assertFalse("Node on path /temp can't be present", matchedNode.isPresent());
+        assertFalse(matchedNode.isPresent(), "Node on path /temp can't be present");
     }
 
     @Test

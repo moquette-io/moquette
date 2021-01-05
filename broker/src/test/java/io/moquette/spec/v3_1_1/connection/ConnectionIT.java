@@ -17,28 +17,29 @@
 package io.moquette.spec.v3_1_1.connection;
 
 import io.moquette.broker.Server;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Properties;
 
 import io.moquette.BrokerConstants;
 import io.moquette.integration.IntegrationUtils;
 import io.moquette.testclient.RawClient;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
 public class ConnectionIT {
 
     Server m_server;
 
-    @Rule
-    public TemporaryFolder tempFolder = new TemporaryFolder();
+    @TempDir
+    Path tempFolder;
 
     protected void startServer(String dbPath) throws IOException {
         final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
@@ -46,27 +47,26 @@ public class ConnectionIT {
         m_server.startServer(configProps);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         String dbPath = IntegrationUtils.tempH2Path(tempFolder);
         startServer(dbPath);
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         m_server.stopServer();
 
         File dbFile = new File(BrokerConstants.DEFAULT_PERSISTENT_PATH);
         if (dbFile.exists()) {
-            assertTrue(
-                    "Error deleting the moquette db file " + BrokerConstants.DEFAULT_PERSISTENT_PATH,
-                    dbFile.delete());
+            assertTrue(dbFile.delete(),
+                "Error deleting the moquette db file " + BrokerConstants.DEFAULT_PERSISTENT_PATH);
         }
         assertFalse(dbFile.exists());
-        tempFolder.delete();
     }
 
-    @Test(timeout = 3000)
+    @Test
+    @Timeout(3)
     public void testConnectThenClose() throws Exception {
         RawClient.connect("127.0.0.1", 1883).isConnected()
                 // CONNECT
@@ -108,7 +108,8 @@ public class ConnectionIT {
                 .closed(1000);
     }
 
-    @Test(timeout = 3000)
+    @Test
+    @Timeout(3)
     public void testConnectWithInvalidWillQoS() throws Exception {
         RawClient.connect("127.0.0.1", 1883).isConnected()
                 // CONNECT
@@ -137,8 +138,9 @@ public class ConnectionIT {
                 .closed(1000);
     }
 
-    @Ignore("Need to validate the test case.")
-    @Test(timeout = 15000)
+    @Disabled("Need to validate the test case.")
+    @Test
+    @Timeout(15)
     public void testConnectWithWillFlagSetToZeroButWillQoSFlagSetToNonZero() throws Exception {
         RawClient.connect("127.0.0.1", 1883).isConnected()
                 // CONNECT

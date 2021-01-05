@@ -23,19 +23,19 @@ import org.eclipse.paho.client.mqttv3.IMqttClient;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Properties;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class ServerIntegrationQoSValidationTest {
 
@@ -48,8 +48,8 @@ public class ServerIntegrationQoSValidationTest {
     MessageCollector m_callback;
     IConfig m_config;
 
-    @Rule
-    public TemporaryFolder tempFolder = new TemporaryFolder();
+    @TempDir
+    Path tempFolder;
 
     protected void startServer(String dbPath) throws IOException {
         m_server = new Server();
@@ -58,7 +58,7 @@ public class ServerIntegrationQoSValidationTest {
         m_server.startServer(m_config);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         String dbPath = IntegrationUtils.tempH2Path(tempFolder);
         startServer(dbPath);
@@ -72,7 +72,7 @@ public class ServerIntegrationQoSValidationTest {
         m_publisher.connect();
     }
 
-    @After
+    @AfterEach
     public void tearDown() throws Exception {
         if (m_publisher.isConnected()) {
             m_publisher.disconnect();
@@ -83,7 +83,6 @@ public class ServerIntegrationQoSValidationTest {
         }
 
         m_server.stopServer();
-        tempFolder.delete();
     }
 
     @Test

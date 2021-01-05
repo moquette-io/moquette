@@ -24,18 +24,24 @@ import io.moquette.broker.security.DBAuthenticator;
 import io.moquette.broker.security.DBAuthenticatorTest;
 import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
-import org.junit.*;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
 import java.util.Properties;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 public class ServerIntegrationDBAuthenticatorTest {
 
@@ -49,11 +55,11 @@ public class ServerIntegrationDBAuthenticatorTest {
     MessageCollector m_messagesCollector;
     IConfig m_config;
 
-    @Rule
-    public TemporaryFolder tempFolder = new TemporaryFolder();
+    @TempDir
+    Path tempFolder;
     private MqttClientPersistence pubDataStore;
 
-    @BeforeClass
+    @BeforeAll
     public static void beforeTests() throws NoSuchAlgorithmException, SQLException, ClassNotFoundException {
         dbAuthenticatorTest = new DBAuthenticatorTest();
         dbAuthenticatorTest.setup();
@@ -79,13 +85,13 @@ public class ServerIntegrationDBAuthenticatorTest {
         return properties;
     }
 
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         String dbPath = IntegrationUtils.tempH2Path(tempFolder);
         startServer(dbPath);
 
-        MqttClientPersistence dataStore = new MqttDefaultFilePersistence(tempFolder.newFolder("client").getAbsolutePath());
-        pubDataStore = new MqttDefaultFilePersistence(tempFolder.newFolder("publisher").getAbsolutePath());
+        MqttClientPersistence dataStore = new MqttDefaultFilePersistence(IntegrationUtils.newFolder(tempFolder, "client").getAbsolutePath());
+        pubDataStore = new MqttDefaultFilePersistence(IntegrationUtils.newFolder(tempFolder,"publisher").getAbsolutePath());
 
         m_client = new MqttClient("tcp://localhost:1883", "TestClient", dataStore);
         m_messagesCollector = new MessageCollector();
@@ -94,7 +100,7 @@ public class ServerIntegrationDBAuthenticatorTest {
         m_publisher = new MqttClient("tcp://localhost:1883", "Publisher", pubDataStore);
     }
 
-    @After
+    @AfterEach
     public void tearDown() throws Exception {
         if (m_client != null && m_client.isConnected()) {
             m_client.disconnect();
@@ -105,11 +111,9 @@ public class ServerIntegrationDBAuthenticatorTest {
         }
 
         stopServer();
-
-        tempFolder.delete();
     }
 
-    @AfterClass
+    @AfterAll
     public static void shutdown() {
         dbAuthenticatorTest.teardown();
     }
@@ -139,11 +143,11 @@ public class ServerIntegrationDBAuthenticatorTest {
                 assertTrue(true);
                 return;
             } else {
-                assertTrue(e.getMessage(), false);
+                fail("Failed with exception: " + e.getMessage());
                 return;
             }
         }
-        assertTrue("must not be connected. cause : wrong password given to client", false);
+        fail("must not be connected. cause : wrong password given to client");
     }
 
 }

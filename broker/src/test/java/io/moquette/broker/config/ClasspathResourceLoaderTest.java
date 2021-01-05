@@ -17,9 +17,8 @@
 package io.moquette.broker.config;
 
 import io.moquette.BrokerConstants;
-import org.junit.Test;
-
-import static org.junit.Assert.assertEquals;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class ClasspathResourceLoaderTest {
 

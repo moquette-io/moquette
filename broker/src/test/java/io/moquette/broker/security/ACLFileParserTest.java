@@ -16,12 +16,12 @@
 
 package io.moquette.broker.security;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import io.moquette.broker.subscriptions.Topic;
 import java.io.Reader;
 import java.io.StringReader;
 import java.text.ParseException;
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class ACLFileParserTest {
 
@@ -43,13 +43,13 @@ public class ACLFileParserTest {
         assertTrue(authorizations.isEmpty());
     }
 
-    @Test(expected = ParseException.class)
+    @Test
     public void testParseInvalidPaddedComment() throws ParseException {
         Reader conf = new StringReader(" #simple comment");
-        AuthorizationsCollector authorizations = ACLFileParser.parse(conf);
+        assertThrows(ParseException.class, () -> ACLFileParser.parse(conf));
 
         // Verify
-        assertTrue(authorizations.isEmpty());
+//        assertTrue(authorizations.isEmpty());
     }
 
     @Test

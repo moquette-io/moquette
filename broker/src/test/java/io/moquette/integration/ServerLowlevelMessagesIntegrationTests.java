@@ -23,20 +23,20 @@ import io.moquette.testclient.Client;
 import io.netty.handler.codec.mqtt.*;
 import io.netty.handler.codec.mqtt.MqttMessage;
 import org.eclipse.paho.client.mqttv3.*;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.awaitility.Awaitility;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class ServerLowlevelMessagesIntegrationTests {
 
@@ -49,8 +49,10 @@ public class ServerLowlevelMessagesIntegrationTests {
     IConfig m_config;
     MqttMessage receivedMsg;
 
-    @Rule
-    public TemporaryFolder tempFolder = new TemporaryFolder();
+//    @Rule
+//    public TemporaryFolder tempFolder = new TemporaryFolder();
+    @TempDir
+    Path tempFolder;
 
     protected void startServer(String dbPath) throws IOException {
         m_server = new Server();
@@ -59,7 +61,7 @@ public class ServerLowlevelMessagesIntegrationTests {
         m_server.startServer(m_config);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         String dbPath = IntegrationUtils.tempH2Path(tempFolder);
         startServer(dbPath);
@@ -69,14 +71,13 @@ public class ServerLowlevelMessagesIntegrationTests {
         m_willSubscriber.setCallback(m_messageCollector);
     }
 
-    @After
+    @AfterEach
     public void tearDown() throws Exception {
         m_client.close();
-        LOG.debug("After raw client close");
+//        LOG.debug("After raw client close");
         Thread.sleep(300); // to let the close event pass before integration stop event
         m_server.stopServer();
-        tempFolder.delete();
-        LOG.debug("After asked integration to stop");
+//        LOG.debug("After asked integration to stop");
     }
 
     @Test
@@ -127,7 +128,7 @@ public class ServerLowlevelMessagesIntegrationTests {
                 // but after the 2 KEEP ALIVE timeout expires it gets fired,
                 // NB it's 1,5 * KEEP_ALIVE so 3 secs and some millis to propagate the message
                 org.eclipse.paho.client.mqttv3.MqttMessage msg = m_messageCollector.getMessageImmediate();
-                assertNotNull("the will message should be fired after keep alive!", msg);
+                assertNotNull(msg, "will message should be fired after keep alive!");
                 // the will message hasn't to be received before the elapsing of Keep Alive timeout
                 assertTrue(System.currentTimeMillis() - connectTime > 3000);
                 assertEquals(willTestamentMsg, new String(msg.getPayload(), UTF_8));

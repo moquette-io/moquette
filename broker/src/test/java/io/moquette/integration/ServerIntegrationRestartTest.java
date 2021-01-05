@@ -21,20 +21,21 @@ import io.moquette.broker.config.IConfig;
 import io.moquette.broker.config.MemoryConfig;
 import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Properties;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class ServerIntegrationRestartTest {
 
@@ -46,8 +47,8 @@ public class ServerIntegrationRestartTest {
     IConfig m_config;
     MessageCollector m_messageCollector;
 
-    @Rule
-    public TemporaryFolder tempFolder = new TemporaryFolder();
+    @TempDir
+    Path tempFolder;
     private String dbPath;
     private MqttClientPersistence pubDataStore;
     private MqttClientPersistence subDataStore;
@@ -59,19 +60,19 @@ public class ServerIntegrationRestartTest {
         m_server.startServer(m_config);
     }
 
-    @BeforeClass
+    @BeforeAll
     public static void beforeTests() {
         CLEAN_SESSION_OPT.setCleanSession(false);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         dbPath = IntegrationUtils.tempH2Path(tempFolder);
 
         startServer(dbPath);
 
-        pubDataStore = new MqttDefaultFilePersistence(tempFolder.newFolder("publisher").getAbsolutePath());
-        subDataStore = new MqttDefaultFilePersistence(tempFolder.newFolder("subscriber").getAbsolutePath());
+        pubDataStore = new MqttDefaultFilePersistence(IntegrationUtils.newFolder(tempFolder, "publisher").getAbsolutePath());
+        subDataStore = new MqttDefaultFilePersistence(IntegrationUtils.newFolder(tempFolder, "subscriber").getAbsolutePath());
         m_subscriber = new MqttClient("tcp://localhost:1883", "Subscriber", subDataStore);
         m_messageCollector = new MessageCollector();
         m_subscriber.setCallback(m_messageCollector);
@@ -79,7 +80,7 @@ public class ServerIntegrationRestartTest {
         m_publisher = new MqttClient("tcp://localhost:1883", "Publisher", pubDataStore);
     }
 
-    @After
+    @AfterEach
     public void tearDown() throws Exception {
         if (m_subscriber != null && m_subscriber.isConnected()) {
             m_subscriber.disconnect();
@@ -90,8 +91,6 @@ public class ServerIntegrationRestartTest {
         }
 
         m_server.stopServer();
-
-        tempFolder.delete();
     }
 
     @Test

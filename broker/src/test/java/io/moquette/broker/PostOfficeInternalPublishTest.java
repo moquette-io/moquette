@@ -25,8 +25,8 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.*;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.Set;
 
@@ -35,7 +35,7 @@ import static io.netty.handler.codec.mqtt.MqttQoS.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class PostOfficeInternalPublishTest {
 
@@ -56,7 +56,7 @@ public class PostOfficeInternalPublishTest {
     private MemoryRetainedRepository retainedRepository;
     private MemoryQueueRepository queueRepository;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         sessionRegistry = initPostOfficeAndSubsystems();
 
@@ -306,6 +306,6 @@ public class PostOfficeInternalPublishTest {
 
     private void verifyNoPublishIsReceived(EmbeddedChannel channel) {
         final Object messageReceived = channel.readOutbound();
-        assertNull("Received an out message from processor while not expected", messageReceived);
+        assertNull(messageReceived, "Received an out message from processor while not expected");
     }
 }

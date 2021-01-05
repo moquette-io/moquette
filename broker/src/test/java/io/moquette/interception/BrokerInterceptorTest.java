@@ -22,16 +22,16 @@ import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttQoS;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Matchers.refEq;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.refEq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -92,13 +92,13 @@ public class BrokerInterceptorTest {
     private static final BrokerInterceptor interceptor = new BrokerInterceptor(
         Collections.<InterceptHandler>singletonList(new MockObserver()));
 
-    @BeforeClass
+    @BeforeAll
     public static void beforeAllTests() {
         // check if any of the handler methods was called before notifications
         assertEquals(0, n.get());
     }
 
-    @AfterClass
+    @AfterAll
     public static void afterAllTests() {
         interceptor.stop();
     }

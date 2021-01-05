@@ -16,22 +16,23 @@
 
 package io.moquette.broker.config;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.Reader;
 import java.io.StringReader;
 import java.text.ParseException;
 import java.util.Properties;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ConfigurationParserTest {
 
     ConfigurationParser m_parser;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         m_parser = new ConfigurationParser();
     }
@@ -64,10 +65,10 @@ public class ConfigurationParserTest {
         assertTrue(m_parser.getProperties().isEmpty());
     }
 
-    @Test(expected = ParseException.class)
+    @Test
     public void parseInvalidComment() throws ParseException {
         Reader conf = new StringReader(" #simple comment");
-        m_parser.parse(conf);
+        assertThrows(ParseException.class, () -> m_parser.parse(conf));
     }
 
     @Test

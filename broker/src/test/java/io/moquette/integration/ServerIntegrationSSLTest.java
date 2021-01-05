@@ -18,12 +18,12 @@ package io.moquette.integration;
 
 import io.moquette.broker.Server;
 
-import static io.moquette.BrokerConstants.DEFAULT_MOQUETTE_STORE_H2_DB_FILENAME;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -44,13 +44,12 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,15 +87,15 @@ public class ServerIntegrationSSLTest {
 
     protected String dbPath;
 
-    @Rule
-    public TemporaryFolder tempFolder = new TemporaryFolder();
+    @TempDir
+    Path tempFolder;
 
-    @BeforeClass
+    @BeforeAll
     public static void beforeTests() {
         backup = System.getProperty("moquette.path");
     }
 
-    @AfterClass
+    @AfterAll
     public static void afterTests() {
         if (backup == null)
             System.clearProperty("moquette.path");
@@ -118,15 +117,15 @@ public class ServerIntegrationSSLTest {
         m_server.startServer(sslProps);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         dbPath = IntegrationUtils.tempH2Path(tempFolder);
         File dbFile = new File(dbPath);
-        assertFalse(String.format("The DB storagefile %s already exists", dbPath), dbFile.exists());
+        assertFalse(dbFile.exists(), String.format("The DB storagefile %s already exists", dbPath));
 
         startServer();
 
-        MqttClientPersistence dataStore = new MqttDefaultFilePersistence(tempFolder.newFolder("client").getAbsolutePath());
+        MqttClientPersistence dataStore = new MqttDefaultFilePersistence(IntegrationUtils.newFolder(tempFolder, "client").getAbsolutePath());
         m_client = new MqttClient("ssl://localhost:8883", "TestClient", dataStore);
         // m_client = new MqttClient("ssl://test.mosquitto.org:8883", "TestClient", s_dataStore);
 
@@ -134,7 +133,7 @@ public class ServerIntegrationSSLTest {
         m_client.setCallback(m_callback);
     }
 
-    @After
+    @AfterEach
     public void tearDown() throws Exception {
         if (m_client != null && m_client.isConnected()) {
             m_client.disconnect();
@@ -143,7 +142,6 @@ public class ServerIntegrationSSLTest {
         if (m_server != null) {
             m_server.stopServer();
         }
-        tempFolder.delete();
     }
 
     @Test

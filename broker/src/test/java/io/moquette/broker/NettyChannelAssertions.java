@@ -21,8 +21,8 @@ import io.netty.handler.codec.mqtt.MqttConnAckMessage;
 import io.netty.handler.codec.mqtt.MqttConnectReturnCode;
 import io.netty.handler.codec.mqtt.MqttSubAckMessage;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Some useful assertions used by Netty's EmbeddedChannel in tests.
@@ -34,13 +34,13 @@ public final class NettyChannelAssertions {
     }
 
     public static void assertEqualsConnAck(String msg, MqttConnectReturnCode expectedCode, Object connAck) {
-        assertTrue("connAck is not an instance of ConnAckMessage", connAck instanceof MqttConnAckMessage);
+        assertTrue(connAck instanceof MqttConnAckMessage, "connAck is not an instance of ConnAckMessage");
         MqttConnAckMessage connAckMsg = (MqttConnAckMessage) connAck;
 
         if (msg == null)
             assertEquals(expectedCode, connAckMsg.variableHeader().connectReturnCode());
         else
-            assertEquals(msg, expectedCode, connAckMsg.variableHeader().connectReturnCode());
+            assertEquals(expectedCode, connAckMsg.variableHeader().connectReturnCode(), msg);
     }
 
     public static void assertConnAckAccepted(EmbeddedChannel channel) {

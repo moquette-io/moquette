@@ -29,23 +29,22 @@ import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Properties;
 
 
 import static io.moquette.broker.ConnectionTestUtils.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class ServerIntegrationPahoCanPublishOnReadBlockedTopicTest {
 
@@ -62,8 +61,8 @@ public class ServerIntegrationPahoCanPublishOnReadBlockedTopicTest {
     IConfig m_config;
     private boolean canRead;
 
-    @Rule
-    public TemporaryFolder tempFolder = new TemporaryFolder();
+    @TempDir
+    Path tempFolder;
 
     protected void startServer(String dbPath) {
         m_server = new Server();
@@ -88,13 +87,13 @@ public class ServerIntegrationPahoCanPublishOnReadBlockedTopicTest {
         m_server.startServer(m_config, EMPTY_OBSERVERS, null, new AcceptAllAuthenticator(), switchingAuthorizator);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         String dbPath = IntegrationUtils.tempH2Path(tempFolder);
         startServer(dbPath);
 
-        MqttClientPersistence dataStore = new MqttDefaultFilePersistence(tempFolder.newFolder("client").getAbsolutePath());
-        MqttClientPersistence pubDataStore = new MqttDefaultFilePersistence(tempFolder.newFolder("publisher").getAbsolutePath());
+        MqttClientPersistence dataStore = new MqttDefaultFilePersistence(IntegrationUtils.newFolder(tempFolder,"client").getAbsolutePath());
+        MqttClientPersistence pubDataStore = new MqttDefaultFilePersistence(IntegrationUtils.newFolder(tempFolder,"publisher").getAbsolutePath());
 
         m_client = new MqttClient("tcp://localhost:1883", "TestClient", dataStore);
         m_messagesCollector = new MessageCollector();
@@ -103,7 +102,7 @@ public class ServerIntegrationPahoCanPublishOnReadBlockedTopicTest {
         m_publisher = new MqttClient("tcp://localhost:1883", "Publisher", pubDataStore);
     }
 
-    @After
+    @AfterEach
     public void tearDown() throws Exception {
         if (m_client != null && m_client.isConnected()) {
             m_client.disconnect();
@@ -114,8 +113,6 @@ public class ServerIntegrationPahoCanPublishOnReadBlockedTopicTest {
         }
 
         stopServer();
-
-        tempFolder.delete();
     }
 
     private void stopServer() {
@@ -162,6 +159,6 @@ public class ServerIntegrationPahoCanPublishOnReadBlockedTopicTest {
 
         // verify the message is not published
         final MqttMessage mqttMessage2 = m_messagesCollector.waitMessage(1);
-        assertNull("No message MUST be received", mqttMessage2);
+        assertNull(mqttMessage2, "No message MUST be received");
     }
 }

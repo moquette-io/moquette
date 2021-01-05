@@ -17,11 +17,11 @@ package io.moquette.broker;
 
 import io.moquette.BrokerConstants;
 import io.moquette.broker.config.MemoryConfig;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.Properties;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class BrokerConfigurationTest {
 
