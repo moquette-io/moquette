@@ -44,7 +44,6 @@ public class ResourceLoaderConfig extends IConfig {
          * If we use a conditional operator, the loadResource() and the loadDefaultResource()
          * methods will be always called. This makes the log traces confusing.
          */
-
         Reader configReader;
         if (configName != null) {
             configReader = resourceLoader.loadResource(configName);
