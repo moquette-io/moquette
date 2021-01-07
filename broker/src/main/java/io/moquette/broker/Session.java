@@ -356,7 +356,7 @@ class Session {
     }
 
     public void sendQueuedMessagesWhileOffline() {
-        LOG.trace("Republishing all saved messages for session {} on CId={}", this, this.clientId);
+        LOG.trace("Republishing all saved messages for session {}", this);
         drainQueueToConnection();
     }
 

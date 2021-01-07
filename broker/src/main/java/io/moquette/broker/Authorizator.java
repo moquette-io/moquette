@@ -56,18 +56,18 @@ final class Authorizator {
             Topic topic = new Topic(req.topicName());
             if (!policy.canRead(topic, username, clientID)) {
                 // send SUBACK with 0x80, the user hasn't credentials to read the topic
-                LOG.warn("Client does not have read permissions on the topic CId={}, username: {}, messageId: {}, " +
-                         "topic: {}", clientID, username, messageId, topic);
+                LOG.warn("Client does not have read permissions on the topic username: {}, messageId: {}, " +
+                         "topic: {}", username, messageId, topic);
                 ackTopics.add(new MqttTopicSubscription(topic.toString(), FAILURE));
             } else {
                 MqttQoS qos;
                 if (topic.isValid()) {
-                    LOG.debug("Client will be subscribed to the topic CId={}, username: {}, messageId: {}, topic: {}",
-                              clientID, username, messageId, topic);
+                    LOG.debug("Client will be subscribed to the topic username: {}, messageId: {}, topic: {}",
+                        username, messageId, topic);
                     qos = req.qualityOfService();
                 } else {
-                    LOG.warn("Topic filter is not valid CId={}, username: {}, messageId: {}, topic: {}", clientID,
-                             username, messageId, topic);
+                    LOG.warn("Topic filter is not valid username: {}, messageId: {}, topic: {}",
+                        username, messageId, topic);
                     qos = FAILURE;
                 }
                 ackTopics.add(new MqttTopicSubscription(topic.toString(), qos));

@@ -24,8 +24,8 @@ import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.mqtt.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
-import java.io.IOException;
 import java.util.List;
 
 import static io.moquette.broker.Utils.messageId;
@@ -42,8 +42,25 @@ public class MQTTMessageLogger extends ChannelDuplexHandler {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object message) throws Exception {
+        updateFishtags(ctx);
         logMQTTMessageRead(ctx, message);
         ctx.fireChannelRead(message);
+        MDC.clear();
+    }
+
+    @Override
+    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
+        updateFishtags(ctx);
+        ctx.fireChannelReadComplete();
+        MDC.clear();
+    }
+
+    private void updateFishtags(ChannelHandlerContext ctx) {
+        MDC.put("channel", ctx.channel().toString());
+        final String clientId = NettyUtils.clientID(ctx.channel());
+        if (clientId != null && !clientId.isEmpty()) {
+            MDC.put("client.id", "[" + clientId + "]");
+        }
     }
 
     private void logMQTTMessageRead(ChannelHandlerContext ctx, Object message) throws Exception {
@@ -61,6 +78,7 @@ public class MQTTMessageLogger extends ChannelDuplexHandler {
         MqttMessage msg = NettyUtils.validateMessage(message);
         String clientID = NettyUtils.clientID(ctx.channel());
         MqttMessageType messageType = msg.fixedHeader().messageType();
+        MDC.put("msg.type", "[" + messageType.name() + "]");
         switch (messageType) {
             case CONNACK:
             case PINGREQ:
@@ -102,16 +120,17 @@ public class MQTTMessageLogger extends ChannelDuplexHandler {
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        String clientID = NettyUtils.clientID(ctx.channel());
-        if (clientID != null && !clientID.isEmpty()) {
-            LOG.info("Channel closed <{}>", clientID);
-        }
+        updateFishtags(ctx);
+        LOG.info("Channel Inactive");
         ctx.fireChannelInactive();
+        MDC.clear();
     }
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+        updateFishtags(ctx);
         logMQTTMessageWrite(ctx, msg);
         ctx.write(msg, promise).addListener(CLOSE_ON_FAILURE);
+        MDC.clear();
     }
 }

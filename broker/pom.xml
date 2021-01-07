@@ -25,7 +25,15 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>1.7.5</version>
+            <version>1.7.25</version>
+        </dependency>
+
+        <dependency>
+            <!-- This is used to use log4j12 implementation -->
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+            <version>1.7.25</version>
+            <scope>runtime</scope>
         </dependency>
 
         <dependency>

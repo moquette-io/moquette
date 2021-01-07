@@ -138,12 +138,11 @@ class PostOffice {
             if (!validTopic) {
                 // close the connection, not valid topicFilter is a protocol violation
                 mqttConnection.dropConnection();
-                LOG.warn("Topic filter is not valid. CId={}, topics: {}, offending topic filter: {}", clientID,
-                         topics, topic);
+                LOG.warn("Topic filter is not valid. topics: {}, offending topic filter: {}", topics, topic);
                 return;
             }
 
-            LOG.trace("Removing subscription. CId={}, topic={}", clientID, topic);
+            LOG.trace("Removing subscription topic={}", topic);
             subscriptions.removeSubscription(topic, clientID);
 
             // TODO remove the subscriptions to Session
@@ -160,7 +159,7 @@ class PostOffice {
     void receivedPublishQos0(Topic topic, String username, String clientID, ByteBuf payload, boolean retain,
                              MqttPublishMessage msg) {
         if (!authorizator.canWrite(topic, username, clientID)) {
-            LOG.error("MQTT client: {} is not authorized to publish on topic: {}", clientID, topic);
+            LOG.error("client is not authorized to publish on topic: {}", topic);
             return;
         }
         publish2Subscribers(payload, topic, AT_MOST_ONCE);
@@ -237,7 +236,7 @@ class PostOffice {
 
         final String clientId = connection.getClientId();
         if (!authorizator.canWrite(topic, username, clientId)) {
-            LOG.error("MQTT client is not authorized to publish on topic. CId={}, topic: {}", clientId, topic);
+            LOG.error("MQTT client is not authorized to publish on topic: {}", topic);
             return;
         }
 
