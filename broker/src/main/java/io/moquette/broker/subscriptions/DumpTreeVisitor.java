@@ -24,7 +24,7 @@ class DumpTreeVisitor implements CTrie.IVisitor<String> {
     @Override
     public void visit(CNode node, int deep) {
         String indentTabs = indentTabs(deep);
-        s += indentTabs + (node.token == null ? "''" : node.token.toString()) + prettySubscriptions(node) + "\n";
+        s += indentTabs + (node.getToken() == null ? "''" : node.getToken().toString()) + prettySubscriptions(node) + "\n";
     }
 
     private String prettySubscriptions(CNode node) {

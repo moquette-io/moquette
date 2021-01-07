@@ -25,7 +25,7 @@ public class CTrie {
 
     CTrie() {
         final CNode mainNode = new CNode();
-        mainNode.token = ROOT;
+        mainNode.setToken(ROOT);
         this.root = new INode(mainNode);
     }
 
@@ -48,14 +48,14 @@ public class CTrie {
     }
 
     private NavigationAction evaluate(Topic topic, CNode cnode) {
-        if (Token.MULTI.equals(cnode.token)) {
+        if (Token.MULTI.equals(cnode.getToken())) {
             return NavigationAction.MATCH;
         }
         if (topic.isEmpty()) {
             return NavigationAction.STOP;
         }
         final Token token = topic.headToken();
-        if (!(Token.SINGLE.equals(cnode.token) || cnode.token.equals(token) || ROOT.equals(cnode.token))) {
+        if (!(Token.SINGLE.equals(cnode.getToken()) || cnode.getToken().equals(token) || ROOT.equals(cnode.getToken()))) {
             return NavigationAction.STOP;
         }
         return NavigationAction.GODEEP;
@@ -67,6 +67,9 @@ public class CTrie {
 
     private Set<Subscription> recursiveMatch(Topic topic, INode inode) {
         CNode cnode = inode.mainNode();
+        if (cnode instanceof TNode) {
+            return Collections.emptySet();
+        }
         NavigationAction action = evaluate(topic, cnode);
         if (action == NavigationAction.MATCH) {
             return cnode.subscriptions;
@@ -74,10 +77,7 @@ public class CTrie {
         if (action == NavigationAction.STOP) {
             return Collections.emptySet();
         }
-        if (cnode instanceof TNode) {
-            return Collections.emptySet();
-        }
-        Topic remainingTopic = (ROOT.equals(cnode.token)) ? topic : topic.exceptHeadToken();
+        Topic remainingTopic = (ROOT.equals(cnode.getToken())) ? topic : topic.exceptHeadToken();
         Set<Subscription> subscriptions = new HashSet<>();
         if (remainingTopic.isEmpty()) {
             subscriptions.addAll(cnode.subscriptions);
@@ -134,7 +134,7 @@ public class CTrie {
         if (!remainingTopic.isEmpty()) {
             INode inode = createPathRec(remainingTopic, newSubscription);
             CNode cnode = new CNode();
-            cnode.token = topic.headToken();
+            cnode.setToken(topic.headToken());
             cnode.add(inode);
             return new INode(cnode);
         } else {
@@ -144,7 +144,7 @@ public class CTrie {
 
     private INode createLeafNodes(Token token, Subscription newSubscription) {
         CNode newLeafCnode = new CNode();
-        newLeafCnode.token = token;
+        newLeafCnode.setToken(token);
         newLeafCnode.addSubscription(newSubscription);
 
         return new INode(newLeafCnode);
