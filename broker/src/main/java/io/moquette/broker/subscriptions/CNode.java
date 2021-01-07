@@ -19,7 +19,7 @@ import java.util.*;
 
 class CNode {
 
-    Token token;
+    private Token token;
     private List<INode> children;
     Set<Subscription> subscriptions;
 
@@ -33,6 +33,14 @@ class CNode {
         this.token = token; // keep reference, root comparison in directory logic relies on it for now.
         this.subscriptions = new HashSet<>(subscriptions);
         this.children = new ArrayList<>(children);
+    }
+
+    public Token getToken() {
+        return token;
+    }
+
+    public void setToken(Token token) {
+        this.token = token;
     }
 
     boolean anyChildrenMatch(Token token) {
@@ -75,6 +83,7 @@ class CNode {
     public void add(INode newINode) {
         this.children.add(newINode);
     }
+
     public void remove(INode node) {
         this.children.remove(node);
     }
