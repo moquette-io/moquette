@@ -67,8 +67,8 @@ public class SessionRegistry {
             ByteBuf copy = payload.copy();
             copy.readBytes(byteArr);
             copy.release();
-            oos.writeObject(byteArr.length);
-            oos.writeObject(byteArr);
+            oos.writeInt(byteArr.length);
+            oos.write(byteArr);
         }
 
         private void readObject(ObjectInputStream ois) throws ClassNotFoundException, IOException {
