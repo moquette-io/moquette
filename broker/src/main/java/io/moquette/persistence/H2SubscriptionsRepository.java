@@ -8,8 +8,8 @@ import org.h2.mvstore.MVStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 public class H2SubscriptionsRepository implements ISubscriptionsRepository {
 
@@ -23,10 +23,10 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
     }
 
     @Override
-    public List<Subscription> listAllSubscriptions() {
+    public Set<Subscription> listAllSubscriptions() {
         LOG.debug("Retrieving existing subscriptions");
 
-        List<Subscription> results = new ArrayList<>();
+        Set<Subscription> results = new HashSet<>();
         Cursor<String, Subscription> mapCursor = subscriptions.cursor(null);
         while (mapCursor.hasNext()) {
             String subscriptionStr = mapCursor.next();

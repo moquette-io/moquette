@@ -54,7 +54,7 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
      */
     @Override
     public Set<String> listAllSessionIds() {
-        final List<Subscription> subscriptions = subscriptionsRepository.listAllSubscriptions();
+        final Set<Subscription> subscriptions = subscriptionsRepository.listAllSubscriptions();
         final Set<String> clientIds = new HashSet<>(subscriptions.size());
         for (Subscription subscription : subscriptions) {
             clientIds.add(subscription.clientId);
