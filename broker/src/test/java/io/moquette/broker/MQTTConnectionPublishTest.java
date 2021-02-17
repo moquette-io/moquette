@@ -20,6 +20,7 @@ import io.moquette.broker.subscriptions.CTrieSubscriptionDirectory;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
 import io.moquette.broker.security.IAuthenticator;
 import io.moquette.persistence.MemorySubscriptionsRepository;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -81,16 +82,18 @@ public class MQTTConnectionPublishTest {
     @Test
     public void dropConnectionOnPublishWithInvalidTopicFormat() {
         // Connect message with clean session set to true and client id is null.
+        final ByteBuf payload = Unpooled.copiedBuffer("Hello MQTT world!".getBytes(UTF_8));
         MqttPublishMessage publish = MqttMessageBuilders.publish()
             .topicName("")
             .retained(false)
             .qos(MqttQoS.AT_MOST_ONCE)
-            .payload(Unpooled.copiedBuffer("Hello MQTT world!".getBytes(UTF_8))).build();
+            .payload(payload).build();
 
         sut.processPublish(publish);
 
         // Verify
         assertFalse(channel.isOpen(), "Connection should be closed by the broker");
+        payload.release();
     }
 
 }

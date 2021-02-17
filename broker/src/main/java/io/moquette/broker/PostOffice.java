@@ -237,6 +237,8 @@ class PostOffice {
         final String clientId = connection.getClientId();
         if (!authorizator.canWrite(topic, username, clientId)) {
             LOG.error("MQTT client is not authorized to publish on topic: {}", topic);
+            // msg not passed on, release payload.
+            payload.release();
             return;
         }
 
@@ -254,6 +256,8 @@ class PostOffice {
 
         String clientID = connection.getClientId();
         interceptor.notifyTopicPublished(mqttPublishMessage, clientID, username);
+        // none of the methods above released the payload, do it now.
+        payload.release();
     }
 
     static MqttQoS lowerQosToTheSubscriptionDesired(Subscription sub, MqttQoS qos) {

@@ -18,6 +18,7 @@ package io.moquette.broker;
 import io.moquette.broker.subscriptions.Topic;
 import io.moquette.broker.security.IAuthenticator;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufHolder;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -376,8 +377,9 @@ final class MQTTConnection {
             }
             case EXACTLY_ONCE: {
                 bindedSession.receivedPublishQos2(messageID, msg);
+                // Second pass-on, retain
+                msg.payload().retain();
                 postOffice.receivedPublishQos2(this, msg, username);
-//                msg.release();
                 break;
             }
             default:
@@ -426,6 +428,11 @@ final class MQTTConnection {
                 channelFuture = channel.write(msg);
             }
             channelFuture.addListener(FIRE_EXCEPTION_ON_FAILURE);
+        } else {
+            // msg not passed on, release.
+            if (msg instanceof ByteBufHolder) {
+                ((ByteBufHolder) msg).release();
+            }
         }
     }
 
