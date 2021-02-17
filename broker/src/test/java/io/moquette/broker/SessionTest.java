@@ -39,6 +39,13 @@ public class SessionTest {
 
         // Verify
         assertTrue(queuedMessages.isEmpty(), "Messages should be drained");
+        
+        // release the rest, to avoid leaking buffers
+        for (int i = 2; i <= 11; i++) {
+            client.pubAckReceived(i);
+        }
+        client.closeImmediately();
+        testChannel.close();
     }
 
     private void sendQoS1To(Session client, Topic destinationTopic, String message) {

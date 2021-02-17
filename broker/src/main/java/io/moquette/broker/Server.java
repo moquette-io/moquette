@@ -295,7 +295,7 @@ public class Server {
      * Use the broker to publish a message. It's intended for embedding applications. It can be used
      * only after the integration is correctly started with startServer.
      *
-     * @param msg      the message to forward.
+     * @param msg      the message to forward. The ByteBuf in the message will be released.
      * @param clientId the id of the sending integration.
      * @throws IllegalStateException if the integration is not yet started
      */
@@ -308,6 +308,7 @@ public class Server {
         }
         LOG.trace("Internal publishing message CId: {}, messageId: {}", clientId, messageID);
         dispatcher.internalPublish(msg);
+        msg.payload().release();
     }
 
     public void stopServer() {

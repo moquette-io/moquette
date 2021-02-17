@@ -146,6 +146,8 @@ public class ServerIntegrationPahoCanPublishOnReadBlockedTopicTest {
             .payload(Unpooled.copiedBuffer("Hello World!!".getBytes(UTF_8)))
             .build();
 
+        // We will be sending the same message again, retain the payload.
+        message.payload().retain();
         m_server.internalPublish(message, "INTRLPUB");
 
         Awaitility.await().until(m_messagesCollector::isMessageReceived);

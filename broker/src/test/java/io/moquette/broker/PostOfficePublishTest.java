@@ -228,10 +228,13 @@ public class PostOfficePublishTest {
         connection.processConnect(connectMessage);
         ConnectionTestUtils.assertConnectAccepted(channel);
 
+        final ByteBuf payload1 = ByteBufUtil.writeAscii(UnpooledByteBufAllocator.DEFAULT, "Hello world!");
         this.retainedRepository.retain(new Topic(NEWS_TOPIC), MqttMessageBuilders.publish()
-            .payload(ByteBufUtil.writeAscii(UnpooledByteBufAllocator.DEFAULT, "Hello world!"))
+            .payload(payload1)
             .qos(AT_LEAST_ONCE)
             .build());
+        // Retaining a msg does not release the payload.
+        payload1.release();
 
         // Exercise
         final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
@@ -241,6 +244,8 @@ public class PostOfficePublishTest {
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(false)
                 .topicName(NEWS_TOPIC).build());
+        // receivedPublishQos0 does not release payload.
+        anyPayload.release();
 
         // Verify
         assertTrue(retainedRepository.isEmpty(), "QoS0 MUST clean retained message for topic");

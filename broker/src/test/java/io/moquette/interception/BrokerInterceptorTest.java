@@ -19,6 +19,7 @@ package io.moquette.interception;
 import io.moquette.interception.messages.*;
 import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.Topic;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttQoS;
@@ -71,6 +72,7 @@ public class BrokerInterceptorTest {
         @Override
         public void onPublish(InterceptPublishMessage msg) {
             n.set(60);
+            msg.getPayload().release();
         }
 
         @Override
@@ -124,13 +126,16 @@ public class BrokerInterceptorTest {
 
     @Test
     public void testNotifyTopicPublished() throws Exception {
+        final ByteBuf payload = Unpooled.copiedBuffer("Hello".getBytes(UTF_8));
+        // Internal function call, will not release buffers.
         interceptor.notifyTopicPublished(
                 MqttMessageBuilders.publish().qos(MqttQoS.AT_MOST_ONCE)
-                    .payload(Unpooled.copiedBuffer("Hello".getBytes(UTF_8))).build(),
+                    .payload(payload).build(),
                 "cli1234",
                 "cli1234");
         interval();
         assertEquals(60, n.get());
+        payload.release();
     }
 
     @Test
