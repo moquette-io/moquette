@@ -240,7 +240,7 @@ public class PostOfficeSubscribeTest {
         assertEquals(1, subscriptions.size(), "After a reconnect, subscription MUST be still present");
 
         final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD, payload, false,
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD,
             MqttMessageBuilders.publish()
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
@@ -285,7 +285,7 @@ public class PostOfficeSubscribeTest {
 
         // publish on /news
         final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD, payload, false,
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD,
             MqttMessageBuilders.publish()
                 .payload(payload)
                 .qos(MqttQoS.AT_MOST_ONCE)
@@ -305,8 +305,9 @@ public class PostOfficeSubscribeTest {
         final MqttPublishMessage retainedPubQoS1Msg = MqttMessageBuilders.publish()
             .payload(payload.retainedDuplicate())
             .qos(MqttQoS.AT_LEAST_ONCE)
+            .retained(true)
             .topicName(NEWS_TOPIC).build();
-        sut.receivedPublishQos1(connection, new Topic(NEWS_TOPIC), TEST_USER, payload, 1, true,
+        sut.receivedPublishQos1(connection, new Topic(NEWS_TOPIC), TEST_USER, 1,
             retainedPubQoS1Msg);
 
         // subscriber connects subscribe to topic /news and receive the last retained message

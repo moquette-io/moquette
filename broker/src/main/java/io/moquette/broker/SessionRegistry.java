@@ -28,7 +28,6 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
@@ -39,6 +38,7 @@ import java.util.stream.Collectors;
 public class SessionRegistry {
 
     public abstract static class EnqueuedMessage {
+        public void release() {}
     }
 
     static class PublishedMessage extends EnqueuedMessage {
@@ -51,6 +51,15 @@ public class SessionRegistry {
             this.topic = topic;
             this.publishingQos = publishingQos;
             this.payload = payload;
+        }
+
+        /**
+         * Releases the payload. Must be called when the PublishedMessage is no
+         * longer needed.
+         */
+        @Override
+        public void release() {
+            payload.release();
         }
     }
 

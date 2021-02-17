@@ -308,6 +308,7 @@ public class Server {
         }
         LOG.trace("Internal publishing message CId: {}, messageId: {}", clientId, messageID);
         dispatcher.internalPublish(msg);
+        msg.payload().release();
     }
 
     public void stopServer() {

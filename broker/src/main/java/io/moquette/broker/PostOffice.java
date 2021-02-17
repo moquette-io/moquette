@@ -156,15 +156,14 @@ class PostOffice {
         mqttConnection.sendUnsubAckMessage(topics, clientID, messageId);
     }
 
-    void receivedPublishQos0(Topic topic, String username, String clientID, ByteBuf payload, boolean retain,
-                             MqttPublishMessage msg) {
+    void receivedPublishQos0(Topic topic, String username, String clientID, MqttPublishMessage msg) {
         if (!authorizator.canWrite(topic, username, clientID)) {
             LOG.error("client is not authorized to publish on topic: {}", topic);
             return;
         }
-        publish2Subscribers(payload, topic, AT_MOST_ONCE);
+        publish2Subscribers(msg.payload(), topic, AT_MOST_ONCE);
 
-        if (retain) {
+        if (msg.fixedHeader().isRetain()) {
             // QoS == 0 && retain => clean old retained
             retainedRepository.cleanRetained(topic);
         }
@@ -172,8 +171,8 @@ class PostOffice {
         interceptor.notifyTopicPublished(msg, clientID, username);
     }
 
-    void receivedPublishQos1(MQTTConnection connection, Topic topic, String username, ByteBuf payload, int messageID,
-                             boolean retain, MqttPublishMessage msg) {
+    void receivedPublishQos1(MQTTConnection connection, Topic topic, String username, int messageID,
+                             MqttPublishMessage msg) {
         // verify if topic can be write
         topic.getTokens();
         if (!topic.isValid()) {
@@ -187,11 +186,12 @@ class PostOffice {
             return;
         }
 
+        ByteBuf payload = msg.payload();
         publish2Subscribers(payload, topic, AT_LEAST_ONCE);
 
         connection.sendPubAck(messageID);
 
-        if (retain) {
+        if (msg.fixedHeader().isRetain()) {
             if (!payload.isReadable()) {
                 retainedRepository.cleanRetained(topic);
             } else {
@@ -237,6 +237,8 @@ class PostOffice {
         final String clientId = connection.getClientId();
         if (!authorizator.canWrite(topic, username, clientId)) {
             LOG.error("MQTT client is not authorized to publish on topic: {}", topic);
+            // msg not passed on, release payload.
+            payload.release();
             return;
         }
 
@@ -254,6 +256,8 @@ class PostOffice {
 
         String clientID = connection.getClientId();
         interceptor.notifyTopicPublished(mqttPublishMessage, clientID, username);
+        // none of the methods above released the payload, do it now.
+        payload.release();
     }
 
     static MqttQoS lowerQosToTheSubscriptionDesired(Subscription sub, MqttQoS qos) {
@@ -284,7 +288,7 @@ class PostOffice {
         if (!msg.fixedHeader().isRetain()) {
             return;
         }
-        if (qos == AT_MOST_ONCE || msg.payload().readableBytes() == 0) {
+        if (qos == AT_MOST_ONCE || payload.readableBytes() == 0) {
             // QoS == 0 && retain => clean old retained
             retainedRepository.cleanRetained(topic);
             return;

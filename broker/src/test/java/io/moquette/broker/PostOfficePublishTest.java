@@ -110,7 +110,7 @@ public class PostOfficePublishTest {
 
         // Exercise
         final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, FAKE_CLIENT_ID, payload, false,
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, FAKE_CLIENT_ID,
             MqttMessageBuilders.publish()
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
@@ -211,7 +211,7 @@ public class PostOfficePublishTest {
 
         // Exercise
         final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, FAKE_CLIENT_ID, payload, false,
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, FAKE_CLIENT_ID,
             MqttMessageBuilders.publish()
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
@@ -228,19 +228,24 @@ public class PostOfficePublishTest {
         connection.processConnect(connectMessage);
         ConnectionTestUtils.assertConnectAccepted(channel);
 
+        final ByteBuf payload1 = ByteBufUtil.writeAscii(UnpooledByteBufAllocator.DEFAULT, "Hello world!");
         this.retainedRepository.retain(new Topic(NEWS_TOPIC), MqttMessageBuilders.publish()
-            .payload(ByteBufUtil.writeAscii(UnpooledByteBufAllocator.DEFAULT, "Hello world!"))
+            .payload(payload1)
             .qos(AT_LEAST_ONCE)
             .build());
+        // Retaining a msg does not release the payload.
+        payload1.release();
 
         // Exercise
         final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, FAKE_CLIENT_ID, anyPayload, true,
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, FAKE_CLIENT_ID,
             MqttMessageBuilders.publish()
                 .payload(anyPayload)
                 .qos(MqttQoS.AT_MOST_ONCE)
-                .retained(false)
+                .retained(true)
                 .topicName(NEWS_TOPIC).build());
+        // receivedPublishQos0 does not release payload.
+        anyPayload.release();
 
         // Verify
         assertTrue(retainedRepository.isEmpty(), "QoS0 MUST clean retained message for topic");
@@ -254,7 +259,7 @@ public class PostOfficePublishTest {
 
         // Exercise
         final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
-        sut.receivedPublishQos1(connection, new Topic(NEWS_TOPIC), TEST_USER, anyPayload, 1, true,
+        sut.receivedPublishQos1(connection, new Topic(NEWS_TOPIC), TEST_USER, 1,
             MqttMessageBuilders.publish()
                 .payload(Unpooled.copiedBuffer("Any payload", Charset.defaultCharset()))
                 .qos(MqttQoS.AT_LEAST_ONCE)
@@ -298,7 +303,7 @@ public class PostOfficePublishTest {
         ConnectionTestUtils.assertConnectAccepted(pubChannel);
 
         final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
-        sut.receivedPublishQos1(pubConn, new Topic(NEWS_TOPIC), TEST_USER, anyPayload, 1, true,
+        sut.receivedPublishQos1(pubConn, new Topic(NEWS_TOPIC), TEST_USER, 1,
             MqttMessageBuilders.publish()
                 .payload(anyPayload.retainedDuplicate())
                 .qos(MqttQoS.AT_LEAST_ONCE)
@@ -336,10 +341,11 @@ public class PostOfficePublishTest {
         ConnectionTestUtils.assertConnectAccepted(pubChannel);
 
         final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
-        sut.receivedPublishQos1(pubConn, new Topic(NEWS_TOPIC), TEST_USER, anyPayload, 1, true,
+        sut.receivedPublishQos1(pubConn, new Topic(NEWS_TOPIC), TEST_USER, 1,
             MqttMessageBuilders.publish()
                 .payload(anyPayload.retainedDuplicate())
                 .qos(MqttQoS.AT_LEAST_ONCE)
+                .retained(true)
                 .topicName(NEWS_TOPIC).build());
 
         // Verify that after a reconnection the client receive the message
@@ -361,7 +367,7 @@ public class PostOfficePublishTest {
         ConnectionTestUtils.assertConnectAccepted(pubChannel);
 
         final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
-        sut.receivedPublishQos1(pubConn, new Topic(NEWS_TOPIC), TEST_USER, anyPayload, 1, true,
+        sut.receivedPublishQos1(pubConn, new Topic(NEWS_TOPIC), TEST_USER, 1,
             MqttMessageBuilders.publish()
                 .payload(anyPayload)
                 .qos(MqttQoS.AT_LEAST_ONCE)
@@ -389,7 +395,7 @@ public class PostOfficePublishTest {
             .retained(true)
             .topicName(NEWS_TOPIC)
             .build();
-        sut.receivedPublishQos1(connection, new Topic(NEWS_TOPIC), TEST_USER, anyPayload, 1, true,
+        sut.receivedPublishQos1(connection, new Topic(NEWS_TOPIC), TEST_USER, 1,
                                 publishMsg);
 
         assertMessageIsRetained(NEWS_TOPIC, anyPayload);
@@ -397,11 +403,11 @@ public class PostOfficePublishTest {
         // publish a QoS0 retained message
         // Exercise
         final ByteBuf qos0Payload = Unpooled.copiedBuffer("QoS0 payload", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, connection.getClientId(), qos0Payload, true,
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, connection.getClientId(),
             MqttMessageBuilders.publish()
                 .payload(qos0Payload)
                 .qos(MqttQoS.AT_MOST_ONCE)
-                .retained(false)
+                .retained(true)
                 .topicName(NEWS_TOPIC).build());
 
         // Verify

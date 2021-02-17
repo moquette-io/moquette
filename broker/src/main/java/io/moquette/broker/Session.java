@@ -183,7 +183,12 @@ class Session {
     }
 
     public void processPubRec(int packetId) {
-        inflightWindow.remove(packetId);
+        // Message discarded, make sure any buffers in it are released
+        SessionRegistry.EnqueuedMessage removed = inflightWindow.remove(packetId);
+        if (removed != null) {
+            removed.release();
+        }
+
         inflightSlots.incrementAndGet();
         if (canSkipQueue()) {
             inflightSlots.decrementAndGet();
@@ -200,7 +205,12 @@ class Session {
     }
 
     public void processPubComp(int messageID) {
-        inflightWindow.remove(messageID);
+        // Message discarded, make sure any buffers in it are released
+        SessionRegistry.EnqueuedMessage removed = inflightWindow.remove(messageID);
+        if (removed != null) {
+            removed.release();
+        }
+
         inflightSlots.incrementAndGet();
 
         drainQueueToConnection();
@@ -216,6 +226,9 @@ class Session {
             case AT_MOST_ONCE:
                 if (connected()) {
                     mqttConnection.sendPublishNotRetainedQos0(topic, qos, payload);
+                } else {
+                    // buffer not passed on, release it.
+                    payload.release();
                 }
                 break;
             case AT_LEAST_ONCE:
@@ -226,12 +239,16 @@ class Session {
                 break;
             case FAILURE:
                 LOG.error("Not admissible");
+                // buffer not passed on, release it.
+                payload.release();
         }
     }
 
     private void sendPublishQos1(Topic topic, MqttQoS qos, ByteBuf payload) {
         if (!connected() && isClean()) {
             //pushing messages to disconnected not clean session
+            //buffer not passed on, release it.
+            payload.release();
             return;
         }
 
@@ -240,6 +257,9 @@ class Session {
             int packetId = mqttConnection.nextPacketId();
             inflightWindow.put(packetId, new SessionRegistry.PublishedMessage(topic, qos, payload));
             inflightTimeouts.add(new InFlightPacket(packetId, FLIGHT_BEFORE_RESEND_MS));
+            
+            // second pass-on, add retain
+            payload.retain();
             MqttPublishMessage publishMsg = MQTTConnection.notRetainedPublishWithMessageId(topic.toString(), qos,
                                                                                            payload, packetId);
             mqttConnection.sendPublish(publishMsg);
@@ -257,6 +277,9 @@ class Session {
             int packetId = mqttConnection.nextPacketId();
             inflightWindow.put(packetId, new SessionRegistry.PublishedMessage(topic, qos, payload));
             inflightTimeouts.add(new InFlightPacket(packetId, FLIGHT_BEFORE_RESEND_MS));
+
+            // second pass-on, add retain
+            payload.retain();
             MqttPublishMessage publishMsg = MQTTConnection.notRetainedPublishWithMessageId(topic.toString(), qos,
                                                                                            payload, packetId);
             mqttConnection.sendPublish(publishMsg);
@@ -283,7 +306,11 @@ class Session {
 
     void pubAckReceived(int ackPacketId) {
         // TODO remain to invoke in somehow m_interceptor.notifyMessageAcknowledged
-        inflightWindow.remove(ackPacketId);
+        SessionRegistry.EnqueuedMessage removed = inflightWindow.remove(ackPacketId);
+        if (removed != null) {
+            removed.release();
+        }
+
         inflightSlots.incrementAndGet();
         drainQueueToConnection();
     }
@@ -343,6 +370,8 @@ class Session {
                 mqttConnection.sendIfWritableElseDrop(pubRel);
             } else {
                 final SessionRegistry.PublishedMessage msgPub = (SessionRegistry.PublishedMessage) msg;
+                // Second pass-on.
+                msgPub.payload.retain();
                 MqttPublishMessage publishMsg = MQTTConnection.notRetainedPublishWithMessageId(msgPub.topic.toString(),
                     msgPub.publishingQos,
                     msgPub.payload, sendPacketId);
