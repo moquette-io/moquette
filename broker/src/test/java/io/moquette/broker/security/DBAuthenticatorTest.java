@@ -46,7 +46,7 @@ public class DBAuthenticatorTest {
         this.connection = DriverManager.getConnection(JDBC_H2_MEM_TEST);
         Statement statement = this.connection.createStatement();
         try {
-            statement.execute("DROP TABLE ACCOUNT");
+            statement.execute("DROP TABLE IF EXISTS ACCOUNT");
         } catch (SQLException sqle) {
             LOG.info("Table not found, not dropping", sqle);
         }
