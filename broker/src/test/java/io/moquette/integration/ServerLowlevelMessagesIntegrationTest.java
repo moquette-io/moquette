@@ -40,9 +40,9 @@ import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class ServerLowlevelMessagesIntegrationTests {
+public class ServerLowlevelMessagesIntegrationTest {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ServerLowlevelMessagesIntegrationTests.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ServerLowlevelMessagesIntegrationTest.class);
     static MqttClientPersistence s_dataStore;
     Server m_server;
     Client m_client;
