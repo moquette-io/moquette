@@ -15,6 +15,8 @@
  */
 package io.moquette.broker;
 
+import static io.moquette.BrokerConstants.FLIGHT_BEFORE_RESEND_MS;
+import static io.moquette.BrokerConstants.INFLIGHT_WINDOW_SIZE;
 import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
@@ -34,8 +36,6 @@ import java.util.concurrent.atomic.AtomicReference;
 class Session {
 
     private static final Logger LOG = LoggerFactory.getLogger(Session.class);
-    private static final int FLIGHT_BEFORE_RESEND_MS = 5_000;
-    private static final int INFLIGHT_WINDOW_SIZE = 10;
 
     static class InFlightPacket implements Delayed {
 
