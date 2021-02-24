@@ -355,6 +355,7 @@ class Session {
                 final MqttQoS qos = msg.publishingQos;
                 final ByteBuf payload = msg.payload;
                 MqttPublishMessage publishMsg = publishNotRetainedDuplicated(notAckPacketId, topic, qos, payload);
+                inflightTimeouts.add(new InFlightPacket(notAckPacketId.packetId, FLIGHT_BEFORE_RESEND_MS));
                 mqttConnection.sendPublish(publishMsg);
             }
         }
