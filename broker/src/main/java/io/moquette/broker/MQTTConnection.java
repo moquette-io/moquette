@@ -503,7 +503,7 @@ final class MQTTConnection {
     }
 
     int nextPacketId() {
-        return lastPacketId.incrementAndGet();
+        return lastPacketId.updateAndGet(v -> v == 65535 ? 1 : v + 1);
     }
 
     @Override
