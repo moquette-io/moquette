@@ -18,6 +18,7 @@ package io.moquette.broker;
 import static io.moquette.BrokerConstants.FLIGHT_BEFORE_RESEND_MS;
 import static io.moquette.BrokerConstants.INFLIGHT_WINDOW_SIZE;
 import io.moquette.broker.SessionRegistry.EnqueuedMessage;
+import io.moquette.broker.SessionRegistry.PubRelMarker;
 import io.moquette.broker.SessionRegistry.PublishedMessage;
 import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.Topic;
@@ -196,18 +197,12 @@ class Session {
             return;
         }
 
-        inflightSlots.incrementAndGet();
-        if (canSkipQueue()) {
-            inflightSlots.decrementAndGet();
-            inflightWindow.put(pubRecPacketId, new SessionRegistry.PubRelMarker());
-            inflightTimeouts.add(new InFlightPacket(pubRecPacketId, FLIGHT_BEFORE_RESEND_MS));
-            MqttMessage pubRel = MQTTConnection.pubrel(pubRecPacketId);
-            mqttConnection.sendIfWritableElseDrop(pubRel);
+        inflightWindow.put(pubRecPacketId, new SessionRegistry.PubRelMarker());
+        inflightTimeouts.add(new InFlightPacket(pubRecPacketId, FLIGHT_BEFORE_RESEND_MS));
+        MqttMessage pubRel = MQTTConnection.pubrel(pubRecPacketId);
+        mqttConnection.sendIfWritableElseDrop(pubRel);
 
-            drainQueueToConnection();
-        } else {
-            sessionQueue.add(new SessionRegistry.PubRelMarker());
-        }
+        drainQueueToConnection();
     }
 
     public void processPubComp(int messageID) {
@@ -348,13 +343,22 @@ class Session {
         debugLogPacketIds(expired);
 
         for (InFlightPacket notAckPacketId : expired) {
-            if (inflightWindow.containsKey(notAckPacketId.packetId)) {
-                final SessionRegistry.PublishedMessage msg =
-                    (SessionRegistry.PublishedMessage) inflightWindow.get(notAckPacketId.packetId);
-                final Topic topic = msg.topic;
-                final MqttQoS qos = msg.publishingQos;
-                final ByteBuf payload = msg.payload;
+            EnqueuedMessage msg = inflightWindow.get(notAckPacketId.packetId);
+            if (msg == null) {
+                // Already acked...
+                continue;
+            }
+            if (msg instanceof PubRelMarker) {
+                MqttMessage pubRel = MQTTConnection.pubrel(notAckPacketId.packetId);
+                inflightTimeouts.add(new InFlightPacket(notAckPacketId.packetId, FLIGHT_BEFORE_RESEND_MS));
+                mqttConnection.sendIfWritableElseDrop(pubRel);
+            } else {
+                final PublishedMessage pubMsg = (PublishedMessage) msg;
+                final Topic topic = pubMsg.topic;
+                final MqttQoS qos = pubMsg.publishingQos;
+                final ByteBuf payload = pubMsg.payload;
                 MqttPublishMessage publishMsg = publishNotRetainedDuplicated(notAckPacketId, topic, qos, payload);
+                inflightTimeouts.add(new InFlightPacket(notAckPacketId.packetId, FLIGHT_BEFORE_RESEND_MS));
                 mqttConnection.sendPublish(publishMsg);
             }
         }
@@ -398,16 +402,12 @@ class Session {
                 inflightSlots.incrementAndGet();
             }
             inflightTimeouts.add(new InFlightPacket(sendPacketId, FLIGHT_BEFORE_RESEND_MS));
-            if (msg instanceof SessionRegistry.PubRelMarker) {
-                MqttMessage pubRel = MQTTConnection.pubrel(sendPacketId);
-                mqttConnection.sendIfWritableElseDrop(pubRel);
-            } else {
-                final SessionRegistry.PublishedMessage msgPub = (SessionRegistry.PublishedMessage) msg;
-                MqttPublishMessage publishMsg = MQTTConnection.notRetainedPublishWithMessageId(msgPub.topic.toString(),
-                    msgPub.publishingQos,
-                    msgPub.payload, sendPacketId);
-                mqttConnection.sendPublish(publishMsg);
-            }
+            final SessionRegistry.PublishedMessage msgPub = (SessionRegistry.PublishedMessage) msg;
+            MqttPublishMessage publishMsg = MQTTConnection.notRetainedPublishWithMessageId(
+                msgPub.topic.toString(),
+                msgPub.publishingQos,
+                msgPub.payload, sendPacketId);
+            mqttConnection.sendPublish(publishMsg);
             // we fetched msg from a map, but the release is cancelled out by the above retain
         }
     }
