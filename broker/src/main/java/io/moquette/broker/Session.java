@@ -393,9 +393,11 @@ class Session {
             // Putting it in a map, but the retain is cancelled out by the below release.
             EnqueuedMessage old = inflightWindow.put(sendPacketId, msg);
             if (old != null) {
+                // Something was already there. Release, and free up its slot.
                 old.release();
                 inflightSlots.incrementAndGet();
             }
+            inflightTimeouts.add(new InFlightPacket(sendPacketId, FLIGHT_BEFORE_RESEND_MS));
             if (msg instanceof SessionRegistry.PubRelMarker) {
                 MqttMessage pubRel = MQTTConnection.pubrel(sendPacketId);
                 mqttConnection.sendIfWritableElseDrop(pubRel);
