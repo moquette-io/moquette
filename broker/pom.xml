@@ -191,7 +191,7 @@
 
         <dependency>
             <groupId>io.netty</groupId>
-            <artifactId>netty-tcnative</artifactId>
+            <artifactId>netty-tcnative-boringssl-static</artifactId>
             <version>${netty.tcnative.version}</version>
             <classifier>linux-x86_64</classifier>
             <scope>test</scope>
