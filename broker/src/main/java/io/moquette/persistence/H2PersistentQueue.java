@@ -15,6 +15,7 @@
  */
 package io.moquette.persistence;
 
+import io.moquette.broker.SessionRegistry;
 import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVStore;
 
