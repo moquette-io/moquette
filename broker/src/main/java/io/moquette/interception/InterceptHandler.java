@@ -46,17 +46,17 @@ public interface InterceptHandler {
      */
     Class<?>[] getInterceptedMessageTypes();
 
-    void onConnect(InterceptConnectMessage msg);
+    default void onConnect(InterceptConnectMessage msg){};
 
-    void onDisconnect(InterceptDisconnectMessage msg);
+    default void onDisconnect(InterceptDisconnectMessage msg){};
 
-    void onConnectionLost(InterceptConnectionLostMessage msg);
+    default void onConnectionLost(InterceptConnectionLostMessage msg){};
 
-    void onPublish(InterceptPublishMessage msg);
+    default void onPublish(InterceptPublishMessage msg){};
 
-    void onSubscribe(InterceptSubscribeMessage msg);
+    default void onSubscribe(InterceptSubscribeMessage msg){};
 
-    void onUnsubscribe(InterceptUnsubscribeMessage msg);
+    default void onUnsubscribe(InterceptUnsubscribeMessage msg){};
 
-    void onMessageAcknowledged(InterceptAcknowledgedMessage msg);
+    default void onMessageAcknowledged(InterceptAcknowledgedMessage msg){};
 }
