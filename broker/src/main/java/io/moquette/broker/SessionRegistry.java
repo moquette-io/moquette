@@ -66,7 +66,7 @@ public class SessionRegistry {
         }
     }
 
-    static final class PubRelMarker extends EnqueuedMessage {
+    public static final class PubRelMarker extends EnqueuedMessage {
     }
 
     public enum CreationModeEnum {
