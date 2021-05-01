@@ -16,7 +16,7 @@
 package io.moquette.broker;
 
 import io.moquette.BrokerConstants;
-import io.moquette.persistence.PublishedMessageValueType;
+import io.moquette.persistence.EnqueuedMessageValueType;
 import io.moquette.broker.security.PermitAllAuthorizatorPolicy;
 import io.moquette.broker.subscriptions.CTrieSubscriptionDirectory;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
@@ -149,7 +149,7 @@ public class SessionRegistryTest {
             .open();
         final MVMap.Builder<String, SessionRegistry.PublishedMessage> builder =
             new MVMap.Builder<String, SessionRegistry.PublishedMessage>()
-                .valueType(new PublishedMessageValueType());
+                .valueType(new EnqueuedMessageValueType());
 
         final ByteBuf payload = Unpooled.wrappedBuffer("Hello World!".getBytes(StandardCharsets.UTF_8));
         SessionRegistry.PublishedMessage msg = new SessionRegistry.PublishedMessage(Topic.asTopic("/say"),
