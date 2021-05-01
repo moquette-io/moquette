@@ -334,7 +334,11 @@ class Session {
     private void drainQueueToConnection() {
         // consume the queue
         while (!sessionQueue.isEmpty() && inflighHasSlotsAndConnectionIsUp()) {
-            final SessionRegistry.EnqueuedMessage msg = sessionQueue.remove();
+            final SessionRegistry.EnqueuedMessage msg = sessionQueue.poll();
+            if (msg == null) {
+                // Our message was already fetched by another Thread.
+                return;
+            }
             inflightSlots.decrementAndGet();
             int sendPacketId = mqttConnection.nextPacketId();
             inflightWindow.put(sendPacketId, msg);
