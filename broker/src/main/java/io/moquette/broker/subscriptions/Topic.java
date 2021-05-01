@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Topic implements Serializable {
+public class Topic implements Serializable, Comparable<Topic> {
 
     private static final Logger LOG = LoggerFactory.getLogger(Topic.class);
 
@@ -215,4 +215,8 @@ public class Topic implements Serializable {
         return topic.hashCode();
     }
 
+    @Override
+    public int compareTo(Topic o) {
+        return topic.compareTo(o.topic);
+    }
 }

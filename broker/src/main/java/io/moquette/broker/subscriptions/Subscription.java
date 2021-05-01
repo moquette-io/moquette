@@ -23,7 +23,7 @@ import java.io.Serializable;
 /**
  * Maintain the information about which Topic a certain ClientID is subscribed and at which QoS
  */
-public final class Subscription implements Serializable {
+public final class Subscription implements Serializable, Comparable<Subscription> {
 
     private static final long serialVersionUID = -3383457629635732794L;
     private final MqttQoS requestedQos; // max QoS acceptable
@@ -91,5 +91,14 @@ public final class Subscription implements Serializable {
         } catch (CloneNotSupportedException e) {
             return null;
         }
+    }
+
+    @Override
+    public int compareTo(Subscription o) {
+        int compare = this.clientId.compareTo(o.clientId);
+        if (compare != 0) {
+            return compare;
+        }
+        return this.topicFilter.compareTo(o.topicFilter);
     }
 }
