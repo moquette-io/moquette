@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The original author or authors
+ * Copyright (c) 2012-2021 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -18,7 +18,6 @@ package io.moquette.persistence;
 import io.moquette.broker.SessionRegistry;
 import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import org.h2.mvstore.WriteBuffer;
 import org.h2.mvstore.type.StringDataType;
@@ -30,6 +29,7 @@ public final class EnqueuedMessageValueType implements org.h2.mvstore.type.DataT
     private enum MessageType {PUB_REL_MARKER, PUBLISHED_MESSAGE}
 
     private final StringDataType topicDataType = new StringDataType();
+    private final ByteBufDataType payloadDataType = new ByteBufDataType();
 
     @Override
     public int compare(Object a, Object b) {
@@ -42,11 +42,10 @@ public final class EnqueuedMessageValueType implements org.h2.mvstore.type.DataT
             return 1;
         }
         final SessionRegistry.PublishedMessage casted = (SessionRegistry.PublishedMessage) obj;
-        final int payloadSize = casted.getPayload().readableBytes();
         return 1 + // message type
             1 + // qos
-            topicDataType.getMemory(casted.getTopic().toString()) + // topic
-            4 + payloadSize; // payload
+            topicDataType.getMemory(casted.getTopic().toString()) +
+            payloadDataType.getMemory(casted.getPayload());
     }
 
     @Override
@@ -59,12 +58,7 @@ public final class EnqueuedMessageValueType implements org.h2.mvstore.type.DataT
 
             final String token = casted.getTopic().toString();
             topicDataType.write(buff, token);
-
-            final int payloadSize = casted.getPayload().readableBytes();
-            byte[] rawBytes = new byte[payloadSize];
-            casted.getPayload().copy().readBytes(rawBytes);
-            buff.putInt(payloadSize);
-            buff.put(rawBytes);
+            payloadDataType.write(buff, casted.getPayload());
         } else if (obj instanceof SessionRegistry.PubRelMarker) {
             buff.put((byte) MessageType.PUB_REL_MARKER.ordinal());
         } else {
@@ -87,11 +81,8 @@ public final class EnqueuedMessageValueType implements org.h2.mvstore.type.DataT
         } else if (messageType == MessageType.PUBLISHED_MESSAGE.ordinal()) {
             final MqttQoS qos = MqttQoS.valueOf(buff.get());
             final String topicStr = topicDataType.read(buff);
-            final int payloadSize = buff.getInt();
-            byte[] payload = new byte[payloadSize];
-            buff.get(payload);
-            final ByteBuf byteBuf = Unpooled.wrappedBuffer(payload);
-            return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, byteBuf);
+            final ByteBuf payload = payloadDataType.read(buff);
+            return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload);
         } else {
             throw new IllegalArgumentException("Can't recognize record of type: " + messageType);
         }
