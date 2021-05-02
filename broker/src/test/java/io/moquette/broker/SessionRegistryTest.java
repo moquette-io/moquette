@@ -15,18 +15,29 @@
  */
 package io.moquette.broker;
 
+import io.moquette.BrokerConstants;
+import io.moquette.persistence.EnqueuedMessageValueType;
 import io.moquette.broker.security.PermitAllAuthorizatorPolicy;
 import io.moquette.broker.subscriptions.CTrieSubscriptionDirectory;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
 import io.moquette.broker.security.IAuthenticator;
+import io.moquette.broker.subscriptions.Topic;
 import io.moquette.persistence.MemorySubscriptionsRepository;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;
+import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttVersion;
+import org.h2.mvstore.MVMap;
+import org.h2.mvstore.MVStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.io.File;
+import java.nio.charset.StandardCharsets;
 
 import static io.moquette.broker.NettyChannelAssertions.assertEqualsConnAck;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
@@ -52,7 +63,6 @@ public class SessionRegistryTest {
 
     @BeforeEach
     public void setUp() {
-        System.out.println("setup invoked");
         connMsg = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_3_1).cleanSession(true);
 
         createMQTTConnection(ALLOW_ANONYMOUS_AND_ZEROBYTE_CLIENT_ID);
@@ -129,5 +139,45 @@ public class SessionRegistryTest {
         // Verify client session is clean false
         Session session = sut.retrieve(FAKE_CLIENT_ID);
         assertFalse(session.isClean());
+    }
+
+    @Test
+    public void testSerializabilityOfPublishedMessage() {
+        MVStore mvStore = new MVStore.Builder()
+            .fileName(BrokerConstants.DEFAULT_PERSISTENT_PATH)
+            .autoCommitDisabled()
+            .open();
+        final MVMap.Builder<String, SessionRegistry.PublishedMessage> builder =
+            new MVMap.Builder<String, SessionRegistry.PublishedMessage>()
+                .valueType(new EnqueuedMessageValueType());
+
+        final ByteBuf payload = Unpooled.wrappedBuffer("Hello World!".getBytes(StandardCharsets.UTF_8));
+        SessionRegistry.PublishedMessage msg = new SessionRegistry.PublishedMessage(Topic.asTopic("/say"),
+            MqttQoS.AT_LEAST_ONCE, payload);
+        try {
+            // store a message in the MVStore
+            final String mapName = "test_map";
+            MVMap<String, SessionRegistry.PublishedMessage> persistentMap = mvStore.openMap(mapName, builder);
+            String key = "message";
+            persistentMap.put(key, msg);
+            mvStore.close();
+
+            // reopen the MVStore and read it
+            mvStore = new MVStore.Builder()
+                .fileName(BrokerConstants.DEFAULT_PERSISTENT_PATH)
+                .autoCommitDisabled()
+                .open();
+            final SessionRegistry.PublishedMessage reloadedMsg = mvStore.openMap(mapName, builder).get(key);
+
+            // Verify
+            assertEquals("/say", reloadedMsg.topic.toString());
+        } finally {
+            mvStore.close();
+            File dbFile = new File(BrokerConstants.DEFAULT_PERSISTENT_PATH);
+            if (dbFile.exists()) {
+                dbFile.delete();
+            }
+            assertFalse(dbFile.exists());
+        }
     }
 }

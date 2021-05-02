@@ -28,7 +28,6 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
@@ -41,20 +40,32 @@ public class SessionRegistry {
     public abstract static class EnqueuedMessage {
     }
 
-    static class PublishedMessage extends EnqueuedMessage {
+    public static class PublishedMessage extends EnqueuedMessage {
 
         final Topic topic;
         final MqttQoS publishingQos;
         final ByteBuf payload;
 
-        PublishedMessage(Topic topic, MqttQoS publishingQos, ByteBuf payload) {
+        public PublishedMessage(Topic topic, MqttQoS publishingQos, ByteBuf payload) {
             this.topic = topic;
             this.publishingQos = publishingQos;
             this.payload = payload;
         }
+
+        public Topic getTopic() {
+            return topic;
+        }
+
+        public MqttQoS getPublishingQos() {
+            return publishingQos;
+        }
+
+        public ByteBuf getPayload() {
+            return payload;
+        }
     }
 
-    static final class PubRelMarker extends EnqueuedMessage {
+    public static final class PubRelMarker extends EnqueuedMessage {
     }
 
     public enum CreationModeEnum {

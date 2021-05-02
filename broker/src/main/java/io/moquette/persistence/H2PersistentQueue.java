@@ -15,6 +15,7 @@
  */
 package io.moquette.persistence;
 
+import io.moquette.broker.SessionRegistry;
 import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVStore;
 
@@ -22,9 +23,9 @@ import java.util.AbstractQueue;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicLong;
 
-class H2PersistentQueue<T> extends AbstractQueue<T> {
+class H2PersistentQueue extends AbstractQueue<SessionRegistry.EnqueuedMessage> {
 
-    private final MVMap<Long, T> queueMap;
+    private final MVMap<Long, SessionRegistry.EnqueuedMessage> queueMap;
     private final MVMap<String, Long> metadataMap;
     private final AtomicLong head;
     private final AtomicLong tail;
@@ -33,7 +34,11 @@ class H2PersistentQueue<T> extends AbstractQueue<T> {
         if (queueName == null || queueName.isEmpty()) {
             throw new IllegalArgumentException("queueName parameter can't be empty or null");
         }
-        this.queueMap = store.openMap("queue_" + queueName);
+        final MVMap.Builder<Long, SessionRegistry.EnqueuedMessage> messageTypeBuilder =
+            new MVMap.Builder<Long, SessionRegistry.EnqueuedMessage>()
+                .valueType(new EnqueuedMessageValueType());
+
+        this.queueMap = store.openMap("queue_" + queueName, messageTypeBuilder);
         this.metadataMap = store.openMap("queue_" + queueName + "_meta");
 
         //setup head index
@@ -61,7 +66,7 @@ class H2PersistentQueue<T> extends AbstractQueue<T> {
     }
 
     @Override
-    public Iterator<T> iterator() {
+    public Iterator<SessionRegistry.EnqueuedMessage> iterator() {
         return null;
     }
 
@@ -71,7 +76,7 @@ class H2PersistentQueue<T> extends AbstractQueue<T> {
     }
 
     @Override
-    public boolean offer(T t) {
+    public boolean offer(SessionRegistry.EnqueuedMessage t) {
         if (t == null) {
             throw new NullPointerException("Inserted element can't be null");
         }
@@ -82,19 +87,19 @@ class H2PersistentQueue<T> extends AbstractQueue<T> {
     }
 
     @Override
-    public T poll() {
+    public SessionRegistry.EnqueuedMessage poll() {
         if (head.equals(tail)) {
             return null;
         }
         final long nextTail = tail.getAndIncrement();
-        final T tail = this.queueMap.get(nextTail);
+        final SessionRegistry.EnqueuedMessage tail = this.queueMap.get(nextTail);
         queueMap.remove(nextTail);
         this.metadataMap.put("tail", nextTail + 1);
         return tail;
     }
 
     @Override
-    public T peek() {
+    public SessionRegistry.EnqueuedMessage peek() {
         if (head.equals(tail)) {
             return null;
         }
