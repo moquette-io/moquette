@@ -38,6 +38,9 @@ public final class EnqueuedMessageValueType implements org.h2.mvstore.type.DataT
 
     @Override
     public int getMemory(Object obj) {
+        if (obj instanceof SessionRegistry.PubRelMarker) {
+            return 1;
+        }
         final SessionRegistry.PublishedMessage casted = (SessionRegistry.PublishedMessage) obj;
         final int payloadSize = casted.getPayload().readableBytes();
         return 1 + // message type
