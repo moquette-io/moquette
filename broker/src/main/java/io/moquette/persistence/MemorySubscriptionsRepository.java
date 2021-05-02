@@ -24,13 +24,7 @@ import java.util.concurrent.ConcurrentSkipListSet;
 
 public class MemorySubscriptionsRepository implements ISubscriptionsRepository {
 
-    private final Set<Subscription> subscriptions = new ConcurrentSkipListSet<>((o1, o2) -> {
-        int compare = o1.getClientId().compareTo(o2.getClientId());
-        if (compare != 0) {
-            return compare;
-        }
-        return o1.getTopicFilter().toString().compareTo(o2.getTopicFilter().toString());
-    });
+    private final Set<Subscription> subscriptions = new ConcurrentSkipListSet<>();
 
     @Override
     public Set<Subscription> listAllSubscriptions() {
