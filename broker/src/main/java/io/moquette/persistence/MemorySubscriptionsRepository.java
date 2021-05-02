@@ -18,17 +18,23 @@ package io.moquette.persistence;
 import io.moquette.broker.ISubscriptionsRepository;
 import io.moquette.broker.subscriptions.Subscription;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentSkipListSet;
 
 public class MemorySubscriptionsRepository implements ISubscriptionsRepository {
 
-    private final List<Subscription> subscriptions = new ArrayList<>();
+    private final Set<Subscription> subscriptions = new ConcurrentSkipListSet<>((o1, o2) -> {
+        int compare = o1.getClientId().compareTo(o2.getClientId());
+        if (compare != 0) {
+            return compare;
+        }
+        return o1.getTopicFilter().toString().compareTo(o2.getTopicFilter().toString());
+    });
 
     @Override
-    public List<Subscription> listAllSubscriptions() {
-        return Collections.unmodifiableList(subscriptions);
+    public Set<Subscription> listAllSubscriptions() {
+        return Collections.unmodifiableSet(subscriptions);
     }
 
     @Override
