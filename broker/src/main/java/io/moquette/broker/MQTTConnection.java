@@ -359,8 +359,6 @@ final class MQTTConnection {
         final String clientId = getClientId();
         final int messageID = msg.variableHeader().packetId();
         LOG.trace("Processing PUBLISH message, topic: {}, messageId: {}, qos: {}", topicName, messageID, qos);
-        ByteBuf payload = msg.payload();
-        final boolean retain = msg.fixedHeader().isRetain();
         final Topic topic = new Topic(topicName);
         if (!topic.isValid()) {
             LOG.debug("Drop connection because of invalid topic format");
@@ -368,10 +366,10 @@ final class MQTTConnection {
         }
         switch (qos) {
             case AT_MOST_ONCE:
-                postOffice.receivedPublishQos0(topic, username, clientId, payload, retain, msg);
+                postOffice.receivedPublishQos0(topic, username, clientId, msg);
                 break;
             case AT_LEAST_ONCE: {
-                postOffice.receivedPublishQos1(this, topic, username, payload, messageID, retain, msg);
+                postOffice.receivedPublishQos1(this, topic, username, messageID, msg);
                 break;
             }
             case EXACTLY_ONCE: {

@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class ServerIntegrationQoSValidationTest {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ServerIntegrationPahoTest.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ServerIntegrationQoSValidationTest.class);
 
     Server m_server;
 
