@@ -312,9 +312,11 @@ class Session {
     void pubAckReceived(int ackPacketId) {
         // TODO remain to invoke in somehow m_interceptor.notifyMessageAcknowledged
         SessionRegistry.EnqueuedMessage removed = inflightWindow.remove(ackPacketId);
-        if (removed != null) {
-            removed.release();
+        if (removed == null) {
+            LOG.warn("Received a PUBACK with not matching packetId");
+            return;
         }
+        removed.release();
 
         inflightSlots.incrementAndGet();
         drainQueueToConnection();
