@@ -183,11 +183,14 @@ class Session {
     }
 
     public void processPubRec(int packetId) {
-        // Message discarded, make sure any buffers in it are released
         SessionRegistry.EnqueuedMessage removed = inflightWindow.remove(packetId);
-        if (removed != null) {
-            removed.release();
+        if (removed == null) {
+            LOG.warn("Received a PUBREC with not matching packetId");
+            return;
         }
+
+        // Message discarded, make sure any buffers in it are released
+        removed.release();
 
         inflightSlots.incrementAndGet();
         if (canSkipQueue()) {
