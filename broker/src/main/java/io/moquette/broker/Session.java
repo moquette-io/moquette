@@ -401,6 +401,8 @@ class Session {
     public void receivedPublishQos2(int messageID, MqttPublishMessage msg) {
         qos2Receiving.put(messageID, msg);
         msg.retain(); // retain to put in the inflight map
+        // Second pass-on, retain
+        msg.payload().retain();
         mqttConnection.sendPublishReceived(messageID);
     }
 

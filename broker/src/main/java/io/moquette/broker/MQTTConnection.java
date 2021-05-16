@@ -375,8 +375,6 @@ final class MQTTConnection {
             }
             case EXACTLY_ONCE: {
                 bindedSession.receivedPublishQos2(messageID, msg);
-                // Second pass-on, retain
-                msg.payload().retain();
                 postOffice.receivedPublishQos2(this, msg, username);
                 break;
             }
