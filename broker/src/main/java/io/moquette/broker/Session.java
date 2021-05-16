@@ -208,11 +208,13 @@ class Session {
     }
 
     public void processPubComp(int messageID) {
-        // Message discarded, make sure any buffers in it are released
         SessionRegistry.EnqueuedMessage removed = inflightWindow.remove(messageID);
-        if (removed != null) {
-            removed.release();
+        if (removed == null) {
+            LOG.warn("Received a PUBCOMP with not matching packetId");
+            return;
         }
+        // Message discarded, make sure any buffers in it are released
+        removed.release();
 
         inflightSlots.incrementAndGet();
 
