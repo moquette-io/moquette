@@ -325,6 +325,7 @@ public class Server {
             h2Builder.closeStore();
         }
 
+        interceptor.stop();
         LOG.info("Moquette integration has been stopped.");
     }
 

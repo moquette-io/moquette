@@ -77,7 +77,7 @@ public final class BrokerInterceptor implements Interceptor {
     /**
      * Shutdown graciously the executor service
      */
-    void stop() {
+    public void stop() {
         LOG.info("Shutting down interceptor thread pool...");
         executor.shutdown();
         try {

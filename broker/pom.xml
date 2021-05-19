@@ -2,7 +2,7 @@
     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <relativePath>../</relativePath>
+        <relativePath>../pom.xml</relativePath>
         <artifactId>moquette-parent</artifactId>
         <groupId>io.moquette</groupId>
         <version>0.15-SNAPSHOT</version>
@@ -15,7 +15,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <bintray.package>io.moquette.moquette-broker</bintray.package>
-        <netty.version>4.1.53.Final</netty.version>
+        <netty.version>4.1.59.Final</netty.version>
         <netty.tcnative.version>2.0.34.Final</netty.tcnative.version>
         <paho.version>1.2.5</paho.version>
         <h2.version>1.4.199</h2.version>

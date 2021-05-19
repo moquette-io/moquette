@@ -22,7 +22,19 @@ jobs:
         name: Test JDK ${{ matrix.java }}, ${{ matrix.os }}
 
         steps:
-            - uses: actions/checkout@v2
+            - name: Check out repository
+              uses: actions/checkout@v2
+
+            - name: Cache maven repository
+              uses: actions/cache@v2
+              with:
+                  path: |
+                      ~/.m2/repository
+                  key: ${{ matrix.arch }}-${{ runner.os }}-maven-${{ matrix.java }}-${{ hashFiles('**/pom.xml') }}
+                  restore-keys: |
+                      ${{ matrix.arch }}-${{ runner.os }}-maven-${{ matrix.java }}
+                      ${{ matrix.arch }}-${{ runner.os }}-maven
+
             - name: Set up JDK
               uses: actions/setup-java@v1
               with:
@@ -30,3 +42,4 @@ jobs:
                   architecture: ${{ matrix.arch }}
             - name: Test with Maven
               run: mvn verify -B --file pom.xml
+
