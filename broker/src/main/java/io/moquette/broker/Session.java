@@ -183,14 +183,18 @@ class Session {
     }
 
     public void processPubRec(int packetId) {
-        SessionRegistry.EnqueuedMessage removed = inflightWindow.remove(packetId);
-        if (removed == null) {
+        SessionRegistry.EnqueuedMessage msgByPacket = inflightWindow.get(packetId);
+        if (msgByPacket == null) {
             LOG.warn("Received a PUBREC with not matching packetId");
+            return;
+        }
+        if (msgByPacket instanceof SessionRegistry.PubRelMarker) {
+            LOG.info("Received a PUBREC for packetId that was already moved in second step of Qos2");
             return;
         }
 
         // Message discarded, make sure any buffers in it are released
-        removed.release();
+        msgByPacket.release();
 
         inflightSlots.incrementAndGet();
         if (canSkipQueue()) {
