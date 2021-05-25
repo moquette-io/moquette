@@ -17,11 +17,11 @@ package io.moquette.broker;
 
 import io.moquette.broker.subscriptions.Subscription;
 
-import java.util.List;
+import java.util.Set;
 
 public interface ISubscriptionsRepository {
 
-    List<Subscription> listAllSubscriptions();
+    Set<Subscription> listAllSubscriptions();
 
     void addNewSubscription(Subscription subscription);
 
