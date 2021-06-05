@@ -19,7 +19,11 @@ package io.moquette.integration;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Used in test to collect all messages received asynchronously by MqttClient.
@@ -37,9 +41,12 @@ public class MessageCollector implements MqttCallback {
         }
     }
 
+    private static final Logger LOG = LoggerFactory.getLogger(MessageCollector.class);
+
     private BlockingQueue<ReceivedMessage> m_messages = new LinkedBlockingQueue<>();
     private boolean m_connectionLost;
     private volatile boolean messageReceived = false;
+    private AtomicInteger receivedCounter = new AtomicInteger(0);
 
     /**
      * Return the message from the queue if not empty, else return null with wait period.
@@ -75,6 +82,7 @@ public class MessageCollector implements MqttCallback {
         m_messages = new LinkedBlockingQueue<>();
         m_connectionLost = false;
         messageReceived = false;
+        receivedCounter.set(0);
     }
 
     public boolean connectionLost() {
@@ -90,6 +98,8 @@ public class MessageCollector implements MqttCallback {
     public void messageArrived(String topic, MqttMessage message) {
         m_messages.offer(new ReceivedMessage(message, topic));
         messageReceived = true;
+        receivedCounter.incrementAndGet();
+        LOG.debug("Message arrived {}", new String(message.getPayload()));
     }
 
     /**
@@ -103,5 +113,13 @@ public class MessageCollector implements MqttCallback {
 //        } catch (MqttException e) {
 //            e.printStackTrace();
 //        }
+    }
+
+    /**
+     *
+     * @return the number of received
+     * */
+    public int countReceived() {
+        return receivedCounter.get();
     }
 }

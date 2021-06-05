@@ -131,7 +131,7 @@ final class MQTTConnection {
         LOG.trace("Processing CONNECT message. CId: {} username: {}", clientId, username);
 
         if (isNotProtocolVersion(msg, MqttVersion.MQTT_3_1) && isNotProtocolVersion(msg, MqttVersion.MQTT_3_1_1)) {
-            LOG.warn("MQTT protocol version is not valid. CId: {}", clientId);
+            LOG.warn("MQTT protocol version {} is not valid or unsupported CId: {}", msg.variableHeader().version(), clientId);
             abortConnection(CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION);
             return;
         }
