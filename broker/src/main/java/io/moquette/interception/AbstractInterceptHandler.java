@@ -48,6 +48,7 @@ public abstract class AbstractInterceptHandler implements InterceptHandler {
 
     @Override
     public void onPublish(InterceptPublishMessage msg) {
+        msg.getPayload().release();
     }
 
     @Override

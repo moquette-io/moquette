@@ -52,6 +52,12 @@ public interface InterceptHandler {
 
     void onConnectionLost(InterceptConnectionLostMessage msg);
 
+    /**
+     * Called when a message is published. The receiver MUST release the payload of the message, either
+     * by calling super.onPublish, or by calling msg.getPayload.release() directly.
+     *
+     * @param msg The message that was published.
+     */
     void onPublish(InterceptPublishMessage msg);
 
     void onSubscribe(InterceptSubscribeMessage msg);

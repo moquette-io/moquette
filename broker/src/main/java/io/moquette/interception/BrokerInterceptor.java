@@ -130,7 +130,8 @@ public final class BrokerInterceptor implements Interceptor {
                     for (InterceptHandler handler : handlers.get(InterceptPublishMessage.class)) {
                         LOG.debug("Notifying MQTT PUBLISH message to interceptor. CId={}, messageId={}, topic={}, "
                                 + "interceptorId={}", clientID, messageId, topic, handler.getID());
-                        handler.onPublish(new InterceptPublishMessage(msg, clientID, username));
+                        // Sending to the outside, make a retainedDuplicate.
+                        handler.onPublish(new InterceptPublishMessage(msg.retainedDuplicate(), clientID, username));
                     }
                 } finally {
                     ReferenceCountUtil.release(msg);

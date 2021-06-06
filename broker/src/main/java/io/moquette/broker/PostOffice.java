@@ -111,6 +111,8 @@ class PostOffice {
 
                 final ByteBuf payloadBuf = Unpooled.wrappedBuffer(retainedMsg.getPayload());
                 targetSession.sendRetainedPublishOnSessionAtQos(retainedMsg.getTopic(), qos, payloadBuf);
+                // We made the buffer, we must release it.
+                payloadBuf.release();
             }
         }
     }
@@ -202,7 +204,7 @@ class PostOffice {
         interceptor.notifyTopicPublished(msg, clientId, username);
     }
 
-    private void publish2Subscribers(ByteBuf origPayload, Topic topic, MqttQoS publishingQos) {
+    private void publish2Subscribers(ByteBuf payload, Topic topic, MqttQoS publishingQos) {
         Set<Subscription> topicMatchingSubscriptions = subscriptions.matchQosSharpening(topic);
 
         for (final Subscription sub : topicMatchingSubscriptions) {
@@ -213,8 +215,6 @@ class PostOffice {
             if (isSessionPresent) {
                 LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
                           sub.getClientId(), sub.getTopicFilter(), qos);
-                // we need to retain because duplicate only copy r/w indexes and don't retain() causing refCnt = 0
-                ByteBuf payload = origPayload.retainedDuplicate();
                 targetSession.sendPublishOnSessionAtQos(topic, qos, payload);
             } else {
                 // If we are, the subscriber disconnected after the subscriptions tree selected that session as a

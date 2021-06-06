@@ -190,7 +190,7 @@ public class ServerLowlevelMessagesIntegrationTest {
             subscriber.subscribe(topic, 1, (String topic1, org.eclipse.paho.client.mqttv3.MqttMessage message) -> {
                 if (isFirst.getAndSet(false)) {
                     // wait to trigger resending PUBLISH
-                    TimeUnit.SECONDS.sleep(FLIGHT_BEFORE_RESEND_MS * 2);
+                    TimeUnit.MILLISECONDS.sleep(FLIGHT_BEFORE_RESEND_MS * 2);
                 } else {
                     receivedPublish.set(true);
                 }

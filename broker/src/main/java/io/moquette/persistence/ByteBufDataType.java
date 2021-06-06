@@ -65,7 +65,7 @@ public final class ByteBufDataType implements org.h2.mvstore.type.DataType {
         final ByteBuf casted = (ByteBuf) obj;
         final int payloadSize = casted.readableBytes();
         byte[] rawBytes = new byte[payloadSize];
-        casted.copy().readBytes(rawBytes);
+        casted.copy().readBytes(rawBytes).release();
         buff.putInt(payloadSize);
         buff.put(rawBytes);
     }
