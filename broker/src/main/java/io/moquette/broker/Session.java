@@ -264,6 +264,10 @@ class Session {
             MqttPublishMessage publishMsg = MQTTConnection.notRetainedPublishWithMessageId(topic.toString(), qos,
                                                                                            payload, packetId);
             mqttConnection.sendPublish(publishMsg);
+            LOG.debug("Write direct to the peer, inflight slots: {}", inflightSlots.get());
+            if (inflightSlots.get() == 0) {
+                mqttConnection.flush();
+            }
 
             // TODO drainQueueToConnection();?
         } else {
@@ -271,6 +275,7 @@ class Session {
             // Adding to a queue, retain.
             msg.retain();
             sessionQueue.add(msg);
+            LOG.debug("Enqueue to peer session");
         }
     }
 
