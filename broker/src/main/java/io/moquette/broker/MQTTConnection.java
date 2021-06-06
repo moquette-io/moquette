@@ -446,7 +446,7 @@ final class MQTTConnection {
     }
 
     void sendPubAck(int messageID) {
-        LOG.trace("sendPubAck invoked");
+        LOG.trace("sendPubAck for messageID: {}", messageID);
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBACK, false, AT_MOST_ONCE,
                                                   false, 0);
         MqttPubAckMessage pubAckMessage = new MqttPubAckMessage(fixedHeader, from(messageID));
@@ -530,5 +530,9 @@ final class MQTTConnection {
             // TODO drain all messages in target's session in-flight message queue
             bindedSession.flushAllQueuedMessages();
         }
+    }
+
+    public void flush() {
+        channel.flush();
     }
 }
