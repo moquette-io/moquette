@@ -1,6 +1,6 @@
-# This workflow deploy the packages to bintray
+# This workflow deploy the packages to Maven Central
 
-name: Build and ship to bintray
+name: Build and ship to Maven Central
 
 #on:
 #    push:
