@@ -6,26 +6,31 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.MqttQoS;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import static io.moquette.BrokerConstants.FLIGHT_BEFORE_RESEND_MS;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class SessionTest {
 
+    private EmbeddedChannel testChannel;
+    private Session client;
+    private Queue<SessionRegistry.EnqueuedMessage> queuedMessages;
+
+    @BeforeEach
+    public void setUp() {
+        testChannel = new EmbeddedChannel();
+        queuedMessages = new ConcurrentLinkedQueue<>();
+        client = new Session("Subscriber", true, null, queuedMessages);
+        createConnection(client);
+    }
+
     @Test
     public void testPubAckDrainMessagesRemainingInQueue() {
-        final Queue<SessionRegistry.EnqueuedMessage> queuedMessages = new ConcurrentLinkedQueue<>();
-        final Session client = new Session("Subscriber", true, null, queuedMessages);
-        final EmbeddedChannel testChannel = new EmbeddedChannel();
-        BrokerConfiguration brokerConfiguration = new BrokerConfiguration(true, false, false, false);
-        MQTTConnection mqttConnection = new MQTTConnection(testChannel, brokerConfiguration, null, null, null);
-        client.markConnecting();
-        client.bind(mqttConnection);
-        client.completeConnection();
-
         final Topic destinationTopic = new Topic("/a/b");
         sendQoS1To(client, destinationTopic, "Hello World!");
         // simulate a filling of inflight space and start pushing on queue
@@ -53,4 +58,54 @@ public class SessionTest {
         client.sendPublishOnSessionAtQos(destinationTopic, MqttQoS.AT_LEAST_ONCE, payload);
     }
 
+    @Test
+    public void testFirstResendOfANotAckedMessage() throws InterruptedException {
+        final Topic destinationTopic = new Topic("/a/b");
+        sendQoS1To(client, destinationTopic, "Message not ACK-ed at first send!");
+        // verify the first time the message is sent
+        ConnectionTestUtils.verifyReceivePublish(testChannel, destinationTopic.toString(), "Message not ACK-ed at first send!");
+
+        // elapse the time to make the message eligible for resend
+        Thread.sleep(FLIGHT_BEFORE_RESEND_MS + 1_000);
+
+        //trigger the resend for the timeout
+        client.resendInflightNotAcked();
+
+        // verify the first time the message is sent
+        ConnectionTestUtils.verifyReceivePublish(testChannel, destinationTopic.toString(), "Message not ACK-ed at first send!");
+    }
+
+    @Test
+    public void testSecondResendOfANotAckedMessage() throws InterruptedException {
+        final Topic destinationTopic = new Topic("/a/b");
+        sendQoS1To(client, destinationTopic, "Message not ACK-ed at first send!");
+        // verify the first time the message is sent
+        ConnectionTestUtils.verifyReceivePublish(testChannel, destinationTopic.toString(), "Message not ACK-ed at first send!");
+
+        // elapse the time to make the message eligible for resend
+        Thread.sleep(FLIGHT_BEFORE_RESEND_MS + 1_000);
+
+        //trigger the resend for the timeout
+        client.resendInflightNotAcked();
+
+        // verify the first time the message is sent
+        ConnectionTestUtils.verifyReceivePublish(testChannel, destinationTopic.toString(), "Message not ACK-ed at first send!");
+
+        // simulate a not ACK for the resent
+        Thread.sleep(FLIGHT_BEFORE_RESEND_MS + 1_000);
+
+        //trigger the resend for the timeout
+        client.resendInflightNotAcked();
+
+        // verify the first time the message is sent
+        ConnectionTestUtils.verifyReceivePublish(testChannel, destinationTopic.toString(), "Message not ACK-ed at first send!");
+    }
+
+    private void createConnection(Session client) {
+        BrokerConfiguration brokerConfiguration = new BrokerConfiguration(true, false, false, false);
+        MQTTConnection mqttConnection = new MQTTConnection(testChannel, brokerConfiguration, null, null, null);
+        client.markConnecting();
+        client.bind(mqttConnection);
+        client.completeConnection();
+    }
 }
