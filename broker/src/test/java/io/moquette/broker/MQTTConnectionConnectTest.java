@@ -319,4 +319,13 @@ public class MQTTConnectionConnectTest {
         assertFalse(channel.isOpen(), "First 'FAKE_CLIENT_ID' channel MUST be closed by the broker");
         assertTrue(anotherChannel.isOpen(), "Second 'FAKE_CLIENT_ID' channel MUST be still open");
     }
+
+    @Test
+    public void testMessageIdGeneration() {
+        for (int i = 0; i < 65_536; i++) {
+            int nextPacketId = sut.nextPacketId();
+            assertTrue(nextPacketId > 0, "Packet ID must be > 0");
+            assertTrue(nextPacketId <= 65_535, "Packet ID must be <= 65_535");
+        }
+    }
 }
