@@ -143,7 +143,7 @@ public class PostOfficeUnsubscribeTest {
 
         // publish on /news
         final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD, payload, false,
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD,
             MqttMessageBuilders.publish()
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
@@ -156,9 +156,9 @@ public class PostOfficeUnsubscribeTest {
 
         // publish on /news
         final ByteBuf payload2 = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD, payload2, false,
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD,
             MqttMessageBuilders.publish()
-                .payload(payload)
+                .payload(payload2)
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(false)
                 .topicName(NEWS_TOPIC).build());
@@ -181,7 +181,7 @@ public class PostOfficeUnsubscribeTest {
         subscribe(connection, NEWS_TOPIC, AT_MOST_ONCE);
         // publish on /news
         final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD, payload, false,
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD,
             MqttMessageBuilders.publish()
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
@@ -201,7 +201,7 @@ public class PostOfficeUnsubscribeTest {
 
         // publish on /news
         final ByteBuf payload2 = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD, payload2, false,
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD,
             MqttMessageBuilders.publish()
                 .payload(payload2)
                 .qos(MqttQoS.AT_MOST_ONCE)
@@ -248,9 +248,9 @@ public class PostOfficeUnsubscribeTest {
 
         // publish from another channel
         final ByteBuf anyPayload = Unpooled.copiedBuffer(firstPayload, Charset.defaultCharset());
-        sut.receivedPublishQos1(anotherConnection, new Topic(topic), TEST_USER, anyPayload, 1, false,
+        sut.receivedPublishQos1(anotherConnection, new Topic(topic), TEST_USER, 1,
             MqttMessageBuilders.publish()
-                .payload(Unpooled.copiedBuffer(firstPayload, Charset.defaultCharset()))
+                .payload(anyPayload)
                 .qos(MqttQoS.AT_LEAST_ONCE)
                 .retained(false)
                 .topicName(topic).build());
@@ -281,7 +281,7 @@ public class PostOfficeUnsubscribeTest {
         subscribe(connection, NEWS_TOPIC, AT_MOST_ONCE);
         // publish on /news
         final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD, payload, false,
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD,
             MqttMessageBuilders.publish()
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
@@ -301,7 +301,7 @@ public class PostOfficeUnsubscribeTest {
         subscribe(subscriberConnection, NEWS_TOPIC, AT_MOST_ONCE);
         // publish on /news
         final ByteBuf payload2 = Unpooled.copiedBuffer("Hello world2!", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD, payload2, false,
+        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD,
             MqttMessageBuilders.publish()
                 .payload(payload2.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
@@ -338,9 +338,9 @@ public class PostOfficeUnsubscribeTest {
 
     private void publishQos1(MQTTConnection publisher, String topic, String payload, int messageID) {
         final ByteBuf bytePayload = Unpooled.copiedBuffer(payload, Charset.defaultCharset());
-        sut.receivedPublishQos1(publisher, new Topic(topic), TEST_USER, bytePayload, messageID, false,
+        sut.receivedPublishQos1(publisher, new Topic(topic), TEST_USER, messageID,
             MqttMessageBuilders.publish()
-                .payload(Unpooled.copiedBuffer(payload, Charset.defaultCharset()))
+                .payload(bytePayload)
                 .qos(MqttQoS.AT_LEAST_ONCE)
                 .retained(false)
                 .topicName(NEWS_TOPIC).build());
