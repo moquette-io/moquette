@@ -13,7 +13,7 @@ echo "  \_|  |_/\___/ \__, |\__,_|\___|\__|\__\___| \_|  |_/\_/\_\ \_/   \_/   "
 echo "                   | |                                                   "
 echo "                   |_|                                                   "
 echo "                                                                         "
-echo "                                               version: 0.15-SNAPSHOT    "
+echo "                                               version: 0.16-SNAPSHOT    "
 
 
 cd "$(dirname "$0")"
