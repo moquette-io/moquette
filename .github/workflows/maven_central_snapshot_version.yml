@@ -20,6 +20,8 @@ jobs:
                   server-password: MAVEN_PASSWORD
                   gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
                   gpg-passphrase: MAVEN_GPG_PASSPHRASE
+            - name: Display settings.xml
+              run: cat /home/runner/.m2/settings.xml
             - name: Publish package
               run: mvn --batch-mode -Prelease-sign-artifacts clean deploy
               env:
