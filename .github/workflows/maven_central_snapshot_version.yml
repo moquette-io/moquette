@@ -1,0 +1,30 @@
+# This workflow deploy the snapshot packages to Maven Central
+
+name: Build and ship SNAPSHOT versions to Maven Central
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+    publish:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v2
+            - name: Set up Maven Central Repository
+              uses: actions/setup-java@v1
+              with:
+                  java-version: 11
+                  server-id: ossrh
+                  server-username: MAVEN_USERNAME
+                  server-password: MAVEN_PASSWORD
+                  gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+                  gpg-passphrase: MAVEN_GPG_PASSPHRASE
+            - name: Display settings.xml
+              run: cat /home/runner/.m2/settings.xml
+            - name: Publish package
+              run: mvn --batch-mode -Prelease-sign-artifacts clean deploy
+              env:
+                  MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+                  MAVEN_PASSWORD: ${{ secrets.OSSRH_TOKEN }}
+                  MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
