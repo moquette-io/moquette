@@ -1,3 +1,6 @@
+Version 0.16-SNAPSHOT:
+   [build] drop generation of broker-test, removed distribution and embedding_moquette modules from deploy phase (#616)
+
 Version 0.12:
    Fixed issue #415
    Dropped Hazelcast because at the moment Moquette is not designed to be clusterizable
