@@ -187,7 +187,7 @@ public class SessionRegistry {
 
     private void terminateSession(Session session) {
         unsubscribe(session);
-        // TODO - terminate session
+        session.terminateSession();
     }
 
     private void reactivateSubscriptions(Session session, String username) {
@@ -237,6 +237,7 @@ public class SessionRegistry {
     }
 
     public void remove(Session session) {
+        session.terminateSession();
         pool.remove(session.getClientID(), session);
     }
 

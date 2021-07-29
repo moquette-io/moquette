@@ -113,6 +113,34 @@ class Session {
         this.sessionQueue = sessionQueue;
     }
 
+    /**
+     * This method terminates a Session, which involves disconnecting the client,
+     * if one is connected, and releasing all references to unacknowledged publishes.
+     */
+    void terminateSession() {
+        MQTTConnection connection = this.mqttConnection;
+        if (connection != null) {
+            connection.dropConnection();
+        }
+        disconnect();
+
+        // Release queued messages
+        while (!sessionQueue.isEmpty()) {
+            final SessionRegistry.EnqueuedMessage msg = sessionQueue.remove();
+            msg.release();
+        }
+
+        // Release in flight messages (QoS 1/2)
+        List<Integer> inflightKeys = new ArrayList<>(inflightWindow.keySet());
+        inflightKeys.forEach((k) -> {
+            SessionRegistry.EnqueuedMessage msg = inflightWindow.get(k);
+            if (msg != null && inflightWindow.remove(k) == msg) {
+                msg.release();
+                inflightSlots.incrementAndGet();
+            }
+        });
+    }
+
     void update(boolean clean, Will will) {
         this.clean = clean;
         this.will = will;
