@@ -23,7 +23,9 @@ import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.mqtt.*;
+import io.netty.util.AbstractReferenceCounted;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.ReferenceCounted;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,7 +37,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-class Session {
+class Session extends AbstractReferenceCounted {
 
     private static final Logger LOG = LoggerFactory.getLogger(Session.class);
 
@@ -113,11 +115,33 @@ class Session {
         this.sessionQueue = sessionQueue;
     }
 
+    // Called when the Session reference count reaches 0
+    @Override
+    protected void deallocate() {
+        terminateSession();
+    }
+
+    @Override
+    public ReferenceCounted touch(Object hint) {
+        return this;
+    }
+
+    private boolean tryRetain() {
+        try {
+            retain();
+        } catch (IllegalStateException e) {
+            LOG.debug("Session has already been deallocated");
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * This method terminates a Session, which involves disconnecting the client,
      * if one is connected, and releasing all references to unacknowledged publishes.
      */
-    void terminateSession() {
+    private void terminateSession() {
         MQTTConnection connection = this.mqttConnection;
         if (connection != null) {
             connection.dropConnection();
@@ -139,11 +163,14 @@ class Session {
                 inflightSlots.incrementAndGet();
             }
         });
-    }
 
-    void update(boolean clean, Will will) {
-        this.clean = clean;
-        this.will = will;
+        List<Integer> qos2ReceivingKeys = new ArrayList<>(qos2Receiving.keySet());
+        qos2ReceivingKeys.forEach((k) -> {
+            MqttPublishMessage msg = qos2Receiving.get(k);
+            if (msg != null && qos2Receiving.remove(k) == msg) {
+                msg.release();
+            }
+        });
     }
 
     void markConnecting() {
@@ -195,6 +222,7 @@ class Session {
     }
 
     public void disconnect() {
+        // TODO - grab a reference first?
         final boolean res = assignState(SessionStatus.CONNECTED, SessionStatus.DISCONNECTING);
         if (!res) {
             // someone already moved away from CONNECTED
@@ -213,14 +241,20 @@ class Session {
     }
 
     public void processPubRec(int pubRecPacketId) {
+        if (!tryRetain()) {
+            return;
+        }
+
         // Message discarded, make sure any buffers in it are released
         SessionRegistry.EnqueuedMessage removed = inflightWindow.remove(pubRecPacketId);
         if (removed == null) {
             LOG.warn("Received a PUBREC with not matching packetId");
+            release();
             return;
         }
         if (removed instanceof SessionRegistry.PubRelMarker) {
             LOG.info("Received a PUBREC for packetId that was already moved in second step of Qos2");
+            release();
             return;
         }
 
@@ -230,13 +264,19 @@ class Session {
         mqttConnection.sendIfWritableElseDrop(pubRel);
 
         drainQueueToConnection();
+        release();
     }
 
     public void processPubComp(int messageID) {
+        if (!tryRetain()) {
+            return;
+        }
+
         // Message discarded, make sure any buffers in it are released
         SessionRegistry.EnqueuedMessage removed = inflightWindow.remove(messageID);
         if (removed == null) {
             LOG.warn("Received a PUBCOMP with not matching packetId");
+            release();
             return;
         }
         removed.release();
@@ -247,9 +287,17 @@ class Session {
 //                final InterceptAcknowledgedMessage interceptAckMsg = new InterceptAcknowledgedMessage(inflightMsg,
 // topic, username, messageID);
 //                m_interceptor.notifyMessageAcknowledged(interceptAckMsg);
+
+        release();
     }
 
     public void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload) {
+        // Add reference to this Session to prevent it from being deallocated
+        // while we are processing this Publish message.
+        if (!tryRetain()) {
+            return;
+        }
+
         switch (qos) {
             case AT_MOST_ONCE:
                 if (connected()) {
@@ -265,6 +313,8 @@ class Session {
             case FAILURE:
                 LOG.error("Not admissible");
         }
+
+        release();
     }
 
     private void sendPublishQos1(Topic topic, MqttQoS qos, ByteBuf payload) {
@@ -347,23 +397,38 @@ class Session {
     }
 
     void pubAckReceived(int ackPacketId) {
+        if (!tryRetain()) {
+            return;
+        }
+
         // TODO remain to invoke in somehow m_interceptor.notifyMessageAcknowledged
         SessionRegistry.EnqueuedMessage removed = inflightWindow.remove(ackPacketId);
         if (removed == null) {
             LOG.warn("Received a PUBACK with not matching packetId");
+            release();
             return;
         }
         removed.release();
 
         inflightSlots.incrementAndGet();
         drainQueueToConnection();
+
+        release();
     }
 
     public void flushAllQueuedMessages() {
+        if (!tryRetain()) {
+            return;
+        }
         drainQueueToConnection();
+        release();
     }
 
     public void resendInflightNotAcked() {
+        if (!tryRetain()) {
+            return;
+        }
+
         Collection<InFlightPacket> expired = new ArrayList<>(INFLIGHT_WINDOW_SIZE);
         inflightTimeouts.drainTo(expired);
 
@@ -390,6 +455,8 @@ class Session {
                 mqttConnection.sendPublish(publishMsg);
             }
         }
+
+        release();
     }
 
     private void debugLogPacketIds(Collection<InFlightPacket> expired) {
@@ -440,13 +507,21 @@ class Session {
         }
     }
 
+    // TODO - two methods that do the same thing? Combine?
     public void writabilityChanged() {
+        if (!tryRetain()) {
+            return;
+        }
         drainQueueToConnection();
+        release();
     }
 
     public void sendQueuedMessagesWhileOffline() {
-        LOG.trace("Republishing all saved messages for session {}", this);
+        if (!tryRetain()) {
+            return;
+        }
         drainQueueToConnection();
+        release();
     }
 
     void sendRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload) {
@@ -459,6 +534,10 @@ class Session {
     }
 
     public void receivedPublishQos2(int messageID, MqttPublishMessage msg) {
+        if (!tryRetain()) {
+            return;
+        }
+
         // Retain before putting msg in map.
         ReferenceCountUtil.retain(msg);
 
@@ -467,12 +546,20 @@ class Session {
         ReferenceCountUtil.release(old);
 
         mqttConnection.sendPublishReceived(messageID);
+
+        release();
     }
 
     public void receivedPubRelQos2(int messageID) {
+        if (!tryRetain()) {
+            return;
+        }
+
         // Done with the message, remove from queue and release payload.
         final MqttPublishMessage removedMsg = qos2Receiving.remove(messageID);
         ReferenceCountUtil.release(removedMsg);
+
+        release();
     }
 
     Optional<InetSocketAddress> remoteAddress() {
