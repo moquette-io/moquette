@@ -133,20 +133,22 @@ class Session extends AbstractReferenceCounted {
             LOG.debug("Session has already been deallocated");
             return false;
         }
-
         return true;
     }
 
     /**
      * This method terminates a Session, which involves disconnecting the client,
      * if one is connected, and releasing all references to unacknowledged publishes.
+     *
+     * Failure to release messages will result in netty byte buffer leaks when this
+     * Session is garbage collected.
      */
     private void terminateSession() {
+        // Drop MQTT connection, if one is connected
         MQTTConnection connection = this.mqttConnection;
         if (connection != null) {
-            connection.dropConnection();
+            connection.unbindSessionAndDisconnect();
         }
-        disconnect();
 
         // Release queued messages
         while (!sessionQueue.isEmpty()) {
@@ -173,8 +175,8 @@ class Session extends AbstractReferenceCounted {
         });
     }
 
-    void markConnecting() {
-        assignState(SessionStatus.DISCONNECTED, SessionStatus.CONNECTING);
+    boolean markConnecting() {
+        return assignState(SessionStatus.DISCONNECTED, SessionStatus.CONNECTING);
     }
 
     boolean completeConnection() {
@@ -213,7 +215,7 @@ class Session extends AbstractReferenceCounted {
         return will;
     }
 
-    boolean assignState(SessionStatus expected, SessionStatus newState) {
+    private boolean assignState(SessionStatus expected, SessionStatus newState) {
         return status.compareAndSet(expected, newState);
     }
 
@@ -221,12 +223,31 @@ class Session extends AbstractReferenceCounted {
         mqttConnection.dropConnection();
     }
 
+    public boolean dropAndReplaceConnection(MQTTConnection mqttConnection) {
+        final boolean res = assignState(SessionStatus.CONNECTED, SessionStatus.DISCONNECTING);
+        if (!res) {
+            // someone already moved away from CONNECTED
+            LOG.debug("session (cID {}) was not in CONNECTED state", clientId);
+            return false;
+        }
+
+        // only a single caller should get to this point
+        this.mqttConnection.unbindSessionAndDisconnect();
+        bind(mqttConnection);
+
+        return assignState(SessionStatus.DISCONNECTING, SessionStatus.CONNECTING);
+    }
+
     public void disconnect() {
-        // TODO - grab a reference first?
+        if (!tryRetain()) {
+            return;
+        }
+
         final boolean res = assignState(SessionStatus.CONNECTED, SessionStatus.DISCONNECTING);
         if (!res) {
             // someone already moved away from CONNECTED
             // TODO what to do?
+            release();
             return;
         }
 
@@ -234,6 +255,7 @@ class Session extends AbstractReferenceCounted {
         will = null;
 
         assignState(SessionStatus.DISCONNECTING, SessionStatus.DISCONNECTED);
+        release();
     }
 
     boolean isClean() {

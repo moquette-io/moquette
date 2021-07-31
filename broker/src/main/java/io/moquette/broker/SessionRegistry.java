@@ -92,7 +92,7 @@ public class SessionRegistry {
     }
 
     public enum CreationModeEnum {
-        CREATED_CLEAN_NEW, REOPEN_EXISTING, DROP_EXISTING
+        CREATED_CLEAN_NEW, REOPEN_EXISTING
     }
 
     public static class SessionCreationResult {
@@ -136,53 +136,64 @@ public class SessionRegistry {
         }
     }
 
-    SessionCreationResult createOrReopenSession(MqttConnectMessage msg, String clientId, String username) {
+    SessionCreationResult openAndBindSession(MqttConnectMessage msg, String clientId, String username,
+                                             MQTTConnection mqttConnection) {
         SessionCreationResult postConnectAction;
         final boolean newIsClean = msg.variableHeader().isCleanSession();
         final Session oldSession = pool.get(clientId);
 
-        if (newIsClean || oldSession == null) {
+        // A new session should be created in the following 3 cases:
+        //  1. clean session = true for the new session
+        //  2. No old session for the given client ID exists
+        //  3. An old session for the client ID does exist, but it itself is a clean session
+        if (newIsClean || oldSession == null || oldSession.isClean()) {
             final Session newSession = createNewSession(msg, clientId);
 
             postConnectAction = new SessionCreationResult(newSession, CreationModeEnum.CREATED_CLEAN_NEW, false);
 
-            // publish the session
+            // Bind MQTT connection to new Session and store it in the session pool. This is needed to prevent
+            // dangling sessions. If this session is terminated prior to it being associated with the mqttConnection,
+            // then the client will never be disconnected, yet they will not be able to receive any messages
             LOG.trace("case 1, creating new session with CId {}, clean session {}", clientId, newIsClean);
+            newSession.bind(mqttConnection);
             final Session previous = pool.put(clientId, newSession);
 
+            // Disconnect the previously connected client
             if (previous != null) {
                 LOG.trace("terminating previous client session with CId {}", clientId);
                 terminateSession(previous);
             }
         } else {
-            postConnectAction = reopenExistingSession(clientId, oldSession, username);
+            postConnectAction = reopenExistingSession(clientId, oldSession, username, mqttConnection);
         }
 
         return postConnectAction;
     }
 
-    private SessionCreationResult reopenExistingSession(String clientId, Session oldSession, String username) {
-        final SessionCreationResult creationResult;
+    private SessionCreationResult reopenExistingSession(String clientId, Session oldSession, String username,
+                                                        MQTTConnection mqttConnection) {
+        // Applying De Morgan's law:
+        // !newIsClean && oldSession != null && !oldSession.isClean()
         if (oldSession.disconnected()) {
-            final boolean connecting = oldSession.assignState(SessionStatus.DISCONNECTED, SessionStatus.CONNECTING);
+            final boolean connecting = oldSession.markConnecting();
             if (!connecting) {
                 throw new SessionCorruptedException("old session moved in connected state by other thread");
             }
             // case 2
-            reactivateSubscriptions(oldSession, username);
-
             LOG.trace("case 2, oldSession with same CId {} disconnected", clientId);
-            creationResult = new SessionCreationResult(oldSession, CreationModeEnum.REOPEN_EXISTING, true);
+            oldSession.bind(mqttConnection);
+            reactivateSubscriptions(oldSession, username);
         } else {
             // case 3
             LOG.trace("case 3, oldSession with same CId {} still connected, force to close", clientId);
-            oldSession.closeImmediately();
-            oldSession.disconnect();
-            oldSession.markConnecting();
-            creationResult = new SessionCreationResult(oldSession, CreationModeEnum.DROP_EXISTING, true);
+            final boolean didReplace = oldSession.dropAndReplaceConnection(mqttConnection);
+            if (!didReplace) {
+                // this could happen if two clients connect at the same time with the same client ID
+                throw new SessionCorruptedException("old connection replaced by different thread");
+            }
         }
 
-        return creationResult;
+        return new SessionCreationResult(oldSession, CreationModeEnum.REOPEN_EXISTING, true);
     }
 
     private void terminateSession(Session session) {

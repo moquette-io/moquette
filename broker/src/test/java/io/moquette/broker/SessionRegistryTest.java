@@ -100,7 +100,8 @@ public class SessionRegistryTest {
         NettyUtils.cleanSession(channel, false);
 
         // Connect a first time
-        final SessionRegistry.SessionCreationResult res = sut.createOrReopenSession(msg, FAKE_CLIENT_ID, connection.getUsername());
+        final SessionRegistry.SessionCreationResult res = sut.openAndBindSession(msg, FAKE_CLIENT_ID,
+            connection.getUsername(), connection);
         // disconnect
         res.session.disconnect();
 //        sut.disconnect(FAKE_CLIENT_ID);
@@ -108,7 +109,8 @@ public class SessionRegistryTest {
         // Exercise, reconnect
         EmbeddedChannel anotherChannel = new EmbeddedChannel();
         MQTTConnection anotherConnection = createMQTTConnection(ALLOW_ANONYMOUS_AND_ZEROBYTE_CLIENT_ID, anotherChannel);
-        final SessionRegistry.SessionCreationResult result = sut.createOrReopenSession(msg, FAKE_CLIENT_ID, anotherConnection.getUsername());
+        final SessionRegistry.SessionCreationResult result = sut.openAndBindSession(msg, FAKE_CLIENT_ID,
+            anotherConnection.getUsername(), anotherConnection);
 
         // Verify
         assertEquals(SessionRegistry.CreationModeEnum.CREATED_CLEAN_NEW, result.mode);
