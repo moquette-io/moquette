@@ -184,6 +184,24 @@ class Session {
         assignState(SessionStatus.DISCONNECTING, SessionStatus.DISCONNECTED);
     }
 
+    /**
+     * Clear queues and release buffers
+     */
+    public void clear() {
+        subscriptions.clear();
+        for (Iterator<Map.Entry<Integer, EnqueuedMessage>> it = inflightWindow.entrySet().iterator(); it.hasNext();) {
+            Map.Entry<Integer, EnqueuedMessage> entry = it.next();
+            entry.getValue().release();
+            it.remove();
+        }
+        for (Iterator<Map.Entry<Integer, MqttPublishMessage>> it = qos2Receiving.entrySet().iterator(); it.hasNext();) {
+            Map.Entry<Integer, MqttPublishMessage> entry = it.next();
+            entry.getValue().release();
+            it.remove();
+        }
+        inflightTimeouts.clear();
+    }
+
     boolean isClean() {
         return clean;
     }
