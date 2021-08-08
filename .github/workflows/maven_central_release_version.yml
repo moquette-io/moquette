@@ -8,11 +8,7 @@ name: Build and ship to Maven Central
 #            - "v*"
 on:
     release:
-<<<<<<< HEAD
         types: [released]
-=======
-        types: [created]
->>>>>>> ed873606... Revert "Removed Maven publishing workflows from personal fork"
 
 jobs:
     publish:
