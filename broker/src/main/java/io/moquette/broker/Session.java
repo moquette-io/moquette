@@ -191,6 +191,7 @@ class Session {
             LOG.warn("Received a PUBREC with not matching packetId");
             return;
         }
+        removed.release();
         if (removed instanceof SessionRegistry.PubRelMarker) {
             LOG.info("Received a PUBREC for packetId that was already moved in second step of Qos2");
             return;
