@@ -134,6 +134,7 @@ class PostOffice {
 
     public void unsubscribe(List<String> topics, MQTTConnection mqttConnection, int messageId) {
         final String clientID = mqttConnection.getClientId();
+        final Session session = sessionRegistry.retrieve(clientID);
         for (String t : topics) {
             Topic topic = new Topic(t);
             boolean validTopic = topic.isValid();
@@ -147,8 +148,7 @@ class PostOffice {
             LOG.trace("Removing subscription topic={}", topic);
             subscriptions.removeSubscription(topic, clientID);
 
-            // TODO remove the subscriptions to Session
-//            clientSession.unsubscribeFrom(topic);
+            session.removeSubscription(topic);
 
             String username = NettyUtils.userName(mqttConnection.channel);
             interceptor.notifyTopicUnsubscribed(topic.toString(), clientID, username);
