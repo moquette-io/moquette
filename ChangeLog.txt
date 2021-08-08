@@ -1,4 +1,5 @@
 Version 0.15.1:
+   [fix] avoid double subscription (#612)
    [leak] fixed buffer leak in processing of PUBREC for QoS2 flow (#609)
 
 Version 0.12:

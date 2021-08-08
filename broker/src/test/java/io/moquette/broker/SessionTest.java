@@ -13,9 +13,14 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static io.moquette.BrokerConstants.FLIGHT_BEFORE_RESEND_MS;
+import io.moquette.broker.subscriptions.Subscription;
+import java.util.Arrays;
+import org.assertj.core.api.Assertions;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class SessionTest {
+
+    private static final String CLIENT_ID = "Subscriber";
 
     private EmbeddedChannel testChannel;
     private Session client;
@@ -25,7 +30,7 @@ public class SessionTest {
     public void setUp() {
         testChannel = new EmbeddedChannel();
         queuedMessages = new ConcurrentLinkedQueue<>();
-        client = new Session("Subscriber", true, null, queuedMessages);
+        client = new Session(CLIENT_ID, true, null, queuedMessages);
         createConnection(client);
     }
 
@@ -99,6 +104,16 @@ public class SessionTest {
 
         // verify the first time the message is sent
         ConnectionTestUtils.verifyReceivePublish(testChannel, destinationTopic.toString(), "Message not ACK-ed at first send!");
+    }
+
+    @Test
+    public void testRemoveSubscription() {
+        client.addSubscriptions(Arrays.asList(new Subscription(CLIENT_ID, new Topic("topic/one"), MqttQoS.AT_MOST_ONCE)));
+        Assertions.assertThat(client.getSubscriptions()).hasSize(1);
+        client.addSubscriptions(Arrays.asList(new Subscription(CLIENT_ID, new Topic("topic/one"), MqttQoS.EXACTLY_ONCE)));
+        Assertions.assertThat(client.getSubscriptions()).hasSize(1);
+        client.removeSubscription(new Topic("topic/one"));
+        Assertions.assertThat(client.getSubscriptions()).isEmpty();
     }
 
     private void createConnection(Session client) {

@@ -93,7 +93,7 @@ class Session {
     private final Queue<SessionRegistry.EnqueuedMessage> sessionQueue;
     private final AtomicReference<SessionStatus> status = new AtomicReference<>(SessionStatus.DISCONNECTED);
     private MQTTConnection mqttConnection;
-    private List<Subscription> subscriptions = new ArrayList<>();
+    private final Set<Subscription> subscriptions = new HashSet<>();
     private final Map<Integer, SessionRegistry.EnqueuedMessage> inflightWindow = new HashMap<>();
     private final DelayQueue<InFlightPacket> inflightTimeouts = new DelayQueue<>();
     private final Map<Integer, MqttPublishMessage> qos2Receiving = new HashMap<>();
@@ -148,6 +148,10 @@ class Session {
 
     public void addSubscriptions(List<Subscription> newSubscriptions) {
         subscriptions.addAll(newSubscriptions);
+    }
+
+    public void removeSubscription(Topic topic) {
+        subscriptions.remove(new Subscription(clientId, topic, MqttQoS.EXACTLY_ONCE));
     }
 
     public boolean hasWill() {
