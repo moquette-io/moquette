@@ -1,5 +1,6 @@
 Version 0.16-SNAPSHOT:
    [build] drop generation of broker-test, removed distribution and embedding_moquette modules from deploy phase (#616)
+   [leak] fixed buffer leak in processing of PUBREC for QoS2 flow (#609)
 
 Version 0.12:
    Fixed issue #415
