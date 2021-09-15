@@ -17,13 +17,12 @@ package io.moquette.broker.subscriptions;
 
 class TNode extends CNode {
 
-    @Override
-    public Token getToken() {
-        throw new IllegalStateException("Can't be invoked on TNode");
+    public TNode(Token token) {
+        super(token);
     }
 
     @Override
-    public void setToken(Token token) {
+    public Token getToken() {
         throw new IllegalStateException("Can't be invoked on TNode");
     }
 

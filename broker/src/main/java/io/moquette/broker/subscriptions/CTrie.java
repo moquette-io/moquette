@@ -24,8 +24,7 @@ public class CTrie {
     INode root;
 
     CTrie() {
-        final CNode mainNode = new CNode();
-        mainNode.setToken(ROOT);
+        final CNode mainNode = new CNode(ROOT);
         this.root = new INode(mainNode);
     }
 
@@ -133,8 +132,7 @@ public class CTrie {
         Topic remainingTopic = topic.exceptHeadToken();
         if (!remainingTopic.isEmpty()) {
             INode inode = createPathRec(remainingTopic, newSubscription);
-            CNode cnode = new CNode();
-            cnode.setToken(topic.headToken());
+            CNode cnode = new CNode(topic.headToken());
             cnode.add(inode);
             return new INode(cnode);
         } else {
@@ -143,8 +141,7 @@ public class CTrie {
     }
 
     private INode createLeafNodes(Token token, Subscription newSubscription) {
-        CNode newLeafCnode = new CNode();
-        newLeafCnode.setToken(token);
+        CNode newLeafCnode = new CNode(token);
         newLeafCnode.addSubscription(newSubscription);
 
         return new INode(newLeafCnode);
@@ -176,7 +173,7 @@ public class CTrie {
                 if (inode == this.root) {
                     return inode.compareAndSet(cnode, inode.mainNode().copy()) ? Action.OK : Action.REPEAT;
                 }
-                TNode tnode = new TNode();
+                TNode tnode = new TNode(cnode.getToken());
                 return inode.compareAndSet(cnode, tnode) ? cleanTomb(inode, iParent) : Action.REPEAT;
             } else if (cnode.contains(clientId) && topic.isEmpty()) {
                 CNode updatedCnode = cnode.copy();
