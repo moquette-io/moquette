@@ -30,7 +30,10 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
@@ -38,11 +41,36 @@ import static io.netty.channel.ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
-import io.netty.util.ReferenceCountUtil;
 
 final class MQTTConnection {
 
     private static final Logger LOG = LoggerFactory.getLogger(MQTTConnection.class);
+    public static final Future FAILED_CONNECT = new Future() {
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            return false;
+        }
+
+        @Override
+        public boolean isCancelled() {
+            return false;
+        }
+
+        @Override
+        public boolean isDone() {
+            return true;
+        }
+
+        @Override
+        public Object get() throws InterruptedException, ExecutionException {
+            return null;
+        }
+
+        @Override
+        public Object get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+            return null;
+        }
+    };
 
     final Channel channel;
     private final BrokerConfiguration brokerConfig;
@@ -126,7 +154,7 @@ final class MQTTConnection {
         bindedSession.pubAckReceived(messageID);
     }
 
-    void processConnect(MqttConnectMessage msg) {
+    Future processConnect(MqttConnectMessage msg) {
         MqttConnectPayload payload = msg.payload();
         String clientId = payload.clientIdentifier();
         final String username = payload.userName();
@@ -135,20 +163,20 @@ final class MQTTConnection {
         if (isNotProtocolVersion(msg, MqttVersion.MQTT_3_1) && isNotProtocolVersion(msg, MqttVersion.MQTT_3_1_1)) {
             LOG.warn("MQTT protocol version is not valid. CId: {}", clientId);
             abortConnection(CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION);
-            return;
+            return FAILED_CONNECT;
         }
         final boolean cleanSession = msg.variableHeader().isCleanSession();
         if (clientId == null || clientId.length() == 0) {
             if (!brokerConfig.isAllowZeroByteClientId()) {
                 LOG.info("Broker doesn't permit MQTT empty client ID. Username: {}", username);
                 abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
-                return;
+                return FAILED_CONNECT;
             }
 
             if (!cleanSession) {
                 LOG.info("MQTT client ID cannot be empty for persistent session. Username: {}", username);
                 abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
-                return;
+                return FAILED_CONNECT;
             }
 
             // Generating client id.
@@ -159,9 +187,18 @@ final class MQTTConnection {
         if (!login(msg, clientId)) {
             abortConnection(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD);
             channel.close().addListener(CLOSE_ON_FAILURE);
-            return;
+            return FAILED_CONNECT;
         }
 
+        final SessionCommand.Connect connectCmd = new SessionCommand.Connect(clientId, this, msg);
+
+        return this.postOffice.routeCommand(connectCmd);
+    }
+
+    /**
+     * Invoked by the Session's event loop.
+     * */
+    public void executeConnect(MqttConnectMessage msg, String clientId) {
         final SessionRegistry.SessionCreationResult result;
         try {
             LOG.trace("Binding MQTTConnection to session");
@@ -532,5 +569,9 @@ final class MQTTConnection {
 
     public void flush() {
         channel.flush();
+    }
+
+    public void bindSession(Session session) {
+        bindedSession = session;
     }
 }

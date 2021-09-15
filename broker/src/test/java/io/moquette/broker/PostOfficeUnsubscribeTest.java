@@ -27,12 +27,14 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.*;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 
 import static io.moquette.broker.PostOfficePublishTest.PUBLISHER_ID;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
@@ -98,7 +100,11 @@ public class PostOfficeUnsubscribeTest {
     }
 
     protected void connect(MQTTConnection connection, MqttConnectMessage connectMessage) {
-        connection.processConnect(connectMessage);
+        try {
+            connection.processConnect(connectMessage).get();
+        } catch (InterruptedException | ExecutionException e) {
+            Assertions.fail(e);
+        }
         ConnectionTestUtils.assertConnectAccepted((EmbeddedChannel) connection.channel);
     }
 
@@ -176,7 +182,7 @@ public class PostOfficeUnsubscribeTest {
     }
 
     @Test
-    public void testDontNotifyClientSubscribedToTopicAfterDisconnectedAndReconnectOnNewChannel() {
+    public void testDontNotifyClientSubscribedToTopicAfterDisconnectedAndReconnectOnNewChannel() throws ExecutionException, InterruptedException {
         connect(this.connection, FAKE_CLIENT_ID);
         subscribe(connection, NEWS_TOPIC, AT_MOST_ONCE);
         // publish on /news
@@ -196,7 +202,7 @@ public class PostOfficeUnsubscribeTest {
         // connect on another channel
         EmbeddedChannel anotherChannel = new EmbeddedChannel();
         MQTTConnection anotherConnection = createMQTTConnection(CONFIG, anotherChannel);
-        anotherConnection.processConnect(connectMessage);
+        anotherConnection.processConnect(connectMessage).get();
         ConnectionTestUtils.assertConnectAccepted(anotherChannel);
 
         // publish on /news
@@ -212,7 +218,7 @@ public class PostOfficeUnsubscribeTest {
     }
 
     @Test
-    public void avoidMultipleNotificationsAfterMultipleReconnection_cleanSessionFalseQoS1() {
+    public void avoidMultipleNotificationsAfterMultipleReconnection_cleanSessionFalseQoS1() throws ExecutionException, InterruptedException {
         final MqttConnectMessage notCleanConnect = ConnectionTestUtils.buildConnectNotClean(FAKE_CLIENT_ID);
         connect(connection, notCleanConnect);
         subscribe(connection, NEWS_TOPIC, AT_LEAST_ONCE);
@@ -225,7 +231,7 @@ public class PostOfficeUnsubscribeTest {
         // reconnect FAKE_CLIENT on another channel
         EmbeddedChannel anotherChannel2 = new EmbeddedChannel();
         MQTTConnection anotherConnection2 = createMQTTConnection(CONFIG, anotherChannel2);
-        anotherConnection2.processConnect(notCleanConnect);
+        anotherConnection2.processConnect(notCleanConnect).get();
         ConnectionTestUtils.assertConnectAccepted(anotherChannel2);
 
         ConnectionTestUtils.verifyPublishIsReceived(anotherChannel2, MqttQoS.AT_LEAST_ONCE, firstPayload);
@@ -237,7 +243,7 @@ public class PostOfficeUnsubscribeTest {
 
         EmbeddedChannel anotherChannel3 = new EmbeddedChannel();
         MQTTConnection anotherConnection3 = createMQTTConnection(CONFIG, anotherChannel3);
-        anotherConnection3.processConnect(notCleanConnect);
+        anotherConnection3.processConnect(notCleanConnect).get();
         ConnectionTestUtils.assertConnectAccepted(anotherChannel3);
 
         ConnectionTestUtils.verifyPublishIsReceived(anotherChannel3, MqttQoS.AT_LEAST_ONCE, secondPayload);
@@ -262,7 +268,11 @@ public class PostOfficeUnsubscribeTest {
     private MQTTConnection connectNotCleanAs(String clientId) {
         EmbeddedChannel channel = new EmbeddedChannel();
         MQTTConnection connection = createMQTTConnection(CONFIG, channel);
-        connection.processConnect(ConnectionTestUtils.buildConnectNotClean(clientId));
+        try {
+            connection.processConnect(ConnectionTestUtils.buildConnectNotClean(clientId)).get();
+        } catch (InterruptedException | ExecutionException e) {
+            Assertions.fail(e);
+        }
         ConnectionTestUtils.assertConnectAccepted(channel);
         return connection;
     }
@@ -270,13 +280,17 @@ public class PostOfficeUnsubscribeTest {
     private MQTTConnection connectAs(String clientId) {
         EmbeddedChannel channel = new EmbeddedChannel();
         MQTTConnection connection = createMQTTConnection(CONFIG, channel);
-        connection.processConnect(ConnectionTestUtils.buildConnect(clientId));
+        try {
+            connection.processConnect(ConnectionTestUtils.buildConnect(clientId)).get();
+        } catch (InterruptedException | ExecutionException e) {
+            Assertions.fail(e);
+        }
         ConnectionTestUtils.assertConnectAccepted(channel);
         return connection;
     }
 
     @Test
-    public void testConnectSubPub_cycle_getTimeout_on_second_disconnect_issue142() {
+    public void testConnectSubPub_cycle_getTimeout_on_second_disconnect_issue142() throws ExecutionException, InterruptedException {
         connect(connection, FAKE_CLIENT_ID);
         subscribe(connection, NEWS_TOPIC, AT_MOST_ONCE);
         // publish on /news
@@ -295,7 +309,7 @@ public class PostOfficeUnsubscribeTest {
         final MqttConnectMessage notCleanConnect = ConnectionTestUtils.buildConnect(FAKE_CLIENT_ID);
         EmbeddedChannel subscriberChannel = new EmbeddedChannel();
         MQTTConnection subscriberConnection = createMQTTConnection(CONFIG, subscriberChannel);
-        subscriberConnection.processConnect(notCleanConnect);
+        subscriberConnection.processConnect(notCleanConnect).get();
         ConnectionTestUtils.assertConnectAccepted(subscriberChannel);
 
         subscribe(subscriberConnection, NEWS_TOPIC, AT_MOST_ONCE);

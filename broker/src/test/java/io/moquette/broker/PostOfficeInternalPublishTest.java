@@ -29,6 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 
 import static io.moquette.broker.PostOfficeUnsubscribeTest.CONFIG;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
@@ -57,7 +58,7 @@ public class PostOfficeInternalPublishTest {
     private MemoryQueueRepository queueRepository;
 
     @BeforeEach
-    public void setUp() {
+    public void setUp() throws ExecutionException, InterruptedException {
         sessionRegistry = initPostOfficeAndSubsystems();
 
         mockAuthenticator = new MockAuthenticator(singleton(FAKE_CLIENT_ID), singletonMap(TEST_USER, TEST_PWD));
@@ -65,7 +66,7 @@ public class PostOfficeInternalPublishTest {
 
         connectMessage = ConnectionTestUtils.buildConnect(FAKE_CLIENT_ID);
 
-        connection.processConnect(connectMessage);
+        connection.processConnect(connectMessage).get();
         ConnectionTestUtils.assertConnectAccepted(channel);
     }
 
@@ -254,7 +255,7 @@ public class PostOfficeInternalPublishTest {
     }
 
     @Test
-    public void testClientSubscribeWithoutCleanSession() {
+    public void testClientSubscribeWithoutCleanSession() throws ExecutionException, InterruptedException {
         subscribe(AT_MOST_ONCE, "foo", connection);
         connection.processDisconnect(null);
         assertEquals(1, subscriptions.size());
@@ -265,7 +266,7 @@ public class PostOfficeInternalPublishTest {
             .clientId(FAKE_CLIENT_ID)
             .cleanSession(false)
             .build();
-        anotherConn.processConnect(connectMessage);
+        anotherConn.processConnect(connectMessage).get();
         ConnectionTestUtils.assertConnectAccepted((EmbeddedChannel) anotherConn.channel);
 
         assertEquals(1, subscriptions.size());

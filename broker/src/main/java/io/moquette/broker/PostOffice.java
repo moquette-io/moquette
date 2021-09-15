@@ -28,6 +28,10 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.stream.Collectors;
 
 import static io.moquette.broker.Utils.messageId;
@@ -44,6 +48,10 @@ class PostOffice {
     private SessionRegistry sessionRegistry;
     private BrokerInterceptor interceptor;
 
+    private final Thread[] sessionExecutors;
+    private final BlockingQueue<FutureTask<Void>>[] sessionQueues;
+    private final int eventLoops = Runtime.getRuntime().availableProcessors();;
+
     PostOffice(ISubscriptionsDirectory subscriptions, IRetainedRepository retainedRepository,
                SessionRegistry sessionRegistry, BrokerInterceptor interceptor, Authorizator authorizator) {
         this.authorizator = authorizator;
@@ -51,6 +59,16 @@ class PostOffice {
         this.retainedRepository = retainedRepository;
         this.sessionRegistry = sessionRegistry;
         this.interceptor = interceptor;
+
+        this.sessionQueues = new BlockingQueue[eventLoops];
+        for (int i = 0; i < eventLoops; i++) {
+            this.sessionQueues[i] = new ArrayBlockingQueue<FutureTask<Void>>(1024);
+        }
+        this.sessionExecutors = new Thread[eventLoops];
+        for (int i = 0; i < eventLoops; i++) {
+            this.sessionExecutors[i] = new Thread(new SessionEventLoop(this.sessionQueues[i]));
+            this.sessionExecutors[i].start();
+        }
     }
 
     public void init(SessionRegistry sessionRegistry) {
@@ -209,6 +227,7 @@ class PostOffice {
 
         for (final Subscription sub : topicMatchingSubscriptions) {
             MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
+
             Session targetSession = this.sessionRegistry.retrieve(sub.getClientId());
 
             boolean isSessionPresent = targetSession != null;
@@ -306,6 +325,19 @@ class PostOffice {
 
     void dispatchConnectionLost(String clientId,String userName) {
         interceptor.notifyClientConnectionLost(clientId, userName);
+    }
+
+    /**
+     * Route the command to the owning SessionEventLoop
+     * */
+    public Future<Void> routeCommand(SessionCommand cmd) {
+        final int targetQueueId = Math.abs(cmd.getSessionId().hashCode()) % this.eventLoops;
+        final FutureTask<Void> task = new FutureTask<>(() -> {
+            cmd.execute();
+            return null;
+        });
+        this.sessionQueues[targetQueueId].add(task);
+        return task;
     }
 
 //    void flushInFlight(MQTTConnection mqttConnection) {
