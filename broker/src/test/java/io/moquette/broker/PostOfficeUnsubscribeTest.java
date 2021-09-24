@@ -324,13 +324,13 @@ public class PostOfficeUnsubscribeTest {
 
         ConnectionTestUtils.verifyPublishIsReceived(subscriberChannel, AT_MOST_ONCE, "Hello world2!");
 
-        subscriberConnection.processDisconnect(null);
+        subscriberConnection.processDisconnect(null).get();
 
         assertFalse(subscriberChannel.isOpen(), "after a disconnect the client should be disconnected");
     }
 
     @Test
-    public void checkReplayofStoredPublishResumeAfter_a_disconnect_cleanSessionFalseQoS1() {
+    public void checkReplayofStoredPublishResumeAfter_a_disconnect_cleanSessionFalseQoS1() throws ExecutionException, InterruptedException {
         final MQTTConnection publisher = connectAs("Publisher");
 
         connect(this.connection, FAKE_CLIENT_ID);
@@ -339,7 +339,7 @@ public class PostOfficeUnsubscribeTest {
         // publish from another channel
         publishQos1(publisher, NEWS_TOPIC, "Hello world MQTT!!-1", 99);
         ConnectionTestUtils.verifyPublishIsReceived(channel, AT_LEAST_ONCE, "Hello world MQTT!!-1");
-        connection.processDisconnect(null);
+        connection.processDisconnect(null).get();
 
         publishQos1(publisher, NEWS_TOPIC, "Hello world MQTT!!-2", 100);
         publishQos1(publisher, NEWS_TOPIC, "Hello world MQTT!!-3", 101);

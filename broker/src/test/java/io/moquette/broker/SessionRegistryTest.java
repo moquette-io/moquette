@@ -122,7 +122,7 @@ public class SessionRegistryTest {
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).cleanSession(true).build();
         connection.processConnect(msg).get();
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
-        connection.processDisconnect(null);
+        connection.processDisconnect(null).get();
         assertFalse(channel.isOpen());
 
         // second connect with clean session false

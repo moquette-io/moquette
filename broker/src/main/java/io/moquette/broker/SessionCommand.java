@@ -39,4 +39,19 @@ abstract class SessionCommand {
             mqttConnection.executeConnect(this.msg, getSessionId());
         }
     }
+
+    static final class Disconnect extends SessionCommand {
+
+        private final MQTTConnection mqttConnection;
+
+        public Disconnect(String sessionId, MQTTConnection mqttConnection) {
+            super(sessionId, CommandType.DISCONNECT);
+            this.mqttConnection = mqttConnection;
+        }
+
+        @Override
+        public void execute() {
+            mqttConnection.executeDisconnect(getSessionId());
+        }
+    }
 }

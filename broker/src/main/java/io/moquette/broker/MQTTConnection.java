@@ -45,7 +45,7 @@ import static io.netty.handler.codec.mqtt.MqttQoS.*;
 final class MQTTConnection {
 
     private static final Logger LOG = LoggerFactory.getLogger(MQTTConnection.class);
-    public static final Future FAILED_CONNECT = new Future() {
+    public static final Future FAILED_FUTURE = new Future() {
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
             return false;
@@ -163,20 +163,20 @@ final class MQTTConnection {
         if (isNotProtocolVersion(msg, MqttVersion.MQTT_3_1) && isNotProtocolVersion(msg, MqttVersion.MQTT_3_1_1)) {
             LOG.warn("MQTT protocol version is not valid. CId: {}", clientId);
             abortConnection(CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION);
-            return FAILED_CONNECT;
+            return FAILED_FUTURE;
         }
         final boolean cleanSession = msg.variableHeader().isCleanSession();
         if (clientId == null || clientId.length() == 0) {
             if (!brokerConfig.isAllowZeroByteClientId()) {
                 LOG.info("Broker doesn't permit MQTT empty client ID. Username: {}", username);
                 abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
-                return FAILED_CONNECT;
+                return FAILED_FUTURE;
             }
 
             if (!cleanSession) {
                 LOG.info("MQTT client ID cannot be empty for persistent session. Username: {}", username);
                 abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
-                return FAILED_CONNECT;
+                return FAILED_FUTURE;
             }
 
             // Generating client id.
@@ -187,7 +187,7 @@ final class MQTTConnection {
         if (!login(msg, clientId)) {
             abortConnection(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD);
             channel.close().addListener(CLOSE_ON_FAILURE);
-            return FAILED_CONNECT;
+            return FAILED_FUTURE;
         }
 
         final SessionCommand.Connect connectCmd = new SessionCommand.Connect(clientId, this, msg);
@@ -342,13 +342,19 @@ final class MQTTConnection {
         channel.close().addListener(FIRE_EXCEPTION_ON_FAILURE);
     }
 
-    void processDisconnect(MqttMessage msg) {
+    Future processDisconnect(MqttMessage msg) {
         final String clientID = NettyUtils.clientID(channel);
         LOG.trace("Start DISCONNECT");
         if (!connected) {
             LOG.info("DISCONNECT received on already closed connection");
-            return;
+            return FAILED_FUTURE;
         }
+
+        final SessionCommand.Disconnect disconnectCmd = new SessionCommand.Disconnect(clientID, this);
+        return this.postOffice.routeCommand(disconnectCmd);
+    }
+
+    public void executeDisconnect(String clientID) {
         bindedSession.disconnect();
         connected = false;
         channel.close().addListener(FIRE_EXCEPTION_ON_FAILURE);
