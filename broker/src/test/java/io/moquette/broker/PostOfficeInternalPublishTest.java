@@ -30,6 +30,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static io.moquette.broker.PostOfficeUnsubscribeTest.CONFIG;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
@@ -108,7 +110,11 @@ public class PostOfficeInternalPublishTest {
             .retained(retained)
             .qos(qos)
             .payload(Unpooled.copiedBuffer(PAYLOAD.getBytes(UTF_8))).build();
-        sut.internalPublish(publish);
+        try {
+            sut.internalPublish(publish).get(5, TimeUnit.SECONDS);
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Test

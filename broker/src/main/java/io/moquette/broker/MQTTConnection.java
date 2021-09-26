@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -45,7 +46,7 @@ import static io.netty.handler.codec.mqtt.MqttQoS.*;
 final class MQTTConnection {
 
     private static final Logger LOG = LoggerFactory.getLogger(MQTTConnection.class);
-    public static final Future FAILED_FUTURE = new Future() {
+    public static final Future<Void> FAILED_FUTURE = new Future<Void>() {
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
             return false;
@@ -62,12 +63,12 @@ final class MQTTConnection {
         }
 
         @Override
-        public Object get() throws InterruptedException, ExecutionException {
+        public Void get() throws InterruptedException, ExecutionException {
             return null;
         }
 
         @Override
-        public Object get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+        public Void get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
             return null;
         }
     };
@@ -136,12 +137,22 @@ final class MQTTConnection {
 
     private void processPubComp(MqttMessage msg) {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        bindedSession.processPubComp(messageID);
+        final SessionCommand.Publish pubCompCmd = new SessionCommand.Publish(bindedSession.getClientID(), () -> {
+            bindedSession.processPubComp(messageID);
+            return null;
+        });
+
+        this.postOffice.routeCommand(pubCompCmd);
     }
 
     private void processPubRec(MqttMessage msg) {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        bindedSession.processPubRec(messageID);
+        final SessionCommand.Publish pubRecCmd = new SessionCommand.Publish(bindedSession.getClientID(), () -> {
+            bindedSession.processPubRec(messageID);
+            return null;
+        });
+
+        this.postOffice.routeCommand(pubRecCmd);
     }
 
     static MqttMessage pubrel(int messageID) {
@@ -151,10 +162,16 @@ final class MQTTConnection {
 
     private void processPubAck(MqttMessage msg) {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        bindedSession.pubAckReceived(messageID);
+        final String clientId = getClientId();
+        final SessionCommand.Publish pubAckCmd = new SessionCommand.Publish(clientId, () -> {
+            bindedSession.pubAckReceived(messageID);
+            return null;
+        });
+
+        this.postOffice.routeCommand(pubAckCmd);
     }
 
-    Future processConnect(MqttConnectMessage msg) {
+    Future<Void> processConnect(MqttConnectMessage msg) {
         MqttConnectPayload payload = msg.payload();
         String clientId = payload.clientIdentifier();
         final String username = payload.userName();
@@ -397,7 +414,7 @@ final class MQTTConnection {
         LOG.trace("Client unsubscribed from topics <{}>", topics);
     }
 
-    void processPublish(MqttPublishMessage msg) {
+    Future<Void> processPublish(MqttPublishMessage msg) {
         final MqttQoS qos = msg.fixedHeader().qosLevel();
         final String username = NettyUtils.userName(channel);
         final String topicName = msg.variableHeader().topicName();
@@ -409,22 +426,29 @@ final class MQTTConnection {
             LOG.debug("Drop connection because of invalid topic format");
             dropConnection();
         }
+
+//        // retain else msg is cleaned by the NewNettyMQTTHandler and is not available
+//        // in execution by SessionEventLoop
+        msg.retain();
         switch (qos) {
             case AT_MOST_ONCE:
-                postOffice.receivedPublishQos0(topic, username, clientId, msg);
-                break;
+                return postOffice.receivedPublishQos0(topic, username, clientId, msg);
             case AT_LEAST_ONCE: {
-                postOffice.receivedPublishQos1(this, topic, username, messageID, msg);
-                break;
+                return postOffice.receivedPublishQos1(this, topic, username, messageID, msg);
             }
             case EXACTLY_ONCE: {
-                bindedSession.receivedPublishQos2(messageID, msg);
-                postOffice.receivedPublishQos2(this, msg, username);
-                break;
+                final SessionCommand.Publish publishFirstStepCmd = new SessionCommand.Publish(clientId, () -> {
+                    bindedSession.receivedPublishQos2(messageID, msg);
+                    return null;
+                });
+                final CompletableFuture<Void> firstStepFuture = postOffice.routeCommand(publishFirstStepCmd);
+                return firstStepFuture.thenCompose(v -> postOffice.receivedPublishQos2(this, msg, username));
             }
             default:
                 LOG.error("Unknown QoS-Type:{}", qos);
-                break;
+                final CompletableFuture<Void> failed = new CompletableFuture<>();
+                failed.completeExceptionally(new Error("Unknown QoS-"));
+                return failed;
         }
     }
 
@@ -438,6 +462,15 @@ final class MQTTConnection {
 
     private void processPubRel(MqttMessage msg) {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
+        final SessionCommand.Publish pubRelCmd = new SessionCommand.Publish(bindedSession.getClientID(), () -> {
+            executePubRel(messageID);
+            return null;
+        });
+
+        this.postOffice.routeCommand(pubRelCmd);
+    }
+
+    private void executePubRel(int messageID) {
         bindedSession.receivedPubRelQos2(messageID);
         sendPubCompMessage(messageID);
     }

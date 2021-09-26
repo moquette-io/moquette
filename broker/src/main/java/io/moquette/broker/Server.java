@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.text.ParseException;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -298,8 +299,9 @@ public class Server {
      * @param msg      the message to forward. The ByteBuf in the message will be released.
      * @param clientId the id of the sending integration.
      * @throws IllegalStateException if the integration is not yet started
+     * @return
      */
-    public void internalPublish(MqttPublishMessage msg, final String clientId) {
+    public CompletableFuture<Void> internalPublish(MqttPublishMessage msg, final String clientId) {
         final int messageID = msg.variableHeader().packetId();
         if (!initialized) {
             LOG.error("Moquette is not started, internal message cannot be published. CId: {}, messageId: {}", clientId,
@@ -307,8 +309,8 @@ public class Server {
             throw new IllegalStateException("Can't publish on a integration is not yet started");
         }
         LOG.trace("Internal publishing message CId: {}, messageId: {}", clientId, messageID);
-        dispatcher.internalPublish(msg);
-        msg.payload().release();
+        return dispatcher.internalPublish(msg)
+            .thenRun(() -> msg.payload().release());
     }
 
     public void stopServer() {

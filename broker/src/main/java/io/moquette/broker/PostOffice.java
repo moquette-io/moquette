@@ -22,6 +22,7 @@ import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.*;
+import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,7 +31,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Future;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.FutureTask;
 import java.util.stream.Collectors;
 
@@ -67,6 +68,7 @@ class PostOffice {
         this.sessionExecutors = new Thread[eventLoops];
         for (int i = 0; i < eventLoops; i++) {
             this.sessionExecutors[i] = new Thread(new SessionEventLoop(this.sessionQueues[i]));
+            this.sessionExecutors[i].setName("Session Executor " + i);
             this.sessionExecutors[i].start();
         }
     }
@@ -176,79 +178,94 @@ class PostOffice {
         mqttConnection.sendUnsubAckMessage(topics, clientID, messageId);
     }
 
-    void receivedPublishQos0(Topic topic, String username, String clientID, MqttPublishMessage msg) {
+    CompletableFuture<Void> receivedPublishQos0(Topic topic, String username, String clientID, MqttPublishMessage msg) {
         if (!authorizator.canWrite(topic, username, clientID)) {
             LOG.error("client is not authorized to publish on topic: {}", topic);
-            return;
+            return null;
         }
-        publish2Subscribers(msg.payload(), topic, AT_MOST_ONCE);
+        final CompletableFuture<Void> publishFuture = publish2Subscribers(msg.payload(), topic, AT_MOST_ONCE);
 
-        if (msg.fixedHeader().isRetain()) {
-            // QoS == 0 && retain => clean old retained
-            retainedRepository.cleanRetained(topic);
-        }
+        return publishFuture.thenRun(() -> {
+            if (msg.fixedHeader().isRetain()) {
+                // QoS == 0 && retain => clean old retained
+                retainedRepository.cleanRetained(topic);
+            }
 
-        interceptor.notifyTopicPublished(msg, clientID, username);
+            interceptor.notifyTopicPublished(msg, clientID, username);
+        });
     }
 
-    void receivedPublishQos1(MQTTConnection connection, Topic topic, String username, int messageID,
-                             MqttPublishMessage msg) {
+    CompletableFuture<Void> receivedPublishQos1(MQTTConnection connection, Topic topic, String username, int messageID,
+                                                MqttPublishMessage msg) {
         // verify if topic can be write
         topic.getTokens();
         if (!topic.isValid()) {
             LOG.warn("Invalid topic format, force close the connection");
             connection.dropConnection();
-            return;
+            return CompletableFuture.completedFuture(null);
         }
         final String clientId = connection.getClientId();
         if (!authorizator.canWrite(topic, username, clientId)) {
             LOG.error("MQTT client: {} is not authorized to publish on topic: {}", clientId, topic);
-            return;
+            return CompletableFuture.completedFuture(null);
         }
 
         ByteBuf payload = msg.payload();
-        publish2Subscribers(payload, topic, AT_LEAST_ONCE);
+        final CompletableFuture<Void> publishFuture = publish2Subscribers(payload, topic, AT_LEAST_ONCE);
+        return publishFuture.thenRun(() -> {
+            connection.sendPubAck(messageID);
 
-        connection.sendPubAck(messageID);
-
-        if (msg.fixedHeader().isRetain()) {
-            if (!payload.isReadable()) {
-                retainedRepository.cleanRetained(topic);
-            } else {
-                // before wasn't stored
-                retainedRepository.retain(topic, msg);
+            if (msg.fixedHeader().isRetain()) {
+                if (!payload.isReadable()) {
+                    retainedRepository.cleanRetained(topic);
+                } else {
+                    // before wasn't stored
+                    retainedRepository.retain(topic, msg);
+                }
             }
-        }
-        interceptor.notifyTopicPublished(msg, clientId, username);
+            interceptor.notifyTopicPublished(msg, clientId, username);
+            ReferenceCountUtil.release(msg);
+        });
     }
 
-    private void publish2Subscribers(ByteBuf payload, Topic topic, MqttQoS publishingQos) {
+    private CompletableFuture<Void> publish2Subscribers(ByteBuf payload, Topic topic, MqttQoS publishingQos) {
         Set<Subscription> topicMatchingSubscriptions = subscriptions.matchQosSharpening(topic);
+        List<CompletableFuture<Void>> publishFutures = new ArrayList<>(topicMatchingSubscriptions.size());
 
         for (final Subscription sub : topicMatchingSubscriptions) {
             MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
+            final SessionCommand.Publish publishCmd = new SessionCommand.Publish(sub.getClientId(), () -> {
+                publishToSession(payload, topic, sub, qos);
+                return null;
+            });
+            publishFutures.add(routeCommand(publishCmd));
+        }
 
-            Session targetSession = this.sessionRegistry.retrieve(sub.getClientId());
+        return CompletableFuture.allOf(publishFutures.toArray(new CompletableFuture[0]));
+    }
 
-            boolean isSessionPresent = targetSession != null;
-            if (isSessionPresent) {
-                LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
-                          sub.getClientId(), sub.getTopicFilter(), qos);
-                targetSession.sendPublishOnSessionAtQos(topic, qos, payload);
-            } else {
-                // If we are, the subscriber disconnected after the subscriptions tree selected that session as a
-                // destination.
-                LOG.debug("PUBLISH to not yet present session. CId: {}, topicFilter: {}, qos: {}", sub.getClientId(),
-                          sub.getTopicFilter(), qos);
-            }
+    private void publishToSession(ByteBuf payload, Topic topic, Subscription sub, MqttQoS qos) {
+        Session targetSession = this.sessionRegistry.retrieve(sub.getClientId());
+
+        boolean isSessionPresent = targetSession != null;
+        if (isSessionPresent) {
+            LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
+                      sub.getClientId(), sub.getTopicFilter(), qos);
+            targetSession.sendPublishOnSessionAtQos(topic, qos, payload);
+        } else {
+            // If we are, the subscriber disconnected after the subscriptions tree selected that session as a
+            // destination.
+            LOG.debug("PUBLISH to not yet present session. CId: {}, topicFilter: {}, qos: {}", sub.getClientId(),
+                      sub.getTopicFilter(), qos);
         }
     }
 
     /**
      * First phase of a publish QoS2 protocol, sent by publisher to the broker. Publish to all interested
      * subscribers.
+     * @return
      */
-    void receivedPublishQos2(MQTTConnection connection, MqttPublishMessage mqttPublishMessage, String username) {
+    CompletableFuture<Void> receivedPublishQos2(MQTTConnection connection, MqttPublishMessage mqttPublishMessage, String username) {
         LOG.trace("Processing PUBREL message on connection: {}", connection);
         final Topic topic = new Topic(mqttPublishMessage.variableHeader().topicName());
         final ByteBuf payload = mqttPublishMessage.payload();
@@ -256,23 +273,24 @@ class PostOffice {
         final String clientId = connection.getClientId();
         if (!authorizator.canWrite(topic, username, clientId)) {
             LOG.error("MQTT client is not authorized to publish on topic: {}", topic);
-            return;
+            return CompletableFuture.completedFuture(null);
         }
 
-        publish2Subscribers(payload, topic, EXACTLY_ONCE);
-
-        final boolean retained = mqttPublishMessage.fixedHeader().isRetain();
-        if (retained) {
-            if (!payload.isReadable()) {
-                retainedRepository.cleanRetained(topic);
-            } else {
-                // before wasn't stored
-                retainedRepository.retain(topic, mqttPublishMessage);
+        final CompletableFuture<Void> publishFuture = publish2Subscribers(payload, topic, EXACTLY_ONCE);
+        return publishFuture.thenRun(() -> {
+            final boolean retained = mqttPublishMessage.fixedHeader().isRetain();
+            if (retained) {
+                if (!payload.isReadable()) {
+                    retainedRepository.cleanRetained(topic);
+                } else {
+                    // before wasn't stored
+                    retainedRepository.retain(topic, mqttPublishMessage);
+                }
             }
-        }
 
-        String clientID = connection.getClientId();
-        interceptor.notifyTopicPublished(mqttPublishMessage, clientID, username);
+            String clientID = connection.getClientId();
+            interceptor.notifyTopicPublished(mqttPublishMessage, clientID, username);
+        });
     }
 
     static MqttQoS lowerQosToTheSubscriptionDesired(Subscription sub, MqttQoS qos) {
@@ -291,24 +309,26 @@ class PostOffice {
      *
      * @param msg
      *            the message to publish
+     * @return
      */
-    public void internalPublish(MqttPublishMessage msg) {
+    public CompletableFuture<Void> internalPublish(MqttPublishMessage msg) {
         final MqttQoS qos = msg.fixedHeader().qosLevel();
         final Topic topic = new Topic(msg.variableHeader().topicName());
         final ByteBuf payload = msg.payload();
         LOG.info("Sending internal PUBLISH message Topic={}, qos={}", topic, qos);
 
-        publish2Subscribers(payload, topic, qos);
-
-        if (!msg.fixedHeader().isRetain()) {
-            return;
-        }
-        if (qos == AT_MOST_ONCE || payload.readableBytes() == 0) {
-            // QoS == 0 && retain => clean old retained
-            retainedRepository.cleanRetained(topic);
-            return;
-        }
-        retainedRepository.retain(topic, msg);
+        final CompletableFuture<Void> publishFuture = publish2Subscribers(payload, topic, qos);
+        return publishFuture.thenRun(() -> {
+            if (!msg.fixedHeader().isRetain()) {
+                return;
+            }
+            if (qos == AT_MOST_ONCE || payload.readableBytes() == 0) {
+                // QoS == 0 && retain => clean old retained
+                retainedRepository.cleanRetained(topic);
+                return;
+            }
+            retainedRepository.retain(topic, msg);
+        });
     }
 
     /**
@@ -330,14 +350,16 @@ class PostOffice {
     /**
      * Route the command to the owning SessionEventLoop
      * */
-    public Future<Void> routeCommand(SessionCommand cmd) {
+    public CompletableFuture<Void> routeCommand(SessionCommand cmd) {
         final int targetQueueId = Math.abs(cmd.getSessionId().hashCode()) % this.eventLoops;
+        LOG.debug("Routing cmd {} for session [{}] to event processor {}", cmd.getType(), cmd.getSessionId(), targetQueueId);
         final FutureTask<Void> task = new FutureTask<>(() -> {
             cmd.execute();
+            cmd.complete();
             return null;
         });
         this.sessionQueues[targetQueueId].add(task);
-        return task;
+        return cmd.completableFuture();
     }
 
 //    void flushInFlight(MQTTConnection mqttConnection) {

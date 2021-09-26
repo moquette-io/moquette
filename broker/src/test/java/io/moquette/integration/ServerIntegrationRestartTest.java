@@ -98,7 +98,7 @@ public class ServerIntegrationRestartTest {
         m_server.stopServer();
     }
 
-    @DisplayName("given not clean session then after a server restart the session should be present")
+    @DisplayName("given not clean session after a server restart, the session is still present")
     @Test
     public void testNotCleanSessionIsVisibleAfterServerRestart() throws Exception {
         m_subscriber.connect(CLEAN_SESSION_OPT);
@@ -114,6 +114,7 @@ public class ServerIntegrationRestartTest {
 
         //reconnect subscriber and topic should be sent
         m_subscriber.connect(CLEAN_SESSION_OPT);
+
         // verify the sent message while offline is read
         Awaitility.await().until(m_messageCollector::isMessageReceived);
         MqttMessage msg = m_messageCollector.retrieveMessage();

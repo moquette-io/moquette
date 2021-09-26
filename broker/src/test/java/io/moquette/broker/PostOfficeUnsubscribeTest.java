@@ -35,6 +35,8 @@ import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static io.moquette.broker.PostOfficePublishTest.PUBLISHER_ID;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
@@ -143,7 +145,7 @@ public class PostOfficeUnsubscribeTest {
     }
 
     @Test
-    public void testDontNotifyClientSubscribedToTopicAfterDisconnectedAndReconnectOnSameChannel() {
+    public void testDontNotifyClientSubscribedToTopicAfterDisconnectedAndReconnectOnSameChannel() throws ExecutionException, InterruptedException, TimeoutException {
         connect(this.connection, FAKE_CLIENT_ID);
         subscribe(connection, NEWS_TOPIC, AT_MOST_ONCE);
 
@@ -154,7 +156,7 @@ public class PostOfficeUnsubscribeTest {
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(false)
-                .topicName(NEWS_TOPIC).build());
+                .topicName(NEWS_TOPIC).build()).get(5, TimeUnit.SECONDS);
 
         ConnectionTestUtils.verifyPublishIsReceived(channel, AT_MOST_ONCE, "Hello world!");
 
@@ -182,7 +184,7 @@ public class PostOfficeUnsubscribeTest {
     }
 
     @Test
-    public void testDontNotifyClientSubscribedToTopicAfterDisconnectedAndReconnectOnNewChannel() throws ExecutionException, InterruptedException {
+    public void testDontNotifyClientSubscribedToTopicAfterDisconnectedAndReconnectOnNewChannel() throws ExecutionException, InterruptedException, TimeoutException {
         connect(this.connection, FAKE_CLIENT_ID);
         subscribe(connection, NEWS_TOPIC, AT_MOST_ONCE);
         // publish on /news
@@ -192,7 +194,7 @@ public class PostOfficeUnsubscribeTest {
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(false)
-                .topicName(NEWS_TOPIC).build());
+                .topicName(NEWS_TOPIC).build()).get(5, TimeUnit.SECONDS);
 
         ConnectionTestUtils.verifyPublishIsReceived(channel, AT_MOST_ONCE, "Hello world!");
 
@@ -290,7 +292,7 @@ public class PostOfficeUnsubscribeTest {
     }
 
     @Test
-    public void testConnectSubPub_cycle_getTimeout_on_second_disconnect_issue142() throws ExecutionException, InterruptedException {
+    public void testConnectSubPub_cycle_getTimeout_on_second_disconnect_issue142() throws ExecutionException, InterruptedException, TimeoutException {
         connect(connection, FAKE_CLIENT_ID);
         subscribe(connection, NEWS_TOPIC, AT_MOST_ONCE);
         // publish on /news
@@ -300,7 +302,7 @@ public class PostOfficeUnsubscribeTest {
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(false)
-                .topicName(NEWS_TOPIC).build());
+                .topicName(NEWS_TOPIC).build()).get(5, TimeUnit.SECONDS);
 
         ConnectionTestUtils.verifyPublishIsReceived((EmbeddedChannel) connection.channel, AT_MOST_ONCE, "Hello world!");
 
@@ -320,7 +322,7 @@ public class PostOfficeUnsubscribeTest {
                 .payload(payload2.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(false)
-                .topicName(NEWS_TOPIC).build());
+                .topicName(NEWS_TOPIC).build()).get(5, TimeUnit.SECONDS);
 
         ConnectionTestUtils.verifyPublishIsReceived(subscriberChannel, AT_MOST_ONCE, "Hello world2!");
 
@@ -352,12 +354,16 @@ public class PostOfficeUnsubscribeTest {
 
     private void publishQos1(MQTTConnection publisher, String topic, String payload, int messageID) {
         final ByteBuf bytePayload = Unpooled.copiedBuffer(payload, Charset.defaultCharset());
-        sut.receivedPublishQos1(publisher, new Topic(topic), TEST_USER, messageID,
-            MqttMessageBuilders.publish()
-                .payload(bytePayload)
-                .qos(MqttQoS.AT_LEAST_ONCE)
-                .retained(false)
-                .topicName(NEWS_TOPIC).build());
+        try {
+            sut.receivedPublishQos1(publisher, new Topic(topic), TEST_USER, messageID,
+                MqttMessageBuilders.publish()
+                    .payload(bytePayload)
+                    .qos(MqttQoS.AT_LEAST_ONCE)
+                    .retained(false)
+                    .topicName(NEWS_TOPIC).build()).get(5, TimeUnit.SECONDS);
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private void publishQos2(MQTTConnection connection, String topic, String payload) {

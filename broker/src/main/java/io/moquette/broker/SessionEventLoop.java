@@ -24,7 +24,14 @@ final class SessionEventLoop implements Runnable {
                 final FutureTask<Void> task = this.sessionQueue.take();
 
                 if (!task.isCancelled()) {
-                    task.run();
+                    try {
+                        task.run();
+
+                        // we ran it, but we have to grab the exception if raised
+                        task.get();
+                    } catch (Throwable th) {
+                        LOG.info("SessionEventLoop {} reached exception in processing command", Thread.currentThread().getName(), th);
+                    }
                 }
             } catch (InterruptedException e) {
                 LOG.info("SessionEventLoop {} interrupted", Thread.currentThread().getName());

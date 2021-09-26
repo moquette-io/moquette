@@ -35,6 +35,8 @@ import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static io.moquette.broker.PostOfficePublishTest.ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID;
 import static io.moquette.broker.PostOfficePublishTest.SUBSCRIBER_ID;
@@ -222,7 +224,7 @@ public class PostOfficeSubscribeTest {
     }
 
     @Test
-    public void testCleanSession_maintainClientSubscriptions() throws ExecutionException, InterruptedException {
+    public void testCleanSession_maintainClientSubscriptions() throws ExecutionException, InterruptedException, TimeoutException {
         connection.processConnect(connectMessage).get();
         ConnectionTestUtils.assertConnectAccepted(channel);
         assertEquals(0, subscriptions.size(), "After CONNECT subscription MUST be empty");
@@ -246,7 +248,7 @@ public class PostOfficeSubscribeTest {
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(false)
-                .topicName(NEWS_TOPIC).build());
+                .topicName(NEWS_TOPIC).build()).get(5, TimeUnit.SECONDS);
 
         ConnectionTestUtils.verifyPublishIsReceived(anotherChannel, AT_MOST_ONCE, "Hello world!");
     }
