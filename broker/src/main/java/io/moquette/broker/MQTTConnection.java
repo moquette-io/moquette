@@ -404,9 +404,14 @@ final class MQTTConnection {
     private void processUnsubscribe(MqttUnsubscribeMessage msg) {
         List<String> topics = msg.payload().topics();
         String clientID = NettyUtils.clientID(channel);
+        final int messageId = msg.variableHeader().messageId();
 
-        LOG.trace("Processing UNSUBSCRIBE message. topics: {}", topics);
-        postOffice.unsubscribe(topics, this, msg.variableHeader().messageId());
+        SessionCommand.Publish subscribeCmd = new SessionCommand.Publish(clientID, () -> {
+            LOG.trace("Processing UNSUBSCRIBE message. topics: {}", topics);
+            postOffice.unsubscribe(topics, this, messageId);
+            return null;
+        });
+        postOffice.routeCommand(subscribeCmd);
     }
 
     void sendUnsubAckMessage(List<String> topics, String clientID, int messageID) {
