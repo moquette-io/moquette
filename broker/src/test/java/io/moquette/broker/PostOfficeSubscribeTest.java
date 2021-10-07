@@ -259,7 +259,7 @@ public class PostOfficeSubscribeTest {
      * previous subscription
      */
     @Test
-    public void testCleanSession_correctlyClientSubscriptions() throws ExecutionException, InterruptedException {
+    public void testCleanSession_correctlyClientSubscriptions() throws ExecutionException, InterruptedException, TimeoutException {
         connection.processConnect(connectMessage).get();
         ConnectionTestUtils.assertConnectAccepted(channel);
         assertEquals(0, subscriptions.size(), "After CONNECT subscription MUST be empty");
@@ -270,10 +270,10 @@ public class PostOfficeSubscribeTest {
             .addSubscription(AT_MOST_ONCE, NEWS_TOPIC)
             .messageId(1)
             .build();
-        connection.processSubscribe(subscribeMsg);
+        connection.processSubscribe(subscribeMsg).get(5, TimeUnit.SECONDS);
         assertEquals(1, subscriptions.size(), "Subscribe MUST contain one subscription");
 
-        connection.processDisconnect(null);
+        connection.processDisconnect(null).get(5, TimeUnit.SECONDS);
         assertEquals(1, subscriptions.size(), "Disconnection MUSTN'T clear subscriptions");
 
         connectMessage = MqttMessageBuilders.connect()

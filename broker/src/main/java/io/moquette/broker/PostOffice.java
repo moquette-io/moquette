@@ -181,7 +181,7 @@ class PostOffice {
     CompletableFuture<Void> receivedPublishQos0(Topic topic, String username, String clientID, MqttPublishMessage msg) {
         if (!authorizator.canWrite(topic, username, clientID)) {
             LOG.error("client is not authorized to publish on topic: {}", topic);
-            return null;
+            return CompletableFuture.completedFuture(null);
         }
         final CompletableFuture<Void> publishFuture = publish2Subscribers(msg.payload(), topic, AT_MOST_ONCE);
 

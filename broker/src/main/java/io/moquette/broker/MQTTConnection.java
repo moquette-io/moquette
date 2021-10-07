@@ -381,14 +381,19 @@ final class MQTTConnection {
         LOG.trace("dispatch disconnection userName={}", userName);
     }
 
-    void processSubscribe(MqttSubscribeMessage msg) {
+    Future<Void> processSubscribe(MqttSubscribeMessage msg) {
         final String clientID = NettyUtils.clientID(channel);
         if (!connected) {
             LOG.warn("SUBSCRIBE received on already closed connection");
             dropConnection();
-            return;
+            return CompletableFuture.completedFuture(null);
         }
-        postOffice.subscribeClientToTopics(msg, clientID, NettyUtils.userName(channel), this);
+        final String username = NettyUtils.userName(channel);
+        SessionCommand.Publish subscribeCmd = new SessionCommand.Publish(clientID, () -> {
+            postOffice.subscribeClientToTopics(msg, clientID, username, this);
+            return null;
+        });
+        return postOffice.routeCommand(subscribeCmd);
     }
 
     void sendSubAckMessage(int messageID, MqttSubAckMessage ackMessage) {
