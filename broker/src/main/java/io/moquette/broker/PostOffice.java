@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.FutureTask;
 import java.util.stream.Collectors;
@@ -234,11 +235,10 @@ class PostOffice {
 
         for (final Subscription sub : topicMatchingSubscriptions) {
             MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
-            final SessionCommand.Publish publishCmd = new SessionCommand.Publish(sub.getClientId(), () -> {
+            publishFutures.add(routeCommand(sub.getClientId(), () -> {
                 publishToSession(payload, topic, sub, qos);
                 return null;
-            });
-            publishFutures.add(routeCommand(publishCmd));
+            }));
         }
 
         return CompletableFuture.allOf(publishFutures.toArray(new CompletableFuture[0]));
@@ -350,9 +350,10 @@ class PostOffice {
     /**
      * Route the command to the owning SessionEventLoop
      * */
-    public CompletableFuture<Void> routeCommand(SessionCommand cmd) {
+    public CompletableFuture<Void> routeCommand(String clientId, Callable<Void> action) {
+        SessionCommand cmd = new SessionCommand(clientId, action);
         final int targetQueueId = Math.abs(cmd.getSessionId().hashCode()) % this.eventLoops;
-        LOG.debug("Routing cmd {} for session [{}] to event processor {}", cmd.getType(), cmd.getSessionId(), targetQueueId);
+        LOG.debug("Routing cmd for session [{}] to event processor {}", cmd.getSessionId(), targetQueueId);
         final FutureTask<Void> task = new FutureTask<>(() -> {
             cmd.execute();
             cmd.complete();

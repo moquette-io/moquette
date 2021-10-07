@@ -46,32 +46,6 @@ import static io.netty.handler.codec.mqtt.MqttQoS.*;
 final class MQTTConnection {
 
     private static final Logger LOG = LoggerFactory.getLogger(MQTTConnection.class);
-    public static final Future<Void> FAILED_FUTURE = new Future<Void>() {
-        @Override
-        public boolean cancel(boolean mayInterruptIfRunning) {
-            return false;
-        }
-
-        @Override
-        public boolean isCancelled() {
-            return false;
-        }
-
-        @Override
-        public boolean isDone() {
-            return true;
-        }
-
-        @Override
-        public Void get() throws InterruptedException, ExecutionException {
-            return null;
-        }
-
-        @Override
-        public Void get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-            return null;
-        }
-    };
 
     final Channel channel;
     private final BrokerConfiguration brokerConfig;
@@ -137,22 +111,18 @@ final class MQTTConnection {
 
     private void processPubComp(MqttMessage msg) {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        final SessionCommand.Publish pubCompCmd = new SessionCommand.Publish(bindedSession.getClientID(), () -> {
+        this.postOffice.routeCommand(bindedSession.getClientID(), () -> {
             bindedSession.processPubComp(messageID);
             return null;
         });
-
-        this.postOffice.routeCommand(pubCompCmd);
     }
 
     private void processPubRec(MqttMessage msg) {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        final SessionCommand.Publish pubRecCmd = new SessionCommand.Publish(bindedSession.getClientID(), () -> {
+        this.postOffice.routeCommand(bindedSession.getClientID(), () -> {
             bindedSession.processPubRec(messageID);
             return null;
         });
-
-        this.postOffice.routeCommand(pubRecCmd);
     }
 
     static MqttMessage pubrel(int messageID) {
@@ -163,12 +133,10 @@ final class MQTTConnection {
     private void processPubAck(MqttMessage msg) {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
         final String clientId = getClientId();
-        final SessionCommand.Publish pubAckCmd = new SessionCommand.Publish(clientId, () -> {
+        this.postOffice.routeCommand(clientId, () -> {
             bindedSession.pubAckReceived(messageID);
             return null;
         });
-
-        this.postOffice.routeCommand(pubAckCmd);
     }
 
     Future<Void> processConnect(MqttConnectMessage msg) {
@@ -180,20 +148,20 @@ final class MQTTConnection {
         if (isNotProtocolVersion(msg, MqttVersion.MQTT_3_1) && isNotProtocolVersion(msg, MqttVersion.MQTT_3_1_1)) {
             LOG.warn("MQTT protocol version is not valid. CId: {}", clientId);
             abortConnection(CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION);
-            return FAILED_FUTURE;
+            return CompletableFuture.completedFuture(null);
         }
         final boolean cleanSession = msg.variableHeader().isCleanSession();
         if (clientId == null || clientId.length() == 0) {
             if (!brokerConfig.isAllowZeroByteClientId()) {
                 LOG.info("Broker doesn't permit MQTT empty client ID. Username: {}", username);
                 abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
-                return FAILED_FUTURE;
+                return CompletableFuture.completedFuture(null);
             }
 
             if (!cleanSession) {
                 LOG.info("MQTT client ID cannot be empty for persistent session. Username: {}", username);
                 abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
-                return FAILED_FUTURE;
+                return CompletableFuture.completedFuture(null);
             }
 
             // Generating client id.
@@ -204,18 +172,20 @@ final class MQTTConnection {
         if (!login(msg, clientId)) {
             abortConnection(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD);
             channel.close().addListener(CLOSE_ON_FAILURE);
-            return FAILED_FUTURE;
+            return CompletableFuture.completedFuture(null);
         }
 
-        final SessionCommand.Connect connectCmd = new SessionCommand.Connect(clientId, this, msg);
-
-        return this.postOffice.routeCommand(connectCmd);
+        final String sessionId = clientId;
+        return this.postOffice.routeCommand(clientId, () -> {
+            executeConnect(msg, sessionId);
+            return null;
+        });
     }
 
     /**
      * Invoked by the Session's event loop.
      * */
-    public void executeConnect(MqttConnectMessage msg, String clientId) {
+    private void executeConnect(MqttConnectMessage msg, String clientId) {
         final SessionRegistry.SessionCreationResult result;
         try {
             LOG.trace("Binding MQTTConnection to session");
@@ -257,7 +227,7 @@ final class MQTTConnection {
                         setupInflightResender(channel);
 
                         postOffice.dispatchConnection(msg);
-                        LOG.trace("dispatch connection: {}", msg.toString());
+                        LOG.trace("dispatch connection: {}", msg);
                     }
                 } else {
                     bindedSession.disconnect();
@@ -359,26 +329,24 @@ final class MQTTConnection {
         channel.close().addListener(FIRE_EXCEPTION_ON_FAILURE);
     }
 
-    Future processDisconnect(MqttMessage msg) {
+    Future<Void> processDisconnect(MqttMessage msg) {
         final String clientID = NettyUtils.clientID(channel);
         LOG.trace("Start DISCONNECT");
         if (!connected) {
             LOG.info("DISCONNECT received on already closed connection");
-            return FAILED_FUTURE;
+            return CompletableFuture.completedFuture(null);
         }
 
-        final SessionCommand.Disconnect disconnectCmd = new SessionCommand.Disconnect(clientID, this);
-        return this.postOffice.routeCommand(disconnectCmd);
-    }
-
-    public void executeDisconnect(String clientID) {
-        bindedSession.disconnect();
-        connected = false;
-        channel.close().addListener(FIRE_EXCEPTION_ON_FAILURE);
-        LOG.trace("Processed DISCONNECT");
-        String userName = NettyUtils.userName(channel);
-        postOffice.dispatchDisconnection(clientID, userName);
-        LOG.trace("dispatch disconnection userName={}", userName);
+        return this.postOffice.routeCommand(clientID, () -> {
+            bindedSession.disconnect();
+            connected = false;
+            channel.close().addListener(FIRE_EXCEPTION_ON_FAILURE);
+            LOG.trace("Processed DISCONNECT");
+            String userName = NettyUtils.userName(channel);
+            postOffice.dispatchDisconnection(clientID, userName);
+            LOG.trace("dispatch disconnection userName={}", userName);
+            return null;
+        });
     }
 
     Future<Void> processSubscribe(MqttSubscribeMessage msg) {
@@ -389,11 +357,10 @@ final class MQTTConnection {
             return CompletableFuture.completedFuture(null);
         }
         final String username = NettyUtils.userName(channel);
-        SessionCommand.Publish subscribeCmd = new SessionCommand.Publish(clientID, () -> {
+        return postOffice.routeCommand(clientID, () -> {
             postOffice.subscribeClientToTopics(msg, clientID, username, this);
             return null;
         });
-        return postOffice.routeCommand(subscribeCmd);
     }
 
     void sendSubAckMessage(int messageID, MqttSubAckMessage ackMessage) {
@@ -403,15 +370,14 @@ final class MQTTConnection {
 
     private void processUnsubscribe(MqttUnsubscribeMessage msg) {
         List<String> topics = msg.payload().topics();
-        String clientID = NettyUtils.clientID(channel);
+        final String clientID = NettyUtils.clientID(channel);
         final int messageId = msg.variableHeader().messageId();
 
-        SessionCommand.Publish subscribeCmd = new SessionCommand.Publish(clientID, () -> {
+        postOffice.routeCommand(clientID, () -> {
             LOG.trace("Processing UNSUBSCRIBE message. topics: {}", topics);
             postOffice.unsubscribe(topics, this, messageId);
             return null;
         });
-        postOffice.routeCommand(subscribeCmd);
     }
 
     void sendUnsubAckMessage(List<String> topics, String clientID, int messageID) {
@@ -447,11 +413,10 @@ final class MQTTConnection {
                 return postOffice.receivedPublishQos1(this, topic, username, messageID, msg);
             }
             case EXACTLY_ONCE: {
-                final SessionCommand.Publish publishFirstStepCmd = new SessionCommand.Publish(clientId, () -> {
+                final CompletableFuture<Void> firstStepFuture = postOffice.routeCommand(clientId, () -> {
                     bindedSession.receivedPublishQos2(messageID, msg);
                     return null;
                 });
-                final CompletableFuture<Void> firstStepFuture = postOffice.routeCommand(publishFirstStepCmd);
                 return firstStepFuture.thenCompose(v -> postOffice.receivedPublishQos2(this, msg, username));
             }
             default:
@@ -472,12 +437,10 @@ final class MQTTConnection {
 
     private void processPubRel(MqttMessage msg) {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        final SessionCommand.Publish pubRelCmd = new SessionCommand.Publish(bindedSession.getClientID(), () -> {
+        this.postOffice.routeCommand(bindedSession.getClientID(), () -> {
             executePubRel(messageID);
             return null;
         });
-
-        this.postOffice.routeCommand(pubRelCmd);
     }
 
     private void executePubRel(int messageID) {
