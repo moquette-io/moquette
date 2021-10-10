@@ -23,9 +23,8 @@ final class SessionCommand {
         action.call();
     }
 
-    public CompletableFuture<Void> complete() {
+    public void complete() {
         task.complete(null);
-        return this.task;
     }
 
     public CompletableFuture<Void> completableFuture() {
