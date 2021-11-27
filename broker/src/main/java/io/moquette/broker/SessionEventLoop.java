@@ -10,9 +10,9 @@ final class SessionEventLoop implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(SessionEventLoop.class);
 
-    private final BlockingQueue<FutureTask<Void>> sessionQueue;
+    private final BlockingQueue<FutureTask<String>> sessionQueue;
 
-    public SessionEventLoop(BlockingQueue<FutureTask<Void>> sessionQueue) {
+    public SessionEventLoop(BlockingQueue<FutureTask<String>> sessionQueue) {
         this.sessionQueue = sessionQueue;
     }
 
@@ -21,7 +21,7 @@ final class SessionEventLoop implements Runnable {
         while (!Thread.interrupted()) {
             try {
                 // blocking call
-                final FutureTask<Void> task = this.sessionQueue.take();
+                final FutureTask<String> task = this.sessionQueue.take();
 
                 if (!task.isCancelled()) {
                     try {

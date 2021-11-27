@@ -27,20 +27,129 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.FutureTask;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 import static io.moquette.broker.Utils.messageId;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
+import static java.util.stream.Collectors.collectingAndThen;
+import static java.util.stream.Collectors.mapping;
+import static java.util.stream.Collectors.partitioningBy;
+import static java.util.stream.Collectors.toCollection;
 
 class PostOffice {
+
+    /**
+     * Maps the failed packetID per clientId (id client source, id_packet) -> [id client target]
+     * */
+    private static class FailedPublishCollection {
+
+        static class PacketId {
+
+            private final String clientId;
+
+            private final int idPacket;
+
+            PacketId(String clientId, int idPacket) {
+                this.clientId = clientId;
+                this.idPacket = idPacket;
+            }
+            @Override
+            public boolean equals(Object o) {
+                if (this == o) return true;
+                if (o == null || getClass() != o.getClass()) return false;
+                PacketId packetId = (PacketId) o;
+                return idPacket == packetId.idPacket && Objects.equals(clientId, packetId.clientId);
+            }
+
+            @Override
+            public int hashCode() {
+                return Objects.hash(clientId, idPacket);
+            }
+
+
+
+        }
+        private final ConcurrentMap<PacketId, Set<String>> packetsMap = new ConcurrentHashMap<>();
+
+        public void insert(String clientId, int messageID, String failedClientId) {
+            final PacketId packetId = new PacketId(clientId, messageID);
+            packetsMap.computeIfAbsent(packetId, k -> new HashSet<>())
+                .add(failedClientId);
+        }
+        public void remove(String clientId, int messageID, String targetClientId) {
+            final PacketId packetId = new PacketId(clientId, messageID);
+            packetsMap.computeIfPresent(packetId, (key, clientsSet) -> {
+               clientsSet.remove(targetClientId);
+               if (clientsSet.isEmpty()) {
+                   // the mapping key, value is removed
+                   return null;
+               } else {
+                   return clientsSet;
+               }
+            });
+        }
+
+        private void removeAll(int messageID, String clientId, Collection<String> routings) {
+            for (String targetClientId : routings) {
+                remove(clientId, messageID, targetClientId);
+            }
+        }
+
+        private void insertAll(int messageID, String clientId, Collection<String> routings) {
+            for (String targetClientId : routings) {
+                insert(clientId, messageID, targetClientId);
+            }
+        }
+
+        public Set<String> listFailed(String clientId, int messageID) {
+            final PacketId packetId = new PacketId(clientId, messageID);
+            return packetsMap.getOrDefault(packetId, Collections.emptySet());
+        }
+    }
+
+    static class RoutingResults {
+
+        private final List<String> successedRoutings;
+        private final List<String> failedRoutings;
+
+        public RoutingResults(List<String> successedRoutings, List<String> failedRoutings) {
+            this.successedRoutings = successedRoutings;
+            this.failedRoutings = failedRoutings;
+        }
+
+        public boolean isAllSuccess() {
+            return failedRoutings.isEmpty();
+        }
+    }
+
+    static class RouteResult {
+        private final String clientId;
+        private final Status status;
+
+        enum Status {SUCCESS, FAIL}
+
+        public static RouteResult success(String clientId) {
+            return new RouteResult(clientId, Status.SUCCESS);
+        }
+
+        public static RouteResult failed(String clientId) {
+            return new RouteResult(clientId, Status.FAIL);
+        }
+
+        private RouteResult(String clientId, RouteResult.Status status) {
+            this.clientId = clientId;
+            this.status = status;
+        }
+    }
 
     private static final Logger LOG = LoggerFactory.getLogger(PostOffice.class);
 
@@ -51,8 +160,9 @@ class PostOffice {
     private BrokerInterceptor interceptor;
 
     private final Thread[] sessionExecutors;
-    private final BlockingQueue<FutureTask<Void>>[] sessionQueues;
-    private final int eventLoops = Runtime.getRuntime().availableProcessors();;
+    private final BlockingQueue<FutureTask<String>>[] sessionQueues;
+    private final int eventLoops = Runtime.getRuntime().availableProcessors();
+    private final FailedPublishCollection failedPublishes = new FailedPublishCollection();
 
     PostOffice(ISubscriptionsDirectory subscriptions, IRetainedRepository retainedRepository,
                SessionRegistry sessionRegistry, BrokerInterceptor interceptor, Authorizator authorizator) {
@@ -64,7 +174,7 @@ class PostOffice {
 
         this.sessionQueues = new BlockingQueue[eventLoops];
         for (int i = 0; i < eventLoops; i++) {
-            this.sessionQueues[i] = new ArrayBlockingQueue<FutureTask<Void>>(1024);
+            this.sessionQueues[i] = new ArrayBlockingQueue<>(1024);
         }
         this.sessionExecutors = new Thread[eventLoops];
         for (int i = 0; i < eventLoops; i++) {
@@ -184,7 +294,7 @@ class PostOffice {
             LOG.error("client is not authorized to publish on topic: {}", topic);
             return CompletableFuture.completedFuture(null);
         }
-        final CompletableFuture<Void> publishFuture = publish2Subscribers(msg.payload(), topic, AT_MOST_ONCE);
+        final CompletableFuture<RoutingResults> publishFuture = publish2Subscribers(msg.payload(), topic, AT_MOST_ONCE);
 
         return publishFuture.thenRun(() -> {
             if (msg.fixedHeader().isRetain()) {
@@ -196,7 +306,7 @@ class PostOffice {
         });
     }
 
-    CompletableFuture<Void> receivedPublishQos1(MQTTConnection connection, Topic topic, String username, int messageID,
+    CompletableFuture<RoutingResults> receivedPublishQos1(MQTTConnection connection, Topic topic, String username, int messageID,
                                                 MqttPublishMessage msg) {
         // verify if topic can be write
         topic.getTokens();
@@ -212,36 +322,81 @@ class PostOffice {
         }
 
         ByteBuf payload = msg.payload();
-        final CompletableFuture<Void> publishFuture = publish2Subscribers(payload, topic, AT_LEAST_ONCE);
-        return publishFuture.thenRun(() -> {
-            connection.sendPubAck(messageID);
+        final CompletableFuture<RoutingResults> publishFuture;
+        if (msg.fixedHeader().isDup()) {
+            final Set<String> failedClients = failedPublishes.listFailed(clientId, messageID);
+            publishFuture = publish2Subscribers(payload, topic, AT_LEAST_ONCE, failedClients);
+        } else {
+            publishFuture = publish2Subscribers(payload, topic, AT_LEAST_ONCE);
+        }
 
-            if (msg.fixedHeader().isRetain()) {
-                if (!payload.isReadable()) {
-                    retainedRepository.cleanRetained(topic);
-                } else {
-                    // before wasn't stored
-                    retainedRepository.retain(topic, msg);
-                }
+        return publishFuture.whenComplete((RoutingResults routings, Throwable err) -> {
+            if (routings.isAllSuccess()) {
+                // QoS1 message was enqueued successfully to every event loop
+                publishQos1Success(connection, topic, username, messageID, msg);
+            } else {
+                // some session event loop enqueue raised a problem
+                failedPublishes.insertAll(messageID, clientId, routings.failedRoutings);
+                ReferenceCountUtil.release(msg);
             }
-            interceptor.notifyTopicPublished(msg, clientId, username);
-            ReferenceCountUtil.release(msg);
+
+            // cleanup success resends from the failed publishes cache
+            failedPublishes.removeAll(messageID, clientId, routings.successedRoutings);
         });
     }
 
-    private CompletableFuture<Void> publish2Subscribers(ByteBuf payload, Topic topic, MqttQoS publishingQos) {
+    private void publishQos1Success(MQTTConnection connection, Topic topic, String username, int messageID,
+                                    MqttPublishMessage msg) {
+        connection.sendPubAck(messageID);
+        final String clientId = connection.getClientId();
+
+        ByteBuf payload = msg.payload();
+        if (msg.fixedHeader().isRetain()) {
+            if (!payload.isReadable()) {
+                retainedRepository.cleanRetained(topic);
+            } else {
+                // before wasn't stored
+                retainedRepository.retain(topic, msg);
+            }
+        }
+        interceptor.notifyTopicPublished(msg, clientId, username);
+        ReferenceCountUtil.release(msg);
+    }
+
+    private CompletableFuture<RoutingResults> publish2Subscribers(ByteBuf payload, Topic topic, MqttQoS publishingQos) {
+        return publish2Subscribers(payload, topic, publishingQos, Collections.emptySet());
+    }
+
+    private CompletableFuture<RoutingResults> publish2Subscribers(ByteBuf payload, Topic topic, MqttQoS publishingQos,
+                                                                  Set<String> filterTargetClients) {
         Set<Subscription> topicMatchingSubscriptions = subscriptions.matchQosSharpening(topic);
-        List<CompletableFuture<Void>> publishFutures = new ArrayList<>(topicMatchingSubscriptions.size());
+        List<CompletableFuture<RouteResult>> publishFutures = new ArrayList<>(topicMatchingSubscriptions.size());
 
         for (final Subscription sub : topicMatchingSubscriptions) {
             MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
-            publishFutures.add(routeCommand(sub.getClientId(), () -> {
-                publishToSession(payload, topic, sub, qos);
-                return null;
-            }));
+            if (filterTargetClients.isEmpty() || filterTargetClients.contains(sub.getClientId())) {
+                publishFutures.add(routeCommand(sub.getClientId(), () -> {
+                    publishToSession(payload, topic, sub, qos);
+                    return sub.getClientId();
+                }));
+            }
         }
 
-        return CompletableFuture.allOf(publishFutures.toArray(new CompletableFuture[0]));
+        final CompletableFuture<Void> publishes = CompletableFuture.allOf(publishFutures.toArray(new CompletableFuture[0]));
+        return publishes.handle((result, exception) -> {
+            final List<String> failedRoutings = publishFutures.stream()
+                .filter(CompletableFuture::isCompletedExceptionally)
+                .map(cf -> cf.thenApply(r -> r.clientId))
+                .map(CompletableFuture::join)
+                .collect(Collectors.toList());
+
+            final List<String> successedRoutings = publishFutures.stream()
+                .filter(f -> !f.isCompletedExceptionally())
+                .map(cf -> cf.thenApply(r -> r.clientId))
+                .map(CompletableFuture::join)
+                .collect(Collectors.toList());
+            return new RoutingResults(successedRoutings, failedRoutings);
+        });
     }
 
     private void publishToSession(ByteBuf payload, Topic topic, Subscription sub, MqttQoS qos) {
@@ -276,7 +431,7 @@ class PostOffice {
             return CompletableFuture.completedFuture(null);
         }
 
-        final CompletableFuture<Void> publishFuture = publish2Subscribers(payload, topic, EXACTLY_ONCE);
+        final CompletableFuture<RoutingResults> publishFuture = publish2Subscribers(payload, topic, EXACTLY_ONCE);
         return publishFuture.thenRun(() -> {
             final boolean retained = mqttPublishMessage.fixedHeader().isRetain();
             if (retained) {
@@ -317,7 +472,7 @@ class PostOffice {
         final ByteBuf payload = msg.payload();
         LOG.info("Sending internal PUBLISH message Topic={}, qos={}", topic, qos);
 
-        final CompletableFuture<Void> publishFuture = publish2Subscribers(payload, topic, qos);
+        final CompletableFuture<RoutingResults> publishFuture = publish2Subscribers(payload, topic, qos);
         return publishFuture.thenRun(() -> {
             if (!msg.fixedHeader().isRetain()) {
                 return;
@@ -350,17 +505,22 @@ class PostOffice {
     /**
      * Route the command to the owning SessionEventLoop
      * */
-    public CompletableFuture<Void> routeCommand(String clientId, Callable<Void> action) {
+    public CompletableFuture<RouteResult> routeCommand(String clientId, Callable<String> action) {
         SessionCommand cmd = new SessionCommand(clientId, action);
         final int targetQueueId = Math.abs(cmd.getSessionId().hashCode()) % this.eventLoops;
         LOG.debug("Routing cmd for session [{}] to event processor {}", cmd.getSessionId(), targetQueueId);
-        final FutureTask<Void> task = new FutureTask<>(() -> {
+        final FutureTask<String> task = new FutureTask<>(() -> {
             cmd.execute();
             cmd.complete();
-            return null;
+            return cmd.getSessionId();
         });
-        this.sessionQueues[targetQueueId].add(task);
-        return cmd.completableFuture();
+        if (this.sessionQueues[targetQueueId].offer(task)) {
+            return cmd.completableFuture().thenApply(RouteResult::success);
+        } else {
+            final CompletableFuture<RouteResult> failed = new CompletableFuture<>();
+            failed.complete(RouteResult.failed(cmd.getSessionId()));
+            return failed;
+        }
     }
 
 //    void flushInFlight(MQTTConnection mqttConnection) {

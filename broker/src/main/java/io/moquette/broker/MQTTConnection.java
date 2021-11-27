@@ -31,10 +31,8 @@ import org.slf4j.LoggerFactory;
 import java.net.InetSocketAddress;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
@@ -113,7 +111,7 @@ final class MQTTConnection {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
         this.postOffice.routeCommand(bindedSession.getClientID(), () -> {
             bindedSession.processPubComp(messageID);
-            return null;
+            return bindedSession.getClientID();
         });
     }
 
@@ -139,7 +137,7 @@ final class MQTTConnection {
         });
     }
 
-    Future<Void> processConnect(MqttConnectMessage msg) {
+    Future<PostOffice.RouteResult> processConnect(MqttConnectMessage msg) {
         MqttConnectPayload payload = msg.payload();
         String clientId = payload.clientIdentifier();
         final String username = payload.userName();
@@ -329,7 +327,7 @@ final class MQTTConnection {
         channel.close().addListener(FIRE_EXCEPTION_ON_FAILURE);
     }
 
-    Future<Void> processDisconnect(MqttMessage msg) {
+    Future<PostOffice.RouteResult> processDisconnect(MqttMessage msg) {
         final String clientID = NettyUtils.clientID(channel);
         LOG.trace("Start DISCONNECT");
         if (!connected) {
@@ -349,7 +347,7 @@ final class MQTTConnection {
         });
     }
 
-    Future<Void> processSubscribe(MqttSubscribeMessage msg) {
+    Future<PostOffice.RouteResult> processSubscribe(MqttSubscribeMessage msg) {
         final String clientID = NettyUtils.clientID(channel);
         if (!connected) {
             LOG.warn("SUBSCRIBE received on already closed connection");
@@ -390,7 +388,7 @@ final class MQTTConnection {
         LOG.trace("Client unsubscribed from topics <{}>", topics);
     }
 
-    Future<Void> processPublish(MqttPublishMessage msg) {
+    Future<? extends Object> processPublish(MqttPublishMessage msg) {
         final MqttQoS qos = msg.fixedHeader().qosLevel();
         final String username = NettyUtils.userName(channel);
         final String topicName = msg.variableHeader().topicName();
@@ -403,8 +401,8 @@ final class MQTTConnection {
             dropConnection();
         }
 
-//        // retain else msg is cleaned by the NewNettyMQTTHandler and is not available
-//        // in execution by SessionEventLoop
+        // retain else msg is cleaned by the NewNettyMQTTHandler and is not available
+        // in execution by SessionEventLoop
         msg.retain();
         switch (qos) {
             case AT_MOST_ONCE:
@@ -413,7 +411,7 @@ final class MQTTConnection {
                 return postOffice.receivedPublishQos1(this, topic, username, messageID, msg);
             }
             case EXACTLY_ONCE: {
-                final CompletableFuture<Void> firstStepFuture = postOffice.routeCommand(clientId, () -> {
+                final CompletableFuture<PostOffice.RouteResult> firstStepFuture = postOffice.routeCommand(clientId, () -> {
                     bindedSession.receivedPublishQos2(messageID, msg);
                     return null;
                 });
