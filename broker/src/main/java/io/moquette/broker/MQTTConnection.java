@@ -425,7 +425,7 @@ final class MQTTConnection {
         }
     }
 
-    void sendPublishReceived(int messageID) {
+    void sendPubRec(int messageID) {
         LOG.trace("sendPubRec invoked, messageID: {}", messageID);
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBREC, false, AT_MOST_ONCE,
             false, 0);

@@ -136,6 +136,7 @@ public class PostOfficePublishTest {
             .payload(anyPayload)
             .qos(MqttQoS.EXACTLY_ONCE)
             .retained(false)
+            .messageId(1)
             .topicName(NEWS_TOPIC).build(), "username");
 
         final MQTTConnection clientYA = connectAs("subscriber");
@@ -147,6 +148,7 @@ public class PostOfficePublishTest {
             .payload(anyPayload2)
             .qos(MqttQoS.EXACTLY_ONCE)
             .retained(true)
+            .messageId(2)
             .topicName(NEWS_TOPIC).build(), "username").get(5, TimeUnit.SECONDS);
 
         // Verify
@@ -290,7 +292,8 @@ public class PostOfficePublishTest {
                 .payload(anyPayload)
                 .qos(MqttQoS.EXACTLY_ONCE)
                 .retained(true)
-                .topicName(NEWS_TOPIC).build(), "username").get(5, TimeUnit.SECONDS);
+                .messageId(2)
+                .topicName(NEWS_TOPIC).build(), "username").get(5000, TimeUnit.SECONDS);
 
         // Verify
         ConnectionTestUtils.verifyPublishIsReceived(channel, EXACTLY_ONCE, "Any payload");

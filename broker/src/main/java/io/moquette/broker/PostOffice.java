@@ -31,7 +31,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.*;
@@ -40,10 +39,7 @@ import java.util.stream.Collectors;
 import static io.moquette.broker.Utils.messageId;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
-import static java.util.stream.Collectors.collectingAndThen;
-import static java.util.stream.Collectors.mapping;
 import static java.util.stream.Collectors.partitioningBy;
-import static java.util.stream.Collectors.toCollection;
 
 class PostOffice {
 
@@ -333,34 +329,29 @@ class PostOffice {
         return publishFuture.whenComplete((RoutingResults routings, Throwable err) -> {
             if (routings.isAllSuccess()) {
                 // QoS1 message was enqueued successfully to every event loop
-                publishQos1Success(connection, topic, username, messageID, msg);
+                connection.sendPubAck(messageID);
+                manageRetain(topic, msg);
+                interceptor.notifyTopicPublished(msg, clientId, username);
             } else {
                 // some session event loop enqueue raised a problem
                 failedPublishes.insertAll(messageID, clientId, routings.failedRoutings);
-                ReferenceCountUtil.release(msg);
             }
+            ReferenceCountUtil.release(msg);
 
             // cleanup success resends from the failed publishes cache
             failedPublishes.removeAll(messageID, clientId, routings.successedRoutings);
         });
     }
 
-    private void publishQos1Success(MQTTConnection connection, Topic topic, String username, int messageID,
-                                    MqttPublishMessage msg) {
-        connection.sendPubAck(messageID);
-        final String clientId = connection.getClientId();
-
-        ByteBuf payload = msg.payload();
+    private void manageRetain(Topic topic, MqttPublishMessage msg) {
         if (msg.fixedHeader().isRetain()) {
-            if (!payload.isReadable()) {
+            if (!msg.payload().isReadable()) {
                 retainedRepository.cleanRetained(topic);
             } else {
                 // before wasn't stored
                 retainedRepository.retain(topic, msg);
             }
         }
-        interceptor.notifyTopicPublished(msg, clientId, username);
-        ReferenceCountUtil.release(msg);
     }
 
     private CompletableFuture<RoutingResults> publish2Subscribers(ByteBuf payload, Topic topic, MqttQoS publishingQos) {
@@ -420,10 +411,10 @@ class PostOffice {
      * subscribers.
      * @return
      */
-    CompletableFuture<Void> receivedPublishQos2(MQTTConnection connection, MqttPublishMessage mqttPublishMessage, String username) {
-        LOG.trace("Processing PUBREL message on connection: {}", connection);
-        final Topic topic = new Topic(mqttPublishMessage.variableHeader().topicName());
-        final ByteBuf payload = mqttPublishMessage.payload();
+    CompletableFuture<RoutingResults> receivedPublishQos2(MQTTConnection connection, MqttPublishMessage msg, String username) {
+        LOG.trace("Processing PUB QoS2 message on connection: {}", connection);
+        final Topic topic = new Topic(msg.variableHeader().topicName());
+        final ByteBuf payload = msg.payload();
 
         final String clientId = connection.getClientId();
         if (!authorizator.canWrite(topic, username, clientId)) {
@@ -431,20 +422,29 @@ class PostOffice {
             return CompletableFuture.completedFuture(null);
         }
 
-        final CompletableFuture<RoutingResults> publishFuture = publish2Subscribers(payload, topic, EXACTLY_ONCE);
-        return publishFuture.thenRun(() -> {
-            final boolean retained = mqttPublishMessage.fixedHeader().isRetain();
-            if (retained) {
-                if (!payload.isReadable()) {
-                    retainedRepository.cleanRetained(topic);
-                } else {
-                    // before wasn't stored
-                    retainedRepository.retain(topic, mqttPublishMessage);
-                }
-            }
+        final int messageID = msg.variableHeader().packetId();
+        final CompletableFuture<RoutingResults> publishFuture;
+        if (msg.fixedHeader().isDup()) {
+            final Set<String> failedClients = failedPublishes.listFailed(clientId, messageID);
+            publishFuture = publish2Subscribers(payload, topic, EXACTLY_ONCE, failedClients);
+        } else {
+            publishFuture = publish2Subscribers(payload, topic, EXACTLY_ONCE);
+        }
 
-            String clientID = connection.getClientId();
-            interceptor.notifyTopicPublished(mqttPublishMessage, clientID, username);
+        return publishFuture.whenComplete((RoutingResults routings, Throwable err) -> {
+            if (routings.isAllSuccess()) {
+                // QoS2 PUB message was enqueued successfully to every event loop
+                connection.sendPubRec(messageID);
+                manageRetain(topic, msg);
+                interceptor.notifyTopicPublished(msg, clientId, username);
+            } else {
+                // some session event loop enqueue raised a problem
+                failedPublishes.insertAll(messageID, clientId, routings.failedRoutings);
+            }
+            ReferenceCountUtil.release(msg);
+
+            // cleanup success resends from the failed publishes cache
+            failedPublishes.removeAll(messageID, clientId, routings.successedRoutings);
         });
     }
 

@@ -443,7 +443,7 @@ class Session {
         // In case of evil client with duplicate msgid.
         ReferenceCountUtil.release(old);
 
-        mqttConnection.sendPublishReceived(messageID);
+//        mqttConnection.sendPublishReceived(messageID);
     }
 
     public void receivedPubRelQos2(int messageID) {
