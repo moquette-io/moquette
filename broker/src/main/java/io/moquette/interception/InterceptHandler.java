@@ -17,7 +17,7 @@
 package io.moquette.interception;
 
 import io.moquette.interception.messages.*;
-import io.moquette.broker.subscriptions.Subscription;
+import io.moquette.api.Subscription;
 import io.netty.handler.codec.mqtt.MqttMessage;
 
 /**

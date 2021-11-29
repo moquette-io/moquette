@@ -15,6 +15,9 @@
  */
 package io.moquette.broker.subscriptions;
 
+import io.moquette.api.Subscription;
+import io.moquette.api.Token;
+
 class TNode extends CNode {
 
     @Override

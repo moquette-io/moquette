@@ -15,7 +15,7 @@
  */
 package io.moquette.broker;
 
-import io.moquette.broker.subscriptions.Topic;
+import io.moquette.api.Topic;
 import io.moquette.broker.security.IAuthorizatorPolicy;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttSubscribeMessage;

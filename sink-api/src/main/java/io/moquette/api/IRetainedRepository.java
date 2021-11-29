@@ -13,9 +13,8 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
-package io.moquette.broker;
+package io.moquette.api;
 
-import io.moquette.broker.subscriptions.Topic;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 
 import java.util.List;

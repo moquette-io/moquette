@@ -13,11 +13,8 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
-package io.moquette.broker.subscriptions;
+package io.moquette.api;
 
-import io.moquette.broker.ISubscriptionsRepository;
-
-import java.util.List;
 import java.util.Set;
 
 public interface ISubscriptionsDirectory {

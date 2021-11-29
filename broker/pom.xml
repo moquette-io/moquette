@@ -14,13 +14,17 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <netty.version>4.1.59.Final</netty.version>
         <netty.tcnative.version>2.0.34.Final</netty.tcnative.version>
         <paho.version>1.2.5</paho.version>
-        <h2.version>1.4.199</h2.version>
+        <h2.version>1.4.200</h2.version>
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>io.moquette</groupId>
+            <artifactId>moquette-sink-api</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
@@ -205,8 +209,9 @@
                     <target>8</target>
                     <compilerArgs>
                         <arg>-XDcompilePolicy=simple</arg>
-                        <arg>-Xplugin:ErrorProne</arg>
+                        <!--<arg>-Xplugin:ErrorProne</arg>-->
                     </compilerArgs>
+                    <!-- Cannot get builds working with this
                     <annotationProcessorPaths>
                         <path>
                             <groupId>com.google.errorprone</groupId>
@@ -214,6 +219,7 @@
                             <version>2.4.0</version>
                         </path>
                     </annotationProcessorPaths>
+                    -->
                 </configuration>
             </plugin>
 

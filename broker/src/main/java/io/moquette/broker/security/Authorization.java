@@ -17,7 +17,7 @@
 package io.moquette.broker.security;
 
 import static io.moquette.broker.security.Authorization.Permission.READWRITE;
-import io.moquette.broker.subscriptions.Topic;
+import io.moquette.api.Topic;
 
 /**
  * Carries the read/write authorization to topics for the users.

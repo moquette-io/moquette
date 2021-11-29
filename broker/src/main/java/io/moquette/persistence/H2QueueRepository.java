@@ -15,8 +15,9 @@
  */
 package io.moquette.persistence;
 
-import io.moquette.broker.IQueueRepository;
-import io.moquette.broker.SessionRegistry.EnqueuedMessage;
+import io.moquette.api.EnqueuedMessage;
+import io.moquette.api.IQueueRepository;
+import io.moquette.api.EnqueuedMessage;
 import org.h2.mvstore.MVStore;
 
 import java.util.HashMap;

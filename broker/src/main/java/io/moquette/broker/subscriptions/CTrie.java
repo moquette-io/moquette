@@ -1,5 +1,9 @@
 package io.moquette.broker.subscriptions;
 
+import io.moquette.api.Subscription;
+import io.moquette.api.Token;
+import io.moquette.api.Topic;
+
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Optional;
@@ -91,7 +95,7 @@ public class CTrie {
     public void addToTree(Subscription newSubscription) {
         Action res;
         do {
-            res = insert(newSubscription.topicFilter, this.root, newSubscription);
+            res = insert(newSubscription.getTopicFilter(), this.root, newSubscription);
         } while (res == Action.REPEAT);
     }
 

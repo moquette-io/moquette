@@ -17,12 +17,12 @@
 package io.moquette.integration;
 
 import io.moquette.BrokerConstants;
+import io.moquette.api.Topic;
 import io.moquette.broker.Server;
 import io.moquette.broker.config.IConfig;
 import io.moquette.broker.config.MemoryConfig;
 import io.moquette.broker.security.IAuthenticator;
 import io.moquette.broker.security.IAuthorizatorPolicy;
-import io.moquette.broker.subscriptions.Topic;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -16,7 +16,8 @@
 package io.moquette.broker.subscriptions;
 
 
-import io.moquette.broker.ISubscriptionsRepository;
+import io.moquette.api.ISubscriptionsRepository;
+import io.moquette.api.Subscription;
 import io.moquette.persistence.MemorySubscriptionsRepository;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,8 +26,8 @@ import org.junit.jupiter.api.Test;
 import java.util.Optional;
 import java.util.Set;
 
+import static io.moquette.api.Topic.asTopic;
 import static io.moquette.broker.subscriptions.CTrieTest.clientSubOnTopic;
-import static io.moquette.broker.subscriptions.Topic.asTopic;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -217,12 +218,12 @@ public class CTrieSubscriptionDirectoryMatchingTest {
         sut.add(slashSub2);
 
         // Exercise
-        sut.removeSubscription(asTopic("/topic"), slashSub2.clientId);
+        sut.removeSubscription(asTopic("/topic"), slashSub2.getClientId());
 
         // Verify
         Subscription remainedSubscription = sut.matchWithoutQosSharpening(asTopic("/topic")).iterator().next();
-        assertThat(remainedSubscription.clientId).isEqualTo(slashSub.clientId);
-        assertEquals(slashSub.clientId, remainedSubscription.clientId);
+        assertThat(remainedSubscription.getClientId()).isEqualTo(slashSub.getClientId());
+        assertEquals(slashSub.getClientId(), remainedSubscription.getClientId());
     }
 
     @Test
@@ -231,7 +232,7 @@ public class CTrieSubscriptionDirectoryMatchingTest {
         sut.add(slashSub);
 
         // Exercise
-        sut.removeSubscription(asTopic("/topic"), slashSub.clientId);
+        sut.removeSubscription(asTopic("/topic"), slashSub.getClientId());
 
         // Verify
         final Set<Subscription> matchingSubscriptions = sut.matchWithoutQosSharpening(asTopic("/topic"));

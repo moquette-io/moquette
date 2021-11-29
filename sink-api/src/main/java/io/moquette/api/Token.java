@@ -14,19 +14,19 @@
  * You may elect to redistribute this code under either of these licenses.
  */
 
-package io.moquette.broker.subscriptions;
+package io.moquette.api;
 
 /**
  * Internal use only class.
  */
 public class Token {
 
-    static final Token EMPTY = new Token("");
-    static final Token MULTI = new Token("#");
-    static final Token SINGLE = new Token("+");
+    public static final Token EMPTY = new Token("");
+    public static final Token MULTI = new Token("#");
+    public static final Token SINGLE = new Token("+");
     final String name;
 
-    protected Token(String s) {
+    public Token(String s) {
         name = s;
     }
 

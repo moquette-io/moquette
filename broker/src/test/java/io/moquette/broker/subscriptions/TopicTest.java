@@ -15,6 +15,8 @@
  */
 package io.moquette.broker.subscriptions;
 
+import io.moquette.api.Token;
+import io.moquette.api.Topic;
 import org.assertj.core.api.AbstractAssert;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;

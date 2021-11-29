@@ -1,9 +1,9 @@
 package io.moquette.persistence;
 
 import io.moquette.BrokerConstants;
-import io.moquette.broker.IQueueRepository;
-import io.moquette.broker.IRetainedRepository;
-import io.moquette.broker.ISubscriptionsRepository;
+import io.moquette.api.IQueueRepository;
+import io.moquette.api.IRetainedRepository;
+import io.moquette.api.ISubscriptionsRepository;
 import io.moquette.broker.config.IConfig;
 import org.h2.mvstore.MVStore;
 import org.slf4j.Logger;

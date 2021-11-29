@@ -16,8 +16,8 @@
 package io.moquette.persistence;
 
 import io.moquette.BrokerConstants;
-import io.moquette.broker.SessionRegistry;
-import io.moquette.broker.subscriptions.Topic;
+import io.moquette.api.PublishedMessage;
+import io.moquette.api.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttQoS;
@@ -60,14 +60,14 @@ public class H2PersistentQueueTest {
         sut.add(createMessage("Hello"));
         sut.add(createMessage("world"));
 
-        assertEquals("Hello", ((SessionRegistry.PublishedMessage) sut.peek()).getTopic().toString());
-        assertEquals("Hello", ((SessionRegistry.PublishedMessage) sut.peek()).getTopic().toString());
+        assertEquals("Hello", ((PublishedMessage) sut.peek()).getTopic().toString());
+        assertEquals("Hello", ((PublishedMessage) sut.peek()).getTopic().toString());
         assertEquals(2, sut.size(), "peek just return elements, doesn't remove them");
     }
 
-    private SessionRegistry.PublishedMessage createMessage(String name) {
+    private PublishedMessage createMessage(String name) {
         final ByteBuf payload = Unpooled.wrappedBuffer(name.getBytes(StandardCharsets.UTF_8));
-        return new SessionRegistry.PublishedMessage(Topic.asTopic(name), MqttQoS.AT_LEAST_ONCE, payload);
+        return new PublishedMessage(Topic.asTopic(name), MqttQoS.AT_LEAST_ONCE, payload);
     }
 
     @Test
@@ -76,8 +76,8 @@ public class H2PersistentQueueTest {
         sut.add(createMessage("Hello"));
         sut.add(createMessage("world"));
 
-        assertEquals("Hello", ((SessionRegistry.PublishedMessage) sut.poll()).getTopic().toString());
-        assertEquals("world", ((SessionRegistry.PublishedMessage) sut.poll()).getTopic().toString());
+        assertEquals("Hello", ((PublishedMessage) sut.poll()).getTopic().toString());
+        assertEquals("world", ((PublishedMessage) sut.poll()).getTopic().toString());
         assertTrue(sut.isEmpty(), "after poll 2 elements inserted before, should be empty");
     }
 
@@ -93,7 +93,7 @@ public class H2PersistentQueueTest {
         mvStore.commit();
 
         for (int i = 0; i < numIterations; i++) {
-            assertEquals("Hello", ((SessionRegistry.PublishedMessage) sut.poll()).getTopic().toString());
+            assertEquals("Hello", ((PublishedMessage) sut.poll()).getTopic().toString());
         }
 
         assertTrue(sut.isEmpty(), "should be empty");
@@ -105,7 +105,7 @@ public class H2PersistentQueueTest {
         before.add(createMessage("Hello"));
         before.add(createMessage("crazy"));
         before.add(createMessage("world"));
-        assertEquals("Hello", ((SessionRegistry.PublishedMessage) before.poll()).getTopic().toString());
+        assertEquals("Hello", ((PublishedMessage) before.poll()).getTopic().toString());
         this.mvStore.commit();
         this.mvStore.close();
 
@@ -117,8 +117,8 @@ public class H2PersistentQueueTest {
         //now reload the persisted state
         H2PersistentQueue after = new H2PersistentQueue(this.mvStore, "test");
 
-        assertEquals("crazy", ((SessionRegistry.PublishedMessage) after.poll()).getTopic().toString());
-        assertEquals("world", ((SessionRegistry.PublishedMessage) after.poll()).getTopic().toString());
+        assertEquals("crazy", ((PublishedMessage) after.poll()).getTopic().toString());
+        assertEquals("world", ((PublishedMessage) after.poll()).getTopic().toString());
         assertTrue(after.isEmpty(), "should be empty");
     }
 }

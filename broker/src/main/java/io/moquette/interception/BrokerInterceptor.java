@@ -19,7 +19,7 @@ package io.moquette.interception;
 import io.moquette.BrokerConstants;
 import io.moquette.interception.messages.*;
 import io.moquette.broker.config.IConfig;
-import io.moquette.broker.subscriptions.Subscription;
+import io.moquette.api.Subscription;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import io.netty.util.ReferenceCountUtil;

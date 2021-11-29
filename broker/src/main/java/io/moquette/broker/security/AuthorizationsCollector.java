@@ -16,7 +16,7 @@
 
 package io.moquette.broker.security;
 
-import io.moquette.broker.subscriptions.Topic;
+import io.moquette.api.Topic;
 
 import java.text.ParseException;
 import java.util.*;

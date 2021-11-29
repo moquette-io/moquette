@@ -16,12 +16,15 @@
 
 package io.moquette.broker.security;
 
+import io.moquette.api.Topic;
 import org.junit.jupiter.api.Test;
-import io.moquette.broker.subscriptions.Topic;
+
 import java.io.Reader;
 import java.io.StringReader;
 import java.text.ParseException;
-import static org.junit.jupiter.api.Assertions.*;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ACLFileParserTest {
 

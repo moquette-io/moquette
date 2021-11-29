@@ -7,6 +7,8 @@
         <source.version>1.8</source.version>
         <target.version>1.8</target.version>
         <junit.version>5.7.0</junit.version>
+
+        <netty.version>4.1.59.Final</netty.version>
     </properties>
 
     <groupId>io.moquette</groupId>
@@ -50,10 +52,26 @@
     </scm>
 
     <modules>
+        <module>sink-api</module>
         <module>broker</module>
         <module>distribution</module>
         <module>embedding_moquette</module>
     </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.moquette</groupId>
+                <artifactId>moquette-sink-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.moquette</groupId>
+                <artifactId>moquette-h2-sink</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>

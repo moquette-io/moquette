@@ -16,23 +16,20 @@
 
 package io.moquette.spec.v3_1_1.connection;
 
+import io.moquette.BrokerConstants;
 import io.moquette.broker.Server;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import io.moquette.integration.IntegrationUtils;
+import io.moquette.testclient.RawClient;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.io.TempDir;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Properties;
 
-import io.moquette.BrokerConstants;
-import io.moquette.integration.IntegrationUtils;
-import io.moquette.testclient.RawClient;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.io.TempDir;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ConnectionIT {
 

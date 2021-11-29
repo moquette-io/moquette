@@ -1,22 +1,24 @@
 package io.moquette.broker;
 
-import io.moquette.broker.subscriptions.Topic;
+import io.moquette.api.EnqueuedMessage;
+import io.moquette.api.Subscription;
+import io.moquette.api.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.MqttQoS;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static io.moquette.BrokerConstants.FLIGHT_BEFORE_RESEND_MS;
-import io.moquette.broker.subscriptions.Subscription;
-import java.util.Arrays;
-import org.assertj.core.api.Assertions;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class SessionTest {
 
@@ -24,7 +26,7 @@ public class SessionTest {
 
     private EmbeddedChannel testChannel;
     private Session client;
-    private Queue<SessionRegistry.EnqueuedMessage> queuedMessages;
+    private Queue<EnqueuedMessage> queuedMessages;
 
     @BeforeEach
     public void setUp() {

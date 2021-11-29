@@ -16,12 +16,14 @@
 package io.moquette.broker;
 
 import io.moquette.BrokerConstants;
-import io.moquette.persistence.EnqueuedMessageValueType;
+import io.moquette.api.ISubscriptionsDirectory;
+import io.moquette.api.ISubscriptionsRepository;
+import io.moquette.api.PublishedMessage;
+import io.moquette.api.Topic;
+import io.moquette.broker.security.IAuthenticator;
 import io.moquette.broker.security.PermitAllAuthorizatorPolicy;
 import io.moquette.broker.subscriptions.CTrieSubscriptionDirectory;
-import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
-import io.moquette.broker.security.IAuthenticator;
-import io.moquette.broker.subscriptions.Topic;
+import io.moquette.persistence.EnqueuedMessageValueType;
 import io.moquette.persistence.MemorySubscriptionsRepository;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -43,9 +45,7 @@ import static io.moquette.broker.NettyChannelAssertions.assertEqualsConnAck;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class SessionRegistryTest {
 
@@ -147,17 +147,17 @@ public class SessionRegistryTest {
             .fileName(BrokerConstants.DEFAULT_PERSISTENT_PATH)
             .autoCommitDisabled()
             .open();
-        final MVMap.Builder<String, SessionRegistry.PublishedMessage> builder =
-            new MVMap.Builder<String, SessionRegistry.PublishedMessage>()
+        final MVMap.Builder<String, PublishedMessage> builder =
+            new MVMap.Builder<String, PublishedMessage>()
                 .valueType(new EnqueuedMessageValueType());
 
         final ByteBuf payload = Unpooled.wrappedBuffer("Hello World!".getBytes(StandardCharsets.UTF_8));
-        SessionRegistry.PublishedMessage msg = new SessionRegistry.PublishedMessage(Topic.asTopic("/say"),
+        PublishedMessage msg = new PublishedMessage(Topic.asTopic("/say"),
             MqttQoS.AT_LEAST_ONCE, payload);
         try {
             // store a message in the MVStore
             final String mapName = "test_map";
-            MVMap<String, SessionRegistry.PublishedMessage> persistentMap = mvStore.openMap(mapName, builder);
+            MVMap<String, PublishedMessage> persistentMap = mvStore.openMap(mapName, builder);
             String key = "message";
             persistentMap.put(key, msg);
             mvStore.close();
@@ -167,10 +167,10 @@ public class SessionRegistryTest {
                 .fileName(BrokerConstants.DEFAULT_PERSISTENT_PATH)
                 .autoCommitDisabled()
                 .open();
-            final SessionRegistry.PublishedMessage reloadedMsg = mvStore.openMap(mapName, builder).get(key);
+            final PublishedMessage reloadedMsg = mvStore.openMap(mapName, builder).get(key);
 
             // Verify
-            assertEquals("/say", reloadedMsg.topic.toString());
+            assertEquals("/say", reloadedMsg.getTopic().toString());
         } finally {
             mvStore.close();
             File dbFile = new File(BrokerConstants.DEFAULT_PERSISTENT_PATH);

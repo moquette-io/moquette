@@ -15,10 +15,11 @@
  */
 package io.moquette.broker;
 
+import io.moquette.api.ISubscriptionsDirectory;
+import io.moquette.api.ISubscriptionsRepository;
+import io.moquette.broker.security.IAuthenticator;
 import io.moquette.broker.security.PermitAllAuthorizatorPolicy;
 import io.moquette.broker.subscriptions.CTrieSubscriptionDirectory;
-import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
-import io.moquette.broker.security.IAuthenticator;
 import io.moquette.persistence.MemorySubscriptionsRepository;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;

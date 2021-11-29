@@ -16,10 +16,12 @@
 
 package io.moquette.broker.security;
 
+import io.moquette.api.Topic;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import io.moquette.broker.subscriptions.Topic;
+
 import java.text.ParseException;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 public class AuthorizationsCollectorTest {

@@ -15,10 +15,11 @@
  */
 package io.moquette.broker;
 
+import io.moquette.api.EnqueuedMessage;
+import io.moquette.api.IQueueRepository;
+import io.moquette.api.ISubscriptionsDirectory;
+import io.moquette.api.Subscription;
 import io.moquette.broker.Session.SessionStatus;
-import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
-import io.moquette.broker.subscriptions.Subscription;
-import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
@@ -36,60 +37,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 public class SessionRegistry {
-
-    public abstract static class EnqueuedMessage {
-
-        /**
-         * Releases any held resources. Must be called when the EnqueuedMessage is no
-         * longer needed.
-         */
-        public void release() {}
-
-        /**
-         * Retains any held resources. Must be called when the EnqueuedMessage is added
-         * to a store.
-         */
-        public void retain() {}
-    }
-
-    public static class PublishedMessage extends EnqueuedMessage {
-
-        final Topic topic;
-        final MqttQoS publishingQos;
-        final ByteBuf payload;
-
-        public PublishedMessage(Topic topic, MqttQoS publishingQos, ByteBuf payload) {
-            this.topic = topic;
-            this.publishingQos = publishingQos;
-            this.payload = payload;
-        }
-
-        public Topic getTopic() {
-            return topic;
-        }
-
-        public MqttQoS getPublishingQos() {
-            return publishingQos;
-        }
-
-        public ByteBuf getPayload() {
-            return payload;
-        }
-
-        @Override
-        public void release() {
-            payload.release();
-        }
-
-        @Override
-        public void retain() {
-            payload.retain();
-        }
-
-    }
-
-    public static final class PubRelMarker extends EnqueuedMessage {
-    }
 
     public enum CreationModeEnum {
         CREATED_CLEAN_NEW, REOPEN_EXISTING, DROP_EXISTING
@@ -114,7 +61,7 @@ public class SessionRegistry {
     private final ISubscriptionsDirectory subscriptionsDirectory;
     private final IQueueRepository queueRepository;
     private final Authorizator authorizator;
-    private final ConcurrentMap<String, Queue<SessionRegistry.EnqueuedMessage>> queues = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Queue<EnqueuedMessage>> queues = new ConcurrentHashMap<>();
 
     SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory,
                     IQueueRepository queueRepository,
@@ -241,7 +188,7 @@ public class SessionRegistry {
 
     private Session createNewSession(MqttConnectMessage msg, String clientId) {
         final boolean clean = msg.variableHeader().isCleanSession();
-        final Queue<SessionRegistry.EnqueuedMessage> sessionQueue =
+        final Queue<EnqueuedMessage> sessionQueue =
                     queues.computeIfAbsent(clientId, (String cli) -> queueRepository.createQueue(cli, clean));
         final Session newSession;
         if (msg.variableHeader().isWillFlag()) {

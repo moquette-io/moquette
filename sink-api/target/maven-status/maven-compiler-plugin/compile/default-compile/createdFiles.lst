@@ -1,0 +1,15 @@
+io/moquette/api/ISubscriptionsDirectory.class
+io/moquette/api/PublishedMessage.class
+io/moquette/api/IRetainedRepository.class
+io/moquette/api/RetainedMessage.class
+io/moquette/api/Subscription.class
+io/moquette/BrokerConstants.class
+io/moquette/api/Topic.class
+io/moquette/api/ISubscriptionsRepository.class
+io/moquette/api/QueueMapProvider.class
+io/moquette/api/ISslContextCreator.class
+io/moquette/api/PersistenceBackend.class
+io/moquette/api/IQueueRepository.class
+io/moquette/api/PubRelMarker.class
+io/moquette/api/Token.class
+io/moquette/api/EnqueuedMessage.class

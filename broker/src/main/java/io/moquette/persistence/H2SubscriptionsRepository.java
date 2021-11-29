@@ -1,7 +1,7 @@
 package io.moquette.persistence;
 
-import io.moquette.broker.ISubscriptionsRepository;
-import io.moquette.broker.subscriptions.Subscription;
+import io.moquette.api.ISubscriptionsRepository;
+import io.moquette.api.Subscription;
 import org.h2.mvstore.Cursor;
 import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVStore;

@@ -15,7 +15,7 @@
  */
 package io.moquette.broker;
 
-import io.moquette.broker.subscriptions.Topic;
+import io.moquette.api.Topic;
 import io.moquette.broker.security.IAuthenticator;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;

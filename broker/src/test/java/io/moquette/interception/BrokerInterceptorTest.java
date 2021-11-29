@@ -16,9 +16,9 @@
 
 package io.moquette.interception;
 
+import io.moquette.api.Subscription;
+import io.moquette.api.Topic;
 import io.moquette.interception.messages.*;
-import io.moquette.broker.subscriptions.Subscription;
-import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;

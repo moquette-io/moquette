@@ -15,8 +15,9 @@
  */
 package io.moquette.persistence;
 
-import io.moquette.broker.SessionRegistry;
-import io.moquette.broker.subscriptions.Topic;
+import io.moquette.api.PubRelMarker;
+import io.moquette.api.PublishedMessage;
+import io.moquette.api.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import org.h2.mvstore.WriteBuffer;
@@ -38,10 +39,10 @@ public final class EnqueuedMessageValueType implements org.h2.mvstore.type.DataT
 
     @Override
     public int getMemory(Object obj) {
-        if (obj instanceof SessionRegistry.PubRelMarker) {
+        if (obj instanceof PubRelMarker) {
             return 1;
         }
-        final SessionRegistry.PublishedMessage casted = (SessionRegistry.PublishedMessage) obj;
+        final PublishedMessage casted = (PublishedMessage) obj;
         return 1 + // message type
             1 + // qos
             topicDataType.getMemory(casted.getTopic().toString()) +
@@ -50,16 +51,16 @@ public final class EnqueuedMessageValueType implements org.h2.mvstore.type.DataT
 
     @Override
     public void write(WriteBuffer buff, Object obj) {
-        if (obj instanceof SessionRegistry.PublishedMessage) {
+        if (obj instanceof PublishedMessage) {
             buff.put((byte) MessageType.PUBLISHED_MESSAGE.ordinal());
 
-            final SessionRegistry.PublishedMessage casted = (SessionRegistry.PublishedMessage) obj;
+            final PublishedMessage casted = (PublishedMessage) obj;
             buff.put((byte) casted.getPublishingQos().value());
 
             final String token = casted.getTopic().toString();
             topicDataType.write(buff, token);
             payloadDataType.write(buff, casted.getPayload());
-        } else if (obj instanceof SessionRegistry.PubRelMarker) {
+        } else if (obj instanceof PubRelMarker) {
             buff.put((byte) MessageType.PUB_REL_MARKER.ordinal());
         } else {
             throw new IllegalArgumentException("Unrecognized message class " + obj.getClass());
@@ -77,12 +78,12 @@ public final class EnqueuedMessageValueType implements org.h2.mvstore.type.DataT
     public Object read(ByteBuffer buff) {
         final byte messageType = buff.get();
         if (messageType == MessageType.PUB_REL_MARKER.ordinal()) {
-            return new SessionRegistry.PubRelMarker();
+            return new PubRelMarker();
         } else if (messageType == MessageType.PUBLISHED_MESSAGE.ordinal()) {
             final MqttQoS qos = MqttQoS.valueOf(buff.get());
             final String topicStr = topicDataType.read(buff);
             final ByteBuf payload = payloadDataType.read(buff);
-            return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload);
+            return new PublishedMessage(Topic.asTopic(topicStr), qos, payload);
         } else {
             throw new IllegalArgumentException("Can't recognize record of type: " + messageType);
         }

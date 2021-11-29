@@ -16,7 +16,7 @@
 
 package io.moquette.interception.messages;
 
-import io.moquette.broker.subscriptions.Subscription;
+import io.moquette.api.Subscription;
 import io.netty.handler.codec.mqtt.MqttQoS;
 
 public class InterceptSubscribeMessage implements InterceptMessage {

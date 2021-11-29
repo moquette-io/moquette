@@ -1,8 +1,8 @@
 package io.moquette.persistence;
 
-import io.moquette.broker.IRetainedRepository;
-import io.moquette.broker.RetainedMessage;
-import io.moquette.broker.subscriptions.Topic;
+import io.moquette.api.IRetainedRepository;
+import io.moquette.api.RetainedMessage;
+import io.moquette.api.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import org.h2.mvstore.MVMap;

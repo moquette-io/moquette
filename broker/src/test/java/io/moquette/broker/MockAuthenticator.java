@@ -16,9 +16,10 @@
 
 package io.moquette.broker;
 
+import io.moquette.broker.security.IAuthenticator;
+
 import java.util.Map;
 import java.util.Set;
-import io.moquette.broker.security.IAuthenticator;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 

@@ -34,6 +34,7 @@ import java.util.Collections;
 import java.util.Objects;
 
 import io.moquette.BrokerConstants;
+import io.moquette.api.ISslContextCreator;
 import io.moquette.broker.config.IConfig;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;

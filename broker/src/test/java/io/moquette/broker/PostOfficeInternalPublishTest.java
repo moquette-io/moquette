@@ -15,11 +15,12 @@
  */
 package io.moquette.broker;
 
+import io.moquette.api.ISubscriptionsDirectory;
+import io.moquette.api.ISubscriptionsRepository;
+import io.moquette.api.Subscription;
+import io.moquette.api.Topic;
 import io.moquette.broker.security.PermitAllAuthorizatorPolicy;
 import io.moquette.broker.subscriptions.CTrieSubscriptionDirectory;
-import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
-import io.moquette.broker.subscriptions.Subscription;
-import io.moquette.broker.subscriptions.Topic;
 import io.moquette.persistence.MemorySubscriptionsRepository;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
@@ -35,7 +36,8 @@ import static io.netty.handler.codec.mqtt.MqttQoS.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 public class PostOfficeInternalPublishTest {
 

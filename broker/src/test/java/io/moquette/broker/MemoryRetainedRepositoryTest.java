@@ -16,7 +16,8 @@
 
 package io.moquette.broker;
 
-import io.moquette.broker.subscriptions.Topic;
+import io.moquette.api.RetainedMessage;
+import io.moquette.api.Topic;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttQoS;
@@ -24,7 +25,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class MemoryRetainedRepositoryTest {
 

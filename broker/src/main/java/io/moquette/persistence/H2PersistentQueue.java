@@ -15,7 +15,7 @@
  */
 package io.moquette.persistence;
 
-import io.moquette.broker.SessionRegistry;
+import io.moquette.api.EnqueuedMessage;
 import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVStore;
 
@@ -23,9 +23,9 @@ import java.util.AbstractQueue;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicLong;
 
-class H2PersistentQueue extends AbstractQueue<SessionRegistry.EnqueuedMessage> {
+class H2PersistentQueue extends AbstractQueue<EnqueuedMessage> {
 
-    private final MVMap<Long, SessionRegistry.EnqueuedMessage> queueMap;
+    private final MVMap<Long, EnqueuedMessage> queueMap;
     private final MVMap<String, Long> metadataMap;
     private final AtomicLong head;
     private final AtomicLong tail;
@@ -34,8 +34,8 @@ class H2PersistentQueue extends AbstractQueue<SessionRegistry.EnqueuedMessage> {
         if (queueName == null || queueName.isEmpty()) {
             throw new IllegalArgumentException("queueName parameter can't be empty or null");
         }
-        final MVMap.Builder<Long, SessionRegistry.EnqueuedMessage> messageTypeBuilder =
-            new MVMap.Builder<Long, SessionRegistry.EnqueuedMessage>()
+        final MVMap.Builder<Long, EnqueuedMessage> messageTypeBuilder =
+            new MVMap.Builder<Long, EnqueuedMessage>()
                 .valueType(new EnqueuedMessageValueType());
 
         this.queueMap = store.openMap("queue_" + queueName, messageTypeBuilder);
@@ -66,7 +66,7 @@ class H2PersistentQueue extends AbstractQueue<SessionRegistry.EnqueuedMessage> {
     }
 
     @Override
-    public Iterator<SessionRegistry.EnqueuedMessage> iterator() {
+    public Iterator<EnqueuedMessage> iterator() {
         return null;
     }
 
@@ -76,7 +76,7 @@ class H2PersistentQueue extends AbstractQueue<SessionRegistry.EnqueuedMessage> {
     }
 
     @Override
-    public boolean offer(SessionRegistry.EnqueuedMessage t) {
+    public boolean offer(EnqueuedMessage t) {
         if (t == null) {
             throw new NullPointerException("Inserted element can't be null");
         }
@@ -87,19 +87,19 @@ class H2PersistentQueue extends AbstractQueue<SessionRegistry.EnqueuedMessage> {
     }
 
     @Override
-    public SessionRegistry.EnqueuedMessage poll() {
+    public EnqueuedMessage poll() {
         if (head.equals(tail)) {
             return null;
         }
         final long nextTail = tail.getAndIncrement();
-        final SessionRegistry.EnqueuedMessage tail = this.queueMap.get(nextTail);
+        final EnqueuedMessage tail = this.queueMap.get(nextTail);
         queueMap.remove(nextTail);
         this.metadataMap.put("tail", nextTail + 1);
         return tail;
     }
 
     @Override
-    public SessionRegistry.EnqueuedMessage peek() {
+    public EnqueuedMessage peek() {
         if (head.equals(tail)) {
             return null;
         }

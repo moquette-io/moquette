@@ -15,6 +15,9 @@
  */
 package io.moquette.broker.subscriptions;
 
+import io.moquette.api.Subscription;
+import io.moquette.api.Token;
+
 import java.util.*;
 
 class CNode {
@@ -110,7 +113,7 @@ class CNode {
      * */
     boolean containsOnly(String clientId) {
         for (Subscription sub : this.subscriptions) {
-            if (!sub.clientId.equals(clientId)) {
+            if (!sub.getClientId().equals(clientId)) {
                 return false;
             }
         }
@@ -120,7 +123,7 @@ class CNode {
     //TODO this is equivalent to negate(containsOnly(clientId))
     public boolean contains(String clientId) {
         for (Subscription sub : this.subscriptions) {
-            if (sub.clientId.equals(clientId)) {
+            if (sub.getClientId().equals(clientId)) {
                 return true;
             }
         }
@@ -130,7 +133,7 @@ class CNode {
     void removeSubscriptionsFor(String clientId) {
         Set<Subscription> toRemove = new HashSet<>();
         for (Subscription sub : this.subscriptions) {
-            if (sub.clientId.equals(clientId)) {
+            if (sub.getClientId().equals(clientId)) {
                 toRemove.add(sub);
             }
         }

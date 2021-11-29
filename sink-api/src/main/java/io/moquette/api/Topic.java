@@ -14,7 +14,7 @@
  * You may elect to redistribute this code under either of these licenses.
  */
 
-package io.moquette.broker.subscriptions;
+package io.moquette.api;
 
 import java.io.Serializable;
 import java.text.ParseException;

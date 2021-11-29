@@ -16,6 +16,7 @@
 package io.moquette.broker;
 
 import io.moquette.BrokerConstants;
+import io.moquette.api.*;
 import io.moquette.broker.config.*;
 import io.moquette.interception.InterceptHandler;
 import io.moquette.persistence.H2Builder;
@@ -23,7 +24,6 @@ import io.moquette.persistence.MemorySubscriptionsRepository;
 import io.moquette.interception.BrokerInterceptor;
 import io.moquette.broker.security.*;
 import io.moquette.broker.subscriptions.CTrieSubscriptionDirectory;
-import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
 import io.moquette.broker.security.IAuthenticator;
 import io.moquette.broker.security.IAuthorizatorPolicy;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
