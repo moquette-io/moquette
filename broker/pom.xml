@@ -22,7 +22,7 @@
     <dependencies>
         <dependency>
             <groupId>io.moquette</groupId>
-            <artifactId>moquette-sink-api</artifactId>
+            <artifactId>moquette-api</artifactId>
         </dependency>
 
         <dependency>

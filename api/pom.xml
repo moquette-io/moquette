@@ -8,9 +8,9 @@
         <version>0.16-SNAPSHOT</version>
     </parent>
 
-    <artifactId>moquette-sink-api</artifactId>
+    <artifactId>moquette-api</artifactId>
     <packaging>jar</packaging>
-    <name>Moquette - sink api</name>
+    <name>Moquette - api</name>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

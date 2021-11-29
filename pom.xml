@@ -52,7 +52,7 @@
     </scm>
 
     <modules>
-        <module>sink-api</module>
+        <module>api</module>
         <module>broker</module>
         <module>distribution</module>
         <module>embedding_moquette</module>
@@ -62,12 +62,7 @@
         <dependencies>
             <dependency>
                 <groupId>io.moquette</groupId>
-                <artifactId>moquette-sink-api</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.moquette</groupId>
-                <artifactId>moquette-h2-sink</artifactId>
+                <artifactId>moquette-api</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>
