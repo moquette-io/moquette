@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Properties;
@@ -21,7 +22,7 @@ class QueuePoolTest {
     public void checkpointFileContainsCorrectReferences() throws QueueException, IOException {
         final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
         final Queue queue = queuePool.getOrCreate("test");
-        queue.enqueue("AAAA".getBytes(StandardCharsets.UTF_8));
+        queue.enqueue((ByteBuffer)ByteBuffer.wrap("AAAA".getBytes(StandardCharsets.UTF_8)));
         queue.force();
         queuePool.close();
 
@@ -51,14 +52,14 @@ class QueuePoolTest {
     public void reloadQueuePoolAndCheckRestartFromWhereItLeft() throws QueueException, IOException {
         QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
         Queue queue = queuePool.getOrCreate("test");
-        queue.enqueue("AAAA".getBytes(StandardCharsets.UTF_8));
+        queue.enqueue(ByteBuffer.wrap("AAAA".getBytes(StandardCharsets.UTF_8)));
         queue.force();
         queuePool.close();
 
         // reload
         queuePool = QueuePool.loadQueues(tempQueueFolder);
         queue = queuePool.getOrCreate("test");
-        queue.enqueue("BBBB".getBytes(StandardCharsets.UTF_8));
+        queue.enqueue(ByteBuffer.wrap("BBBB".getBytes(StandardCharsets.UTF_8)));
         queue.force();
         queuePool.close();
 

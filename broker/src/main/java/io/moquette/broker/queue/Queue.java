@@ -30,10 +30,10 @@ public class Queue {
     /**
      * @throws QueueException if an error happens during access to file.
      * */
-    public void enqueue(byte[] data) throws QueueException {
-        final SegmentPointer res = spinningMove(LENGTH_HEADER_SIZE + data.length);
+    public void enqueue(ByteBuffer data) throws QueueException {
+        final SegmentPointer res = spinningMove(LENGTH_HEADER_SIZE + data.remaining());
         if (res != null) {
-            LOG.trace("CAT insertion at: {}", res);
+            LOG.trace("CAS insertion at: {}", res);
             writeData(headSegment.get(), res, data);
             return;
         } else {
@@ -42,43 +42,52 @@ public class Queue {
             SegmentPointer lastOffset = null;
 
             // the bytes written from the data input
-            long consumedBytes = 0;
             do {
                 final Segment currentSegment = headSegment.get();
                 spaceNeeded = currentSegment.bytesAfter(currentHeadPtr.get());
             } while (spaceNeeded != 0 && ((lastOffset = spinningMove(spaceNeeded)) == null));
 
             SegmentPointer newSegmentPointer = null;
+            boolean firstWrite = true;
             if (spaceNeeded != 0) {
                 LOG.trace("Writing partial data to offset {} for {} bytes", lastOffset, spaceNeeded);
+                final int dataSize = data.remaining();
+
                 final int copySize = (int) (spaceNeeded - LENGTH_HEADER_SIZE);
-                byte[] copy = new byte[copySize];
-                System.arraycopy(data, 0, copy, 0, copySize);
-                writeData(headSegment.get(), lastOffset, data.length, copy);
-                consumedBytes += copySize;
+                final ByteBuffer slice = data.slice();
+                slice.limit(copySize);
+
+                writeData(headSegment.get(), lastOffset, dataSize, slice);
+                firstWrite = false;
                 newSegmentPointer = new SegmentPointer(headSegment.get(), currentHeadPtr.get().offset() + spaceNeeded);
+
+                // shift forward the consumption point
+                data.position(data.position() + copySize);
             }
 
             Segment newSegment = null;
             try {
-                while (consumedBytes < data.length) {
+                while (data.hasRemaining()) {
                     newSegment = allocator.nextFreeSegment();
                     //notify segment creation for queue in queue pool
                     action.segmentedCreated(name, newSegment);
 
-                    int copySize = (int) Math.min(data.length - consumedBytes, Segment.SIZE);
+                    int copySize = (int) Math.min(data.remaining(), Segment.SIZE);
+                    final ByteBuffer slice = data.slice();
+                    slice.limit(copySize);
 
-                    byte[] copy = new byte[copySize];
-                    System.arraycopy(data, (int) consumedBytes, copy, 0, copySize);
-                    consumedBytes += copySize;
                     newSegmentPointer = new SegmentPointer(newSegment, newSegment.begin.offset() + (copySize + LENGTH_HEADER_SIZE) - 1);
 
                     // if not first write of data
-                    if (consumedBytes > 0) {
-                        writeDataNoHeader(newSegment, newSegment.begin, copy);
+                    if (!firstWrite) {
+                        writeDataNoHeader(newSegment, newSegment.begin, slice);
                     } else {
-                        writeData(newSegment, newSegment.begin, copy);
+                        writeData(newSegment, newSegment.begin, slice);
                     }
+                    firstWrite = false;
+
+                    // shift forward the consumption point
+                    data.position(data.position() + copySize);
                 }
 
                 // publish the last segment created and the pointer to head.
@@ -94,36 +103,21 @@ public class Queue {
         }
     }
 
-    private void writeDataNoHeader(Segment segment, SegmentPointer start, byte[] data) {
-        ByteBuffer content = ByteBuffer.allocate(data.length);
-        content
-            .put(data) // put the payload
-            .flip();
-
-        segment.write(start, content);
+    private void writeDataNoHeader(Segment segment, SegmentPointer start, ByteBuffer data) {
+        segment.write(start, data);
     }
 
     /**
      * Writes data and size to the current Head segment starting from start pointer.
      * */
-    private void writeData(Segment segment, SegmentPointer start, byte[] data) {
-        ByteBuffer content = ByteBuffer.allocate(LENGTH_HEADER_SIZE + data.length);
-        content
-            .putInt(data.length) // put 4 bytes header
-            .put(data) // put the payload
-            .flip();
-
-        segment.write(start, content);
+    private void writeData(Segment segment, SegmentPointer start, ByteBuffer data) {
+        writeData(segment, start, data.remaining(), data);
     }
 
-    private void writeData(Segment segment, SegmentPointer start, int totalSize, byte[] data) {
-        ByteBuffer content = ByteBuffer.allocate(LENGTH_HEADER_SIZE + data.length);
-        content
-            .putInt(totalSize) // put 4 bytes header
-            .put(data) // put the payload
-            .flip();
-
-        segment.write(start, content);
+    private void writeData(Segment segment, SegmentPointer start, int size, ByteBuffer data) {
+        ByteBuffer length = (ByteBuffer) ByteBuffer.allocate(LENGTH_HEADER_SIZE).putInt(size).flip();
+        segment.write(start, length); // write 4 bytes header
+        segment.write(start.plus(LENGTH_HEADER_SIZE), data); // write the payload
     }
 
     /**

@@ -55,17 +55,23 @@ class QueueTest {
         });
 
         // generate byte array to insert.
-        byte[] payload = new byte[128];
-        new Random().nextBytes(payload);
+        ByteBuffer payload = randomPayload(128);
 
         queue.enqueue(payload);
+    }
+
+    private ByteBuffer randomPayload(int dataSize) {
+        byte[] payload = new byte[dataSize];
+        new Random().nextBytes(payload);
+
+        return (ByteBuffer) ByteBuffer.wrap(payload);
     }
 
     @Test
     public void insertSomeDataIntoNewQueue() throws QueueException, IOException {
         final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
         final Queue queue = queuePool.getOrCreate("test");
-        queue.enqueue("AAAA".getBytes(StandardCharsets.UTF_8));
+        queue.enqueue(ByteBuffer.wrap("AAAA".getBytes(StandardCharsets.UTF_8)));
 
         // verify
         final HashSet<String> fileset = new HashSet<>(Arrays.asList(tempQueueFolder.toFile().list()));
@@ -102,11 +108,10 @@ class QueueTest {
         // one page is 64 MB so the loop count to fill it is 64 * 1024
 
        // 4 bytes are left for length so that each time are inserted 1024 bytes, 4 header and 1020 payload
-        byte[] payload = generatePayload(1024 - 4);
+        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - 4));
         for (int i = 0; i < 64; i++) {
-            System.out.println("loop " + i);
             for (int j = 0; j < 1024; j++) {
-//                System.out.print("outer: " + i + ", inner: " + j);
+                payload.rewind();
                 queue.enqueue(payload);
             }
         }
@@ -120,7 +125,8 @@ class QueueTest {
 
         // Exercise
         // some data to force create a new page
-        queue.enqueue(generatePayload(10, (byte) 'B'));
+        final ByteBuffer crossingPayload = ByteBuffer.wrap(generatePayload(10, (byte) 'B'));
+        queue.enqueue(crossingPayload);
 
         // Verify
         fileset = new HashSet<>(Arrays.asList(tempQueueFolder.toFile().list()));
@@ -140,13 +146,14 @@ class QueueTest {
         // a payload of 1028 (4 bytes over remaining space)
 
         // 4 bytes are left for length so that each time are inserted 1024 bytes, 4 header and 1020 payload
-        byte[] payload = generatePayload(1024 - 4);
+        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - 4));
         for (int i = 0; i < (4 * 1024) - 1; i++) {
+            payload.rewind();
             queue.enqueue(payload);
         }
 
         // Experiment
-        byte[] crossingPayload = generatePayload(1028 - 4, (byte) 'B');
+        ByteBuffer crossingPayload = ByteBuffer.wrap(generatePayload(1028 - 4, (byte) 'B'));
         queue.enqueue(crossingPayload);
         queue.force();
         queuePool.close();
@@ -173,15 +180,16 @@ class QueueTest {
         // a payload of 1028 (4 bytes over remaining space)
 
         // 4 bytes are left for length so that each time are inserted 1024 bytes, 4 header and 1020 payload
-        byte[] payload = generatePayload(1024 - 4);
+        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - 4));
         for (int i = 0; i < (4 * 1024) - 1; i++) {
+            payload.rewind();
             queue.enqueue(payload);
         }
 
         // Experiment
         // 1024 + 4 * 1024 * 1024 + 16 bytes
         int moreThanOneSegment = 1024 + 4*1024*1024 + 16;
-        byte[] crossingMultipleSegmentPayload = generatePayload(moreThanOneSegment, (byte) 'B');
+        ByteBuffer crossingMultipleSegmentPayload = ByteBuffer.wrap(generatePayload(moreThanOneSegment, (byte) 'B'));
         queue.enqueue(crossingMultipleSegmentPayload);
         queue.force();
         queuePool.close();
