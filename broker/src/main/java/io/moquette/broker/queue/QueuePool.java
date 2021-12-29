@@ -10,12 +10,13 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 public class QueuePool {
@@ -65,8 +66,8 @@ public class QueuePool {
 
     private final SegmentAllocator allocator;
     private final Path dataPath;
-    private final Map<QueueName, List<SegmentRef>> queueSegments = new HashMap<>();
-    private final Map<QueueName, Queue> queues = new HashMap<>();
+    private final ConcurrentMap<QueueName, LinkedList<SegmentRef>> queueSegments = new ConcurrentHashMap<>();
+    private final ConcurrentMap<QueueName, Queue> queues = new ConcurrentHashMap<>();
 
     private QueuePool(SegmentAllocator allocator, Path dataPath) {
         this.allocator = allocator;
@@ -89,7 +90,7 @@ public class QueuePool {
 
     private void segmentedCreated(String name, Segment segment) {
         final QueueName queueName = new QueueName(name);
-        List<SegmentRef> segmentRefs = this.queueSegments.computeIfAbsent(queueName, k -> new ArrayList<>());
+        List<SegmentRef> segmentRefs = this.queueSegments.computeIfAbsent(queueName, k -> new LinkedList<>());
 
         segmentRefs.add(new SegmentRef(segment));
     }
@@ -154,7 +155,7 @@ public class QueuePool {
                 continue;
             }
             final QueueName queueName = new QueueName(checkpointProps.getProperty(queueKey));
-            List<SegmentRef> segmentRefs = decodeSegments(checkpointProps.getProperty(String.format("queues.%d.segments", queueId)));
+            LinkedList<SegmentRef> segmentRefs = decodeSegments(checkpointProps.getProperty(String.format("queues.%d.segments", queueId)));
             queueSegments.put(queueName, segmentRefs);
 
             final long headOffset = Long.parseLong(checkpointProps.getProperty(String.format("queues.%d.head_offset", queueId)));
@@ -171,17 +172,17 @@ public class QueuePool {
         }
     }
 
-    private List<SegmentRef> decodeSegments(String s) {
+    private LinkedList<SegmentRef> decodeSegments(String s) {
         final String[] segments = s.substring(s.indexOf("(") + 1, s.lastIndexOf(")"))
                 .split("\\), \\(");
 
-        List<SegmentRef> acc = new ArrayList<>();
+        LinkedList<SegmentRef> acc = new LinkedList<>();
         for (String segment : segments) {
             final String[] split = segment.split(",");
             final int idPage = Integer.parseInt(split[0].trim());
             final int offset = Integer.parseInt(split[1].trim());
 
-            acc.add(new SegmentRef(idPage, offset));
+            acc.offer(new SegmentRef(idPage, offset));
         }
         return acc;
     }
@@ -216,13 +217,13 @@ public class QueuePool {
         allocator.dumpState(checkpoint);
 
         int queueCounter = 0;
-        for (Map.Entry<QueueName, List<SegmentRef>> entry : queueSegments.entrySet()) {
+        for (Map.Entry<QueueName, LinkedList<SegmentRef>> entry : queueSegments.entrySet()) {
             // queues.0.name = bla bla
             final QueueName queueName = entry.getKey();
             checkpoint.setProperty("queues." + queueCounter + ".name", queueName.name);
 
             // queues.0.segments = head (id_page, offset), (id_page, offset), ... tail
-            final List<SegmentRef> segmentRefs = entry.getValue();
+            final LinkedList<SegmentRef> segmentRefs = entry.getValue();
             final String segmentsDef = segmentRefs.stream()
                 .map(SegmentRef::toString)
                 .collect(Collectors.joining(", "));
