@@ -298,11 +298,19 @@ final class MQTTConnection {
     }
 
     void handleConnectionLost() {
-        String clientID = NettyUtils.clientID(channel);
+        final String clientID = NettyUtils.clientID(channel);
         if (clientID == null || clientID.isEmpty()) {
             return;
         }
+        // this must not be done on the netty thread
         LOG.info("Notifying connection lost event");
+        postOffice.routeCommand(clientID, () -> {
+            processConnectionLost(clientID);
+            return null;
+        });
+    }
+
+    private void processConnectionLost(String clientID) {
         if (bindedSession.hasWill()) {
             postOffice.fireWill(bindedSession.getWill());
         }
