@@ -90,7 +90,7 @@ class Session {
     private final String clientId;
     private boolean clean;
     private Will will;
-    private final Queue<SessionRegistry.EnqueuedMessage> sessionQueue;
+    private Queue<SessionRegistry.EnqueuedMessage> sessionQueue;
     private final AtomicReference<SessionStatus> status = new AtomicReference<>(SessionStatus.DISCONNECTED);
     private MQTTConnection mqttConnection;
     private final Set<Subscription> subscriptions = new HashSet<>();
@@ -99,18 +99,29 @@ class Session {
     private final Map<Integer, MqttPublishMessage> qos2Receiving = new HashMap<>();
     private final AtomicInteger inflightSlots = new AtomicInteger(INFLIGHT_WINDOW_SIZE); // this should be configurable
 
-    Session(String clientId, boolean clean, Will will, Queue<SessionRegistry.EnqueuedMessage> sessionQueue) {
-        this(clientId, clean, sessionQueue);
+    Session(String clientId, boolean clean, Will will) {
+        this(clientId, clean);
         this.will = will;
     }
 
-    Session(String clientId, boolean clean, Queue<SessionRegistry.EnqueuedMessage> sessionQueue) {
+    Session(String clientId, boolean clean) {
+        this.clientId = clientId;
+        this.clean = clean;
+    }
+
+    public Queue<EnqueuedMessage> getSessionQueue() {
+        return sessionQueue;
+    }
+
+    public Session setSessionQueue(Queue<EnqueuedMessage> sessionQueue) {
+        if (this.sessionQueue != null) {
+            throw new IllegalStateException("Session already has a queue");
+        }
         if (sessionQueue == null) {
             throw new IllegalArgumentException("sessionQueue parameter can't be null");
         }
-        this.clientId = clientId;
-        this.clean = clean;
         this.sessionQueue = sessionQueue;
+        return this;
     }
 
     void update(boolean clean, Will will) {
@@ -460,6 +471,24 @@ class Session {
             return Optional.of(mqttConnection.remoteAddress());
         }
         return Optional.empty();
+    }
+
+    public void cleanUp() {
+        int bufferCount = 0;
+
+        for (EnqueuedMessage msg : inflightWindow.values()) {
+            if (msg instanceof PublishedMessage) {
+                bufferCount++;
+                msg.release();
+            }
+        }
+        for (MqttPublishMessage msg : qos2Receiving.values()) {
+            msg.release();
+            bufferCount++;
+        }
+        if (bufferCount > 0) {
+            LOG.warn("Released {} messages with buffers", bufferCount);
+        }
     }
 
     @Override

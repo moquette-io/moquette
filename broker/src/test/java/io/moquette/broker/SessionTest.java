@@ -30,7 +30,7 @@ public class SessionTest {
     public void setUp() {
         testChannel = new EmbeddedChannel();
         queuedMessages = new ConcurrentLinkedQueue<>();
-        client = new Session(CLIENT_ID, true, null, queuedMessages);
+        client = new Session(CLIENT_ID, true, null).setSessionQueue(queuedMessages);
         createConnection(client);
     }
 

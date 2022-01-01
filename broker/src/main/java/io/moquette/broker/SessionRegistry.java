@@ -136,7 +136,7 @@ public class SessionRegistry {
             // if the subscriptions are present is obviously false
             final Queue<EnqueuedMessage> persistentQueue = queues.get(clientId);
             if (persistentQueue != null) {
-                Session rehydrated = new Session(clientId, false, persistentQueue);
+                Session rehydrated = new Session(clientId, false).setSessionQueue(persistentQueue);
                 pool.put(clientId, rehydrated);
             }
         }
@@ -155,6 +155,7 @@ public class SessionRegistry {
             final boolean success = previous == null;
 
             if (success) {
+                newSession.setSessionQueue(createQueueForClient(clientId, newSession.isClean()));
                 LOG.trace("case 1, not existing session with CId {}", clientId);
             } else {
                 postConnectAction = reopenExistingSession(msg, clientId, previous, newSession, username);
@@ -178,9 +179,9 @@ public class SessionRegistry {
 
                 // case 2
                 // publish new session
-                dropQueuesForClient(clientId);
                 unsubscribe(oldSession);
                 copySessionConfig(msg, oldSession);
+                newSession.setSessionQueue(createQueueForClient(clientId, newSession.isClean()));
 
                 LOG.trace("case 2, oldSession with same CId {} disconnected", clientId);
                 creationResult = new SessionCreationResult(oldSession, CreationModeEnum.CREATED_CLEAN_NEW, true);
@@ -189,6 +190,7 @@ public class SessionRegistry {
                 if (!connecting) {
                     throw new SessionCorruptedException("old session moved in connected state by other thread");
                 }
+                newSession.setSessionQueue(queues.get(clientId));
                 // case 3
                 reactivateSubscriptions(oldSession, username);
 
@@ -241,14 +243,12 @@ public class SessionRegistry {
 
     private Session createNewSession(MqttConnectMessage msg, String clientId) {
         final boolean clean = msg.variableHeader().isCleanSession();
-        final Queue<SessionRegistry.EnqueuedMessage> sessionQueue =
-                    queues.computeIfAbsent(clientId, (String cli) -> queueRepository.createQueue(cli, clean));
         final Session newSession;
         if (msg.variableHeader().isWillFlag()) {
             final Session.Will will = createWill(msg);
-            newSession = new Session(clientId, clean, will, sessionQueue);
+            newSession = new Session(clientId, clean, will);
         } else {
-            newSession = new Session(clientId, clean, sessionQueue);
+            newSession = new Session(clientId, clean);
         }
 
         newSession.markConnecting();
@@ -279,11 +279,50 @@ public class SessionRegistry {
     }
 
     public void remove(Session session) {
-        pool.remove(session.getClientID(), session);
+        final String clientID = session.getClientID();
+        final Session old = pool.get(clientID);
+        if (old != null) {
+            old.cleanUp();
+        }
+        pool.remove(clientID, session);
+        dropQueueForClient(clientID, session.getSessionQueue());
     }
 
-    private void dropQueuesForClient(String clientId) {
-        queues.remove(clientId);
+    private Queue<SessionRegistry.EnqueuedMessage> createQueueForClient(String clientId, boolean clean) {
+        dropQueueForClient(clientId, null);
+        final Queue<EnqueuedMessage> newQueue = queueRepository.createQueue(clientId, clean);
+        Queue<EnqueuedMessage> oldQueue = queues.put(clientId, newQueue);
+        if (oldQueue != null) {
+            LOG.error("A queue already exists for client {}", clientId);
+            cleanQueue(oldQueue);
+        }
+        return newQueue;
+    }
+
+    private void dropQueueForClient(String clientId, Queue<EnqueuedMessage> queue) {
+        queueRepository.removeQueue(clientId);
+        if (queue == null) {
+            queues.remove(clientId);
+        } else {
+            queues.remove(clientId, queue);
+        }
+        cleanQueue(queue);
+    }
+
+    private void cleanQueue(Queue<EnqueuedMessage> queue) {
+        if (queue == null) {
+            return;
+        }
+        int bufferCount = 0;
+        for (EnqueuedMessage msg : queue) {
+            if (msg instanceof PublishedMessage) {
+                bufferCount++;
+                msg.release();
+            }
+        }
+        if (bufferCount > 0) {
+            LOG.warn("Released {} messages with buffers", bufferCount);
+        }
     }
 
     Collection<ClientDescriptor> listConnectedClients() {
