@@ -262,6 +262,13 @@ class PostOffice {
     public void unsubscribe(List<String> topics, MQTTConnection mqttConnection, int messageId) {
         final String clientID = mqttConnection.getClientId();
         final Session session = sessionRegistry.retrieve(clientID);
+        if (session == null) {
+            // Session is already destroyed.
+            // Just ack the client
+            LOG.warn("Session not found when unsubscribing {}", clientID);
+            mqttConnection.sendUnsubAckMessage(topics, clientID, messageId);
+            return;
+        }
         for (String t : topics) {
             Topic topic = new Topic(t);
             boolean validTopic = topic.isValid();

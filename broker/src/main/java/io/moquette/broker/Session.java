@@ -250,9 +250,10 @@ class Session {
             return;
         }
 
-        if (canSkipQueue()) {
+        final MQTTConnection localMqttConnectionRef = mqttConnection;
+        if (canSkipQueue(localMqttConnectionRef)) {
             inflightSlots.decrementAndGet();
-            int packetId = mqttConnection.nextPacketId();
+            int packetId = localMqttConnectionRef.nextPacketId();
 
             // Adding to a map, retain.
             payload.retain();
@@ -266,10 +267,10 @@ class Session {
 
             MqttPublishMessage publishMsg = MQTTConnection.notRetainedPublishWithMessageId(topic.toString(), qos,
                                                                                            payload, packetId);
-            mqttConnection.sendPublish(publishMsg);
+            localMqttConnectionRef.sendPublish(publishMsg);
             LOG.debug("Write direct to the peer, inflight slots: {}", inflightSlots.get());
             if (inflightSlots.get() == 0) {
-                mqttConnection.flush();
+                localMqttConnectionRef.flush();
             }
 
             // TODO drainQueueToConnection();?
@@ -283,9 +284,10 @@ class Session {
     }
 
     private void sendPublishQos2(Topic topic, MqttQoS qos, ByteBuf payload) {
-        if (canSkipQueue()) {
+        final MQTTConnection localMqttConnectionRef = mqttConnection;
+        if (canSkipQueue(localMqttConnectionRef)) {
             inflightSlots.decrementAndGet();
-            int packetId = mqttConnection.nextPacketId();
+            int packetId = localMqttConnectionRef.nextPacketId();
 
             // Retain before adding to map
             payload.retain();
@@ -299,7 +301,7 @@ class Session {
 
             MqttPublishMessage publishMsg = MQTTConnection.notRetainedPublishWithMessageId(topic.toString(), qos,
                                                                                            payload, packetId);
-            mqttConnection.sendPublish(publishMsg);
+            localMqttConnectionRef.sendPublish(publishMsg);
 
             drainQueueToConnection();
         } else {
@@ -310,11 +312,12 @@ class Session {
         }
     }
 
-    private boolean canSkipQueue() {
-        return sessionQueue.isEmpty() &&
+    private boolean canSkipQueue(MQTTConnection localMqttConnectionRef) {
+        return localMqttConnectionRef != null &&
+            sessionQueue.isEmpty() &&
             inflightSlots.get() > 0 &&
             connected() &&
-            mqttConnection.channel.isWritable();
+            localMqttConnectionRef.channel.isWritable();
     }
 
     private boolean inflighHasSlotsAndConnectionIsUp() {
