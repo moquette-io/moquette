@@ -329,6 +329,7 @@ public class Server {
         }
 
         interceptor.stop();
+        dispatcher.terminate();
         LOG.info("Moquette integration has been stopped.");
     }
 

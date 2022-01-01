@@ -523,6 +523,11 @@ class PostOffice {
         }
     }
 
+    public void terminate() {
+        for (Thread processor:sessionExecutors) {
+            processor.interrupt();
+        }
+    }
 //    void flushInFlight(MQTTConnection mqttConnection) {
 //        Session targetSession = sessionRegistry.retrieve(mqttConnection.getClientId());
 //        targetSession.flushAllQueuedMessages();
