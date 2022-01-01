@@ -41,6 +41,11 @@ public class H2QueueRepository implements IQueueRepository {
     }
 
     @Override
+    public void removeQueue(String cli) {
+        H2PersistentQueue.dropQueue(mvStore, cli);
+    }
+
+    @Override
     public Map<String, Queue<EnqueuedMessage>> listAllQueues() {
         Map<String, Queue<EnqueuedMessage>> result = new HashMap<>();
         mvStore.getMapNames().stream()
