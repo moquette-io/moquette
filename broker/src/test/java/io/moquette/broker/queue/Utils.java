@@ -2,6 +2,7 @@ package io.moquette.broker.queue;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.OpenOption;
@@ -21,5 +22,12 @@ class Utils {
         final OpenOption[] openOptions = {StandardOpenOption.READ, StandardOpenOption.TRUNCATE_EXISTING};
         FileChannel fileChannel = FileChannel.open(pageFile, openOptions);
         return fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, PagedFilesAllocator.PAGE_SIZE);
+    }
+
+    static String bufferToString(ByteBuffer buffer) {
+        byte[] data = new byte[buffer.remaining()];
+        buffer.get(data);
+
+        return new String(data);
     }
 }

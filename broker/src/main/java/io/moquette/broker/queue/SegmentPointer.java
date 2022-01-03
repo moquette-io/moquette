@@ -1,5 +1,7 @@
 package io.moquette.broker.queue;
 
+import java.util.Objects;
+
 final class SegmentPointer implements Comparable<SegmentPointer> {
     private final int idPage;
     private final long offset;
@@ -17,6 +19,13 @@ final class SegmentPointer implements Comparable<SegmentPointer> {
         this.offset = offset;
     }
 
+    /**
+     * Copy constructor
+     * */
+    public SegmentPointer(SegmentPointer original) {
+        this(original.idPage, original.offset);
+    }
+
     @Override
     public int compareTo(SegmentPointer other) {
         if (idPage == other.idPage) {
@@ -24,6 +33,19 @@ final class SegmentPointer implements Comparable<SegmentPointer> {
         } else {
             return Integer.compare(idPage, other.idPage);
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        SegmentPointer that = (SegmentPointer) o;
+        return idPage == that.idPage && offset == that.offset;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(idPage, offset);
     }
 
     boolean samePage(SegmentPointer other) {
@@ -52,7 +74,7 @@ final class SegmentPointer implements Comparable<SegmentPointer> {
     }
 
     public SegmentPointer plus(int delta) {
-        return new SegmentPointer(this.idPage, offset + delta);
+        return moveForward(delta);
     }
 
     int pageId() {

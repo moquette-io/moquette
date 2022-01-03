@@ -16,6 +16,7 @@ import java.util.Random;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -28,6 +29,17 @@ class QueueTest {
         for (int i = 0; i < verify.length; i++) {
             if (verify[i] != expectedChar) {
                 fail(String.format("Expected %c but found %c in %c%c%c", expectedChar, verify[i], verify[i-1], verify[i], verify[i+1]));
+            }
+        }
+    }
+
+    private void assertContainsOnly(char expectedChar, ByteBuffer verify) {
+        int pos = verify.position();
+        while (verify.hasRemaining()) {
+            final byte readChar = verify.get();
+            pos++;
+            if (readChar != expectedChar) {
+                fail(String.format("Expected %c but found %c at position %d", expectedChar, readChar, pos));
             }
         }
     }
@@ -49,10 +61,10 @@ class QueueTest {
         final MappedByteBuffer pageBuffer = Utils.createPageFile();
 
         final Segment head = new Segment(pageBuffer, new SegmentPointer(0,0), new SegmentPointer(0, 1024));
-        final SegmentPointer currentHead = new SegmentPointer(0, 0);
-        final Queue queue = new Queue("test", head, currentHead, new DummySegmentAllocator(), (name, segment) -> {
+        final SegmentPointer currentHead = new SegmentPointer(0, -1);
+        final Queue queue = new Queue("test", head, currentHead, head, currentHead, new DummySegmentAllocator(), (name, segment) -> {
             // NOOP
-        });
+        }, null);
 
         // generate byte array to insert.
         ByteBuffer payload = randomPayload(128);
@@ -137,6 +149,39 @@ class QueueTest {
     }
 
     @Test
+    public void insertWithHeaderCrossingSegments() throws QueueException, IOException {
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final Queue queue = queuePool.getOrCreate("test");
+
+        // fill the segment, inserting last message crossing the boundary
+        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - 4));
+        for (int i = 0; i < (4 * 1024) - 1; i++) {
+            payload.rewind();
+            queue.enqueue(payload);
+        }
+        // at the end we have 1024 bytes free, so fill only 1022 bytes of that
+        payload = ByteBuffer.wrap(generatePayload(1022 - 4));
+        payload.rewind();
+        queue.enqueue(payload);
+
+        // Exercise
+        ByteBuffer crossingPayload = ByteBuffer.wrap(generatePayload(1024 - 4, (byte) 'B'));
+        queue.enqueue(crossingPayload);
+
+        // Verify
+        final MappedByteBuffer page = Utils.openPageFile(tempQueueFolder.resolve("0.page"));
+        final int beforeLastMessagePayload = 4 * 1024 * 1024 + 2;
+        final ByteBuffer crossingSegment = (ByteBuffer) page.position(beforeLastMessagePayload);
+//        final int msgLength = crossingSegment.getInt();
+
+//        assertEquals(1028 - 4, msgLength);
+//        byte[] probe = new byte[msgLength];
+        byte[] probe = new byte[1020];
+        crossingSegment.get(probe);
+        assertContainsOnly('B', probe);
+    }
+
+    @Test
     public void insertDataCrossingSegmentBoundary() throws QueueException, IOException {
         final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
         final Queue queue = queuePool.getOrCreate("test");
@@ -204,5 +249,82 @@ class QueueTest {
         byte[] probe = new byte[msgLength];
         crossingSegment.get(probe);
         assertContainsOnly('B', probe);
+    }
+
+    @Test
+    public void readFromEmptyQueue() throws QueueException {
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final Queue queue = queuePool.getOrCreate("test");
+
+        assertNull(queue.dequeue(), "Pulling from empty queue MUST return null value");
+    }
+
+    @Test
+    public void readInSameSegment() throws QueueException {
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final Queue queue = queuePool.getOrCreate("test");
+
+        final ByteBuffer message = ByteBuffer.wrap("Hello World!".getBytes(StandardCharsets.UTF_8));
+        queue.enqueue(message);
+
+        //Exercise
+        final ByteBuffer result = queue.dequeue();
+        final String readMessage = Utils.bufferToString(result);
+        assertEquals("Hello World!", readMessage, "Read the same message tha was enqueued");
+    }
+
+    @Test
+    public void readCrossingSegment() throws QueueException {
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final Queue queue = queuePool.getOrCreate("test");
+
+        // fill the segment, inserting last message crossing the boundary
+        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - 4));
+        for (int i = 0; i < (4 * 1024) - 1; i++) {
+            payload.rewind();
+            queue.enqueue(payload);
+            queue.dequeue();
+        }
+
+        ByteBuffer crossingPayload = ByteBuffer.wrap(generatePayload(1028 - 4, (byte) 'B'));
+        queue.enqueue(crossingPayload);
+
+        //Exercise
+        final ByteBuffer message = queue.dequeue();
+        assertEquals(1028 - 4, message.remaining(), "There must be 1024 'B' letters");
+        assertContainsOnly('B', message);
+    }
+
+    @Test
+    public void readWithHeaderCrossingSegments() throws QueueException {
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final Queue queue = queuePool.getOrCreate("test");
+
+        // fill the segment, inserting last message crossing the boundary
+        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - 4));
+        for (int i = 0; i < (4 * 1024) - 1; i++) {
+            payload.rewind();
+            queue.enqueue(payload);
+            queue.dequeue();
+        }
+        // at the end we have 1024 bytes free, so fill only 1022 bytes of that
+        payload = ByteBuffer.wrap(generatePayload(1022 - 4));
+        payload.rewind();
+        queue.enqueue(payload);
+        queue.dequeue();
+
+        // Exercise
+        ByteBuffer crossingPayload = ByteBuffer.wrap(generatePayload(1024 - 4, (byte) 'B'));
+        queue.enqueue(crossingPayload);
+
+        //Exercise
+        final ByteBuffer message = queue.dequeue();
+        assertEquals(1024 - 4, message.remaining(), "There must be 1020 'B' letters");
+        assertContainsOnly('B', message);
+    }
+
+    @Test
+    public void readCrossingPages() {
+        throw new IllegalStateException("Not yet implemented");
     }
 }

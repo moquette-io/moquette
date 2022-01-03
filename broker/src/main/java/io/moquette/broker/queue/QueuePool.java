@@ -8,8 +8,12 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
+import java.nio.file.OpenOption;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +22,8 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
+
+import static io.moquette.broker.queue.PagedFilesAllocator.PAGE_SIZE;
 
 public class QueuePool {
 
@@ -146,6 +152,7 @@ public class QueuePool {
         // queues.0.name = bla bla
         // queues.0.segments = head (id_page, offset), (id_page, offset), ... tail
         // queues.0.head_offset = bytes offset from the start of the page where last data was written
+        // queues.0.tail_offset = bytes offset from the start of the page where first data could be read
         boolean noMoreQueues = false;
         int queueId = 0;
         while (!noMoreQueues) {
@@ -159,13 +166,18 @@ public class QueuePool {
             queueSegments.put(queueName, segmentRefs);
 
             final long headOffset = Long.parseLong(checkpointProps.getProperty(String.format("queues.%d.head_offset", queueId)));
-
             final SegmentRef headSegmentRef = segmentRefs.get(0);
             final SegmentPointer currentHead = new SegmentPointer(headSegmentRef.pageId, headOffset);
             // TODO this reopen could be done in lazy way during getOrCreate method.
             Segment headSegment = allocator.reopenSegment(headSegmentRef.pageId, headSegmentRef.offset);
 
-            final Queue queue = new Queue(queueName.name, headSegment, currentHead, allocator, callback);
+            final long tailOffset = Long.parseLong(checkpointProps.getProperty(String.format("queues.%d.tail_offset", queueId)));
+            final SegmentRef tailSegmentRef = segmentRefs.poll();
+            final SegmentPointer currentTail = new SegmentPointer(tailSegmentRef.pageId, tailOffset);
+            Segment tailSegment = allocator.reopenSegment(tailSegmentRef.pageId, tailSegmentRef.offset);
+
+            final Queue queue = new Queue(queueName.name, headSegment, currentHead, tailSegment, currentTail,
+                allocator, callback, this);
             queues.put(queueName, queue);
 
             queueId++;
@@ -200,7 +212,8 @@ public class QueuePool {
             // When a segment is freshly created the head must the last occupied byte,
             // so can't be the begin of a segment, but one position before, or in case
             // of a new page, -1
-            final Queue queue = new Queue(queueName, segment, segment.begin.plus(-1), this.allocator, callback);
+            final Queue queue = new Queue(queueName, segment, segment.begin.plus(-1), segment, segment.begin.plus(-1),
+                this.allocator, callback, this);
             queues.put(queueN, queue);
             return queue;
         }
@@ -232,6 +245,7 @@ public class QueuePool {
             // queues.0.head_offset = bytes offset from the start of the page where last data was written
             final Queue queue = queues.get(queueName);
             checkpoint.setProperty("queues." + queueCounter + ".head_offset", String.valueOf(queue.currentHead().offset()));
+            checkpoint.setProperty("queues." + queueCounter + ".tail_offset", String.valueOf(queue.currentTail().offset()));
         }
 
         final File propertiesFile = dataPath.resolve("checkpoint.properties").toFile();
@@ -246,5 +260,43 @@ public class QueuePool {
         } catch (IOException ex) {
             throw new QueueException("Problem writing checkpoint.properties file", ex);
         }
+    }
+
+    Segment openNextTailSegment(String name) throws QueueException {
+        // definition from QueuePool.queueSegments
+        final QueueName queueName = new QueueName(name);
+        final LinkedList<SegmentRef> segmentRefs = queueSegments.get(queueName);
+
+        final SegmentRef pollSegment = segmentRefs.peek();
+        if (pollSegment == null) {
+            throw new IllegalStateException("Opening tail segment can't never go in empty queue, because it's checked upfront in Queue class");
+        }
+
+        final Path pageFile = dataPath.resolve(String.format("%d.page", pollSegment.pageId));
+        if (!Files.exists(pageFile)) {
+            throw new QueueException("Can't find file for page file" +  pageFile);
+        }
+
+
+        final MappedByteBuffer tailPage;
+        final OpenOption[] openOptions = {StandardOpenOption.READ, StandardOpenOption.TRUNCATE_EXISTING};
+        try (FileChannel fileChannel = FileChannel.open(pageFile, openOptions)) {
+            tailPage = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, PAGE_SIZE);
+        } catch (IOException ex) {
+            throw new QueueException("Can't open page file " + pageFile, ex);
+        }
+
+        final SegmentPointer begin = new SegmentPointer(pollSegment.pageId, pollSegment.offset);
+        final SegmentPointer end = new SegmentPointer(pollSegment.pageId, pollSegment.offset + Segment.SIZE);
+        return new Segment(tailPage, begin, end);
+    }
+
+    /**
+     * Notify the actual tail segment was completely read
+     * */
+    void consumedTailSegment(String name) {
+        final QueueName queueName = new QueueName(name);
+        final LinkedList<SegmentRef> segmentRefs = queueSegments.get(queueName);
+        segmentRefs.poll();
     }
 }

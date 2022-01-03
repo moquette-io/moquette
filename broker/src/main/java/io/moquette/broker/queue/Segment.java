@@ -1,5 +1,6 @@
 package io.moquette.broker.queue;
 
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 
@@ -20,10 +21,12 @@ final class Segment {
 
     boolean hasSpace(SegmentPointer mark, long length) {
         return mark.samePage(this.end) &&
-// TODO            <= 0 > mark has t0 be <= end
             mark.moveForward(length).compareTo(this.end) <= 0;
     }
 
+    /**
+     * @return number of bytes in segment after the pointer.
+     * */
     public long bytesAfter(SegmentPointer mark) {
         assert mark.samePage(this.end);
         return end.distance(mark);
@@ -39,5 +42,33 @@ final class Segment {
      * */
     void force() {
         mappedBuffer.force();
+    }
+
+    /**
+     * return the int value contained in the 4 bytes after the pointer.
+     *
+     * @param pointer*/
+    int readHeader(SegmentPointer pointer) {
+        final int res = mappedBuffer.getInt(pointer.offset());
+        return res;
+    }
+
+    public ByteBuffer read(SegmentPointer start, int length) {
+        byte[] dst = new byte[length];
+
+        if (length > mappedBuffer.remaining() - start.offset())
+            throw new BufferUnderflowException();
+
+        int sourceIdx = start.offset();
+        for (int dstIndex = 0; dstIndex < length; dstIndex++, sourceIdx++) {
+            dst[dstIndex] = mappedBuffer.get(sourceIdx);
+        }
+
+        return ByteBuffer.wrap(dst);
+    }
+
+    @Override
+    public String toString() {
+        return "Segment{page=" + begin.pageId() + ", begin=" + begin.offset() + ", end=" + end.offset() + "}";
     }
 }
