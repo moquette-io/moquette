@@ -364,8 +364,8 @@ class Session {
                 final Topic topic = pubMsg.topic;
                 final MqttQoS qos = pubMsg.publishingQos;
                 final ByteBuf payload = pubMsg.payload;
-                final ByteBuf copiedPayload = payload.retainedDuplicate();
-                MqttPublishMessage publishMsg = publishNotRetainedDuplicated(notAckPacketId, topic, qos, copiedPayload);
+                // message fetched from map, but not removed from map. No need to duplicate or release.
+                MqttPublishMessage publishMsg = publishNotRetainedDuplicated(notAckPacketId, topic, qos, payload);
                 inflightTimeouts.add(new InFlightPacket(notAckPacketId.packetId, FLIGHT_BEFORE_RESEND_MS));
                 mqttConnection.sendPublish(publishMsg);
             }
