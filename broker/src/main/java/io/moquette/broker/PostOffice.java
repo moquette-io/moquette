@@ -581,6 +581,10 @@ class PostOffice {
             cmd.complete();
             return cmd.getSessionId();
         });
+        if (Thread.currentThread() == sessionExecutors[targetQueueId]) {
+            SessionEventLoop.executeTask(task);
+            return cmd.completableFuture().thenApply(RouteResult::success);
+        }
         if (this.sessionQueues[targetQueueId].offer(task)) {
             return cmd.completableFuture().thenApply(RouteResult::success);
         } else {

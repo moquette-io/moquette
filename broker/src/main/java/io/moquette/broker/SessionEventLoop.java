@@ -22,20 +22,23 @@ final class SessionEventLoop implements Runnable {
             try {
                 // blocking call
                 final FutureTask<String> task = this.sessionQueue.take();
-
-                if (!task.isCancelled()) {
-                    try {
-                        task.run();
-
-                        // we ran it, but we have to grab the exception if raised
-                        task.get();
-                    } catch (Throwable th) {
-                        LOG.info("SessionEventLoop {} reached exception in processing command", Thread.currentThread().getName(), th);
-                    }
-                }
+                executeTask(task);
             } catch (InterruptedException e) {
                 LOG.info("SessionEventLoop {} interrupted", Thread.currentThread().getName());
                 Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    public static void executeTask(final FutureTask<String> task) {
+        if (!task.isCancelled()) {
+            try {
+                task.run();
+
+                // we ran it, but we have to grab the exception if raised
+                task.get();
+            } catch (Throwable th) {
+                LOG.info("SessionEventLoop {} reached exception in processing command", Thread.currentThread().getName(), th);
             }
         }
     }
