@@ -24,7 +24,7 @@ final class SessionCommand {
     }
 
     public void complete() {
-        task.complete(null);
+        task.complete(sessionId);
     }
 
     public CompletableFuture<String> completableFuture() {

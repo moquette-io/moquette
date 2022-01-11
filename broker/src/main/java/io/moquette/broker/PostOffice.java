@@ -364,35 +364,86 @@ class PostOffice {
         return publish2Subscribers(payload, topic, publishingQos, Collections.emptySet());
     }
 
+    private static class SubQosCombo {
+        public final Subscription sub;
+        public final MqttQoS qos;
+
+        public SubQosCombo(Subscription sub, MqttQoS qos) {
+            this.sub = sub;
+            this.qos = qos;
+        }
+    }
+
+    private static class PublishListCmd implements  Callable<String> {
+
+        public final String eventLoopNr;
+        public final ByteBuf payload;
+        public final Topic topic;
+        public final List<SubQosCombo> subscriptions = new ArrayList<>();
+        private final PostOffice postOffice;
+
+        public PublishListCmd(PostOffice postOffice, String eventLoopNr, ByteBuf payload, Topic topic) {
+            this.postOffice = postOffice;
+            this.eventLoopNr = eventLoopNr;
+            this.payload = payload;
+            this.topic = topic;
+        }
+
+        public void add(SubQosCombo subQos) {
+            subscriptions.add(subQos);
+        }
+
+        @Override
+        public String call() throws Exception {
+            for (SubQosCombo subQos:subscriptions) {
+                postOffice.publishToSession(payload, topic, subQos.sub, subQos.qos);
+            }
+            return eventLoopNr;
+        }
+    }
+
     private CompletableFuture<RoutingResults> publish2Subscribers(ByteBuf payload, Topic topic, MqttQoS publishingQos,
                                                                   Set<String> filterTargetClients) {
         Set<Subscription> topicMatchingSubscriptions = subscriptions.matchQosSharpening(topic);
         List<CompletableFuture<RouteResult>> publishFutures = new ArrayList<>(topicMatchingSubscriptions.size());
 
+        final PublishListCmd[] subCommands = new PublishListCmd[eventLoops];
+
         for (final Subscription sub : topicMatchingSubscriptions) {
             MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
             if (filterTargetClients.isEmpty() || filterTargetClients.contains(sub.getClientId())) {
                 LOG.debug("Routing PUBLISH to subscription {}", sub);
-                publishFutures.add(routeCommand(sub.getClientId(), () -> {
-                    publishToSession(payload, topic, sub, qos);
-                    return sub.getClientId();
-                }));
+                final int targetQueueId = Math.abs(sub.getClientId().hashCode()) % this.eventLoops;
+                if (subCommands[targetQueueId] == null) {
+                    subCommands[targetQueueId] = new PublishListCmd(this, Integer.toString(targetQueueId), payload, topic);
+                }
+                subCommands[targetQueueId].add(new SubQosCombo(sub, qos));
+            }
+        }
+
+        for (int i = 0; i < eventLoops; i++) {
+            if (subCommands[i] != null) {
+                publishFutures.add(routeCommand(subCommands[i].eventLoopNr, subCommands[i]));
             }
         }
 
         final CompletableFuture<Void> publishes = CompletableFuture.allOf(publishFutures.toArray(new CompletableFuture[0]));
         return publishes.handle((result, exception) -> {
-            final List<String> failedRoutings = publishFutures.stream()
-                .filter(CompletableFuture::isCompletedExceptionally)
-                .map(cf -> cf.thenApply(r -> r.clientId))
-                .map(CompletableFuture::join)
-                .collect(Collectors.toList());
-
-            final List<String> successedRoutings = publishFutures.stream()
-                .filter(f -> !f.isCompletedExceptionally())
-                .map(cf -> cf.thenApply(r -> r.clientId))
-                .map(CompletableFuture::join)
-                .collect(Collectors.toList());
+            final List<String> failedRoutings = new ArrayList<>();
+            final List<String> successedRoutings = new ArrayList<>();
+            for (CompletableFuture<RouteResult> cf : publishFutures) {
+                RouteResult rr = cf.join();
+                List<SubQosCombo> futureSubs = subCommands[Integer.parseInt(rr.clientId)].subscriptions;
+                if (rr.status == RouteResult.Status.FAIL) {
+                    for (SubQosCombo faildSub : futureSubs) {
+                        failedRoutings.add(faildSub.sub.getClientId());
+                    }
+                } else {
+                    for (SubQosCombo faildSub : futureSubs) {
+                        successedRoutings.add(faildSub.sub.getClientId());
+                    }
+                }
+            }
             return new RoutingResults(successedRoutings, failedRoutings);
         });
     }
