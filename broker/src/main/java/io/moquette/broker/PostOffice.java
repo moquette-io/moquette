@@ -365,8 +365,8 @@ class PostOffice {
     }
 
     private static class SubQosCombo {
-        public final Subscription sub;
-        public final MqttQoS qos;
+        final Subscription sub;
+        final MqttQoS qos;
 
         public SubQosCombo(Subscription sub, MqttQoS qos) {
             this.sub = sub;
@@ -374,17 +374,17 @@ class PostOffice {
         }
     }
 
-    private static class PublishListCmd implements  Callable<String> {
+    private static class BatchPublishCommand implements Callable<String> {
 
-        public final String eventLoopNr;
-        public final ByteBuf payload;
-        public final Topic topic;
-        public final List<SubQosCombo> subscriptions = new ArrayList<>();
+        final String firstClientId;
+        final ByteBuf payload;
+        final Topic topic;
+        final List<SubQosCombo> subscriptions = new ArrayList<>();
         private final PostOffice postOffice;
 
-        public PublishListCmd(PostOffice postOffice, String eventLoopNr, ByteBuf payload, Topic topic) {
+        public BatchPublishCommand(PostOffice postOffice, String firstClientId, ByteBuf payload, Topic topic) {
             this.postOffice = postOffice;
-            this.eventLoopNr = eventLoopNr;
+            this.firstClientId = firstClientId;
             this.payload = payload;
             this.topic = topic;
         }
@@ -398,7 +398,7 @@ class PostOffice {
             for (SubQosCombo subQos:subscriptions) {
                 postOffice.publishToSession(payload, topic, subQos.sub, subQos.qos);
             }
-            return eventLoopNr;
+            return firstClientId;
         }
     }
 
@@ -407,7 +407,7 @@ class PostOffice {
         Set<Subscription> topicMatchingSubscriptions = subscriptions.matchQosSharpening(topic);
         List<CompletableFuture<RouteResult>> publishFutures = new ArrayList<>(topicMatchingSubscriptions.size());
 
-        final PublishListCmd[] subCommands = new PublishListCmd[eventLoops];
+        final BatchPublishCommand[] subCommands = new BatchPublishCommand[eventLoops];
 
         for (final Subscription sub : topicMatchingSubscriptions) {
             MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
@@ -415,16 +415,14 @@ class PostOffice {
                 LOG.debug("Routing PUBLISH to subscription {}", sub);
                 final int targetQueueId = Math.abs(sub.getClientId().hashCode()) % this.eventLoops;
                 if (subCommands[targetQueueId] == null) {
-                    subCommands[targetQueueId] = new PublishListCmd(this, Integer.toString(targetQueueId), payload, topic);
+                    subCommands[targetQueueId] = new BatchPublishCommand(this, sub.getClientId(), payload, topic);
                 }
                 subCommands[targetQueueId].add(new SubQosCombo(sub, qos));
             }
         }
 
-        for (int i = 0; i < eventLoops; i++) {
-            if (subCommands[i] != null) {
-                publishFutures.add(routeCommand(subCommands[i].eventLoopNr, subCommands[i]));
-            }
+        for (BatchPublishCommand batchedPublish : subCommands) {
+            publishFutures.add(routeCommand(batchedPublish.firstClientId, batchedPublish));
         }
 
         final CompletableFuture<Void> publishes = CompletableFuture.allOf(publishFutures.toArray(new CompletableFuture[0]));
