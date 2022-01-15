@@ -16,6 +16,10 @@
 
 package io.moquette.integration;
 
+import org.eclipse.paho.client.mqttv3.IMqttClient;
+import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttException;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -56,5 +60,11 @@ public final class IntegrationUtils {
     }
 
     private IntegrationUtils() {
+    }
+
+    static void disconnectClient(IMqttClient client) throws MqttException {
+        if (client != null && client.isConnected()) {
+            client.disconnect();
+        }
     }
 }

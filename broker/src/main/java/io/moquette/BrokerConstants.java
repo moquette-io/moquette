@@ -34,6 +34,7 @@ public final class BrokerConstants {
     public static final String WSS_PORT_PROPERTY_NAME = "secure_websocket_port";
     public static final String WEB_SOCKET_PATH_PROPERTY_NAME = "websocket_path";
     public static final String WEB_SOCKET_MAX_FRAME_SIZE_PROPERTY_NAME = "websocket_max_frame_size";
+    public static final String SESSION_QUEUE_SIZE = "session_queue_size";
 
     /**
      * Defines the SSL implementation to use, default to "JDK".

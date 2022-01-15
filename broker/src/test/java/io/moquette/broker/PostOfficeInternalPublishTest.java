@@ -92,7 +92,7 @@ public class PostOfficeInternalPublishTest {
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
         SessionRegistry sessionRegistry = new SessionRegistry(subscriptions, queueRepository, permitAll);
         sut = new PostOffice(subscriptions, retainedRepository, sessionRegistry,
-                             ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll);
+                             ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, 1024);
         return sessionRegistry;
     }
 

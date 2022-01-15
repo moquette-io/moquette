@@ -39,7 +39,6 @@ import java.util.stream.Collectors;
 import static io.moquette.broker.Utils.messageId;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
-import static java.util.stream.Collectors.partitioningBy;
 
 class PostOffice {
 
@@ -161,7 +160,7 @@ class PostOffice {
     private final FailedPublishCollection failedPublishes = new FailedPublishCollection();
 
     PostOffice(ISubscriptionsDirectory subscriptions, IRetainedRepository retainedRepository,
-               SessionRegistry sessionRegistry, BrokerInterceptor interceptor, Authorizator authorizator) {
+               SessionRegistry sessionRegistry, BrokerInterceptor interceptor, Authorizator authorizator, int sessionQueueSize) {
         this.authorizator = authorizator;
         this.subscriptions = subscriptions;
         this.retainedRepository = retainedRepository;
@@ -170,7 +169,7 @@ class PostOffice {
 
         this.sessionQueues = new BlockingQueue[eventLoops];
         for (int i = 0; i < eventLoops; i++) {
-            this.sessionQueues[i] = new ArrayBlockingQueue<>(1024);
+            this.sessionQueues[i] = new ArrayBlockingQueue<>(sessionQueueSize);
         }
         this.sessionExecutors = new Thread[eventLoops];
         for (int i = 0; i < eventLoops; i++) {
@@ -311,7 +310,7 @@ class PostOffice {
 
     CompletableFuture<RoutingResults> receivedPublishQos1(MQTTConnection connection, Topic topic, String username, int messageID,
                                                 MqttPublishMessage msg) {
-        // verify if topic can be write
+        // verify if topic can be written
         topic.getTokens();
         if (!topic.isValid()) {
             LOG.warn("Invalid topic format, force close the connection");
@@ -373,6 +372,7 @@ class PostOffice {
         for (final Subscription sub : topicMatchingSubscriptions) {
             MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
             if (filterTargetClients.isEmpty() || filterTargetClients.contains(sub.getClientId())) {
+                LOG.debug("Routing PUBLISH to subscription {}", sub);
                 publishFutures.add(routeCommand(sub.getClientId(), () -> {
                     publishToSession(payload, topic, sub, qos);
                     return sub.getClientId();
@@ -524,6 +524,7 @@ class PostOffice {
         if (this.sessionQueues[targetQueueId].offer(task)) {
             return cmd.completableFuture().thenApply(RouteResult::success);
         } else {
+            LOG.warn("Session command queue {} is full", targetQueueId);
             final CompletableFuture<RouteResult> failed = new CompletableFuture<>();
             failed.complete(RouteResult.failed(cmd.getSessionId()));
             return failed;
