@@ -29,6 +29,7 @@ public final class DebugUtils {
             final int size = copy.readableBytes();
             bytesContent = new byte[size];
             copy.readBytes(bytesContent);
+            copy.release();
         } else {
             bytesContent = copy.array();
         }
