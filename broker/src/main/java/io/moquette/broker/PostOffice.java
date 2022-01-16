@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static io.moquette.broker.Utils.messageId;
@@ -364,66 +365,71 @@ class PostOffice {
         return publish2Subscribers(payload, topic, publishingQos, Collections.emptySet());
     }
 
-    private static class SubQosCombo {
-        final Subscription sub;
-        final MqttQoS qos;
+    private class BatchingPublishesCollector {
+        final List<Subscription>[] subscriptions;
+        private final int eventLoops;
 
-        public SubQosCombo(Subscription sub, MqttQoS qos) {
-            this.sub = sub;
-            this.qos = qos;
-        }
-    }
-
-    private static class BatchPublishCommand implements Callable<String> {
-
-        final String firstClientId;
-        final ByteBuf payload;
-        final Topic topic;
-        final List<SubQosCombo> subscriptions = new ArrayList<>();
-        private final PostOffice postOffice;
-
-        public BatchPublishCommand(PostOffice postOffice, String firstClientId, ByteBuf payload, Topic topic) {
-            this.postOffice = postOffice;
-            this.firstClientId = firstClientId;
-            this.payload = payload;
-            this.topic = topic;
+        BatchingPublishesCollector(int eventLoops) {
+            subscriptions = new List[eventLoops];
+            this.eventLoops = eventLoops;
         }
 
-        public void add(SubQosCombo subQos) {
-            subscriptions.add(subQos);
-        }
-
-        @Override
-        public String call() throws Exception {
-            for (SubQosCombo subQos:subscriptions) {
-                postOffice.publishToSession(payload, topic, subQos.sub, subQos.qos);
+        public void add(Subscription sub) {
+            final int targetQueueId = subscriberEventLoop(sub.getClientId());
+            if (subscriptions[targetQueueId] == null) {
+                subscriptions[targetQueueId] = new ArrayList<>();
             }
-            return firstClientId;
+            subscriptions[targetQueueId].add(sub);
+        }
+
+        private int subscriberEventLoop(String clientId) {
+            return Math.abs(clientId.hashCode()) % this.eventLoops;
+        }
+
+        List<CompletableFuture<RouteResult>> routeBatchedPublishes(Consumer<List<Subscription>> action) {
+            List<CompletableFuture<RouteResult>> publishFutures = new ArrayList<>(this.eventLoops);
+
+            for (List<Subscription> subscriptionsBatch : subscriptions) {
+                if (subscriptionsBatch == null) {
+                    continue;
+                }
+                final String clientId = subscriptionsBatch.get(0).getClientId();
+                if (LOG.isTraceEnabled()) {
+                    final String subscriptionsDetails = subscriptionsBatch.stream()
+                        .map(Subscription::toString)
+                        .collect(Collectors.joining(",\n"));
+                    final int loopId = subscriberEventLoop(clientId);
+                    LOG.trace("Routing PUBLISH to eventLoop {}  for subscriptions [{}]", loopId, subscriptionsDetails);
+                }
+                publishFutures.add(routeCommand(clientId, () -> {
+                    action.accept(subscriptionsBatch);
+                    return null;
+                }));
+            }
+            return publishFutures;
+        }
+
+        Collection<String> subscriberIdsByEventLoop(String clientId) {
+            final int targetQueueId = subscriberEventLoop(clientId);
+            return subscriptions[targetQueueId].stream().map(Subscription::getClientId).collect(Collectors.toList());
         }
     }
 
     private CompletableFuture<RoutingResults> publish2Subscribers(ByteBuf payload, Topic topic, MqttQoS publishingQos,
                                                                   Set<String> filterTargetClients) {
         Set<Subscription> topicMatchingSubscriptions = subscriptions.matchQosSharpening(topic);
-        List<CompletableFuture<RouteResult>> publishFutures = new ArrayList<>(topicMatchingSubscriptions.size());
 
-        final BatchPublishCommand[] subCommands = new BatchPublishCommand[eventLoops];
+        final BatchingPublishesCollector collector = new BatchingPublishesCollector(eventLoops);
 
         for (final Subscription sub : topicMatchingSubscriptions) {
-            MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
             if (filterTargetClients.isEmpty() || filterTargetClients.contains(sub.getClientId())) {
-                LOG.debug("Routing PUBLISH to subscription {}", sub);
-                final int targetQueueId = Math.abs(sub.getClientId().hashCode()) % this.eventLoops;
-                if (subCommands[targetQueueId] == null) {
-                    subCommands[targetQueueId] = new BatchPublishCommand(this, sub.getClientId(), payload, topic);
-                }
-                subCommands[targetQueueId].add(new SubQosCombo(sub, qos));
+                collector.add(sub);
             }
         }
 
-        for (BatchPublishCommand batchedPublish : subCommands) {
-            publishFutures.add(routeCommand(batchedPublish.firstClientId, batchedPublish));
-        }
+        List<CompletableFuture<RouteResult>> publishFutures = collector.routeBatchedPublishes((batch) -> {
+            publishToSession(payload, topic, batch, publishingQos);
+        });
 
         final CompletableFuture<Void> publishes = CompletableFuture.allOf(publishFutures.toArray(new CompletableFuture[0]));
         return publishes.handle((result, exception) -> {
@@ -431,19 +437,22 @@ class PostOffice {
             final List<String> successedRoutings = new ArrayList<>();
             for (CompletableFuture<RouteResult> cf : publishFutures) {
                 RouteResult rr = cf.join();
-                List<SubQosCombo> futureSubs = subCommands[Integer.parseInt(rr.clientId)].subscriptions;
+                Collection<String> subscibersIds = collector.subscriberIdsByEventLoop(rr.clientId);
                 if (rr.status == RouteResult.Status.FAIL) {
-                    for (SubQosCombo faildSub : futureSubs) {
-                        failedRoutings.add(faildSub.sub.getClientId());
-                    }
+                    failedRoutings.addAll(subscibersIds);
                 } else {
-                    for (SubQosCombo faildSub : futureSubs) {
-                        successedRoutings.add(faildSub.sub.getClientId());
-                    }
+                    successedRoutings.addAll(subscibersIds);
                 }
             }
             return new RoutingResults(successedRoutings, failedRoutings);
         });
+    }
+
+    private void publishToSession(ByteBuf payload, Topic topic, Collection<Subscription> subscriptions, MqttQoS publishingQos) {
+        for (Subscription sub : subscriptions) {
+            MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
+            publishToSession(payload, topic, sub, qos);
+        }
     }
 
     private void publishToSession(ByteBuf payload, Topic topic, Subscription sub, MqttQoS qos) {

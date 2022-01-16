@@ -119,7 +119,7 @@ public class PublishToManySubscribersUseCaseTest {
 
         Awaitility.await("Waiting for resend.")
             .atMost(FLIGHT_BEFORE_RESEND_MS * 3, TimeUnit.MILLISECONDS)
-            .pollDelay(FLIGHT_BEFORE_RESEND_MS * 2, TimeUnit.MILLISECONDS)
+//            .pollDelay(FLIGHT_BEFORE_RESEND_MS * 2, TimeUnit.MILLISECONDS)
             .pollInterval(100, TimeUnit.MILLISECONDS)
             .untilAdder(receivedPublish, equalTo((long) NUM_SUBSCRIBERS));
     }
