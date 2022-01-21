@@ -51,7 +51,6 @@ class PostOffice {
         static class PacketId {
 
             private final String clientId;
-
             private final int idPacket;
 
             PacketId(String clientId, int idPacket) {
@@ -71,16 +70,19 @@ class PostOffice {
                 return Objects.hash(clientId, idPacket);
             }
 
-
-
+            public boolean belongToClient(String clientId) {
+                return this.clientId.equals(clientId);
+            }
         }
+
         private final ConcurrentMap<PacketId, Set<String>> packetsMap = new ConcurrentHashMap<>();
 
-        public void insert(String clientId, int messageID, String failedClientId) {
+        private void insert(String clientId, int messageID, String failedClientId) {
             final PacketId packetId = new PacketId(clientId, messageID);
             packetsMap.computeIfAbsent(packetId, k -> new HashSet<>())
                 .add(failedClientId);
         }
+
         public void remove(String clientId, int messageID, String targetClientId) {
             final PacketId packetId = new PacketId(clientId, messageID);
             packetsMap.computeIfPresent(packetId, (key, clientsSet) -> {
@@ -100,13 +102,21 @@ class PostOffice {
             }
         }
 
-        private void insertAll(int messageID, String clientId, Collection<String> routings) {
+        void cleanupForClient(String clientId) {
+            // the only way to linear scan the map to collect of PacketIds references,
+            // for a following step of cleaning
+            packetsMap.keySet().stream()
+                .filter(packet -> packet.belongToClient(clientId))
+                .forEach(packetsMap::remove);
+        }
+
+        void insertAll(int messageID, String clientId, Collection<String> routings) {
             for (String targetClientId : routings) {
                 insert(clientId, messageID, targetClientId);
             }
         }
 
-        public Set<String> listFailed(String clientId, int messageID) {
+        Set<String> listFailed(String clientId, int messageID) {
             final PacketId packetId = new PacketId(clientId, messageID);
             return packetsMap.getOrDefault(packetId, Collections.emptySet());
         }
@@ -600,8 +610,12 @@ class PostOffice {
             processor.interrupt();
         }
     }
-//    void flushInFlight(MQTTConnection mqttConnection) {
-//        Session targetSession = sessionRegistry.retrieve(mqttConnection.getClientId());
-//        targetSession.flushAllQueuedMessages();
-//    }
+
+    /**
+     * Clean up all the data related to the specified client;
+     * */
+    public void clientDisconnected(String clientID, String userName) {
+        dispatchDisconnection(clientID, userName);
+        this.failedPublishes.cleanupForClient(clientID);
+    }
 }

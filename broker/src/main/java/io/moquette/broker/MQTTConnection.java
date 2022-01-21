@@ -349,7 +349,7 @@ final class MQTTConnection {
             channel.close().addListener(FIRE_EXCEPTION_ON_FAILURE);
             LOG.trace("Processed DISCONNECT");
             String userName = NettyUtils.userName(channel);
-            postOffice.dispatchDisconnection(clientID, userName);
+            postOffice.clientDisconnected(clientID, userName);
             LOG.trace("dispatch disconnection userName={}", userName);
             return null;
         });
