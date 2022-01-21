@@ -149,6 +149,8 @@ class PostOffice {
 
     private static final Logger LOG = LoggerFactory.getLogger(PostOffice.class);
 
+    private static final Set<String> NO_FILTER = new HashSet<>();
+
     private final Authorizator authorizator;
     private final ISubscriptionsDirectory subscriptions;
     private final IRetainedRepository retainedRepository;
@@ -362,7 +364,7 @@ class PostOffice {
     }
 
     private CompletableFuture<RoutingResults> publish2Subscribers(ByteBuf payload, Topic topic, MqttQoS publishingQos) {
-        return publish2Subscribers(payload, topic, publishingQos, Collections.emptySet());
+        return publish2Subscribers(payload, topic, publishingQos, NO_FILTER);
     }
 
     private class BatchingPublishesCollector {
@@ -422,7 +424,7 @@ class PostOffice {
         final BatchingPublishesCollector collector = new BatchingPublishesCollector(eventLoops);
 
         for (final Subscription sub : topicMatchingSubscriptions) {
-            if (filterTargetClients.isEmpty() || filterTargetClients.contains(sub.getClientId())) {
+            if (filterTargetClients == NO_FILTER || filterTargetClients.contains(sub.getClientId())) {
                 collector.add(sub);
             }
         }
