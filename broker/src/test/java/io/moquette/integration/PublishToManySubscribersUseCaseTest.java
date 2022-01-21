@@ -29,10 +29,12 @@ import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.LongAdder;
+import java.util.function.BiConsumer;
 
 import static io.moquette.BrokerConstants.FLIGHT_BEFORE_RESEND_MS;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.hamcrest.Matchers.equalTo;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 // inspired by ServerIntegrationPahoTest
 public class PublishToManySubscribersUseCaseTest {
@@ -136,11 +138,16 @@ public class PublishToManySubscribersUseCaseTest {
         final LongAdder receivedPublish = new LongAdder();
 
         //subscribe all
-        for (IMqttAsyncClient subscriber : this.subscribers) {
-            subscriber.subscribe("/temperature", 1, (String topic1, org.eclipse.paho.client.mqttv3.MqttMessage message) -> {
-                    receivedPublish.increment();
-                }).waitForCompletion();
-        }
+        segmentedParallelSubscriptions((subscriber, completionCallback) -> {
+            try {
+                subscriber.subscribe("/temperature", 1, null, completionCallback,
+                    (String topic1, org.eclipse.paho.client.mqttv3.MqttMessage message) -> {
+                        receivedPublish.increment();
+                    });
+            } catch (MqttException e) {
+                throw new RuntimeException(e);
+            }
+        });
 
         this.publisher.publish("/temperature", "15°C".getBytes(UTF_8), 0, false);
 
@@ -148,5 +155,24 @@ public class PublishToManySubscribersUseCaseTest {
             .atMost(FLIGHT_BEFORE_RESEND_MS * 3, TimeUnit.MILLISECONDS)
             .pollInterval(100, TimeUnit.MILLISECONDS)
             .untilAdder(receivedPublish, equalTo((long) NUM_SUBSCRIBERS));
+    }
+
+    private void segmentedParallelSubscriptions(BiConsumer<IMqttAsyncClient, IMqttActionListener> biConsumer) throws InterruptedException {
+        int subscribesCount = 0;
+        int subscribeBatchSize = COMMAND_QUEUE_SIZE * EVENT_LOOPS;
+        CountDownLatch latch = new CountDownLatch(subscribeBatchSize);
+        IMqttActionListener completionCallback = createMqttCallback(latch);
+        for (IMqttAsyncClient subscriber : this.subscribers) {
+            biConsumer.accept(subscriber, completionCallback);
+            subscribesCount++;
+            if (subscribesCount % subscribeBatchSize == 0) {
+                // send a batch of COMMAND_QUEUE_SIZE subscribers, then wait for ack of subscriptions,
+                // this to avoid overflow the command queues.
+                final boolean completedInTime = latch.await(5, TimeUnit.SECONDS);
+                assertTrue(completedInTime, "Subscription ACK latch expired");
+                latch = new CountDownLatch(subscribeBatchSize);
+                completionCallback = createMqttCallback(latch);
+            }
+        }
     }
 }
