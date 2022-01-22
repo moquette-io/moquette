@@ -33,6 +33,7 @@ import java.util.function.BiConsumer;
 
 import static io.moquette.BrokerConstants.FLIGHT_BEFORE_RESEND_MS;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import java.util.concurrent.Semaphore;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -102,6 +103,20 @@ public class PublishToManySubscribersUseCaseTest {
         };
     }
 
+    private IMqttActionListener createMqttCallback(Semaphore openSlots) {
+        return new IMqttActionListener() {
+            @Override
+            public void onSuccess(IMqttToken asyncActionToken) {
+                openSlots.release();
+            }
+
+            @Override
+            public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
+                openSlots.release();
+            }
+        };
+    }
+
     private List<IMqttAsyncClient> createSubscribers(int numSubscribers) throws MqttException, IOException {
         List<IMqttAsyncClient> clients = new ArrayList<>(numSubscribers);
         for (int i = 0; i < numSubscribers; i++) {
@@ -158,21 +173,16 @@ public class PublishToManySubscribersUseCaseTest {
     }
 
     private void segmentedParallelSubscriptions(BiConsumer<IMqttAsyncClient, IMqttActionListener> biConsumer) throws InterruptedException {
-        int subscribesCount = 0;
-        int subscribeBatchSize = COMMAND_QUEUE_SIZE * EVENT_LOOPS;
-        CountDownLatch latch = new CountDownLatch(subscribeBatchSize);
-        IMqttActionListener completionCallback = createMqttCallback(latch);
+        int openSlotCount = COMMAND_QUEUE_SIZE;
+        Semaphore openSlots = new Semaphore(openSlotCount);
+        IMqttActionListener completionCallback = createMqttCallback(openSlots);
         for (IMqttAsyncClient subscriber : this.subscribers) {
+            boolean haveSlot = openSlots.tryAcquire(5, TimeUnit.SECONDS);
+            assertTrue(haveSlot, "Subscription ACK semaphore expired");
             biConsumer.accept(subscriber, completionCallback);
-            subscribesCount++;
-            if (subscribesCount % subscribeBatchSize == 0) {
-                // send a batch of COMMAND_QUEUE_SIZE subscribers, then wait for ack of subscriptions,
-                // this to avoid overflow the command queues.
-                final boolean completedInTime = latch.await(5, TimeUnit.SECONDS);
-                assertTrue(completedInTime, "Subscription ACK latch expired");
-                latch = new CountDownLatch(subscribeBatchSize);
-                completionCallback = createMqttCallback(latch);
-            }
         }
+        // Wait until all subscribes are completed (all slots are free again)
+        boolean haveSlot = openSlots.tryAcquire(openSlotCount, 5, TimeUnit.SECONDS);
+        assertTrue(haveSlot, "Subscription ACK semaphore expired");
     }
 }
