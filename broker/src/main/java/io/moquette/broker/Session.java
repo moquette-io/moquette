@@ -201,6 +201,9 @@ class Session {
             return;
         }
 
+        if (mqttConnection == null) {
+            return;
+        }
         inflightWindow.put(pubRecPacketId, new SessionRegistry.PubRelMarker());
         inflightTimeouts.add(new InFlightPacket(pubRecPacketId, FLIGHT_BEFORE_RESEND_MS));
         MqttMessage pubRel = MQTTConnection.pubrel(pubRecPacketId);
