@@ -116,8 +116,8 @@ public class ServerLowlevelMessagesIntegrationTest {
     }
 
     @Test
-    public void testWillMessageIsWiredOnClientKeepAliveExpiry() throws Exception {
-        LOG.info("*** testWillMessageIsWiredOnClientKeepAliveExpiry ***");
+    public void testWillMessageIsFiredOnClientKeepAliveExpiry() throws Exception {
+        LOG.info("*** testWillMessageIsFiredOnClientKeepAliveExpiry ***");
         String willTestamentTopic = "/will/test";
         String willTestamentMsg = "Bye bye";
 

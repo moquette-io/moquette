@@ -31,6 +31,8 @@ import io.netty.handler.codec.mqtt.MqttVersion;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.ExecutionException;
+
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
@@ -59,6 +61,7 @@ public class MQTTConnectionPublishTest {
 
     private void createMQTTConnection(BrokerConfiguration config) {
         channel = new EmbeddedChannel();
+        NettyUtils.clientID(channel, "test_client");
         sut = createMQTTConnection(config, channel);
     }
 
@@ -75,12 +78,12 @@ public class MQTTConnectionPublishTest {
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
         sessionRegistry = new SessionRegistry(subscriptions, queueRepository, permitAll);
         final PostOffice postOffice = new PostOffice(subscriptions,
-            new MemoryRetainedRepository(), sessionRegistry, ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll);
+            new MemoryRetainedRepository(), sessionRegistry, ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, 1024);
         return new MQTTConnection(channel, config, mockAuthenticator, sessionRegistry, postOffice);
     }
 
     @Test
-    public void dropConnectionOnPublishWithInvalidTopicFormat() {
+    public void dropConnectionOnPublishWithInvalidTopicFormat() throws ExecutionException, InterruptedException {
         // Connect message with clean session set to true and client id is null.
         final ByteBuf payload = Unpooled.copiedBuffer("Hello MQTT world!".getBytes(UTF_8));
         MqttPublishMessage publish = MqttMessageBuilders.publish()
@@ -89,7 +92,7 @@ public class MQTTConnectionPublishTest {
             .qos(MqttQoS.AT_MOST_ONCE)
             .payload(payload).build();
 
-        sut.processPublish(publish);
+        sut.processPublish(publish).get();
 
         // Verify
         assertFalse(channel.isOpen(), "Connection should be closed by the broker");

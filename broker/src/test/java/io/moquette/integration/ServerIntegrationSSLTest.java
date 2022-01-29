@@ -135,9 +135,7 @@ public class ServerIntegrationSSLTest {
 
     @AfterEach
     public void tearDown() throws Exception {
-        if (m_client != null && m_client.isConnected()) {
-            m_client.disconnect();
-        }
+        IntegrationUtils.disconnectClient(m_client);
 
         if (m_server != null) {
             m_server.stopServer();

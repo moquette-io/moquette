@@ -36,7 +36,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Path;
-import java.security.SecureRandom;
 import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -101,10 +100,7 @@ public class ServerIntegrationMultiConnectTest {
 
     @AfterEach
     public void tearDown() throws Exception {
-        if (client != null && client.isConnected()) {
-            client.disconnect();
-        }
-
+        IntegrationUtils.disconnectClient(client);
         server.stopServer();
     }
 

@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -147,7 +148,8 @@ public class ServerIntegrationQoSValidationTest {
         m_subscriber.subscribe("/topic", 1);
 
         m_publisher.publish("/topic", "Hello world MQTT QoS1".getBytes(UTF_8), 1, false);
-        Awaitility.await().until(m_callback::isMessageReceived);
+        Awaitility.await().atMost(5, TimeUnit.SECONDS)
+            .until(m_callback::isMessageReceived);
         MqttMessage message = m_callback.retrieveMessage();
         assertEquals("Hello world MQTT QoS1", message.toString());
         assertEquals(1, message.getQos());

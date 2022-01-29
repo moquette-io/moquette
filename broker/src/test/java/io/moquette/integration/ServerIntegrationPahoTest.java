@@ -82,13 +82,8 @@ public class ServerIntegrationPahoTest {
 
     @AfterEach
     public void tearDown() throws Exception {
-        if (m_client != null && m_client.isConnected()) {
-            m_client.disconnect();
-        }
-
-        if (m_publisher != null && m_publisher.isConnected()) {
-            m_publisher.disconnect();
-        }
+        IntegrationUtils.disconnectClient(m_client);
+        IntegrationUtils.disconnectClient(m_publisher);
 
         stopServer();
     }

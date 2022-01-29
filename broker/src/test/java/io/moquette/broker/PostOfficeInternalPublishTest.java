@@ -29,6 +29,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static io.moquette.broker.PostOfficeUnsubscribeTest.CONFIG;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
@@ -57,7 +60,7 @@ public class PostOfficeInternalPublishTest {
     private MemoryQueueRepository queueRepository;
 
     @BeforeEach
-    public void setUp() {
+    public void setUp() throws ExecutionException, InterruptedException {
         sessionRegistry = initPostOfficeAndSubsystems();
 
         mockAuthenticator = new MockAuthenticator(singleton(FAKE_CLIENT_ID), singletonMap(TEST_USER, TEST_PWD));
@@ -65,7 +68,7 @@ public class PostOfficeInternalPublishTest {
 
         connectMessage = ConnectionTestUtils.buildConnect(FAKE_CLIENT_ID);
 
-        connection.processConnect(connectMessage);
+        connection.processConnect(connectMessage).get();
         ConnectionTestUtils.assertConnectAccepted(channel);
     }
 
@@ -89,7 +92,7 @@ public class PostOfficeInternalPublishTest {
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
         SessionRegistry sessionRegistry = new SessionRegistry(subscriptions, queueRepository, permitAll);
         sut = new PostOffice(subscriptions, retainedRepository, sessionRegistry,
-                             ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll);
+                             ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, 1024);
         return sessionRegistry;
     }
 
@@ -107,7 +110,11 @@ public class PostOfficeInternalPublishTest {
             .retained(retained)
             .qos(qos)
             .payload(Unpooled.copiedBuffer(PAYLOAD.getBytes(UTF_8))).build();
-        sut.internalPublish(publish);
+        try {
+            sut.internalPublish(publish).get(5, TimeUnit.SECONDS);
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Test
@@ -254,7 +261,7 @@ public class PostOfficeInternalPublishTest {
     }
 
     @Test
-    public void testClientSubscribeWithoutCleanSession() {
+    public void testClientSubscribeWithoutCleanSession() throws ExecutionException, InterruptedException {
         subscribe(AT_MOST_ONCE, "foo", connection);
         connection.processDisconnect(null);
         assertEquals(1, subscriptions.size());
@@ -265,7 +272,7 @@ public class PostOfficeInternalPublishTest {
             .clientId(FAKE_CLIENT_ID)
             .cleanSession(false)
             .build();
-        anotherConn.processConnect(connectMessage);
+        anotherConn.processConnect(connectMessage).get();
         ConnectionTestUtils.assertConnectAccepted((EmbeddedChannel) anotherConn.channel);
 
         assertEquals(1, subscriptions.size());

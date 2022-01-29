@@ -26,7 +26,10 @@ import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttVersion;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+
+import java.util.concurrent.ExecutionException;
 
 import static io.moquette.broker.NettyChannelAssertions.assertEqualsConnAck;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
@@ -69,7 +72,7 @@ public class MQTTConnectionConnectTest {
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
         sessionRegistry = new SessionRegistry(subscriptions, queueRepository, permitAll);
         postOffice = new PostOffice(subscriptions, new MemoryRetainedRepository(), sessionRegistry,
-                                    ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll);
+                                    ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, 1024);
 
         sut = createMQTTConnection(CONFIG);
         channel = (EmbeddedChannel) sut.channel;
@@ -90,7 +93,7 @@ public class MQTTConnectionConnectTest {
     }
 
     @Test
-    public void testZeroByteClientIdWithCleanSession() {
+    public void testZeroByteClientIdWithCleanSession() throws InterruptedException, ExecutionException {
         // Connect message with clean session set to true and client id is null.
         MqttConnectMessage msg = MqttMessageBuilders.connect()
             .protocolVersion(MqttVersion.MQTT_3_1_1)
@@ -98,7 +101,7 @@ public class MQTTConnectionConnectTest {
             .cleanSession(true)
             .build();
 
-        sut.processConnect(msg);
+        sut.processConnect(msg).get();
         assertEqualsConnAck("Connection must be accepted", CONNECTION_ACCEPTED, channel.readOutbound());
         assertNotNull("unique clientid must be generated", sut.getClientId());
         assertTrue(sessionRegistry.retrieve(sut.getClientId()).isClean(), "clean session flag must be true");
@@ -121,39 +124,39 @@ public class MQTTConnectionConnectTest {
     }
 
     @Test
-    public void testConnect_badClientID() {
+    public void testConnect_badClientID() throws ExecutionException, InterruptedException {
         connMsg.clientId("extremely_long_clientID_greater_than_23").build();
 
         // Exercise
-        sut.processConnect(connMsg.clientId("extremely_long_clientID_greater_than_23").build());
+        sut.processConnect(connMsg.clientId("extremely_long_clientID_greater_than_23").build()).get();
 
         // Verify
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
     }
 
     @Test
-    public void testWillIsAccepted() {
+    public void testWillIsAccepted() throws ExecutionException, InterruptedException {
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).willFlag(true)
             .willTopic("topic").willMessage("Topic message").build();
 
         // Exercise
-        // m_handler.setMessaging(mockedMessaging);
-        sut.processConnect(msg);
+        sut.processConnect(msg).get();
 
         // Verify
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
         assertTrue(channel.isOpen(), "Connection is accepted and therefore should remain open");
     }
 
+    @Disabled("already covered by testWillMessageIsFiredOnClientKeepAliveExpiry and testWillMessageIsPublishedOnClientBadDisconnection")
     @Test
-    public void testWillIsFired() {
+    public void testWillIsFired() throws ExecutionException, InterruptedException {
         final PostOffice postOfficeMock = mock(PostOffice.class);
         sut = createMQTTConnectionWithPostOffice(CONFIG, postOfficeMock);
         channel = (EmbeddedChannel) sut.channel;
 
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).willFlag(true)
             .willTopic("topic").willMessage("Topic message").build();
-        sut.processConnect(msg);
+        sut.processConnect(msg).get();
 
         // Exercise
         sut.handleConnectionLost();
@@ -164,11 +167,11 @@ public class MQTTConnectionConnectTest {
     }
 
     @Test
-    public void acceptAnonymousClient() {
+    public void acceptAnonymousClient() throws ExecutionException, InterruptedException {
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).build();
 
         // Exercise
-        sut.processConnect(msg);
+        sut.processConnect(msg).get();
 
         // Verify
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
@@ -176,12 +179,12 @@ public class MQTTConnectionConnectTest {
     }
 
     @Test
-    public void validAuthentication() {
+    public void validAuthentication() throws ExecutionException, InterruptedException {
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID)
             .username(TEST_USER).password(TEST_PWD).build();
 
         // Exercise
-        sut.processConnect(msg);
+        sut.processConnect(msg).get();
 
         // Verify
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
@@ -268,13 +271,13 @@ public class MQTTConnectionConnectTest {
     }
 
     @Test
-    public void testBindWithSameClientIDBadCredentialsDoesntDropExistingClient() {
+    public void testBindWithSameClientIDBadCredentialsDoesntDropExistingClient() throws ExecutionException, InterruptedException {
         // Connect a client1
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID)
             .username(TEST_USER)
             .password(TEST_PWD)
             .build();
-        sut.processConnect(msg);
+        sut.processConnect(msg).get();
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
 
         // create another connect same clientID but with bad credentials
@@ -301,17 +304,17 @@ public class MQTTConnectionConnectTest {
     }
 
     @Test
-    public void testForceClientDisconnection_issue116() {
+    public void testForceClientDisconnection_issue116() throws ExecutionException, InterruptedException {
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID)
             .username(TEST_USER)
             .password(TEST_PWD)
             .build();
-        sut.processConnect(msg);
+        sut.processConnect(msg).get();
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
 
         // now create another connection and check the new one closes the older
         MQTTConnection anotherConnection = createMQTTConnection(CONFIG);
-        anotherConnection.processConnect(msg);
+        anotherConnection.processConnect(msg).get();
         EmbeddedChannel anotherChannel = (EmbeddedChannel) anotherConnection.channel;
         assertEqualsConnAck(CONNECTION_ACCEPTED, anotherChannel.readOutbound());
 

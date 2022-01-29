@@ -38,6 +38,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutionException;
 
 import static io.moquette.broker.NettyChannelAssertions.assertEqualsConnAck;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
@@ -86,7 +87,7 @@ public class SessionRegistryTest {
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
         sut = new SessionRegistry(subscriptions, queueRepository, permitAll);
         final PostOffice postOffice = new PostOffice(subscriptions,
-            new MemoryRetainedRepository(), sut, ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll);
+            new MemoryRetainedRepository(), sut, ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, 1024);
         return new MQTTConnection(channel, config, mockAuthenticator, sut, postOffice);
     }
 
@@ -116,12 +117,12 @@ public class SessionRegistryTest {
     }
 
     @Test
-    public void connectWithCleanSessionUpdateClientSession() {
+    public void connectWithCleanSessionUpdateClientSession() throws ExecutionException, InterruptedException {
         // first connect with clean session true
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).cleanSession(true).build();
-        connection.processConnect(msg);
+        connection.processConnect(msg).get();
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
-        connection.processDisconnect(null);
+        connection.processDisconnect(null).get();
         assertFalse(channel.isOpen());
 
         // second connect with clean session false
@@ -133,7 +134,7 @@ public class SessionRegistryTest {
             .protocolVersion(MqttVersion.MQTT_3_1)
             .build();
 
-        anotherConnection.processConnect(secondConnMsg);
+        anotherConnection.processConnect(secondConnMsg).get();
         assertEqualsConnAck(CONNECTION_ACCEPTED, anotherChannel.readOutbound());
 
         // Verify client session is clean false
