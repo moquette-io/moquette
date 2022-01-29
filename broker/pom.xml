@@ -14,8 +14,10 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <netty.version>4.1.59.Final</netty.version>
-        <netty.tcnative.version>2.0.34.Final</netty.tcnative.version>
+        <netty.version>4.1.73.Final</netty.version>
+        <!-- Check Netty pom.xm to know the right version of tcnative, for example
+             https://github.com/netty/netty/blob/netty-4.1.73.Final/pom.xml#L545 -->
+        <netty.tcnative.version>2.0.46.Final</netty.tcnative.version>
         <paho.version>1.2.5</paho.version>
         <h2.version>1.4.199</h2.version>
     </properties>
@@ -24,14 +26,14 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>1.7.25</version>
+            <version>1.7.35</version>
         </dependency>
 
         <dependency>
             <!-- This is used to use log4j12 implementation -->
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
-            <version>1.7.25</version>
+            <version>1.7.35</version>
             <scope>runtime</scope>
         </dependency>
 

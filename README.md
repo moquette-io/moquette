@@ -1,8 +1,8 @@
-![Java CI with Maven](https://github.com/moquette-io/moquette/workflows/Java%20CI%20with%20Maven/badge.svg?branch=master)
+ServerIntegrationOpenSSLTest![Java CI with Maven](https://github.com/moquette-io/moquette/workflows/Java%20CI%20with%20Maven/badge.svg?branch=main)
 
 ## Moquette Project
 
-[![Build Status](https://api.travis-ci.org/moquette-io/moquette.svg?branch=master)](https://travis-ci.org/moquette-io/moquette)
+[![Build Status](https://api.travis-ci.org/moquette-io/moquette.svg?branch=main)](https://travis-ci.org/moquette-io/moquette)
 
 * [Documentation reference guide](http://moquette-io.github.io/moquette/) Guide on how to use and configure Moquette
 * [Google Group](https://groups.google.com/forum/#!forum/moquette-mqtt) Google Group to participate in development discussions.
@@ -44,30 +44,13 @@ Or if you are on Windows shell
 
 ## Embedding in other projects
 
-To embed Moquette in another maven project is sufficient to include a repository and declare the dependency: 
-
-```
-<repositories>
-  <repository>
-    <id>bintray</id>
-    <url>https://jcenter.bintray.com</url>
-    <releases>
-      <enabled>true</enabled>
-    </releases>
-    <snapshots>
-      <enabled>false</enabled>
-    </snapshots>
-  </repository>
-</repositories>
-```
-
 Include dependency in your project: 
 
 ```
 <dependency>
       <groupId>io.moquette</groupId>
       <artifactId>moquette-broker</artifactId>
-      <version>0.14</version>
+      <version>0.15</version>
 </dependency>
 ```
 
