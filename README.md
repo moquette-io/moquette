@@ -20,17 +20,13 @@ Moquette is also used into [Atomize Spin](http://atomizesoftware.com/spin) a sof
 Part of moquette are used into the [Vertx MQTT module](https://github.com/giovibal/vertx-mqtt-broker-mod), into [MQTT spy](http://kamilfb.github.io/mqtt-spy/)
 and into [WSO2 Messge broker](http://techexplosives-pamod.blogspot.it/2014/05/mqtt-transport-architecture-wso2-mb-3x.html).
 
-## Try the demo instance
-
-Point your browser to [cloud instance](http://broker.moquette.io), request an account then use it from your MQTT clients.
-
 ## 1 minute set up
 
-Start play with it, download the self distribution tar from [BinTray](https://bintray.com/artifact/download/andsel/generic/moquette-0.14.tar.gz) ,
+Start play with it, download the self distribution tar from [BinTray](https://bintray.com/artifact/download/andsel/generic/moquette-0.15.tar.gz) ,
 the un untar and start the broker listening on `1883` port and enjoy!
 
 ```
-tar xvf moquette-distribution-0.14.tar.gz
+tar xvf moquette-distribution-0.15.tar.gz
 cd bin
 ./moquette.sh
 ```
@@ -56,9 +52,7 @@ Include dependency in your project:
 
 ## Build from sources
 
+After a git clone of the repository, cd into the cloned sources and: `./gradlew package`, at the end the distribution 
+package is present at `distribution/target/distribution-0.16-SNAPSHOT-bundle.tar.gz`
 
-After a git clone of the repository, cd into the cloned sources and: `./gradlew clean moquette-distribution:distMoquetteTar` or
-`./gradlew clean moquette-distribution:distMoquetteZip`.
-
-
-In distribution/build directory will be produced the selfcontained file for the broker with all dependencies and a running script. 
+In distribution/target directory will be produced the selfcontained file for the broker with all dependencies and a running script. 
