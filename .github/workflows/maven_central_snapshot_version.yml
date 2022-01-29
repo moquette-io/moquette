@@ -4,7 +4,7 @@ name: Build and ship SNAPSHOT versions to Maven Central
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
 
 jobs:
     publish:
