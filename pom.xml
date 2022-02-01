@@ -7,10 +7,14 @@
         <source.version>1.8</source.version>
         <target.version>1.8</target.version>
         <junit.version>5.7.0</junit.version>
+
+        <iqm.repository.host>http://192.168.17.193</iqm.repository.host>
+        <iqm.repository.port>8081</iqm.repository.port>
+        <iqm.repository.url>${iqm.repository.host}:${iqm.repository.port}/nexus/content/groups/public/</iqm.repository.url>
     </properties>
 
     <groupId>io.moquette</groupId>
-    <artifactId>moquette-parent</artifactId>
+    <artifactId>moquette-parent-custom</artifactId>
 
     <packaging>pom</packaging>
     <version>0.16-SNAPSHOT</version>
@@ -214,7 +218,52 @@
                 </plugins>
             </build>
         </profile>
+        <profile>
+            <id>with-sources-and-docs-artifacts</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
     </profiles>
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>iqmessenger</id>
+            <name>IQMessenger</name>
+            <url>${iqm.repository.url}</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </pluginRepository>
+    </pluginRepositories>
 
     <repositories>
         <repository>
@@ -228,22 +277,31 @@
         </repository>
 
         <repository>
-            <id>sonatype-snapshots</id>
+            <id>iqmessenger</id>
+            <name>My Public Repository</name>
+            <url>${iqm.repository.url}</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
             <snapshots>
                 <enabled>true</enabled>
+                <updatePolicy>always</updatePolicy>
             </snapshots>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
         </repository>
     </repositories>
 
     <distributionManagement>
+        <!--  Publish snapshots here  -->
         <snapshotRepository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+            <id>snapshots</id>
+            <name>Snapshots</name>
+            <url>${iqm.repository.host}:${iqm.repository.port}/nexus/content/repositories/snapshots/</url>
         </snapshotRepository>
+        <!--  Publish versioned releases here  -->
         <repository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
+            <id>releases</id>
+            <name>Releases</name>
+            <url>${iqm.repository.host}:${iqm.repository.port}/nexus/content/repositories/releases/</url>
         </repository>
     </distributionManagement>
 </project>

@@ -3,19 +3,19 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <relativePath>../pom.xml</relativePath>
-        <artifactId>moquette-parent</artifactId>
+        <artifactId>moquette-parent-custom</artifactId>
         <groupId>io.moquette</groupId>
         <version>0.16-SNAPSHOT</version>
     </parent>
 
-    <artifactId>embedded_test</artifactId>
+    <artifactId>embedded_test-custom</artifactId>
     <packaging>pom</packaging>
     <name>Moquette - Embedded test</name>
 
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>moquette-broker</artifactId>
+            <artifactId>moquette-broker-custom</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>
