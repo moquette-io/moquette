@@ -1,4 +1,4 @@
- ServerIntegrationOpenSSLTest![Java CI with Maven](https://github.com/moquette-io/moquette/workflows/Java%20CI%20with%20Maven/badge.svg?branch=main)
+ServerIntegrationOpenSSLTest![Java CI with Maven](https://github.com/moquette-io/moquette/workflows/Java%20CI%20with%20Maven/badge.svg?branch=main)
 
 ## Moquette Project
 
