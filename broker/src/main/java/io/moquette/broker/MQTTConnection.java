@@ -230,7 +230,7 @@ final class MQTTConnection {
                     }
                 } else {
                     bindedSession.disconnect();
-                    sessionRegistry.remove(bindedSession);
+                    sessionRegistry.remove(bindedSession.getClientID());
                     LOG.error("CONNACK send failed, cleanup session and close the connection", future.cause());
                     channel.close();
                 }
@@ -317,7 +317,7 @@ final class MQTTConnection {
         }
         if (bindedSession.isClean()) {
             LOG.debug("Remove session for client");
-            sessionRegistry.remove(bindedSession);
+            sessionRegistry.remove(bindedSession.getClientID());
         } else {
             bindedSession.disconnect();
         }

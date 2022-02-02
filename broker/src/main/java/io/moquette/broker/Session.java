@@ -69,7 +69,7 @@ class Session {
     }
 
     enum SessionStatus {
-        CONNECTED, CONNECTING, DISCONNECTING, DISCONNECTED
+        CONNECTED, CONNECTING, DISCONNECTING, DISCONNECTED, DESTROYED
     }
 
     static final class Will {
@@ -168,6 +168,8 @@ class Session {
 
     public void closeImmediately() {
         mqttConnection.dropConnection();
+        mqttConnection = null;
+        status.set(SessionStatus.DISCONNECTED);
     }
 
     public void disconnect() {
@@ -462,6 +464,18 @@ class Session {
             return Optional.of(mqttConnection.remoteAddress());
         }
         return Optional.empty();
+    }
+
+    public void cleanUp() {
+        for (EnqueuedMessage msg : sessionQueue) {
+            msg.release();
+        }
+        for (EnqueuedMessage msg : inflightWindow.values()) {
+            msg.release();
+        }
+        for (MqttPublishMessage msg : qos2Receiving.values()) {
+            msg.release();
+        }
     }
 
     @Override
