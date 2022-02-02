@@ -223,7 +223,7 @@ class NewNettyAcceptor {
         } catch (Exception ex) {
             if (ex instanceof BindException) {
                LOG.error("Cannot bind to port: " + port, ex);
-                throw new RuntimeException(ex);
+               throw new RuntimeException(ex);
             } else {
                 LOG.error("An interruptedException was caught while initializing integration. Protocol={}", protocol, ex);
                 throw new RuntimeException(ex);

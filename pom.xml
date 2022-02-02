@@ -14,7 +14,7 @@
     </properties>
 
     <groupId>io.moquette</groupId>
-    <artifactId>moquette-parent-custom</artifactId>
+    <artifactId>moquette-parent-iqmessenger</artifactId>
 
     <packaging>pom</packaging>
     <version>0.16-SNAPSHOT</version>

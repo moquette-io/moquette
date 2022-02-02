@@ -45,7 +45,7 @@ Include dependency in your project:
 ```
 <dependency>
       <groupId>io.moquette</groupId>
-      <artifactId>moquette-broker-custom</artifactId>
+      <artifactId>moquette-broker-iqmessenger</artifactId>
       <version>0.15</version>
 </dependency>
 ```

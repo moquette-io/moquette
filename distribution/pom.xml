@@ -3,12 +3,12 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <relativePath>../pom.xml</relativePath>
-        <artifactId>moquette-parent-custom</artifactId>
+        <artifactId>moquette-parent-iqmessenger</artifactId>
         <groupId>io.moquette</groupId>
         <version>0.16-SNAPSHOT</version>
     </parent>
 
-    <artifactId>distribution-custom</artifactId>
+    <artifactId>distribution-iqmessenger</artifactId>
     <packaging>pom</packaging>
     <name>Moquette - distribution</name>
 
@@ -16,7 +16,7 @@
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>moquette-broker-custom</artifactId>
+            <artifactId>moquette-broker-iqmessenger</artifactId>
             <version>${project.version}</version>
         </dependency>
 
