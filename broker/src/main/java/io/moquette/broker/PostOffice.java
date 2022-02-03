@@ -318,6 +318,7 @@ class PostOffice {
             }
 
             interceptor.notifyTopicPublished(msg, clientID, username);
+            // ? ReferenceCountUtil.release(msg);
         });
     }
 

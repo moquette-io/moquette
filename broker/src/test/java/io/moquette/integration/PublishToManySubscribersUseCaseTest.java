@@ -10,9 +10,7 @@ import org.eclipse.paho.client.mqttv3.IMqttActionListener;
 import org.eclipse.paho.client.mqttv3.IMqttAsyncClient;
 import org.eclipse.paho.client.mqttv3.IMqttToken;
 import org.eclipse.paho.client.mqttv3.MqttAsyncClient;
-import org.eclipse.paho.client.mqttv3.MqttClientPersistence;
 import org.eclipse.paho.client.mqttv3.MqttException;
-import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,7 +36,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 // inspired by ServerIntegrationPahoTest
-public class PublishToManySubscribersUseCaseTest {
+public class PublishToManySubscribersUseCaseTest extends AbstractIntegration {
 
     private static final Logger LOG = LoggerFactory.getLogger(PublishToManySubscribersUseCaseTest.class);
 
@@ -47,19 +45,16 @@ public class PublishToManySubscribersUseCaseTest {
     private static final int EVENT_LOOPS = Runtime.getRuntime().availableProcessors();
     public static final int NUM_SUBSCRIBERS = COMMAND_QUEUE_SIZE * EVENT_LOOPS * 4;
     private Server broker;
-    private IConfig brokerConfig;
 
     @TempDir
     Path tempFolder;
-    private String dbPath;
-    private MqttAsyncClient publisher;
     private List<IMqttAsyncClient> subscribers;
 
     protected void startServer(String dbPath) throws IOException {
         broker = new Server();
         final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
         configProps.put(BrokerConstants.SESSION_QUEUE_SIZE, Integer.toString(COMMAND_QUEUE_SIZE));
-        brokerConfig = new MemoryConfig(configProps);
+        IConfig brokerConfig = new MemoryConfig(configProps);
         broker.startServer(brokerConfig);
     }
 
@@ -73,7 +68,7 @@ public class PublishToManySubscribersUseCaseTest {
         dbPath = IntegrationUtils.tempH2Path(tempFolder);
         startServer(dbPath);
 
-        publisher = createClient("publisher");
+        publisher = createClient("publisher", tempFolder);
         publisher.connect().waitForCompletion(1_000);
 
         subscribers = createSubscribers(NUM_SUBSCRIBERS);
@@ -120,15 +115,9 @@ public class PublishToManySubscribersUseCaseTest {
     private List<IMqttAsyncClient> createSubscribers(int numSubscribers) throws MqttException, IOException {
         List<IMqttAsyncClient> clients = new ArrayList<>(numSubscribers);
         for (int i = 0; i < numSubscribers; i++) {
-            clients.add(createClient("subscriber_" + i));
+            clients.add(createClient("subscriber_" + i, tempFolder));
         }
         return clients;
-    }
-
-    private MqttAsyncClient createClient(String clientName) throws IOException, MqttException {
-        final String dataPath = IntegrationUtils.newFolder(tempFolder, clientName).getAbsolutePath();
-        MqttClientPersistence clientDataStore = new MqttDefaultFilePersistence(dataPath);
-        return new MqttAsyncClient("tcp://localhost:1883", clientName, clientDataStore);
     }
 
     @AfterEach
