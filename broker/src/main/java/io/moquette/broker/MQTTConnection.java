@@ -415,9 +415,8 @@ final class MQTTConnection {
         switch (qos) {
             case AT_MOST_ONCE:
                 return postOffice.receivedPublishQos0(topic, username, clientId, msg);
-            case AT_LEAST_ONCE: {
+            case AT_LEAST_ONCE:
                 return postOffice.receivedPublishQos1(this, topic, username, messageID, msg);
-            }
             case EXACTLY_ONCE: {
                 final CompletableFuture<PostOffice.RouteResult> firstStepFuture = postOffice.routeCommand(clientId, () -> {
                     bindedSession.receivedPublishQos2(messageID, msg);
