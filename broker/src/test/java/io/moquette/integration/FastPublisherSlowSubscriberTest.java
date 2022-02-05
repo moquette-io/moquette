@@ -39,17 +39,18 @@ public class FastPublisherSlowSubscriberTest extends AbstractIntegration {
     private Server broker;
     private MqttAsyncClient subscriber;
     private ScheduledExecutorService publisherPool;
+    private final SecureRandom random = new SecureRandom();
 
-//    protected void startServer(String dbPath) throws IOException {
-//        broker = new Server();
-//        final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
-//        broker.startServer(new MemoryConfig(configProps));
-//    }
+    protected void startServer(String dbPath) throws IOException {
+        broker = new Server();
+        final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
+        broker.startServer(new MemoryConfig(configProps));
+    }
 
     @BeforeEach
     public void setUp() throws Exception {
-//        dbPath = IntegrationUtils.tempH2Path(tempFolder);
-//        startServer(dbPath);
+        dbPath = IntegrationUtils.tempH2Path(tempFolder);
+        startServer(dbPath);
 
         publisher = createClient("publisher", tempFolder);
         publisher.connect().waitForCompletion(1_000);
@@ -61,8 +62,7 @@ public class FastPublisherSlowSubscriberTest extends AbstractIntegration {
 
     @Ignore
     @Test
-    public void executeUseCase() throws MqttException, InterruptedException {
-        final SecureRandom random = new SecureRandom();
+    public void publisherAtFixedRate() throws MqttException, InterruptedException {
         CountDownLatch stopTest = new CountDownLatch(1);
         publisherPool.scheduleAtFixedRate(new Runnable() {
             @Override
@@ -79,23 +79,37 @@ public class FastPublisherSlowSubscriberTest extends AbstractIntegration {
             }
         }, 1000, 100, TimeUnit.MILLISECONDS);
 
-//        final Thread publisherTask = new Thread() {
-//            @Override
-//            public void run() {
-//                while(!isInterrupted()) {
-//                    final int delta = random.nextInt(10);
-//                    int temp = 15 + delta;
-//                    try {
-//                        publisher.publish("/temperature", (temp + "°C").getBytes(UTF_8), 0, false);
-//                    } catch (MqttException e) {
-//                        e.printStackTrace();
-//                        interrupt();
-//                    }
-//                }
-//            }
-//        };
-//        publisherTask.start();
+        slowSubscribe();
 
+        stopTest.await();
+    }
+
+    @Ignore
+    @Test
+    public void asFastAsItCan() throws MqttException, InterruptedException {
+        final Thread publisherTask = new Thread() {
+            @Override
+            public void run() {
+                while(!isInterrupted()) {
+                    final int delta = random.nextInt(10);
+                    int temp = 15 + delta;
+                    try {
+                        publisher.publish("/temperature", (temp + "°C").getBytes(UTF_8), 0, false);
+                    } catch (MqttException e) {
+                        e.printStackTrace();
+                        interrupt();
+                    }
+                }
+            }
+        };
+        publisherTask.start();
+
+        slowSubscribe();
+
+        publisherTask.join();
+    }
+
+    private void slowSubscribe() throws MqttException {
         subscriber.subscribe("/temperature", 1, new IMqttMessageListener() {
             @Override
             public void messageArrived(String topic, MqttMessage message) throws Exception {
@@ -104,9 +118,6 @@ public class FastPublisherSlowSubscriberTest extends AbstractIntegration {
                 LOG.info("Received temp: {}", temp);
             }
         });
-
-        stopTest.await();
-//        publisherTask.join();
     }
 
     @AfterEach
