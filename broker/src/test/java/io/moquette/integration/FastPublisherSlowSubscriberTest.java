@@ -79,7 +79,7 @@ public class FastPublisherSlowSubscriberTest extends AbstractIntegration {
             }
         }, 1000, 100, TimeUnit.MILLISECONDS);
 
-        slowSubscribe();
+        slowSubscribe(1);
 
         stopTest.await();
     }
@@ -104,13 +104,13 @@ public class FastPublisherSlowSubscriberTest extends AbstractIntegration {
         };
         publisherTask.start();
 
-        slowSubscribe();
+        slowSubscribe(2);
 
         publisherTask.join();
     }
 
-    private void slowSubscribe() throws MqttException {
-        subscriber.subscribe("/temperature", 1, new IMqttMessageListener() {
+    private void slowSubscribe(int qos) throws MqttException {
+        subscriber.subscribe("/temperature", qos, new IMqttMessageListener() {
             @Override
             public void messageArrived(String topic, MqttMessage message) throws Exception {
                 Thread.currentThread().sleep(500);
