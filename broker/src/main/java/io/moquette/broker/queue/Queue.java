@@ -51,31 +51,54 @@ public class Queue {
             return;
         } else {
             lock.lock();
-            long spaceNeeded;
+            long bytesAvailableInHeaderSegment;
             SegmentPointer lastOffset = null;
 
             // the bytes written from the data input
             do {
                 final Segment currentSegment = headSegment.get();
-                spaceNeeded = currentSegment.bytesAfter(currentHeadPtr.get());
-            } while (spaceNeeded != 0 && ((lastOffset = spinningMove(spaceNeeded)) == null));
+                bytesAvailableInHeaderSegment = currentSegment.bytesAfter(currentHeadPtr.get());
+            } while (bytesAvailableInHeaderSegment != 0 && ((lastOffset = spinningMove(bytesAvailableInHeaderSegment)) == null));
 
             SegmentPointer newSegmentPointer = null;
             boolean firstWrite = true;
-            if (spaceNeeded != 0) {
-                LOG.trace("Writing partial data to offset {} for {} bytes", lastOffset, spaceNeeded);
+            if (bytesAvailableInHeaderSegment != 0) {
+                LOG.trace("Writing partial data to offset {} for {} bytes", lastOffset, bytesAvailableInHeaderSegment);
                 final int dataSize = data.remaining();
+                if (bytesAvailableInHeaderSegment <= LENGTH_HEADER_SIZE) {
+                    //TODO write the length in a buffer
+                    // write the partial buffer to existing segment
+                    // ask for another segment
+                    // write the remaining of the header
+                    // write the data
+                    ByteBuffer fullPacket = (ByteBuffer) ByteBuffer.allocate(LENGTH_HEADER_SIZE + dataSize)
+                        .putInt(dataSize)
+                        .put(data)
+                        .flip();
+                    data = fullPacket; // WARN, parameter overwriting
 
-                final int copySize = (int) (spaceNeeded - LENGTH_HEADER_SIZE);
-                final ByteBuffer slice = data.slice();
-                slice.limit(copySize);
+                    final int copySize = (int) (LENGTH_HEADER_SIZE - bytesAvailableInHeaderSegment);
+                    final ByteBuffer slice = data.slice();
+                    slice.limit(copySize);
+                    writeDataNoHeader(headSegment.get(), lastOffset, slice);
 
-                writeData(headSegment.get(), lastOffset, dataSize, slice);
-                firstWrite = false;
-                newSegmentPointer = new SegmentPointer(headSegment.get(), currentHeadPtr.get().offset() + spaceNeeded);
+                    firstWrite = false;
+                    newSegmentPointer = new SegmentPointer(headSegment.get(), currentHeadPtr.get().offset() + bytesAvailableInHeaderSegment);
 
-                // shift forward the consumption point
-                data.position(data.position() + copySize);
+                    // shift forward the consumption point
+                    data.position(data.position() + copySize);
+                } else {
+                    final int copySize = (int) (bytesAvailableInHeaderSegment - LENGTH_HEADER_SIZE);
+                    final ByteBuffer slice = data.slice();
+                    slice.limit(copySize);
+
+                    writeData(headSegment.get(), lastOffset, dataSize, slice);
+                    firstWrite = false;
+                    newSegmentPointer = new SegmentPointer(headSegment.get(), currentHeadPtr.get().offset() + bytesAvailableInHeaderSegment);
+
+                    // shift forward the consumption point
+                    data.position(data.position() + copySize);
+                }
             }
 
             Segment newSegment = null;
@@ -127,6 +150,12 @@ public class Queue {
         writeData(segment, start, data.remaining(), data);
     }
 
+    /**
+     * @param segment the target segment.
+     * @param start where start writing.
+     * @param size the length of the data to write on the segment.
+     * @param data the data to write.
+     * */
     private void writeData(Segment segment, SegmentPointer start, int size, ByteBuffer data) {
         ByteBuffer length = (ByteBuffer) ByteBuffer.allocate(LENGTH_HEADER_SIZE).putInt(size).flip();
         segment.write(start, length); // write 4 bytes header

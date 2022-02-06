@@ -149,7 +149,7 @@ class QueueTest {
     }
 
     @Test
-    public void insertWithHeaderCrossingSegments() throws QueueException, IOException {
+    public void insertWithAnHeaderThatCrossSegments() throws QueueException, IOException {
         final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
         final Queue queue = queuePool.getOrCreate("test");
 
