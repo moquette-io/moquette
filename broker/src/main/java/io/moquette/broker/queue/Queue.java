@@ -16,9 +16,9 @@ public class Queue {
     public static final int LENGTH_HEADER_SIZE = 4;
     private final String name;
     private final AtomicReference<Segment> headSegment;
-    /* First writeable byte */
+    /* First writeable byte, point to first free byte */
     private final AtomicReference<SegmentPointer> currentHeadPtr;
-    /* First readable byte */
+    /* First readable byte, point to the last occupied byte */
     private final AtomicReference<SegmentPointer> currentTailPtr;
     private final AtomicReference<Segment> tailSegment;
 
@@ -54,6 +54,12 @@ public class Queue {
             long bytesAvailableInHeaderSegment;
             SegmentPointer lastOffset = null;
 
+            final int dataSize = data.remaining();
+            final ByteBuffer rawData = (ByteBuffer) ByteBuffer.allocate(LENGTH_HEADER_SIZE + dataSize)
+                .putInt(dataSize)
+                .put(data)
+                .flip();
+
             // the bytes written from the data input
             do {
                 final Segment currentSegment = headSegment.get();
@@ -61,69 +67,36 @@ public class Queue {
             } while (bytesAvailableInHeaderSegment != 0 && ((lastOffset = spinningMove(bytesAvailableInHeaderSegment)) == null));
 
             SegmentPointer newSegmentPointer = null;
-            boolean firstWrite = true;
             if (bytesAvailableInHeaderSegment != 0) {
                 LOG.trace("Writing partial data to offset {} for {} bytes", lastOffset, bytesAvailableInHeaderSegment);
-                final int dataSize = data.remaining();
-                if (bytesAvailableInHeaderSegment <= LENGTH_HEADER_SIZE) {
-                    //TODO write the length in a buffer
-                    // write the partial buffer to existing segment
-                    // ask for another segment
-                    // write the remaining of the header
-                    // write the data
-                    ByteBuffer fullPacket = (ByteBuffer) ByteBuffer.allocate(LENGTH_HEADER_SIZE + dataSize)
-                        .putInt(dataSize)
-                        .put(data)
-                        .flip();
-                    data = fullPacket; // WARN, parameter overwriting
 
-                    final int copySize = (int) (LENGTH_HEADER_SIZE - bytesAvailableInHeaderSegment);
-                    final ByteBuffer slice = data.slice();
-                    slice.limit(copySize);
-                    writeDataNoHeader(headSegment.get(), lastOffset, slice);
+                final int copySize = (int) bytesAvailableInHeaderSegment;
+                final ByteBuffer slice = rawData.slice();
+                slice.limit(copySize);
+                writeDataNoHeader(headSegment.get(), lastOffset, slice);
 
-                    firstWrite = false;
-                    newSegmentPointer = new SegmentPointer(headSegment.get(), currentHeadPtr.get().offset() + bytesAvailableInHeaderSegment);
+                newSegmentPointer = new SegmentPointer(headSegment.get(), currentHeadPtr.get().offset() + bytesAvailableInHeaderSegment);
 
-                    // shift forward the consumption point
-                    data.position(data.position() + copySize);
-                } else {
-                    final int copySize = (int) (bytesAvailableInHeaderSegment - LENGTH_HEADER_SIZE);
-                    final ByteBuffer slice = data.slice();
-                    slice.limit(copySize);
-
-                    writeData(headSegment.get(), lastOffset, dataSize, slice);
-                    firstWrite = false;
-                    newSegmentPointer = new SegmentPointer(headSegment.get(), currentHeadPtr.get().offset() + bytesAvailableInHeaderSegment);
-
-                    // shift forward the consumption point
-                    data.position(data.position() + copySize);
-                }
+                // shift forward the consumption point
+                rawData.position(rawData.position() + copySize);
             }
 
             Segment newSegment = null;
             try {
-                while (data.hasRemaining()) {
+                while (rawData.hasRemaining()) {
                     newSegment = allocator.nextFreeSegment();
                     //notify segment creation for queue in queue pool
                     action.segmentedCreated(name, newSegment);
 
-                    int copySize = (int) Math.min(data.remaining(), Segment.SIZE);
-                    final ByteBuffer slice = data.slice();
+                    int copySize = (int) Math.min(rawData.remaining(), Segment.SIZE);
+                    final ByteBuffer slice = rawData.slice();
                     slice.limit(copySize);
 
-                    newSegmentPointer = new SegmentPointer(newSegment, newSegment.begin.offset() + (copySize + LENGTH_HEADER_SIZE) - 1);
-
-                    // if not first write of data
-                    if (!firstWrite) {
-                        writeDataNoHeader(newSegment, newSegment.begin, slice);
-                    } else {
-                        writeData(newSegment, newSegment.begin, slice);
-                    }
-                    firstWrite = false;
+                    newSegmentPointer = new SegmentPointer(newSegment, newSegment.begin.offset() + copySize - 1);
+                    writeDataNoHeader(newSegment, newSegment.begin, slice);
 
                     // shift forward the consumption point
-                    data.position(data.position() + copySize);
+                    rawData.position(rawData.position() + copySize);
                 }
 
                 // publish the last segment created and the pointer to head.
