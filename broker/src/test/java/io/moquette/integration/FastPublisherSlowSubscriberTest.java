@@ -2,13 +2,13 @@ package io.moquette.integration;
 
 import io.moquette.broker.Server;
 import io.moquette.broker.config.MemoryConfig;
-import jdk.nashorn.internal.ir.annotations.Ignore;
 import org.eclipse.paho.client.mqttv3.IMqttMessageListener;
 import org.eclipse.paho.client.mqttv3.MqttAsyncClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
@@ -60,7 +60,7 @@ public class FastPublisherSlowSubscriberTest extends AbstractIntegration {
         publisherPool = Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors() * 2);
     }
 
-    @Ignore
+    @Disabled("Never ending test to be triggered by hand")
     @Test
     public void publisherAtFixedRate() throws MqttException, InterruptedException {
         CountDownLatch stopTest = new CountDownLatch(1);
@@ -84,7 +84,7 @@ public class FastPublisherSlowSubscriberTest extends AbstractIntegration {
         stopTest.await();
     }
 
-    @Ignore
+    @Disabled("Never ending test to be triggered by hand")
     @Test
     public void asFastAsItCan() throws MqttException, InterruptedException {
         final Thread publisherTask = new Thread() {
