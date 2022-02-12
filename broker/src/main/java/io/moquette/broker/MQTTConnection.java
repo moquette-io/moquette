@@ -25,6 +25,7 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.mqtt.*;
 import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -414,9 +415,15 @@ final class MQTTConnection {
         msg.retain();
         switch (qos) {
             case AT_MOST_ONCE:
-                return postOffice.receivedPublishQos0(topic, username, clientId, msg);
+                return postOffice.routeCommand(clientId, () -> {
+                    postOffice.receivedPublishQos0(topic, username, clientId, msg);
+                    return null;
+                });
             case AT_LEAST_ONCE:
-                return postOffice.receivedPublishQos1(this, topic, username, messageID, msg);
+                return postOffice.routeCommand(clientId, () -> {
+                    postOffice.receivedPublishQos1(this, topic, username, messageID, msg);
+                    return null;
+                });
             case EXACTLY_ONCE: {
                 final CompletableFuture<PostOffice.RouteResult> firstStepFuture = postOffice.routeCommand(clientId, () -> {
                     bindedSession.receivedPublishQos2(messageID, msg);
