@@ -19,6 +19,7 @@ import io.moquette.interception.BrokerInterceptor;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
 import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.Topic;
+import io.moquette.interception.messages.InterceptAcknowledgedMessage;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.*;
@@ -577,6 +578,11 @@ class PostOffice {
 
     void dispatchConnectionLost(String clientId,String userName) {
         interceptor.notifyClientConnectionLost(clientId, userName);
+    }
+
+    void dispatchMessageAcknowledgement(String clientId, int packetId) {
+        interceptor.notifyMessageAcknowledged(new InterceptAcknowledgedMessage(
+            null, null, clientId, packetId));
     }
 
     /**

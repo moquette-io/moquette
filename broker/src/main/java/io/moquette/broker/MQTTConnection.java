@@ -111,6 +111,7 @@ final class MQTTConnection {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
         this.postOffice.routeCommand(bindedSession.getClientID(), () -> {
             bindedSession.processPubComp(messageID);
+            postOffice.dispatchMessageAcknowledgement(getClientId(), messageID); // for iqm
             return bindedSession.getClientID();
         });
     }
@@ -133,6 +134,7 @@ final class MQTTConnection {
         final String clientId = getClientId();
         this.postOffice.routeCommand(clientId, () -> {
             bindedSession.pubAckReceived(messageID);
+            postOffice.dispatchMessageAcknowledgement(clientId, messageID); // for iqm
             return null;
         });
     }
@@ -564,8 +566,15 @@ final class MQTTConnection {
         bindedSession.resendInflightNotAcked();
     }
 
+    int predictNextPacketIdWithoutChangingId() {
+        int lastPacketIdLocal = lastPacketId.get();
+        lastPacketIdLocal =  lastPacketIdLocal == 65535 ? 1 : lastPacketIdLocal + 1;
+        return lastPacketIdLocal;
+    }
+
     int nextPacketId() {
-        return lastPacketId.updateAndGet(v -> v == 65535 ? 1 : v + 1);
+        LOG.debug("Next packet id was called: {}", lastPacketId.updateAndGet(v -> v == 65535 ? 1 : v + 1));
+        return lastPacketId.get();
     }
 
     @Override
