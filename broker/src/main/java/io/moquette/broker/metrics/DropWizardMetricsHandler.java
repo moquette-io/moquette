@@ -46,11 +46,6 @@ public final class DropWizardMetricsHandler extends ChannelInboundHandlerAdapter
         this.publishesMetrics = metrics.meter("publish.requests");
         this.subscribeMetrics = metrics.meter("subscribe.requests");
         this.connectedClientsMetrics = metrics.counter("connect.num_clients");
-//        ConsoleReporter reporter = ConsoleReporter.forRegistry(metrics)
-//            .convertRatesTo(TimeUnit.SECONDS)
-//            .convertDurationsTo(TimeUnit.MILLISECONDS)
-//            .build();
-//        reporter.start(1, TimeUnit.MINUTES);
         final String email = props.getProperty(METRICS_LIBRATO_EMAIL_PROPERTY_NAME);
         final String token = props.getProperty(METRICS_LIBRATO_TOKEN_PROPERTY_NAME);
         final String source = props.getProperty(METRICS_LIBRATO_SOURCE_PROPERTY_NAME);

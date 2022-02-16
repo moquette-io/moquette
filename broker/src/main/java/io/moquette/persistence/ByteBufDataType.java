@@ -17,7 +17,6 @@ package io.moquette.persistence;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import org.h2.mvstore.DataUtils;
 import org.h2.mvstore.WriteBuffer;
 
 import java.nio.ByteBuffer;
