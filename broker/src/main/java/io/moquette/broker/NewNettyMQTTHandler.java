@@ -24,8 +24,6 @@ import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.function.BiConsumer;
-
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 
 @Sharable
@@ -37,27 +35,23 @@ public class NewNettyMQTTHandler extends ChannelInboundHandlerAdapter {
     private static final AttributeKey<Object> ATTR_KEY_CONNECTION = AttributeKey.valueOf(ATTR_CONNECTION);
 
     private MQTTConnectionFactory connectionFactory;
-    private BiConsumer<String, Integer> updateMapClientIdPredictedNextPacketId;
 
-    NewNettyMQTTHandler(MQTTConnectionFactory connectionFactory, BiConsumer<String, Integer> updateMapClientIdPredictedNextPacketId) {
+    NewNettyMQTTHandler(MQTTConnectionFactory connectionFactory) {
         this.connectionFactory = connectionFactory;
-        this.updateMapClientIdPredictedNextPacketId = updateMapClientIdPredictedNextPacketId;
     }
 
     private static void mqttConnection(Channel channel, MQTTConnection connection) {
         channel.attr(ATTR_KEY_CONNECTION).set(connection);
     }
 
-    private static MQTTConnection mqttConnection(Channel channel, NewNettyMQTTHandler handlerToCallUpdateMap) {
-        MQTTConnection mqttConnection = (MQTTConnection) channel.attr(ATTR_KEY_CONNECTION).get();
-        handlerToCallUpdateMap.updateMapClientIdPredictedNextPacketId.accept(mqttConnection.getClientId(), mqttConnection.predictNextPacketIdWithoutChangingId());
-        return mqttConnection;
+    private static MQTTConnection mqttConnection(Channel channel) {
+        return (MQTTConnection) channel.attr(ATTR_KEY_CONNECTION).get();
     }
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object message) throws Exception {
         MqttMessage msg = NettyUtils.validateMessage(message);
-        final MQTTConnection mqttConnection = mqttConnection(ctx.channel(), this);
+        final MQTTConnection mqttConnection = mqttConnection(ctx.channel());
         try {
             mqttConnection.handleMessage(msg);
         } catch (Throwable ex) {
@@ -76,7 +70,7 @@ public class NewNettyMQTTHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-        final MQTTConnection mqttConnection = mqttConnection(ctx.channel(), this);
+        final MQTTConnection mqttConnection = mqttConnection(ctx.channel());
         mqttConnection.readCompleted();
     }
 
@@ -88,7 +82,7 @@ public class NewNettyMQTTHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
-        final MQTTConnection mqttConnection = mqttConnection(ctx.channel(), this);
+        final MQTTConnection mqttConnection = mqttConnection(ctx.channel());
         mqttConnection.handleConnectionLost();
     }
 
@@ -104,7 +98,7 @@ public class NewNettyMQTTHandler extends ChannelInboundHandlerAdapter {
 //        if (ctx.channel().isWritable()) {
 //            m_processor.notifyChannelWritable(ctx.channel());
 //        }
-        final MQTTConnection mqttConnection = mqttConnection(ctx.channel(), this);
+        final MQTTConnection mqttConnection = mqttConnection(ctx.channel());
         mqttConnection.writabilityChanged();
         ctx.fireChannelWritabilityChanged();
     }
@@ -112,7 +106,7 @@ public class NewNettyMQTTHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
         if (evt instanceof InflightResender.ResendNotAckedPublishes) {
-            final MQTTConnection mqttConnection = mqttConnection(ctx.channel(), this);
+            final MQTTConnection mqttConnection = mqttConnection(ctx.channel());
             mqttConnection.resendNotAckedPublishes();
         }
         ctx.fireUserEventTriggered(evt);

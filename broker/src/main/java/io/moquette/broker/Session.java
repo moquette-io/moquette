@@ -229,7 +229,7 @@ class Session {
 //                m_interceptor.notifyMessageAcknowledged(interceptAckMsg);
     }
 
-    public void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload) {
+    public void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload, Integer customPackId) {
         switch (qos) {
             case AT_MOST_ONCE:
                 if (connected()) {
@@ -237,17 +237,17 @@ class Session {
                 }
                 break;
             case AT_LEAST_ONCE:
-                sendPublishQos1(topic, qos, payload);
+                sendPublishQos1(topic, qos, payload, customPackId); // fixme
                 break;
             case EXACTLY_ONCE:
-                sendPublishQos2(topic, qos, payload);
+                sendPublishQos2(topic, qos, payload, customPackId); // fixme
                 break;
             case FAILURE:
                 LOG.error("Not admissible");
         }
     }
 
-    private void sendPublishQos1(Topic topic, MqttQoS qos, ByteBuf payload) {
+    private void sendPublishQos1(Topic topic, MqttQoS qos, ByteBuf payload, Integer customPackId) {
         if (!connected() && isClean()) {
             //pushing messages to disconnected not clean session
             return;
@@ -256,7 +256,12 @@ class Session {
         final MQTTConnection localMqttConnectionRef = mqttConnection;
         if (canSkipQueue(localMqttConnectionRef)) {
             inflightSlots.decrementAndGet();
-            int packetId = localMqttConnectionRef.nextPacketId();
+            int packetId;
+            if (customPackId != null) {
+                packetId = customPackId;
+            } else {
+                packetId = localMqttConnectionRef.nextPacketId();
+            }
 
             // Adding to a map, retain.
             payload.retain();
@@ -286,11 +291,16 @@ class Session {
         }
     }
 
-    private void sendPublishQos2(Topic topic, MqttQoS qos, ByteBuf payload) {
+    private void sendPublishQos2(Topic topic, MqttQoS qos, ByteBuf payload, Integer customPackId) {
         final MQTTConnection localMqttConnectionRef = mqttConnection;
         if (canSkipQueue(localMqttConnectionRef)) {
             inflightSlots.decrementAndGet();
-            int packetId = localMqttConnectionRef.nextPacketId();
+            int packetId;
+            if (customPackId != null) {
+                packetId = customPackId;
+            } else {
+                packetId = localMqttConnectionRef.nextPacketId();
+            }
 
             // Retain before adding to map
             payload.retain();

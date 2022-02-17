@@ -566,15 +566,8 @@ final class MQTTConnection {
         bindedSession.resendInflightNotAcked();
     }
 
-    int predictNextPacketIdWithoutChangingId() {
-        int lastPacketIdLocal = lastPacketId.get();
-        lastPacketIdLocal =  lastPacketIdLocal == 65535 ? 1 : lastPacketIdLocal + 1;
-        return lastPacketIdLocal;
-    }
-
     int nextPacketId() {
-        LOG.debug("Next packet id was called: {}", lastPacketId.updateAndGet(v -> v == 65535 ? 1 : v + 1));
-        return lastPacketId.get();
+        return lastPacketId.updateAndGet(v -> v == 65535 ? 1 : v + 1);
     }
 
     @Override

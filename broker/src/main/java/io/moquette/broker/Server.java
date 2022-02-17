@@ -38,7 +38,6 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.function.BiConsumer;
 
 import static io.moquette.logging.LoggingUtils.getInterceptorIds;
 
@@ -132,12 +131,11 @@ public class Server {
      */
     public void startServer(IConfig config, List<? extends InterceptHandler> handlers) throws IOException {
         LOG.debug("Starting moquette integration using IConfig instance and intercept handlers");
-        startServer(config, handlers, null, null, null, (clientId, lastPacketId) -> {});
+        startServer(config, handlers, null, null, null);
     }
 
     public void startServer(IConfig config, List<? extends InterceptHandler> handlers, ISslContextCreator sslCtxCreator,
-                            IAuthenticator authenticator, IAuthorizatorPolicy authorizatorPolicy,
-                            BiConsumer<String, Integer> updateMapClientIdPredictedNextPacketId) {
+                            IAuthenticator authenticator, IAuthorizatorPolicy authorizatorPolicy) {
         final long start = System.currentTimeMillis();
         if (handlers == null) {
             handlers = Collections.emptyList();
@@ -188,7 +186,7 @@ public class Server {
         MQTTConnectionFactory connectionFactory = new MQTTConnectionFactory(brokerConfig, authenticator, sessions,
                                                                             dispatcher);
 
-        final NewNettyMQTTHandler mqttHandler = new NewNettyMQTTHandler(connectionFactory, updateMapClientIdPredictedNextPacketId);
+        final NewNettyMQTTHandler mqttHandler = new NewNettyMQTTHandler(connectionFactory);
         acceptor = new NewNettyAcceptor();
         acceptor.initialize(mqttHandler, config, sslCtxCreator);
 
