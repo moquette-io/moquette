@@ -39,6 +39,8 @@ class Session {
 
     private static final Logger LOG = LoggerFactory.getLogger(Session.class);
 
+    private static final int ZERO_PACKET_ID_NEED_TO_GET_NEXT = 0;
+
     static class InFlightPacket implements Delayed {
 
         final int packetId;
@@ -229,7 +231,7 @@ class Session {
 //                m_interceptor.notifyMessageAcknowledged(interceptAckMsg);
     }
 
-    public void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload, Integer customPackId) {
+    public void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload, int packetId) {
         switch (qos) {
             case AT_MOST_ONCE:
                 if (connected()) {
@@ -237,17 +239,17 @@ class Session {
                 }
                 break;
             case AT_LEAST_ONCE:
-                sendPublishQos1(topic, qos, payload, customPackId); // fixme
+                sendPublishQos1(topic, qos, payload, packetId); // fixme
                 break;
             case EXACTLY_ONCE:
-                sendPublishQos2(topic, qos, payload, customPackId); // fixme
+                sendPublishQos2(topic, qos, payload, packetId); // fixme
                 break;
             case FAILURE:
                 LOG.error("Not admissible");
         }
     }
 
-    private void sendPublishQos1(Topic topic, MqttQoS qos, ByteBuf payload, Integer customPackId) {
+    private void sendPublishQos1(Topic topic, MqttQoS qos, ByteBuf payload, int packId) {
         if (!connected() && isClean()) {
             //pushing messages to disconnected not clean session
             return;
@@ -257,10 +259,10 @@ class Session {
         if (canSkipQueue(localMqttConnectionRef)) {
             inflightSlots.decrementAndGet();
             int packetId;
-            if (customPackId != null) {
-                packetId = customPackId;
-            } else {
+            if (packId == ZERO_PACKET_ID_NEED_TO_GET_NEXT) {
                 packetId = localMqttConnectionRef.nextPacketId();
+            } else {
+                packetId = packId;
             }
 
             // Adding to a map, retain.
@@ -291,15 +293,15 @@ class Session {
         }
     }
 
-    private void sendPublishQos2(Topic topic, MqttQoS qos, ByteBuf payload, Integer customPackId) {
+    private void sendPublishQos2(Topic topic, MqttQoS qos, ByteBuf payload, int packId) {
         final MQTTConnection localMqttConnectionRef = mqttConnection;
         if (canSkipQueue(localMqttConnectionRef)) {
             inflightSlots.decrementAndGet();
             int packetId;
-            if (customPackId != null) {
-                packetId = customPackId;
-            } else {
+            if (packId == ZERO_PACKET_ID_NEED_TO_GET_NEXT) {
                 packetId = localMqttConnectionRef.nextPacketId();
+            } else {
+                packetId = packId;
             }
 
             // Retain before adding to map
