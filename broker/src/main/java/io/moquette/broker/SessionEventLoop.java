@@ -28,6 +28,7 @@ final class SessionEventLoop implements Runnable {
                 Thread.currentThread().interrupt();
             }
         }
+        LOG.info("SessionEventLoop {} exit", Thread.currentThread().getName());
     }
 
     public static void executeTask(final FutureTask<String> task) {

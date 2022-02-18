@@ -120,9 +120,9 @@ public class SessionRegistryTest {
     public void connectWithCleanSessionUpdateClientSession() throws ExecutionException, InterruptedException {
         // first connect with clean session true
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).cleanSession(true).build();
-        connection.processConnect(msg).get();
+        connection.processConnect(msg).completableFuture().get();
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
-        connection.processDisconnect(null).get();
+        connection.processDisconnect(null).completableFuture().get();
         assertFalse(channel.isOpen());
 
         // second connect with clean session false
@@ -134,7 +134,7 @@ public class SessionRegistryTest {
             .protocolVersion(MqttVersion.MQTT_3_1)
             .build();
 
-        anotherConnection.processConnect(secondConnMsg).get();
+        anotherConnection.processConnect(secondConnMsg).completableFuture().get();
         assertEqualsConnAck(CONNECTION_ACCEPTED, anotherChannel.readOutbound());
 
         // Verify client session is clean false

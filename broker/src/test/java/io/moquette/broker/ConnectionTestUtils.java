@@ -35,6 +35,10 @@ public final class ConnectionTestUtils {
     private ConnectionTestUtils() {
     }
 
+    static void assertConnectAccepted(MQTTConnection connection) {
+        assertConnectAccepted((EmbeddedChannel) connection.channel);
+    }
+
     static void assertConnectAccepted(EmbeddedChannel channel) {
         MqttConnAckMessage connAck = channel.readOutbound();
         final MqttConnectReturnCode connAckReturnCode = connAck.variableHeader().connectReturnCode();
@@ -67,6 +71,10 @@ public final class ConnectionTestUtils {
         assertEquals(receivedPublish.fixedHeader().qosLevel(), expectedQos);
         assertPublishIsCorrect(expectedTopic, expectedContent, receivedPublish);
         assertTrue(receivedPublish.fixedHeader().isRetain(), "MUST be retained publish");
+    }
+
+    static void verifyPublishIsReceived(MQTTConnection connection, MqttQoS expectedQos, String expectedPayload) {
+        verifyPublishIsReceived((EmbeddedChannel) connection.channel, expectedQos, expectedPayload);
     }
 
     static void verifyPublishIsReceived(EmbeddedChannel embCh, MqttQoS expectedQos, String expectedPayload) {
