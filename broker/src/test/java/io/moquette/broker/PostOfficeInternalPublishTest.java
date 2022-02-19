@@ -26,7 +26,6 @@ import io.netty.channel.Channel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.*;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
@@ -111,7 +110,6 @@ public class PostOfficeInternalPublishTest {
         sut.internalPublish(publish);
     }
 
-    @Disabled
     @Test
     public void testClientSubscribeAfterNotRetainedQoS0IsSent() {
 //        connection.processConnect(connectMessage);
@@ -128,7 +126,6 @@ public class PostOfficeInternalPublishTest {
         verifyNoPublishIsReceived(channel);
     }
 
-    @Disabled
     @Test
     public void testClientSubscribeAfterRetainedQoS0IsSent() {
         // Exercise
@@ -142,7 +139,6 @@ public class PostOfficeInternalPublishTest {
         verifyNoPublishIsReceived(channel);
     }
 
-    @Disabled
     @Test
     public void testClientSubscribeBeforeNotRetainedQoS0IsSent() {
         subscribe(AT_MOST_ONCE, "/topic", connection);
@@ -155,7 +151,6 @@ public class PostOfficeInternalPublishTest {
         ConnectionTestUtils.verifyPublishIsReceived(channel, AT_MOST_ONCE, PAYLOAD);
     }
 
-    @Disabled
     @Test
     public void testClientSubscribeBeforeRetainedQoS0IsSent() {
         subscribe(AT_MOST_ONCE, "/topic", connection);
@@ -173,7 +168,6 @@ public class PostOfficeInternalPublishTest {
         sut.terminate();
     }
 
-    @Disabled
     @Test
     public void testClientSubscribeBeforeNotRetainedQoS1IsSent() {
         subscribe(AT_LEAST_ONCE, "/topic", connection);
@@ -186,7 +180,6 @@ public class PostOfficeInternalPublishTest {
         ConnectionTestUtils.verifyPublishIsReceived(channel, AT_LEAST_ONCE, PAYLOAD);
     }
 
-    @Disabled
     @Test
     public void testClientSubscribeAfterNotRetainedQoS1IsSent() {
         // Exercise
@@ -210,7 +203,6 @@ public class PostOfficeInternalPublishTest {
         ConnectionTestUtils.verifyPublishIsReceived(channel, AT_LEAST_ONCE, PAYLOAD);
     }
 
-    @Disabled
     @Test
     public void testClientSubscribeAfterRetainedQoS1IsSent() {
         // Exercise
@@ -222,7 +214,6 @@ public class PostOfficeInternalPublishTest {
         ConnectionTestUtils.verifyPublishIsReceived(channel, AT_LEAST_ONCE, PAYLOAD);
     }
 
-    @Disabled
     @Test
     public void testClientSubscribeBeforeNotRetainedQoS2IsSent() {
         subscribe(EXACTLY_ONCE, "/topic", connection);
@@ -235,7 +226,6 @@ public class PostOfficeInternalPublishTest {
         ConnectionTestUtils.verifyPublishIsReceived(channel, EXACTLY_ONCE, PAYLOAD);
     }
 
-    @Disabled
     @Test
     public void testClientSubscribeAfterNotRetainedQoS2IsSent() {
         // Exercise
@@ -260,7 +250,6 @@ public class PostOfficeInternalPublishTest {
         ConnectionTestUtils.verifyPublishIsReceived(channel, EXACTLY_ONCE, PAYLOAD);
     }
 
-    @Disabled
     @Test
     public void testClientSubscribeAfterRetainedQoS2IsSent() {
         // Exercise
@@ -272,7 +261,6 @@ public class PostOfficeInternalPublishTest {
         ConnectionTestUtils.verifyPublishIsReceived(channel, EXACTLY_ONCE, PAYLOAD);
     }
 
-    @Disabled
     @Test
     public void testClientSubscribeAfterDisconnected() {
         subscribe(AT_MOST_ONCE, "foo", connection);
@@ -284,7 +272,6 @@ public class PostOfficeInternalPublishTest {
         verifyNoPublishIsReceived(channel);
     }
 
-    @Disabled
     @Test
     public void testClientSubscribeWithoutCleanSession() throws ExecutionException, InterruptedException {
         subscribe(AT_MOST_ONCE, "foo", connection);
