@@ -246,6 +246,7 @@ public class PostOfficeInternalPublishTest {
         completeEventLoopCommands();
 
         // Verify
+        assertNotNull(channel, "channel can't be null");
         ConnectionTestUtils.verifyPublishIsReceived(channel, EXACTLY_ONCE, PAYLOAD);
     }
 

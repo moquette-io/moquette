@@ -20,7 +20,6 @@ import io.moquette.interception.InterceptHandler;
 import io.moquette.interception.BrokerInterceptor;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.*;
-import org.junit.jupiter.api.Assertions;
 
 import java.util.Collections;
 import java.util.List;
