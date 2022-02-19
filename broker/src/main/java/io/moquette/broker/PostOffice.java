@@ -146,6 +146,15 @@ class PostOffice {
             // WARN this is a special case failed is empty, but this result is to be considered as error.
             return new RoutingResults(Collections.emptyList(), Collections.emptyList(), CompletableFuture.completedFuture(null));
         }
+
+        @Override
+        public String toString() {
+            return "RoutingResults{" +
+                "successedRoutings=" + successedRoutings +
+                ", failedRoutings=" + failedRoutings +
+                ", mergedAction=" + mergedAction +
+                '}';
+        }
     }
 
     static class RouteResult {
