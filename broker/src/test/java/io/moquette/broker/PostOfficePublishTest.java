@@ -28,7 +28,6 @@ import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.*;
-import jdk.nashorn.internal.ir.annotations.Ignore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -199,7 +198,6 @@ public class PostOfficePublishTest {
         assertEquals(expectedSubscription, onlyMatchedSubscription);
     }
 
-    @Ignore
     @Test
     public void testPublishToMultipleSubscribers() throws ExecutionException, InterruptedException, TimeoutException {
         final Set<String> clientIds = new HashSet<>(Arrays.asList(FAKE_CLIENT_ID, FAKE_CLIENT_ID2));
@@ -309,7 +307,6 @@ public class PostOfficePublishTest {
     }
 
     // aka testPublishWithQoS1_notCleanSession
-    @Ignore
     @Test
     public void forwardQoS1PublishesWhenNotCleanSessionReconnects() throws ExecutionException, InterruptedException {
         connection.processConnect(ConnectionTestUtils.buildConnectNotClean(FAKE_CLIENT_ID)).completableFuture().get();
