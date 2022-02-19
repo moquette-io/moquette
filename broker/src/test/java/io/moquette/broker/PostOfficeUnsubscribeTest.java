@@ -96,18 +96,9 @@ public class PostOfficeUnsubscribeTest {
         return new MQTTConnection(channel, config, mockAuthenticator, sessionRegistry, sut);
     }
 
-    protected void connect(MQTTConnection connection, String clientId) {
+    protected static void connect(MQTTConnection connection, String clientId) {
         MqttConnectMessage connectMessage = ConnectionTestUtils.buildConnect(clientId);
-        connect(connection, connectMessage);
-    }
-
-    protected void connect(MQTTConnection connection, MqttConnectMessage connectMessage) {
-        try {
-            connection.processConnect(connectMessage).completableFuture().get();
-        } catch (InterruptedException | ExecutionException e) {
-            Assertions.fail(e);
-        }
-        ConnectionTestUtils.assertConnectAccepted((EmbeddedChannel) connection.channel);
+        ConnectionTestUtils.connect(connection, connectMessage);
     }
 
     protected void subscribe(MQTTConnection connection, String topic, MqttQoS desiredQos) {
@@ -222,7 +213,7 @@ public class PostOfficeUnsubscribeTest {
     @Test
     public void avoidMultipleNotificationsAfterMultipleReconnection_cleanSessionFalseQoS1() throws ExecutionException, InterruptedException {
         final MqttConnectMessage notCleanConnect = ConnectionTestUtils.buildConnectNotClean(FAKE_CLIENT_ID);
-        connect(connection, notCleanConnect);
+        ConnectionTestUtils.connect(connection, notCleanConnect);
         subscribe(connection, NEWS_TOPIC, AT_LEAST_ONCE);
         connection.processDisconnect(null);
 
@@ -270,24 +261,14 @@ public class PostOfficeUnsubscribeTest {
     private MQTTConnection connectNotCleanAs(String clientId) {
         EmbeddedChannel channel = new EmbeddedChannel();
         MQTTConnection connection = createMQTTConnection(CONFIG, channel);
-        try {
-            connection.processConnect(ConnectionTestUtils.buildConnectNotClean(clientId)).completableFuture().get();
-        } catch (InterruptedException | ExecutionException e) {
-            Assertions.fail(e);
-        }
-        ConnectionTestUtils.assertConnectAccepted(channel);
+        ConnectionTestUtils.connect(connection, ConnectionTestUtils.buildConnectNotClean(clientId));
         return connection;
     }
 
     private MQTTConnection connectAs(String clientId) {
         EmbeddedChannel channel = new EmbeddedChannel();
         MQTTConnection connection = createMQTTConnection(CONFIG, channel);
-        try {
-            connection.processConnect(ConnectionTestUtils.buildConnect(clientId)).completableFuture().get();
-        } catch (InterruptedException | ExecutionException e) {
-            Assertions.fail(e);
-        }
-        ConnectionTestUtils.assertConnectAccepted(channel);
+        ConnectionTestUtils.connect(connection, ConnectionTestUtils.buildConnect(clientId));
         return connection;
     }
 

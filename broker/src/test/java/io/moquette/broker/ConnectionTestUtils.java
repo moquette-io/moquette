@@ -20,9 +20,11 @@ import io.moquette.interception.InterceptHandler;
 import io.moquette.interception.BrokerInterceptor;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.*;
+import org.junit.jupiter.api.Assertions;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
 import static org.junit.jupiter.api.Assertions.*;
@@ -100,5 +102,14 @@ public final class ConnectionTestUtils {
             .clientId(clientId)
             .cleanSession(false)
             .build();
+    }
+
+    static void connect(MQTTConnection connection, MqttConnectMessage connectMessage) {
+        try {
+            connection.processConnect(connectMessage).completableFuture().get();
+        } catch (InterruptedException | ExecutionException e) {
+            fail(e);
+        }
+        assertConnectAccepted((EmbeddedChannel) connection.channel);
     }
 }

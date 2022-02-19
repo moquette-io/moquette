@@ -164,12 +164,7 @@ public class PostOfficePublishTest {
     private MQTTConnection connectAs(String clientId) {
         EmbeddedChannel channel = new EmbeddedChannel();
         MQTTConnection connection = createMQTTConnection(CONFIG, channel);
-        try {
-            connection.processConnect(ConnectionTestUtils.buildConnect(clientId)).completableFuture().get();
-        } catch (InterruptedException | ExecutionException e) {
-            fail(e);
-        }
-        ConnectionTestUtils.assertConnectAccepted(channel);
+        ConnectionTestUtils.connect(connection, ConnectionTestUtils.buildConnect(clientId));
         return connection;
     }
 
