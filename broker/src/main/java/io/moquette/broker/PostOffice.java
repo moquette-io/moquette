@@ -485,6 +485,7 @@ class PostOffice {
         Set<Subscription> topicMatchingSubscriptions = subscriptions.matchQosSharpening(topic);
         if (topicMatchingSubscriptions.isEmpty()) {
             // no matching subscriptions, clean exit
+            LOG.trace("No matching subscriptions for topic: {}", topic);
             return new RoutingResults(Collections.emptyList(), Collections.emptyList(), CompletableFuture.completedFuture(null));
         }
 
