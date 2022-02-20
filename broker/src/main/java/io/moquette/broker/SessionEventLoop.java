@@ -27,7 +27,7 @@ final class SessionEventLoop implements Runnable {
 
     @Override
     public void run() {
-        while (!Thread.interrupted() || ( Thread.interrupted() && !sessionQueue.isEmpty() && flushOnExit)) {
+        while (!Thread.interrupted() || (Thread.interrupted() && !sessionQueue.isEmpty() && flushOnExit)) {
             try {
                 // blocking call
                 final FutureTask<String> task = this.sessionQueue.take();
