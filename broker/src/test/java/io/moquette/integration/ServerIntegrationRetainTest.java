@@ -115,8 +115,12 @@ public class ServerIntegrationRetainTest {
         return "Hello world MQTT " + qosPub + " " + qosSub;
     }
 
-    private void sendRetainedAndSubscribe(int qosPub, int qosSub) throws Exception {
-        final String topic = "/topic" + qosPub + qosSub;
+    private String createTopic(int qosPub, int qosSub) {
+        return "/topic" + qosPub + qosSub;
+    }
+
+    private void sendRetainedAndSubscribe(int qosPub, int qosSub) throws MqttException {
+        String topic = createTopic(qosPub, qosSub);
         String messageString = createMessage(qosPub, qosSub);
         clientPublisher.subscribe(topic);
         clientPublisher.publish(topic, messageString.getBytes(UTF_8), qosPub, true);
@@ -124,6 +128,29 @@ public class ServerIntegrationRetainTest {
         Awaitility.await().until(() -> callbackPublisher.isMessageReceived());
         callbackPublisher.getMessageImmediate();
 
+        callbackSubscriber.reinit();
+        clientSubscriber.subscribe(topic, qosSub);
+        try {
+            Awaitility.await().until(() -> callbackSubscriber.isMessageReceived());
+        } catch (ConditionTimeoutException ex) {
+            // This may be fine.
+        }
+    }
+
+    private void unsubscribeSubscriber(int qosPub, int qosSub) throws MqttException {
+        String topic = createTopic(qosPub, qosSub);
+        clientSubscriber.unsubscribe(topic);
+    }
+
+    private void sendEmptyRetainedAndSubscribe(int qosPub, int qosSub) throws MqttException {
+        String topic = createTopic(qosPub, qosSub);
+        callbackPublisher.reinit();
+        clientPublisher.publish(topic, new byte[0], qosPub, true);
+        // Wait for the publish to finish
+        Awaitility.await().until(() -> callbackPublisher.isMessageReceived());
+        callbackPublisher.getMessageImmediate();
+
+        callbackSubscriber.reinit();
         clientSubscriber.subscribe(topic, qosSub);
         try {
             Awaitility.await().until(() -> callbackSubscriber.isMessageReceived());
@@ -143,7 +170,8 @@ public class ServerIntegrationRetainTest {
 
     private void validateMustNotReceive(int qosPub) {
         final boolean messageReceived = callbackSubscriber.isMessageReceived();
-        Assertions.assertFalse(messageReceived, "Received an unexpected message retained at QoS " + qosPub + ".");
+        MqttMessage message = callbackSubscriber.getMessageImmediate();
+        Assertions.assertFalse(messageReceived, "Received an unexpected message retained at QoS " + qosPub + ": " + message);
     }
 
     static Stream<Arguments> notRetainedProvider() {
@@ -179,6 +207,9 @@ public class ServerIntegrationRetainTest {
         LOG.info("*** checkShouldRetain: qosPub {}, qosSub {} ***", qosPub, qosSub);
         sendRetainedAndSubscribe(qosPub, qosSub);
         validateMustReceive(qosPub, qosSub);
+        unsubscribeSubscriber(qosPub, qosSub);
+        sendEmptyRetainedAndSubscribe(qosPub, qosSub);
+        validateMustNotReceive(qosPub);
     }
 
 }
