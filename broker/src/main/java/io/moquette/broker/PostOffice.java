@@ -249,7 +249,7 @@ class PostOffice {
                 MqttQoS qos = lowerQosToTheSubscriptionDesired(subscription, retainedQos);
 
                 final ByteBuf payloadBuf = Unpooled.wrappedBuffer(retainedMsg.getPayload());
-                targetSession.sendRetainedPublishOnSessionAtQos(retainedMsg.getTopic(), qos, payloadBuf);
+                targetSession.sendPublishOnSessionAtQos(retainedMsg.getTopic(), qos, payloadBuf, true);
                 // We made the buffer, we must release it.
                 payloadBuf.release();
             }
@@ -475,7 +475,7 @@ class PostOffice {
         if (isSessionPresent) {
             LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
                       sub.getClientId(), sub.getTopicFilter(), qos);
-            targetSession.sendPublishOnSessionAtQos(topic, qos, payload);
+            targetSession.sendPublishOnSessionAtQos(topic, qos, payload, false);
         } else {
             // If we are, the subscriber disconnected after the subscriptions tree selected that session as a
             // destination.
