@@ -37,19 +37,24 @@ import java.nio.file.Path;
 import java.util.Properties;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import java.util.stream.Stream;
 import org.awaitility.core.ConditionTimeoutException;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public class ServerIntegrationRetainTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(ServerIntegrationRetainTest.class);
 
-    private static IConfig m_config;
-    private static Server m_server;
+    private static IConfig serverConfig;
+    private static Server server;
 
     private IMqttClient clientSubscriber;
     private IMqttClient clientPublisher;
@@ -60,10 +65,10 @@ public class ServerIntegrationRetainTest {
     static Path tempFolder;
 
     private static void startServer(String dbPath) throws IOException {
-        m_server = new Server();
+        server = new Server();
         final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
-        m_config = new MemoryConfig(configProps);
-        m_server.startServer(m_config);
+        serverConfig = new MemoryConfig(configProps);
+        server.startServer(serverConfig);
     }
 
     @BeforeAll
@@ -75,9 +80,9 @@ public class ServerIntegrationRetainTest {
 
     @AfterAll
     public static void afterTests() {
-        m_server.stopServer();
-        m_server = null;
-        m_config = null;
+        server.stopServer();
+        server = null;
+        serverConfig = null;
     }
 
     @BeforeEach
@@ -107,9 +112,13 @@ public class ServerIntegrationRetainTest {
         }
     }
 
-    public void checkRetained(int qosPub, int qosSub, boolean shouldReceive) throws Exception {
+    private String createMessage(int qosPub, int qosSub) {
+        return "Hello world MQTT " + qosPub + " " + qosSub;
+    }
+
+    private void sendRetainedAndSubscribe(int qosPub, int qosSub) throws Exception {
         final String topic = "/topic" + qosPub + qosSub;
-        final String messageString = "Hello world MQTT " + qosPub + " " + qosSub;
+        String messageString = createMessage(qosPub, qosSub);
         clientPublisher.subscribe(topic);
         clientPublisher.publish(topic, messageString.getBytes(UTF_8), qosPub, true);
         // Wait for the publish to finish
@@ -122,69 +131,55 @@ public class ServerIntegrationRetainTest {
         } catch (ConditionTimeoutException ex) {
             // This may be fine.
         }
+    }
+
+    private void validateMustReceive(int qosPub, int qosSub) {
         final boolean messageReceived = callbackSubscriber.isMessageReceived();
-        if (messageReceived) {
-            MqttMessage message = callbackSubscriber.retrieveMessage();
-            Assertions.assertTrue(shouldReceive, "QoS " + qosPub + " Messages should not be retained, received: " + message.toString());
-            assertEquals(messageString, message.toString());
-            assertEquals(Math.min(qosPub, qosSub), message.getQos());
-        } else {
-            Assertions.assertFalse(shouldReceive, "QoS " + qosPub + " Messages should be retained.");
-        }
+        Assertions.assertTrue(messageReceived, "Expected a message retained at QoS " + qosPub + ".");
+        MqttMessage message = callbackSubscriber.getMessageImmediate();
+        String expectedMessage = createMessage(qosPub, qosSub);
+        assertEquals(expectedMessage, message.toString());
+        assertEquals(Math.min(qosPub, qosSub), message.getQos());
     }
 
-    @Test
-    public void checkSubscriberQoS0ReceiveQoS0Retained() throws Exception {
-        LOG.info("*** checkSubscriberQoS0ReceiveQoS0Retained ***");
-        checkRetained(0, 0, false);
+    private void validateMustNotReceive(int qosPub) {
+        final boolean messageReceived = callbackSubscriber.isMessageReceived();
+        Assertions.assertFalse(messageReceived, "Received an unexpected message retained at QoS " + qosPub + ".");
     }
 
-    @Test
-    public void checkSubscriberQoS1ReceiveQoS0Retained() throws Exception {
-        LOG.info("*** checkSubscriberQoS1ReceiveQoS0Retained ***");
-        checkRetained(0, 1, false);
+    static Stream<Arguments> notRetainedProvider() {
+        return Stream.of(
+            arguments(0, 0),
+            arguments(0, 1),
+            arguments(0, 2)
+        );
     }
 
-    @Test
-    public void checkSubscriberQoS2ReceiveQoS0Retained() throws Exception {
-        LOG.info("*** checkSubscriberQoS2ReceiveQoS0Retained ***");
-        checkRetained(0, 2, false);
+    static Stream<Arguments> retainedProvider() {
+        return Stream.of(
+            arguments(1, 0),
+            arguments(1, 1),
+            arguments(1, 2),
+            arguments(2, 0),
+            arguments(2, 1),
+            arguments(2, 2)
+        );
     }
 
-    @Test
-    public void checkSubscriberQoS0ReceiveQoS1Retained() throws Exception {
-        LOG.info("*** checkSubscriberQoS0ReceiveQoS1Retained ***");
-        checkRetained(1, 0, true);
+    @ParameterizedTest
+    @MethodSource("notRetainedProvider")
+    public void checkShouldNotRetain(int qosPub, int qosSub) throws Exception {
+        LOG.info("*** checkShouldNotRetain: qosPub {}, qosSub {} ***", qosPub, qosSub);
+        sendRetainedAndSubscribe(qosPub, qosSub);
+        validateMustNotReceive(qosPub);
     }
 
-    @Test
-    public void checkSubscriberQoS1ReceiveQoS1Retained() throws Exception {
-        LOG.info("*** checkSubscriberQoS1ReceiveQoS1Retained ***");
-        checkRetained(1, 1, true);
-    }
-
-    @Test
-    public void checkSubscriberQoS2ReceiveQoS1Retained() throws Exception {
-        LOG.info("*** checkSubscriberQoS2ReceiveQoS1Retained ***");
-        checkRetained(1, 2, true);
-    }
-
-    @Test
-    public void checkSubscriberQoS0ReceiveQoS2Retained() throws Exception {
-        LOG.info("*** checkSubscriberQoS0ReceiveQoS2Retained ***");
-        checkRetained(2, 0, true);
-    }
-
-    @Test
-    public void checkSubscriberQoS1ReceiveQoS2Retained() throws Exception {
-        LOG.info("*** checkSubscriberQoS1ReceiveQoS2Retained ***");
-        checkRetained(2, 1, true);
-    }
-
-    @Test
-    public void checkSubscriberQoS2ReceiveQoS2Retained() throws Exception {
-        LOG.info("*** checkSubscriberQoS2ReceiveQoS2Retained ***");
-        checkRetained(2, 2, true);
+    @ParameterizedTest
+    @MethodSource("retainedProvider")
+    public void checkShouldRetain(int qosPub, int qosSub) throws Exception {
+        LOG.info("*** checkShouldRetain: qosPub {}, qosSub {} ***", qosPub, qosSub);
+        sendRetainedAndSubscribe(qosPub, qosSub);
+        validateMustReceive(qosPub, qosSub);
     }
 
 }
