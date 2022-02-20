@@ -535,17 +535,30 @@ final class MQTTConnection {
 
     // TODO move this method in Session
     void sendPublishQos0(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained) {
-        MqttPublishMessage publishMsg = createPublishMessage(topic.toString(), qos, payload, retained);
+        MqttPublishMessage publishMsg = createPublishMessage(topic.toString(), qos, payload, 0, retained);
         sendPublish(publishMsg);
     }
 
-    static MqttPublishMessage createPublishMessage(String topic, MqttQoS qos, ByteBuf message,
-                                                   boolean retained) {
-        return createPublishMessage(topic, qos, message, 0, retained);
+    static MqttPublishMessage createRetainedPublishMessage(String topic, MqttQoS qos, ByteBuf message) {
+        return createPublishMessage(topic, qos, message, 0, true);
     }
 
-    static MqttPublishMessage createPublishMessage(String topic, MqttQoS qos, ByteBuf message,
-                                                   int messageId, boolean retained) {
+    static MqttPublishMessage createNonRetainedPublishMessage(String topic, MqttQoS qos, ByteBuf message) {
+        return createPublishMessage(topic, qos, message, 0, false);
+    }
+
+    static MqttPublishMessage createRetainedPublishMessage(String topic, MqttQoS qos, ByteBuf message,
+                                                           int messageId) {
+        return createPublishMessage(topic, qos, message, messageId, true);
+    }
+
+    static MqttPublishMessage createNonRetainedPublishMessage(String topic, MqttQoS qos, ByteBuf message,
+                                                              int messageId) {
+        return createPublishMessage(topic, qos, message, messageId, false);
+    }
+
+    private static MqttPublishMessage createPublishMessage(String topic, MqttQoS qos, ByteBuf message,
+                                                           int messageId, boolean retained) {
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, retained, 0);
         MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId);
         return new MqttPublishMessage(fixedHeader, varHeader, message);

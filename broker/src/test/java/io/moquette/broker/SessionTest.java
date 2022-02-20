@@ -60,7 +60,7 @@ public class SessionTest {
 
     private void sendQoS1To(Session client, Topic destinationTopic, String message) {
         final ByteBuf payload = ByteBufUtil.writeUtf8(UnpooledByteBufAllocator.DEFAULT, message);
-        client.sendPublishOnSessionAtQos(destinationTopic, MqttQoS.AT_LEAST_ONCE, payload, false);
+        client.sendNonRetainedPublishOnSessionAtQos(destinationTopic, MqttQoS.AT_LEAST_ONCE, payload);
     }
 
     @Test
