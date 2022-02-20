@@ -604,7 +604,7 @@ class PostOffice {
      *            the message to publish
      * @return
      */
-    public void internalPublish(MqttPublishMessage msg) {
+    public RoutingResults internalPublish(MqttPublishMessage msg) {
         final MqttQoS qos = msg.fixedHeader().qosLevel();
         final Topic topic = new Topic(msg.variableHeader().topicName());
         final ByteBuf payload = msg.payload();
@@ -614,14 +614,15 @@ class PostOffice {
         LOG.trace("after routed publishes: {}", publishResult);
 
         if (!msg.fixedHeader().isRetain()) {
-            return;
+            return publishResult;
         }
         if (qos == AT_MOST_ONCE || payload.readableBytes() == 0) {
             // QoS == 0 && retain => clean old retained
             retainedRepository.cleanRetained(topic);
-            return;
+            return publishResult;
         }
         retainedRepository.retain(topic, msg);
+        return publishResult;
     }
 
     /**

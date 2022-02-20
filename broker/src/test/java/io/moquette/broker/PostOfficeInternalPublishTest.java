@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import static io.moquette.broker.PostOfficeUnsubscribeTest.CONFIG;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
@@ -111,7 +112,12 @@ public class PostOfficeInternalPublishTest {
             .retained(retained)
             .qos(qos)
             .payload(Unpooled.copiedBuffer(PAYLOAD.getBytes(UTF_8))).build();
-        sut.internalPublish(publish);
+        final PostOffice.RoutingResults res = sut.internalPublish(publish);
+        try {
+            res.completableFuture().get(5, TimeUnit.SECONDS);
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
     @Test
@@ -196,7 +202,7 @@ public class PostOfficeInternalPublishTest {
     }
 
     @Test
-    public void testClientSubscribeBeforeRetainedQoS1IsSent() {
+    public void testClientSubscribeBeforeRetainedQoS1IsSent() throws Exception {
         subscribe(AT_LEAST_ONCE, "/topic", connection);
 
         // Exercise
@@ -219,7 +225,7 @@ public class PostOfficeInternalPublishTest {
     }
 
     @Test
-    public void testClientSubscribeBeforeNotRetainedQoS2IsSent() {
+    public void testClientSubscribeBeforeNotRetainedQoS2IsSent() throws Exception {
         LOG.info("testClientSubscribeBeforeNotRetainedQoS2IsSent");
         subscribe(EXACTLY_ONCE, "/topic", connection);
 
