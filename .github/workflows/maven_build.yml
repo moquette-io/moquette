@@ -14,8 +14,8 @@ jobs:
         runs-on: ${{ matrix.os }}
         strategy:
             matrix:
-                os: [ubuntu-18.04]
-                java: [11]
+                os: [ubuntu-18.04, ubuntu-latest]
+                java: [11, 17]
                 arch: [x64] # when ARM will be present add aarch64
             fail-fast: false
             max-parallel: 4

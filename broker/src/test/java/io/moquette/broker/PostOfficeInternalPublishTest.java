@@ -27,8 +27,6 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
@@ -42,8 +40,6 @@ import static java.util.Collections.singletonMap;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class PostOfficeInternalPublishTest {
-
-    private static final Logger LOG = LoggerFactory.getLogger(PostOfficeInternalPublishTest.class);
 
     private static final String FAKE_CLIENT_ID = "FAKE_123";
     private static final String TEST_USER = "fakeuser";
@@ -226,7 +222,6 @@ public class PostOfficeInternalPublishTest {
 
     @Test
     public void testClientSubscribeBeforeNotRetainedQoS2IsSent() throws Exception {
-        LOG.info("testClientSubscribeBeforeNotRetainedQoS2IsSent");
         subscribe(EXACTLY_ONCE, "/topic", connection);
 
         // Exercise
