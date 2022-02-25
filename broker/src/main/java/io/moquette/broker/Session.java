@@ -234,7 +234,7 @@ class Session {
     }
 
     public void sendNonRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload) {
-        sendPublishOnSessionAtQos(topic, qos, payload, true);
+        sendPublishOnSessionAtQos(topic, qos, payload, false);
     }
 
     private void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained) {

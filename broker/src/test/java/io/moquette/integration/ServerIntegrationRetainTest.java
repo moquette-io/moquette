@@ -126,7 +126,7 @@ public class ServerIntegrationRetainTest {
         clientPublisher.publish(topic, messageString.getBytes(UTF_8), qosPub, true);
         // Wait for the publish to finish
         Awaitility.await().until(() -> callbackPublisher.isMessageReceived());
-        callbackPublisher.getMessageImmediate();
+        validateRetainedFlagNotSet(callbackPublisher.getMessageImmediate());
 
         callbackSubscriber.reinit();
         clientSubscriber.subscribe(topic, qosSub);
@@ -148,7 +148,7 @@ public class ServerIntegrationRetainTest {
         clientPublisher.publish(topic, new byte[0], qosPub, true);
         // Wait for the publish to finish
         Awaitility.await().until(() -> callbackPublisher.isMessageReceived());
-        callbackPublisher.getMessageImmediate();
+        validateRetainedFlagNotSet(callbackPublisher.getMessageImmediate());
 
         callbackSubscriber.reinit();
         clientSubscriber.subscribe(topic, qosSub);
@@ -157,6 +157,10 @@ public class ServerIntegrationRetainTest {
         } catch (ConditionTimeoutException ex) {
             // This may be fine.
         }
+    }
+
+    private void validateRetainedFlagNotSet(MqttMessage message) {
+        Assertions.assertFalse(message.isRetained(), "Directly published version of messages should not have the retained flag set");
     }
 
     private void validateMustReceive(int qosPub, int qosSub) {
