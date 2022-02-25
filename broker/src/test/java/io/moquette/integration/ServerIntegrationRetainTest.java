@@ -41,8 +41,9 @@ import org.awaitility.core.ConditionTimeoutException;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -162,12 +163,12 @@ public class ServerIntegrationRetainTest {
     }
 
     private void validateRetainedFlagNotSet(MqttMessage message) {
-        Assertions.assertFalse(message.isRetained(), "Directly published version of messages should not have the retained flag set");
+        assertFalse(message.isRetained(), "Directly published version of messages should not have the retained flag set");
     }
 
     private void validateMustReceive(int qosPub, int qosSub) {
         final boolean messageReceived = callbackSubscriber.isMessageReceived();
-        Assertions.assertTrue(messageReceived, "Expected a message retained at QoS " + qosPub + ".");
+        assertTrue(messageReceived, "Expected a message retained at QoS " + qosPub + ".");
         MqttMessage message = callbackSubscriber.getMessageImmediate();
         String expectedMessage = createMessage(qosPub, qosSub);
         assertEquals(expectedMessage, message.toString());
@@ -177,7 +178,7 @@ public class ServerIntegrationRetainTest {
     private void validateMustNotReceive(int qosPub) {
         final boolean messageReceived = callbackSubscriber.isMessageReceived();
         MqttMessage message = callbackSubscriber.getMessageImmediate();
-        Assertions.assertFalse(messageReceived, "Received an unexpected message retained at QoS " + qosPub + ": " + message);
+        assertFalse(messageReceived, "Received an unexpected message retained at QoS " + qosPub + ": " + message);
     }
 
     static Stream<Arguments> notRetainedProvider() {
