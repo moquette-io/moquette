@@ -233,7 +233,7 @@ class Session {
         sendPublishOnSessionAtQos(topic, qos, payload, true);
     }
 
-    public void sendNonRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload) {
+    public void sendNotRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload) {
         sendPublishOnSessionAtQos(topic, qos, payload, false);
     }
 
@@ -276,7 +276,7 @@ class Session {
             }
             inflightTimeouts.add(new InFlightPacket(packetId, FLIGHT_BEFORE_RESEND_MS));
 
-            MqttPublishMessage publishMsg = MQTTConnection.createNonRetainedPublishMessage(topic.toString(), qos,
+            MqttPublishMessage publishMsg = MQTTConnection.createNotRetainedPublishMessage(topic.toString(), qos,
                                                                                            payload, packetId);
             localMqttConnectionRef.sendPublish(publishMsg);
             LOG.debug("Write direct to the peer, inflight slots: {}", inflightSlots.get());
@@ -310,7 +310,7 @@ class Session {
             }
             inflightTimeouts.add(new InFlightPacket(packetId, FLIGHT_BEFORE_RESEND_MS));
 
-            MqttPublishMessage publishMsg = MQTTConnection.createNonRetainedPublishMessage(topic.toString(), qos,
+            MqttPublishMessage publishMsg = MQTTConnection.createNotRetainedPublishMessage(topic.toString(), qos,
                                                                                            payload, packetId);
             localMqttConnectionRef.sendPublish(publishMsg);
 
@@ -421,7 +421,7 @@ class Session {
             }
             inflightTimeouts.add(new InFlightPacket(sendPacketId, FLIGHT_BEFORE_RESEND_MS));
             final SessionRegistry.PublishedMessage msgPub = (SessionRegistry.PublishedMessage) msg;
-            MqttPublishMessage publishMsg = MQTTConnection.createNonRetainedPublishMessage(
+            MqttPublishMessage publishMsg = MQTTConnection.createNotRetainedPublishMessage(
                 msgPub.topic.toString(),
                 msgPub.publishingQos,
                 msgPub.payload, sendPacketId);

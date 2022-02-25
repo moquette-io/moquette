@@ -552,7 +552,7 @@ final class MQTTConnection {
         return createPublishMessage(topic, qos, message, messageId, true);
     }
 
-    static MqttPublishMessage createNonRetainedPublishMessage(String topic, MqttQoS qos, ByteBuf message,
+    static MqttPublishMessage createNotRetainedPublishMessage(String topic, MqttQoS qos, ByteBuf message,
                                                               int messageId) {
         return createPublishMessage(topic, qos, message, messageId, false);
     }
