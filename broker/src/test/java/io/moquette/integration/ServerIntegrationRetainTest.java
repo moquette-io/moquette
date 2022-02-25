@@ -43,6 +43,7 @@ import org.eclipse.paho.client.mqttv3.MqttException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -123,6 +124,7 @@ public class ServerIntegrationRetainTest {
         String topic = createTopic(qosPub, qosSub);
         String messageString = createMessage(qosPub, qosSub);
         clientPublisher.subscribe(topic);
+        callbackPublisher.reinit();
         clientPublisher.publish(topic, messageString.getBytes(UTF_8), qosPub, true);
         // Wait for the publish to finish
         Awaitility.await().until(() -> callbackPublisher.isMessageReceived());
@@ -199,7 +201,7 @@ public class ServerIntegrationRetainTest {
 
     @ParameterizedTest
     @MethodSource("notRetainedProvider")
-    public void checkShouldNotRetain(int qosPub, int qosSub) throws Exception {
+    public void checkShouldNotRetain(int qosPub, int qosSub) throws MqttException {
         LOG.info("*** checkShouldNotRetain: qosPub {}, qosSub {} ***", qosPub, qosSub);
         sendRetainedAndSubscribe(qosPub, qosSub);
         validateMustNotReceive(qosPub);
@@ -207,7 +209,7 @@ public class ServerIntegrationRetainTest {
 
     @ParameterizedTest
     @MethodSource("retainedProvider")
-    public void checkShouldRetain(int qosPub, int qosSub) throws Exception {
+    public void checkShouldRetain(int qosPub, int qosSub) throws MqttException {
         LOG.info("*** checkShouldRetain: qosPub {}, qosSub {} ***", qosPub, qosSub);
         sendRetainedAndSubscribe(qosPub, qosSub);
         validateMustReceive(qosPub, qosSub);
@@ -216,4 +218,15 @@ public class ServerIntegrationRetainTest {
         validateMustNotReceive(qosPub);
     }
 
+    @Test
+    public void checkQos0CancelsRetain() throws MqttException {
+        LOG.info("*** checkQos0CancelsRetain ***");
+        // First send a QoS 2 retain, and check it arrives.
+        sendRetainedAndSubscribe(2, 2);
+        validateMustReceive(2, 2);
+        unsubscribeSubscriber(2, 2);
+        // Then send a QoS 0 retain, and check it cancels the previous retain.
+        sendRetainedAndSubscribe(0, 2);
+        validateMustNotReceive(0);
+    }
 }
