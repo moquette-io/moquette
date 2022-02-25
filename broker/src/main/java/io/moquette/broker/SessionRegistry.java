@@ -57,11 +57,13 @@ public class SessionRegistry {
         final Topic topic;
         final MqttQoS publishingQos;
         final ByteBuf payload;
+        final boolean retained;
 
-        public PublishedMessage(Topic topic, MqttQoS publishingQos, ByteBuf payload) {
+        public PublishedMessage(Topic topic, MqttQoS publishingQos, ByteBuf payload, boolean retained) {
             this.topic = topic;
             this.publishingQos = publishingQos;
             this.payload = payload;
+            this.retained = false;
         }
 
         public Topic getTopic() {

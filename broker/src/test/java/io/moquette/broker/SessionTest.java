@@ -49,7 +49,7 @@ public class SessionTest {
 
         // Verify
         assertTrue(queuedMessages.isEmpty(), "Messages should be drained");
-        
+
         // release the rest, to avoid leaking buffers
         for (int i = 2; i <= 11; i++) {
             client.pubAckReceived(i);
@@ -60,7 +60,7 @@ public class SessionTest {
 
     private void sendQoS1To(Session client, Topic destinationTopic, String message) {
         final ByteBuf payload = ByteBufUtil.writeUtf8(UnpooledByteBufAllocator.DEFAULT, message);
-        client.sendPublishOnSessionAtQos(destinationTopic, MqttQoS.AT_LEAST_ONCE, payload);
+        client.sendNotRetainedPublishOnSessionAtQos(destinationTopic, MqttQoS.AT_LEAST_ONCE, payload);
     }
 
     @Test
