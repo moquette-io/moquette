@@ -170,8 +170,6 @@ public class SessionRegistry {
         final SessionCreationResult creationResult;
         if (!oldSession.disconnected()) {
             oldSession.closeImmediately();
-            // TODO: Add a mechanism to avoid the old connection from influencing the session from this point on.
-            // Since the session has a link to the connection, check that?
         }
 
 
