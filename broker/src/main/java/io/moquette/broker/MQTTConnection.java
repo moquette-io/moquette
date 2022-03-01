@@ -306,8 +306,12 @@ final class MQTTConnection {
         // this must not be done on the netty thread
         LOG.debug("Notifying connection lost event");
         postOffice.routeCommand(clientID, () -> {
-            if (isBoundToSession())
+            if (isBoundToSession() || isSessionUnbound()) {
+                LOG.debug("Cleaning {}", clientID);
                 processConnectionLost(clientID);
+            } else {
+                LOG.debug("NOT Cleaning {}, bound to other connection.", clientID);
+            }
             return null;
         });
     }
@@ -317,7 +321,7 @@ final class MQTTConnection {
             postOffice.fireWill(bindedSession.getWill());
         }
         if (bindedSession.isClean()) {
-            LOG.debug("Remove session for client");
+            LOG.debug("Remove session for client {}", clientID);
             sessionRegistry.remove(bindedSession.getClientID());
         } else {
             bindedSession.disconnect();
@@ -346,12 +350,13 @@ final class MQTTConnection {
         }
 
         return this.postOffice.routeCommand(clientID, () -> {
-            if (!isBoundToSession())
+            if (!isBoundToSession()) {
+                LOG.debug("NOT processing disconnect {}, not bound.", clientID);
                 return null;
+            }
             bindedSession.disconnect();
             connected = false;
             channel.close().addListener(FIRE_EXCEPTION_ON_FAILURE);
-            LOG.trace("Processed DISCONNECT");
             String userName = NettyUtils.userName(channel);
             postOffice.clientDisconnected(clientID, userName);
             LOG.trace("dispatch disconnection userName={}", userName);
@@ -607,6 +612,10 @@ final class MQTTConnection {
 
     private boolean isBoundToSession() {
         return bindedSession != null && bindedSession.isBoundTo(this);
+    }
+
+    private boolean isSessionUnbound() {
+        return bindedSession != null && bindedSession.isBoundTo(null);
     }
 
     public void bindSession(Session session) {
