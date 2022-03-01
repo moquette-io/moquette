@@ -130,6 +130,10 @@ class Session {
         this.mqttConnection = mqttConnection;
     }
 
+    boolean isBoundTo(MQTTConnection mqttConnection) {
+        return this.mqttConnection == mqttConnection;
+    }
+
     public boolean disconnected() {
         return status.get() == SessionStatus.DISCONNECTED;
     }

@@ -304,9 +304,10 @@ final class MQTTConnection {
             return;
         }
         // this must not be done on the netty thread
-        LOG.info("Notifying connection lost event");
+        LOG.debug("Notifying connection lost event");
         postOffice.routeCommand(clientID, () -> {
-            processConnectionLost(clientID);
+            if (isBoundToSession())
+                processConnectionLost(clientID);
             return null;
         });
     }
@@ -345,6 +346,8 @@ final class MQTTConnection {
         }
 
         return this.postOffice.routeCommand(clientID, () -> {
+            if (!isBoundToSession())
+                return null;
             bindedSession.disconnect();
             connected = false;
             channel.close().addListener(FIRE_EXCEPTION_ON_FAILURE);
@@ -365,7 +368,8 @@ final class MQTTConnection {
         }
         final String username = NettyUtils.userName(channel);
         return postOffice.routeCommand(clientID, () -> {
-            postOffice.subscribeClientToTopics(msg, clientID, username, this);
+            if (isBoundToSession())
+                postOffice.subscribeClientToTopics(msg, clientID, username, this);
             return null;
         });
     }
@@ -381,6 +385,8 @@ final class MQTTConnection {
         final int messageId = msg.variableHeader().messageId();
 
         postOffice.routeCommand(clientID, () -> {
+            if (!isBoundToSession())
+                return null;
             LOG.trace("Processing UNSUBSCRIBE message. topics: {}", topics);
             postOffice.unsubscribe(topics, this, messageId);
             return null;
@@ -416,16 +422,22 @@ final class MQTTConnection {
         switch (qos) {
             case AT_MOST_ONCE:
                 return postOffice.routeCommand(clientId, () -> {
+                    if (!isBoundToSession())
+                        return null;
                     postOffice.receivedPublishQos0(topic, username, clientId, msg);
                     return null;
                 });
             case AT_LEAST_ONCE:
                 return postOffice.routeCommand(clientId, () -> {
+                    if (!isBoundToSession())
+                        return null;
                     postOffice.receivedPublishQos1(this, topic, username, messageID, msg);
                     return null;
                 });
             case EXACTLY_ONCE: {
                 final CompletableFuture<PostOffice.RouteResult> firstStepFuture = postOffice.routeCommand(clientId, () -> {
+                    if (!isBoundToSession())
+                        return null;
                     bindedSession.receivedPublishQos2(messageID, msg);
                     return null;
                 });
@@ -591,6 +603,10 @@ final class MQTTConnection {
 
     public void flush() {
         channel.flush();
+    }
+
+    private boolean isBoundToSession() {
+        return bindedSession != null && bindedSession.isBoundTo(this);
     }
 
     public void bindSession(Session session) {
