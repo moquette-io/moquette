@@ -524,6 +524,7 @@ class PostOffice {
             Collection<String> subscibersIds = collector.subscriberIdsByEventLoop(rr.clientId);
             if (rr.status == RouteResult.Status.FAIL) {
                 failedRoutings.addAll(subscibersIds);
+                payload.release();
             } else {
                 successedRoutings.addAll(subscibersIds);
             }
