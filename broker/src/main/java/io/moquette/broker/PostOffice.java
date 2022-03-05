@@ -353,6 +353,7 @@ class PostOffice {
     CompletableFuture<Void> receivedPublishQos0(Topic topic, String username, String clientID, MqttPublishMessage msg) {
         if (!authorizator.canWrite(topic, username, clientID)) {
             LOG.error("client is not authorized to publish on topic: {}", topic);
+            ReferenceCountUtil.release(msg);
             return CompletableFuture.completedFuture(null);
         }
         final RoutingResults publishResult = publish2Subscribers(msg.payload(), topic, AT_MOST_ONCE);
@@ -375,11 +376,13 @@ class PostOffice {
         if (!topic.isValid()) {
             LOG.warn("Invalid topic format, force close the connection");
             connection.dropConnection();
+            ReferenceCountUtil.release(msg);
             return RoutingResults.preroutingError();
         }
         final String clientId = connection.getClientId();
         if (!authorizator.canWrite(topic, username, clientId)) {
             LOG.error("MQTT client: {} is not authorized to publish on topic: {}", clientId, topic);
+            ReferenceCountUtil.release(msg);
             return RoutingResults.preroutingError();
         }
 
