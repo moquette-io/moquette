@@ -138,6 +138,10 @@ class PostOffice {
             return failedRoutings.isEmpty();
         }
 
+        public boolean isAllFailed() {
+            return successedRoutings.isEmpty();
+        }
+
         public CompletableFuture<Void> completableFuture() {
             return mergedAction;
         }
@@ -357,6 +361,11 @@ class PostOffice {
             return CompletableFuture.completedFuture(null);
         }
         final RoutingResults publishResult = publish2Subscribers(msg.payload(), topic, AT_MOST_ONCE);
+        if (publishResult.isAllFailed()) {
+            LOG.info("No one publish was successfully enqueued to session loops");
+            ReferenceCountUtil.release(msg);
+            return CompletableFuture.completedFuture(null);
+        }
 
         return publishResult.completableFuture().thenRun(() -> {
             if (msg.fixedHeader().isRetain()) {
