@@ -27,6 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
@@ -137,24 +138,25 @@ public class SessionRegistry {
             }
         }
         if (!queues.isEmpty()) {
-            // This indicates a bug...
-            LOG.error("Recreating sessions left {} unused queues.", queues.size());
+            LOG.error("Recreating sessions left {} unused queues. This is probably bug. Session IDs: {}", queues.size(), Arrays.toString(queues.keySet().toArray()));
         }
     }
 
     SessionCreationResult createOrReopenSession(MqttConnectMessage msg, String clientId, String username) {
         SessionCreationResult postConnectAction;
-        //final Session newSession = createNewSession(msg, clientId);
         final Session oldSession = retrieve(clientId);
         if (oldSession == null) {
-            // case 1 no old session.
+            // case 1, no existing session with given clientId.
             final Session newSession = createNewSession(msg, clientId);
             postConnectAction = new SessionCreationResult(newSession, CreationModeEnum.CREATED_CLEAN_NEW, false);
 
             // publish the session
             final Session previous = pool.put(clientId, newSession);
             if (previous != null) {
-                LOG.error("Another Thread added a Session for our clientId {}, this is a bug!", clientId);
+                // if this happens mean that another Session Event Loop thread processed a CONNECT message
+                // with the same clientId. This is a bug because all messages for the same clientId should
+                // be handled by the same event loop thread.
+                LOG.error("Another thread added a Session for our clientId {}, this is a bug!", clientId);
             }
 
             LOG.trace("case 1, not existing session with CId {}", clientId);
@@ -179,7 +181,7 @@ public class SessionRegistry {
                 throw new SessionCorruptedException("old session has already changed state");
             }
 
-            // case 2
+            // case 2, reopening existing session but with cleanSession true
             // publish new session
             unsubscribe(oldSession);
             remove(clientId);
@@ -193,7 +195,7 @@ public class SessionRegistry {
             if (!connecting) {
                 throw new SessionCorruptedException("old session moved in connected state by other thread");
             }
-            // case 3
+            // case 3, reopening existing session without cleanSession, so keep the existing subscriptions
             copySessionConfig(msg, oldSession);
             reactivateSubscriptions(oldSession, username);
 
