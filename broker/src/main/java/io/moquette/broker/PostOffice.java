@@ -135,11 +135,11 @@ class PostOffice {
         }
 
         public boolean isAllSuccess() {
-            return failedRoutings.isEmpty();
+            return failedRoutings.isEmpty() && !successedRoutings.isEmpty();
         }
 
         public boolean isAllFailed() {
-            return successedRoutings.isEmpty();
+            return successedRoutings.isEmpty() && !failedRoutings.isEmpty();
         }
 
         public CompletableFuture<Void> completableFuture() {
