@@ -194,6 +194,13 @@ class PostOffice {
         public boolean isSuccess() {
             return status == Status.SUCCESS;
         }
+
+        public RouteResult ifFailed(Runnable action) {
+            if (!isSuccess()) {
+                action.run();
+            }
+            return this;
+        }
     }
 
     private static final Logger LOG = LoggerFactory.getLogger(PostOffice.class);

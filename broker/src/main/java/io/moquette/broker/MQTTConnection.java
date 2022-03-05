@@ -429,14 +429,14 @@ final class MQTTConnection {
                         return null;
                     postOffice.receivedPublishQos0(topic, username, clientId, msg);
                     return null;
-                });
+                }).ifFailed(msg::release);
             case AT_LEAST_ONCE:
                 return postOffice.routeCommand(clientId, "PUB QoS1", () -> {
                     if (!isBoundToSession())
                         return null;
                     postOffice.receivedPublishQos1(this, topic, username, messageID, msg);
                     return null;
-                });
+                }).ifFailed(msg::release);
             case EXACTLY_ONCE: {
                 final PostOffice.RouteResult firstStepResult = postOffice.routeCommand(clientId, "PUB QoS2", () -> {
                     if (!isBoundToSession())
@@ -444,6 +444,11 @@ final class MQTTConnection {
                     bindedSession.receivedPublishQos2(messageID, msg);
                     return null;
                 });
+                if (!firstStepResult.isSuccess()) {
+                    msg.release();
+                    LOG.trace("Failed to enqueue PUB QoS2 to session loop for  {}", clientId);
+                    return firstStepResult;
+                }
                 firstStepResult.completableFuture().thenRun(() ->
                     postOffice.receivedPublishQos2(this, msg, username).completableFuture()
                 );
