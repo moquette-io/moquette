@@ -230,7 +230,7 @@ final class MQTTConnection {
                     }
                 } else {
                     bindedSession.disconnect();
-                    sessionRegistry.remove(bindedSession);
+                    sessionRegistry.remove(bindedSession.getClientID());
                     LOG.error("CONNACK send failed, cleanup session and close the connection", future.cause());
                     channel.close();
                 }
@@ -304,9 +304,14 @@ final class MQTTConnection {
             return;
         }
         // this must not be done on the netty thread
-        LOG.info("Notifying connection lost event");
+        LOG.debug("Notifying connection lost event");
         postOffice.routeCommand(clientID, () -> {
-            processConnectionLost(clientID);
+            if (isBoundToSession() || isSessionUnbound()) {
+                LOG.debug("Cleaning {}", clientID);
+                processConnectionLost(clientID);
+            } else {
+                LOG.debug("NOT Cleaning {}, bound to other connection.", clientID);
+            }
             return null;
         });
     }
@@ -316,8 +321,8 @@ final class MQTTConnection {
             postOffice.fireWill(bindedSession.getWill());
         }
         if (bindedSession.isClean()) {
-            LOG.debug("Remove session for client");
-            sessionRegistry.remove(bindedSession);
+            LOG.debug("Remove session for client {}", clientID);
+            sessionRegistry.remove(bindedSession.getClientID());
         } else {
             bindedSession.disconnect();
         }
@@ -345,10 +350,13 @@ final class MQTTConnection {
         }
 
         return this.postOffice.routeCommand(clientID, () -> {
+            if (!isBoundToSession()) {
+                LOG.debug("NOT processing disconnect {}, not bound.", clientID);
+                return null;
+            }
             bindedSession.disconnect();
             connected = false;
             channel.close().addListener(FIRE_EXCEPTION_ON_FAILURE);
-            LOG.trace("Processed DISCONNECT");
             String userName = NettyUtils.userName(channel);
             postOffice.clientDisconnected(clientID, userName);
             LOG.trace("dispatch disconnection userName={}", userName);
@@ -365,7 +373,8 @@ final class MQTTConnection {
         }
         final String username = NettyUtils.userName(channel);
         return postOffice.routeCommand(clientID, () -> {
-            postOffice.subscribeClientToTopics(msg, clientID, username, this);
+            if (isBoundToSession())
+                postOffice.subscribeClientToTopics(msg, clientID, username, this);
             return null;
         });
     }
@@ -381,6 +390,8 @@ final class MQTTConnection {
         final int messageId = msg.variableHeader().messageId();
 
         postOffice.routeCommand(clientID, () -> {
+            if (!isBoundToSession())
+                return null;
             LOG.trace("Processing UNSUBSCRIBE message. topics: {}", topics);
             postOffice.unsubscribe(topics, this, messageId);
             return null;
@@ -416,16 +427,22 @@ final class MQTTConnection {
         switch (qos) {
             case AT_MOST_ONCE:
                 return postOffice.routeCommand(clientId, () -> {
+                    if (!isBoundToSession())
+                        return null;
                     postOffice.receivedPublishQos0(topic, username, clientId, msg);
                     return null;
                 });
             case AT_LEAST_ONCE:
                 return postOffice.routeCommand(clientId, () -> {
+                    if (!isBoundToSession())
+                        return null;
                     postOffice.receivedPublishQos1(this, topic, username, messageID, msg);
                     return null;
                 });
             case EXACTLY_ONCE: {
                 final CompletableFuture<PostOffice.RouteResult> firstStepFuture = postOffice.routeCommand(clientId, () -> {
+                    if (!isBoundToSession())
+                        return null;
                     bindedSession.receivedPublishQos2(messageID, msg);
                     return null;
                 });
@@ -591,6 +608,14 @@ final class MQTTConnection {
 
     public void flush() {
         channel.flush();
+    }
+
+    private boolean isBoundToSession() {
+        return bindedSession != null && bindedSession.isBoundTo(this);
+    }
+
+    private boolean isSessionUnbound() {
+        return bindedSession != null && bindedSession.isBoundTo(null);
     }
 
     public void bindSession(Session session) {

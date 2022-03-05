@@ -18,6 +18,11 @@ public class MemoryQueueRepository implements IQueueRepository {
     }
 
     @Override
+    public void removeQueue(String cli) {
+        queues.remove(cli);
+    }
+
+    @Override
     public Map<String, Queue<SessionRegistry.EnqueuedMessage>> listAllQueues() {
         return Collections.unmodifiableMap(queues);
     }

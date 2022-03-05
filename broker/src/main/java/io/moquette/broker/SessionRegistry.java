@@ -27,6 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
@@ -116,7 +117,6 @@ public class SessionRegistry {
     private final ISubscriptionsDirectory subscriptionsDirectory;
     private final IQueueRepository queueRepository;
     private final Authorizator authorizator;
-    private final ConcurrentMap<String, Queue<SessionRegistry.EnqueuedMessage>> queues = new ConcurrentHashMap<>();
 
     SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory,
                     IQueueRepository queueRepository,
@@ -124,98 +124,83 @@ public class SessionRegistry {
         this.subscriptionsDirectory = subscriptionsDirectory;
         this.queueRepository = queueRepository;
         this.authorizator = authorizator;
-        reloadPersistentQueues();
         recreateSessionPool();
     }
 
-    private void reloadPersistentQueues() {
-        final Map<String, Queue<EnqueuedMessage>> persistentQueues = queueRepository.listAllQueues();
-        persistentQueues.forEach(queues::put);
-    }
-
     private void recreateSessionPool() {
+        final Map<String, Queue<EnqueuedMessage>> queues = queueRepository.listAllQueues();
         for (String clientId : subscriptionsDirectory.listAllSessionIds()) {
             // if the subscriptions are present is obviously false
-            final Queue<EnqueuedMessage> persistentQueue = queues.get(clientId);
+            final Queue<EnqueuedMessage> persistentQueue = queues.remove(clientId);
             if (persistentQueue != null) {
                 Session rehydrated = new Session(clientId, false, persistentQueue);
                 pool.put(clientId, rehydrated);
             }
         }
+        if (!queues.isEmpty()) {
+            LOG.error("Recreating sessions left {} unused queues. This is probably bug. Session IDs: {}", queues.size(), Arrays.toString(queues.keySet().toArray()));
+        }
     }
 
     SessionCreationResult createOrReopenSession(MqttConnectMessage msg, String clientId, String username) {
         SessionCreationResult postConnectAction;
-        final Session newSession = createNewSession(msg, clientId);
-        final Session oldSession = pool.get(clientId);
+        final Session oldSession = retrieve(clientId);
         if (oldSession == null) {
-            // case 1
+            // case 1, no existing session with given clientId.
+            final Session newSession = createNewSession(msg, clientId);
             postConnectAction = new SessionCreationResult(newSession, CreationModeEnum.CREATED_CLEAN_NEW, false);
 
             // publish the session
-            final Session previous = pool.putIfAbsent(clientId, newSession);
-            final boolean success = previous == null;
-
-            if (success) {
-                LOG.trace("case 1, not existing session with CId {}", clientId);
-            } else {
-                postConnectAction = reopenExistingSession(msg, clientId, previous, newSession, username);
+            final Session previous = pool.put(clientId, newSession);
+            if (previous != null) {
+                // if this happens mean that another Session Event Loop thread processed a CONNECT message
+                // with the same clientId. This is a bug because all messages for the same clientId should
+                // be handled by the same event loop thread.
+                LOG.error("Another thread added a Session for our clientId {}, this is a bug!", clientId);
             }
+
+            LOG.trace("case 1, not existing session with CId {}", clientId);
         } else {
-            postConnectAction = reopenExistingSession(msg, clientId, oldSession, newSession, username);
+            postConnectAction = reopenExistingSession(msg, clientId, oldSession, username);
         }
         return postConnectAction;
     }
 
     private SessionCreationResult reopenExistingSession(MqttConnectMessage msg, String clientId,
-                                                        Session oldSession, Session newSession, String username) {
+                                                        Session oldSession, String username) {
         final boolean newIsClean = msg.variableHeader().isCleanSession();
         final SessionCreationResult creationResult;
-        if (oldSession.disconnected()) {
-            if (newIsClean) {
-                boolean result = oldSession.assignState(SessionStatus.DISCONNECTED, SessionStatus.CONNECTING);
-                if (!result) {
-                    throw new SessionCorruptedException("old session was already changed state");
-                }
-
-                // case 2
-                // publish new session
-                dropQueuesForClient(clientId);
-                unsubscribe(oldSession);
-                copySessionConfig(msg, oldSession);
-
-                LOG.trace("case 2, oldSession with same CId {} disconnected", clientId);
-                creationResult = new SessionCreationResult(oldSession, CreationModeEnum.CREATED_CLEAN_NEW, true);
-            } else {
-                final boolean connecting = oldSession.assignState(SessionStatus.DISCONNECTED, SessionStatus.CONNECTING);
-                if (!connecting) {
-                    throw new SessionCorruptedException("old session moved in connected state by other thread");
-                }
-                // case 3
-                reactivateSubscriptions(oldSession, username);
-
-                LOG.trace("case 3, oldSession with same CId {} disconnected", clientId);
-                creationResult = new SessionCreationResult(oldSession, CreationModeEnum.REOPEN_EXISTING, true);
-            }
-        } else {
-            // case 4
-            LOG.trace("case 4, oldSession with same CId {} still connected, force to close", clientId);
+        if (!oldSession.disconnected()) {
             oldSession.closeImmediately();
-            //remove(clientId);
-            creationResult = new SessionCreationResult(newSession, CreationModeEnum.DROP_EXISTING, true);
         }
 
-        if (creationResult.mode == CreationModeEnum.DROP_EXISTING) {
-            LOG.debug("Drop session of already connected client with same id");
-            if (!pool.replace(clientId, oldSession, newSession)) {
-                //the other client was disconnecting and removed it's own session
-                pool.put(clientId, newSession);
+
+        if (newIsClean) {
+            boolean result = oldSession.assignState(SessionStatus.DISCONNECTED, SessionStatus.DESTROYED);
+            if (!result) {
+                throw new SessionCorruptedException("old session has already changed state");
             }
+
+            // case 2, reopening existing session but with cleanSession true
+            // publish new session
+            unsubscribe(oldSession);
+            remove(clientId);
+            final Session newSession = createNewSession(msg, clientId);
+            pool.put(clientId, newSession);
+
+            LOG.trace("case 2, oldSession with same CId {} disconnected", clientId);
+            creationResult = new SessionCreationResult(newSession, CreationModeEnum.CREATED_CLEAN_NEW, true);
         } else {
-            LOG.debug("Replace session of client with same id");
-            if (!pool.replace(clientId, oldSession, oldSession)) {
-                throw new SessionCorruptedException("old session was already removed");
+            final boolean connecting = oldSession.assignState(SessionStatus.DISCONNECTED, SessionStatus.CONNECTING);
+            if (!connecting) {
+                throw new SessionCorruptedException("old session moved in connected state by other thread");
             }
+            // case 3, reopening existing session without cleanSession, so keep the existing subscriptions
+            copySessionConfig(msg, oldSession);
+            reactivateSubscriptions(oldSession, username);
+
+            LOG.trace("case 3, oldSession with same CId {} disconnected", clientId);
+            creationResult = new SessionCreationResult(oldSession, CreationModeEnum.REOPEN_EXISTING, true);
         }
 
         // case not covered new session is clean true/false and old session not in CONNECTED/DISCONNECTED
@@ -243,14 +228,13 @@ public class SessionRegistry {
 
     private Session createNewSession(MqttConnectMessage msg, String clientId) {
         final boolean clean = msg.variableHeader().isCleanSession();
-        final Queue<SessionRegistry.EnqueuedMessage> sessionQueue =
-                    queues.computeIfAbsent(clientId, (String cli) -> queueRepository.createQueue(cli, clean));
         final Session newSession;
+        final Queue<EnqueuedMessage> queue = queueRepository.createQueue(clientId, clean);
         if (msg.variableHeader().isWillFlag()) {
             final Session.Will will = createWill(msg);
-            newSession = new Session(clientId, clean, will, sessionQueue);
+            newSession = new Session(clientId, clean, will, queue);
         } else {
-            newSession = new Session(clientId, clean, sessionQueue);
+            newSession = new Session(clientId, clean, queue);
         }
 
         newSession.markConnecting();
@@ -280,12 +264,11 @@ public class SessionRegistry {
         return pool.get(clientID);
     }
 
-    public void remove(Session session) {
-        pool.remove(session.getClientID(), session);
-    }
-
-    private void dropQueuesForClient(String clientId) {
-        queues.remove(clientId);
+    void remove(String clientID) {
+        final Session old = pool.remove(clientID);
+        if (old != null) {
+            old.cleanUp();
+        }
     }
 
     Collection<ClientDescriptor> listConnectedClients() {
