@@ -568,6 +568,7 @@ class PostOffice {
         final String clientId = connection.getClientId();
         if (!authorizator.canWrite(topic, username, clientId)) {
             LOG.error("MQTT client is not authorized to publish on topic: {}", topic);
+            ReferenceCountUtil.release(msg);
             // WARN this is a special case failed is empty, but this result is to be considered as error.
             return RoutingResults.preroutingError();
         }
