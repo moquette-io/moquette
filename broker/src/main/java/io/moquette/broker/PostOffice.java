@@ -615,6 +615,7 @@ class PostOffice {
      * @param msg
      *            the message to publish
      * @return
+     *            the result of the enqueuing operation to session loops.
      */
     public RoutingResults internalPublish(MqttPublishMessage msg) {
         final MqttQoS qos = msg.fixedHeader().qosLevel();
