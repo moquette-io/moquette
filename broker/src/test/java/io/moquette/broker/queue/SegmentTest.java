@@ -22,4 +22,16 @@ public class SegmentTest {
         assertFalse(segment.hasSpace(current, 513));
         assertFalse(segment.hasSpace(otherCurrent, 513));
     }
+
+    @Test
+    public void testBytesAfter() throws IOException {
+        final MappedByteBuffer pageBuffer = Utils.createPageFile();
+
+        final SegmentPointer begin = new SegmentPointer(0, 0);
+        final SegmentPointer end = new SegmentPointer(0, 1023);
+        final Segment segment = new Segment(pageBuffer, begin, end);
+
+        assertEquals(0, segment.bytesAfter(end));
+        assertEquals(1023, segment.bytesAfter(begin));
+    }
 }

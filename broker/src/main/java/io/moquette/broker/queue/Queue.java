@@ -247,7 +247,7 @@ public class Queue {
                     if (tailSegment.get().equals(currentSegment)) {
                         // read the length header that's crossing 2 segments
                         ByteBuffer lengthBuffer = ByteBuffer.allocate(LENGTH_HEADER_SIZE);
-                        final int remainingHeader = (int) currentSegment.bytesAfter(currentTail);
+                        final int remainingHeader = (int) currentSegment.bytesAfter(currentTail) + 1;
                         lengthBuffer.put(currentSegment.read(currentTail, remainingHeader));
 
                         queuePool.consumedTailSegment(name);

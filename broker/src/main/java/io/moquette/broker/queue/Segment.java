@@ -26,6 +26,7 @@ final class Segment {
 
     /**
      * @return number of bytes in segment after the pointer.
+     * The pointer slot is not counted.
      * */
     public long bytesAfter(SegmentPointer mark) {
         assert mark.samePage(this.end);
