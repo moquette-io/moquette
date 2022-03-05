@@ -672,7 +672,7 @@ class PostOffice {
         if (this.sessionQueues[targetQueueId].offer(task)) {
             return RouteResult.success(clientId, cmd.completableFuture());
         } else {
-            LOG.warn("Session command queue {} is full", targetQueueId);
+            LOG.warn("Session command queue {} is full executing action {}", targetQueueId, actionDescription);
             return RouteResult.failed(clientId);
         }
     }
