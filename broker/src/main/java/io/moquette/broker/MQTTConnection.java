@@ -229,7 +229,7 @@ final class MQTTConnection {
                     }
                 } else {
                     bindedSession.disconnect();
-                    sessionRegistry.remove(bindedSession);
+                    sessionRegistry.remove(bindedSession.getClientID());
                     LOG.error("CONNACK send failed, cleanup session and close the connection", future.cause());
                     channel.close();
                 }
@@ -303,9 +303,14 @@ final class MQTTConnection {
             return;
         }
         // this must not be done on the netty thread
-        LOG.info("Notifying connection lost event");
+        LOG.debug("Notifying connection lost event");
         postOffice.routeCommand(clientID, () -> {
-            processConnectionLost(clientID);
+            if (isBoundToSession() || isSessionUnbound()) {
+                LOG.debug("Cleaning {}", clientID);
+                processConnectionLost(clientID);
+            } else {
+                LOG.debug("NOT Cleaning {}, bound to other connection.", clientID);
+            }
             return null;
         });
     }
@@ -315,8 +320,8 @@ final class MQTTConnection {
             postOffice.fireWill(bindedSession.getWill());
         }
         if (bindedSession.isClean()) {
-            LOG.debug("Remove session for client");
-            sessionRegistry.remove(bindedSession);
+            LOG.debug("Remove session for client {}", clientID);
+            sessionRegistry.remove(bindedSession.getClientID());
         } else {
             bindedSession.disconnect();
         }
@@ -344,10 +349,13 @@ final class MQTTConnection {
         }
 
         return this.postOffice.routeCommand(clientID, () -> {
+            if (!isBoundToSession()) {
+                LOG.debug("NOT processing disconnect {}, not bound.", clientID);
+                return null;
+            }
             bindedSession.disconnect();
             connected = false;
             channel.close().addListener(FIRE_EXCEPTION_ON_FAILURE);
-            LOG.trace("Processed DISCONNECT");
             String userName = NettyUtils.userName(channel);
             postOffice.clientDisconnected(clientID, userName);
             LOG.trace("dispatch disconnection userName={}", userName);
@@ -364,7 +372,8 @@ final class MQTTConnection {
         }
         final String username = NettyUtils.userName(channel);
         return postOffice.routeCommand(clientID, () -> {
-            postOffice.subscribeClientToTopics(msg, clientID, username, this);
+            if (isBoundToSession())
+                postOffice.subscribeClientToTopics(msg, clientID, username, this);
             return null;
         });
     }
@@ -380,6 +389,8 @@ final class MQTTConnection {
         final int messageId = msg.variableHeader().messageId();
 
         postOffice.routeCommand(clientID, () -> {
+            if (!isBoundToSession())
+                return null;
             LOG.trace("Processing UNSUBSCRIBE message. topics: {}", topics);
             postOffice.unsubscribe(topics, this, messageId);
             return null;
@@ -415,16 +426,22 @@ final class MQTTConnection {
         switch (qos) {
             case AT_MOST_ONCE:
                 return postOffice.routeCommand(clientId, () -> {
+                    if (!isBoundToSession())
+                        return null;
                     postOffice.receivedPublishQos0(topic, username, clientId, msg);
                     return null;
                 });
             case AT_LEAST_ONCE:
                 return postOffice.routeCommand(clientId, () -> {
+                    if (!isBoundToSession())
+                        return null;
                     postOffice.receivedPublishQos1(this, topic, username, messageID, msg);
                     return null;
                 });
             case EXACTLY_ONCE: {
                 final CompletableFuture<PostOffice.RouteResult> firstStepFuture = postOffice.routeCommand(clientId, () -> {
+                    if (!isBoundToSession())
+                        return null;
                     bindedSession.receivedPublishQos2(messageID, msg);
                     return null;
                 });
@@ -526,41 +543,39 @@ final class MQTTConnection {
         return NettyUtils.userName(channel);
     }
 
-    public void sendPublishRetainedQos0(Topic topic, MqttQoS qos, ByteBuf payload) {
-        MqttPublishMessage publishMsg = retainedPublish(topic.toString(), qos, payload);
-        sendPublish(publishMsg);
-    }
-
-    public void sendPublishRetainedWithPacketId(Topic topic, MqttQoS qos, ByteBuf payload) {
+    public void sendPublishWithPacketId(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained) {
         final int packetId = nextPacketId();
-        MqttPublishMessage publishMsg = retainedPublishWithMessageId(topic.toString(), qos, payload, packetId);
+        MqttPublishMessage publishMsg = createPublishMessage(topic.toString(), qos, payload, packetId, retained);
         sendPublish(publishMsg);
-    }
-
-    private static MqttPublishMessage retainedPublish(String topic, MqttQoS qos, ByteBuf message) {
-        return retainedPublishWithMessageId(topic, qos, message, 0);
-    }
-
-    private static MqttPublishMessage retainedPublishWithMessageId(String topic, MqttQoS qos, ByteBuf message,
-                                                                   int messageId) {
-        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, true, 0);
-        MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId);
-        return new MqttPublishMessage(fixedHeader, varHeader, message);
     }
 
     // TODO move this method in Session
-    void sendPublishNotRetainedQos0(Topic topic, MqttQoS qos, ByteBuf payload) {
-        MqttPublishMessage publishMsg = notRetainedPublish(topic.toString(), qos, payload);
+    void sendPublishQos0(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained) {
+        MqttPublishMessage publishMsg = createPublishMessage(topic.toString(), qos, payload, 0, retained);
         sendPublish(publishMsg);
     }
 
-    static MqttPublishMessage notRetainedPublish(String topic, MqttQoS qos, ByteBuf message) {
-        return notRetainedPublishWithMessageId(topic, qos, message, 0);
+    static MqttPublishMessage createRetainedPublishMessage(String topic, MqttQoS qos, ByteBuf message) {
+        return createPublishMessage(topic, qos, message, 0, true);
     }
 
-    static MqttPublishMessage notRetainedPublishWithMessageId(String topic, MqttQoS qos, ByteBuf message,
+    static MqttPublishMessage createNonRetainedPublishMessage(String topic, MqttQoS qos, ByteBuf message) {
+        return createPublishMessage(topic, qos, message, 0, false);
+    }
+
+    static MqttPublishMessage createRetainedPublishMessage(String topic, MqttQoS qos, ByteBuf message,
+                                                           int messageId) {
+        return createPublishMessage(topic, qos, message, messageId, true);
+    }
+
+    static MqttPublishMessage createNotRetainedPublishMessage(String topic, MqttQoS qos, ByteBuf message,
                                                               int messageId) {
-        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, false, 0);
+        return createPublishMessage(topic, qos, message, messageId, false);
+    }
+
+    private static MqttPublishMessage createPublishMessage(String topic, MqttQoS qos, ByteBuf message,
+                                                           int messageId, boolean retained) {
+        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, retained, 0);
         MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId);
         return new MqttPublishMessage(fixedHeader, varHeader, message);
     }
@@ -592,6 +607,14 @@ final class MQTTConnection {
 
     public void flush() {
         channel.flush();
+    }
+
+    private boolean isBoundToSession() {
+        return bindedSession != null && bindedSession.isBoundTo(this);
+    }
+
+    private boolean isSessionUnbound() {
+        return bindedSession != null && bindedSession.isBoundTo(null);
     }
 
     public void bindSession(Session session) {

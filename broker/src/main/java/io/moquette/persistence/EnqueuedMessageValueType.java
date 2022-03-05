@@ -82,7 +82,7 @@ public final class EnqueuedMessageValueType implements org.h2.mvstore.type.DataT
             final MqttQoS qos = MqttQoS.valueOf(buff.get());
             final String topicStr = topicDataType.read(buff);
             final ByteBuf payload = payloadDataType.read(buff);
-            return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload);
+            return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload, false);
         } else {
             throw new IllegalArgumentException("Can't recognize record of type: " + messageType);
         }

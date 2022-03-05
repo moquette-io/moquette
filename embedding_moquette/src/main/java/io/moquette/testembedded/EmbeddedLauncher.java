@@ -48,7 +48,7 @@ public final class EmbeddedLauncher {
 
         @Override
         public void onPublish(InterceptPublishMessage msg) {
-            final String decodedPayload = new String(msg.getPayload().array(), UTF_8);
+            final String decodedPayload = msg.getPayload().toString(UTF_8);
             System.out.println("Received on topic: " + msg.getTopicName() + " content: " + decodedPayload);
         }
     }

@@ -67,7 +67,7 @@ public class H2PersistentQueueTest {
 
     private SessionRegistry.PublishedMessage createMessage(String name) {
         final ByteBuf payload = Unpooled.wrappedBuffer(name.getBytes(StandardCharsets.UTF_8));
-        return new SessionRegistry.PublishedMessage(Topic.asTopic(name), MqttQoS.AT_LEAST_ONCE, payload);
+        return new SessionRegistry.PublishedMessage(Topic.asTopic(name), MqttQoS.AT_LEAST_ONCE, payload, false);
     }
 
     @Test
