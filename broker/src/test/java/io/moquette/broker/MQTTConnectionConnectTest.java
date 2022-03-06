@@ -101,7 +101,7 @@ public class MQTTConnectionConnectTest {
             .cleanSession(true)
             .build();
 
-        sut.processConnect(msg).get();
+        sut.processConnect(msg).completableFuture().get();
         assertEqualsConnAck("Connection must be accepted", CONNECTION_ACCEPTED, channel.readOutbound());
         assertNotNull("unique clientid must be generated", sut.getClientId());
         assertTrue(sessionRegistry.retrieve(sut.getClientId()).isClean(), "clean session flag must be true");
@@ -128,7 +128,7 @@ public class MQTTConnectionConnectTest {
         connMsg.clientId("extremely_long_clientID_greater_than_23").build();
 
         // Exercise
-        sut.processConnect(connMsg.clientId("extremely_long_clientID_greater_than_23").build()).get();
+        sut.processConnect(connMsg.clientId("extremely_long_clientID_greater_than_23").build()).completableFuture().get();
 
         // Verify
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
@@ -140,7 +140,7 @@ public class MQTTConnectionConnectTest {
             .willTopic("topic").willMessage("Topic message").build();
 
         // Exercise
-        sut.processConnect(msg).get();
+        sut.processConnect(msg).completableFuture().get();
 
         // Verify
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
@@ -156,7 +156,7 @@ public class MQTTConnectionConnectTest {
 
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).willFlag(true)
             .willTopic("topic").willMessage("Topic message").build();
-        sut.processConnect(msg).get();
+        sut.processConnect(msg).completableFuture().get();
 
         // Exercise
         sut.handleConnectionLost();
@@ -171,7 +171,7 @@ public class MQTTConnectionConnectTest {
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).build();
 
         // Exercise
-        sut.processConnect(msg).get();
+        sut.processConnect(msg).completableFuture().get();
 
         // Verify
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
@@ -184,7 +184,7 @@ public class MQTTConnectionConnectTest {
             .username(TEST_USER).password(TEST_PWD).build();
 
         // Exercise
-        sut.processConnect(msg).get();
+        sut.processConnect(msg).completableFuture().get();
 
         // Verify
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
@@ -277,7 +277,7 @@ public class MQTTConnectionConnectTest {
             .username(TEST_USER)
             .password(TEST_PWD)
             .build();
-        sut.processConnect(msg).get();
+        sut.processConnect(msg).completableFuture().get();
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
 
         // create another connect same clientID but with bad credentials
@@ -309,12 +309,12 @@ public class MQTTConnectionConnectTest {
             .username(TEST_USER)
             .password(TEST_PWD)
             .build();
-        sut.processConnect(msg).get();
+        sut.processConnect(msg).completableFuture().get();
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
 
         // now create another connection and check the new one closes the older
         MQTTConnection anotherConnection = createMQTTConnection(CONFIG);
-        anotherConnection.processConnect(msg).get();
+        anotherConnection.processConnect(msg).completableFuture().get();
         EmbeddedChannel anotherChannel = (EmbeddedChannel) anotherConnection.channel;
         assertEqualsConnAck(CONNECTION_ACCEPTED, anotherChannel.readOutbound());
 

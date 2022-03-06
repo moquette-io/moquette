@@ -92,7 +92,7 @@ public class MQTTConnectionPublishTest {
             .qos(MqttQoS.AT_MOST_ONCE)
             .payload(payload).build();
 
-        sut.processPublish(publish).get();
+        sut.processPublish(publish).completableFuture().get();
 
         // Verify
         assertFalse(channel.isOpen(), "Connection should be closed by the broker");

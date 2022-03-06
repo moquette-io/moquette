@@ -11,14 +11,23 @@ final class SessionEventLoop implements Runnable {
     private static final Logger LOG = LoggerFactory.getLogger(SessionEventLoop.class);
 
     private final BlockingQueue<FutureTask<String>> sessionQueue;
+    private final boolean flushOnExit;
 
     public SessionEventLoop(BlockingQueue<FutureTask<String>> sessionQueue) {
+        this(sessionQueue, true);
+    }
+
+    /**
+     * @param flushOnExit consume the commands queue before exit.
+     * */
+    public SessionEventLoop(BlockingQueue<FutureTask<String>> sessionQueue, boolean flushOnExit) {
         this.sessionQueue = sessionQueue;
+        this.flushOnExit = flushOnExit;
     }
 
     @Override
     public void run() {
-        while (!Thread.interrupted()) {
+        while (!Thread.interrupted() || (Thread.interrupted() && !sessionQueue.isEmpty() && flushOnExit)) {
             try {
                 // blocking call
                 final FutureTask<String> task = this.sessionQueue.take();
@@ -28,6 +37,7 @@ final class SessionEventLoop implements Runnable {
                 Thread.currentThread().interrupt();
             }
         }
+        LOG.info("SessionEventLoop {} exit", Thread.currentThread().getName());
     }
 
     public static void executeTask(final FutureTask<String> task) {
