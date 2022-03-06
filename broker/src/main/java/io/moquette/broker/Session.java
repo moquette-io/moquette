@@ -28,6 +28,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
@@ -35,7 +37,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-class Session {
+class Session implements Delayed {
 
     private static final Logger LOG = LoggerFactory.getLogger(Session.class);
 
@@ -98,6 +100,9 @@ class Session {
     private final DelayQueue<InFlightPacket> inflightTimeouts = new DelayQueue<>();
     private final Map<Integer, MqttPublishMessage> qos2Receiving = new HashMap<>();
     private final AtomicInteger inflightSlots = new AtomicInteger(INFLIGHT_WINDOW_SIZE); // this should be configurable
+    private Instant disconnectTime;
+    private Instant cleanupTime;
+    private SessionRegistry sessionRegistry;
 
     Session(String clientId, boolean clean, Will will, Queue<SessionRegistry.EnqueuedMessage> sessionQueue) {
         this(clientId, clean, sessionQueue);
@@ -167,13 +172,25 @@ class Session {
     }
 
     boolean assignState(SessionStatus expected, SessionStatus newState) {
-        return status.compareAndSet(expected, newState);
+        final boolean result = status.compareAndSet(expected, newState);
+        if (result && newState == SessionStatus.DISCONNECTED) {
+            disconnectTime = Instant.now();
+            notifyDisconnected();
+        } else {
+            disconnectTime = null;
+            if (expected == SessionStatus.DISCONNECTED) {
+                notifyReconnecting();
+            }
+        }
+        return result;
     }
 
     public void closeImmediately() {
         mqttConnection.dropConnection();
         mqttConnection = null;
         status.set(SessionStatus.DISCONNECTED);
+        disconnectTime = Instant.now();
+        notifyDisconnected();
     }
 
     public void disconnect() {
@@ -491,4 +508,39 @@ class Session {
             ", inflightSlots=" + inflightSlots +
             '}';
     }
+
+    private void notifyReconnecting() {
+        if (sessionRegistry != null) {
+            sessionRegistry.sessionReconnected(this);
+        }
+    }
+
+    private void notifyDisconnected() {
+        if (sessionRegistry != null) {
+            sessionRegistry.sessionDisconnected(this);
+        }
+    }
+
+    public boolean disconnectedBefore(Instant treshold) {
+        return disconnectTime != null && disconnectTime.isBefore(treshold);
+    }
+
+    public void setSessionRegistry(SessionRegistry sessionRegistry) {
+        this.sessionRegistry = sessionRegistry;
+    }
+
+    public void setCleanupTime(Instant cleanupTime) {
+        this.cleanupTime = cleanupTime;
+    }
+
+    @Override
+    public int compareTo(Delayed o) {
+        return Long.compare(getDelay(TimeUnit.MILLISECONDS), o.getDelay(TimeUnit.MILLISECONDS));
+    }
+
+    @Override
+    public long getDelay(TimeUnit unit) {
+        return unit.convert(cleanupTime.toEpochMilli() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+    }
+
 }

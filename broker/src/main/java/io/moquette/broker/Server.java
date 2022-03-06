@@ -185,6 +185,7 @@ public class Server {
         final int sessionQueueSize = config.intProp(BrokerConstants.SESSION_QUEUE_SIZE, 1024);
         dispatcher = new PostOffice(subscriptions, retainedRepository, sessions, interceptor, authorizator,
                                     sessionQueueSize);
+        sessions.startSessionCleaner(dispatcher);
         final BrokerConfiguration brokerConfig = new BrokerConfiguration(config);
         MQTTConnectionFactory connectionFactory = new MQTTConnectionFactory(brokerConfig, authenticator, sessions,
                                                                             dispatcher);
@@ -335,6 +336,7 @@ public class Server {
         }
 
         interceptor.stop();
+        sessions.terminate();
         dispatcher.terminate();
         LOG.info("Moquette integration has been stopped.");
     }

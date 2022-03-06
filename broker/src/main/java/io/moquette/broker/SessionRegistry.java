@@ -28,6 +28,10 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.util.Arrays;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAmount;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.Queue;
@@ -35,6 +39,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.DelayQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public class SessionRegistry {
@@ -115,9 +122,15 @@ public class SessionRegistry {
     private static final Logger LOG = LoggerFactory.getLogger(SessionRegistry.class);
 
     private final ConcurrentMap<String, Session> pool = new ConcurrentHashMap<>();
+    private final DelayQueue<Session> inactiveSessions = new DelayQueue<>();
+    private Thread sessionCleaner;
+
     private final ISubscriptionsDirectory subscriptionsDirectory;
     private final IQueueRepository queueRepository;
     private final Authorizator authorizator;
+
+    // TODO: Make timeout configurable
+    private final TemporalAmount defaultTimeout = Duration.of(1, ChronoUnit.MINUTES);
 
     SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory,
                     IQueueRepository queueRepository,
@@ -137,6 +150,8 @@ public class SessionRegistry {
                 queues.remove(clientId);
                 Session rehydrated = new Session(clientId, false, persistentQueue);
                 pool.put(clientId, rehydrated);
+                rehydrated.setSessionRegistry(this);
+                sessionDisconnected(rehydrated);
             }
         }
         if (!queues.isEmpty()) {
@@ -154,6 +169,7 @@ public class SessionRegistry {
 
             // publish the session
             final Session previous = pool.put(clientId, newSession);
+            newSession.setSessionRegistry(this);
             if (previous != null) {
                 // if this happens mean that another Session Event Loop thread processed a CONNECT message
                 // with the same clientId. This is a bug because all messages for the same clientId should
@@ -176,7 +192,6 @@ public class SessionRegistry {
             oldSession.closeImmediately();
         }
 
-
         if (newIsClean) {
             boolean result = oldSession.assignState(SessionStatus.DISCONNECTED, SessionStatus.DESTROYED);
             if (!result) {
@@ -189,6 +204,7 @@ public class SessionRegistry {
             remove(clientId);
             final Session newSession = createNewSession(msg, clientId);
             pool.put(clientId, newSession);
+            newSession.setSessionRegistry(this);
 
             LOG.trace("case 2, oldSession with same CId {} disconnected", clientId);
             creationResult = new SessionCreationResult(newSession, CreationModeEnum.CREATED_CLEAN_NEW, true);
@@ -292,4 +308,88 @@ public class SessionRegistry {
         final Optional<InetSocketAddress> remoteAddressOpt = s.remoteAddress();
         return remoteAddressOpt.map(r -> new ClientDescriptor(clientID, r.getHostString(), r.getPort()));
     }
+
+    void startSessionCleaner(final PostOffice postOffice) {
+        LOG.info("Starting Session Cleaner.");
+        sessionCleaner = new Thread(() -> {
+            cleanerLoop(postOffice);
+        });
+        sessionCleaner.start();
+    }
+
+    public void terminate() {
+        if (sessionCleaner != null) {
+            sessionCleaner.interrupt();
+        }
+        try {
+            sessionCleaner.join(5_000);
+        } catch (InterruptedException ex) {
+            LOG.info("Interrupted while joining session event loop {}", sessionCleaner.getName(), ex);
+        }
+    }
+
+    void sessionDisconnected(Session session) {
+        // Only persistent (non-clean) sessions are added to the queue.
+        if (!session.isClean()) {
+            session.setCleanupTime(Instant.now().plus(defaultTimeout));
+            inactiveSessions.add(session);
+            LOG.debug("Added session {} with timeout {}s", session.getClientID(), session.getDelay(TimeUnit.SECONDS));
+        }
+    }
+
+    void sessionReconnected(Session session) {
+        // Only persistent (non-clean) sessions are added to the queue.
+        if (!session.isClean()) {
+            boolean removed = inactiveSessions.remove(session);
+            LOG.debug("Removing session {} success: {}", session.getClientID(), removed);
+        }
+    }
+
+    private void cleanerLoop(final PostOffice postOffice) {
+        Session expired = null;
+        while (!Thread.interrupted()) {
+            try {
+                // If expired is not null, then the last offer to the eventQueue
+                // failed, and we should try again after a small delay.
+                if (expired == null) {
+                    // blocking call
+                    expired = inactiveSessions.take();
+                }
+                final Session localExpired = expired;
+                PostOffice.RouteResult routeResult = postOffice.routeCommand(expired.getClientID(), "CleanSession", () -> {
+                    checkSession(localExpired);
+                    return null;
+                });
+                if (routeResult.isSuccess()) {
+                    LOG.debug("Session passed to thread for cleaning.");
+                    expired = null;
+                }
+
+            } catch (InterruptedException ex) {
+                LOG.info("SessionEventLoop {} interrupted", Thread.currentThread().getName());
+                Thread.currentThread().interrupt();
+            } catch (RuntimeException ex) {
+                LOG.warn("Failed to execute Clean command.", ex);
+            }
+        }
+    }
+
+    private void checkSession(Session session) {
+        if (!session.disconnected()) {
+            // The session was re-started in the meantime.
+            return;
+        }
+        if (session.getDelay(TimeUnit.MILLISECONDS) <= 0) {
+            destroyTimedoutSession(session);
+        }
+    }
+
+    private void destroyTimedoutSession(Session session) {
+        final String clientId = session.getClientID();
+        LOG.debug("Destroying timed out session for client {}", clientId);
+        if (session.disconnected()) {
+            remove(clientId);
+        }
+    }
+
 }
