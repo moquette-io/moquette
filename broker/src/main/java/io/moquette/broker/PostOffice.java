@@ -135,7 +135,7 @@ class PostOffice {
         }
 
         public boolean isAllSuccess() {
-            return failedRoutings.isEmpty() && !successedRoutings.isEmpty();
+            return failedRoutings.isEmpty();
         }
 
         public boolean isAllFailed() {
