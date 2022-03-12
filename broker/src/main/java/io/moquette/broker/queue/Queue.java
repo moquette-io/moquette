@@ -24,58 +24,65 @@ public class Queue {
 
     private final SegmentAllocator allocator;
     private final QueuePool queuePool;
-    private final PagedFilesAllocator.AllocationAction action;
+    private final PagedFilesAllocator.AllocationListener allocationListener;
     private final ReentrantLock lock = new ReentrantLock();
 
     Queue(String name, Segment headSegment, SegmentPointer currentHeadPtr,
           Segment tailSegment, SegmentPointer currentTailPtr,
-          SegmentAllocator allocator, PagedFilesAllocator.AllocationAction action, QueuePool queuePool) {
+          SegmentAllocator allocator, PagedFilesAllocator.AllocationListener allocationListener, QueuePool queuePool) {
         this.name = name;
         this.headSegment = new AtomicReference<>(headSegment);
         this.currentHeadPtr = new AtomicReference<>(currentHeadPtr);
         this.currentTailPtr = new AtomicReference<>(currentTailPtr);
         this.tailSegment = new AtomicReference<>(tailSegment);
         this.allocator = allocator;
-        this.action = action;
+        this.allocationListener = allocationListener;
         this.queuePool = queuePool;
     }
 
     /**
      * @throws QueueException if an error happens during access to file.
      * */
-    public void enqueue(ByteBuffer data) throws QueueException {
-        final SegmentPointer res = spinningMove(LENGTH_HEADER_SIZE + data.remaining());
+    public void enqueue(ByteBuffer payload) throws QueueException {
+        final SegmentPointer res = spinningMove(LENGTH_HEADER_SIZE + payload.remaining());
         if (res != null) {
+            // in this case all the payload is contained in the current head segment
             LOG.trace("CAS insertion at: {}", res);
-            writeData(headSegment.get(), res, data);
+            writeData(headSegment.get(), res, payload);
             return;
         } else {
+            // the payload can't be fully contained into the current head segment and needs to be splitted
+            // with another segment. To request the next segment, it's needed to be done in global lock.
             lock.lock();
-            long bytesAvailableInHeaderSegment;
-            SegmentPointer lastOffset = null;
 
-            final int dataSize = data.remaining();
+            final int dataSize = payload.remaining();
             final ByteBuffer rawData = (ByteBuffer) ByteBuffer.allocate(LENGTH_HEADER_SIZE + dataSize)
                 .putInt(dataSize)
-                .put(data)
+                .put(payload)
                 .flip();
 
-            // the bytes written from the data input
+            // the bytes written from the payload input
+            long bytesRemainingInHeaderSegment;
+            SegmentPointer lastOffset = null;
             do {
+                // there could be another thread that's pushing data to the segment
+                // outside the lock, so conquer with that to grab the remaining space
+                // in the segment.
                 final Segment currentSegment = headSegment.get();
-                bytesAvailableInHeaderSegment = currentSegment.bytesAfter(currentHeadPtr.get());
-            } while (bytesAvailableInHeaderSegment != 0 && ((lastOffset = spinningMove(bytesAvailableInHeaderSegment)) == null));
+                bytesRemainingInHeaderSegment = currentSegment.bytesAfter(currentHeadPtr.get());
+            } while (bytesRemainingInHeaderSegment != 0 && ((lastOffset = spinningMove(bytesRemainingInHeaderSegment)) == null));
 
             SegmentPointer newSegmentPointer = null;
-            if (bytesAvailableInHeaderSegment != 0) {
-                LOG.trace("Writing partial data to offset {} for {} bytes", lastOffset, bytesAvailableInHeaderSegment);
+            if (bytesRemainingInHeaderSegment != 0) {
+                // copy the beginning part of payload into the head segment, to fill it up.
+                LOG.trace("Writing partial payload to offset {} for {} bytes", lastOffset, bytesRemainingInHeaderSegment);
 
-                final int copySize = (int) bytesAvailableInHeaderSegment;
+                final int copySize = (int) bytesRemainingInHeaderSegment;
                 final ByteBuffer slice = rawData.slice();
                 slice.limit(copySize);
                 writeDataNoHeader(headSegment.get(), lastOffset, slice);
 
-                newSegmentPointer = new SegmentPointer(headSegment.get(), currentHeadPtr.get().offset() + bytesAvailableInHeaderSegment);
+                newSegmentPointer = new SegmentPointer(headSegment.get(), currentHeadPtr.get().offset() + bytesRemainingInHeaderSegment);
 
                 // shift forward the consumption point
                 rawData.position(rawData.position() + copySize);
@@ -83,10 +90,12 @@ public class Queue {
 
             Segment newSegment = null;
             try {
+                // till the payload is not completely stored,
+                // save the remaining part into a new segment.
                 while (rawData.hasRemaining()) {
                     newSegment = allocator.nextFreeSegment();
                     //notify segment creation for queue in queue pool
-                    action.segmentedCreated(name, newSegment);
+                    allocationListener.segmentedCreated(name, newSegment);
 
                     int copySize = (int) Math.min(rawData.remaining(), Segment.SIZE);
                     final ByteBuffer slice = rawData.slice();
@@ -149,7 +158,7 @@ public class Queue {
             }
             newHead = currentHeadPtr.moveForward(size);
         } while (!this.currentHeadPtr.compareAndSet(currentHeadPtr, newHead));
-        // the start position must the be the first free position, while the previous head reference
+        // the start position must be the first free position, while the previous head reference
         // keeps the last occupied position, move .forward by 1
         return currentHeadPtr.plus(1);
     }

@@ -17,7 +17,7 @@ import java.util.Properties;
  * */
 class PagedFilesAllocator implements SegmentAllocator {
 
-    interface AllocationAction {
+    interface AllocationListener {
         void segmentedCreated(String name, Segment segment);
     }
 

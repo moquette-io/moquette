@@ -80,7 +80,7 @@ public class QueuePool {
         this.dataPath = dataPath;
     }
 
-    private static class SegmentAllocationCallback implements PagedFilesAllocator.AllocationAction {
+    private static class SegmentAllocationCallback implements PagedFilesAllocator.AllocationListener {
 
         private final QueuePool queuePool;
 
