@@ -23,6 +23,7 @@ import io.netty.handler.codec.mqtt.*;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
 import static org.junit.jupiter.api.Assertions.*;
@@ -33,6 +34,10 @@ public final class ConnectionTestUtils {
     public static final BrokerInterceptor NO_OBSERVERS_INTERCEPTOR = new BrokerInterceptor(EMPTY_OBSERVERS);
 
     private ConnectionTestUtils() {
+    }
+
+    static void assertConnectAccepted(MQTTConnection connection) {
+        assertConnectAccepted((EmbeddedChannel) connection.channel);
     }
 
     static void assertConnectAccepted(EmbeddedChannel channel) {
@@ -69,8 +74,13 @@ public final class ConnectionTestUtils {
         assertTrue(receivedPublish.fixedHeader().isRetain(), "MUST be retained publish");
     }
 
+    static void verifyPublishIsReceived(MQTTConnection connection, MqttQoS expectedQos, String expectedPayload) {
+        verifyPublishIsReceived((EmbeddedChannel) connection.channel, expectedQos, expectedPayload);
+    }
+
     static void verifyPublishIsReceived(EmbeddedChannel embCh, MqttQoS expectedQos, String expectedPayload) {
         final MqttPublishMessage publishReceived = embCh.flushOutbound().readOutbound();
+        assertNotNull(publishReceived, "A PUB message must be received");
         final String payloadMessage = DebugUtils.payload2Str(publishReceived.payload());
         assertEquals(expectedPayload, payloadMessage, "Sent and received payload must be identical");
         assertEquals(expectedQos, publishReceived.fixedHeader().qosLevel(), "Expected QoS don't match");
@@ -92,5 +102,14 @@ public final class ConnectionTestUtils {
             .clientId(clientId)
             .cleanSession(false)
             .build();
+    }
+
+    static void connect(MQTTConnection connection, MqttConnectMessage connectMessage) {
+        try {
+            connection.processConnect(connectMessage).completableFuture().get();
+        } catch (InterruptedException | ExecutionException e) {
+            fail(e);
+        }
+        assertConnectAccepted((EmbeddedChannel) connection.channel);
     }
 }

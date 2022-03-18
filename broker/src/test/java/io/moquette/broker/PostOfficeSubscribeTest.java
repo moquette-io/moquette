@@ -115,7 +115,7 @@ public class PostOfficeSubscribeTest {
 
     @Test
     public void testSubscribe() throws ExecutionException, InterruptedException {
-        connection.processConnect(connectMessage).get();
+        connection.processConnect(connectMessage).completableFuture().get();
         ConnectionTestUtils.assertConnectAccepted(channel);
 
         // Exercise & verify
@@ -172,7 +172,7 @@ public class PostOfficeSubscribeTest {
         sut = new PostOffice(subscriptions, new MemoryRetainedRepository(), sessionRegistry,
                              ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, new Authorizator(prohibitReadOnNewsTopic), 1024);
 
-        connection.processConnect(connectMessage).get();
+        connection.processConnect(connectMessage).completableFuture().get();
         ConnectionTestUtils.assertConnectAccepted(channel);
 
         //Exercise
@@ -195,7 +195,7 @@ public class PostOfficeSubscribeTest {
 
     @Test
     public void testDoubleSubscribe() throws ExecutionException, InterruptedException {
-        connection.processConnect(connectMessage).get();
+        connection.processConnect(connectMessage).completableFuture().get();
         ConnectionTestUtils.assertConnectAccepted(channel);
         assertEquals(0, subscriptions.size(), "After CONNECT subscription MUST be empty");
         subscribe(channel, NEWS_TOPIC, AT_MOST_ONCE);
@@ -207,7 +207,7 @@ public class PostOfficeSubscribeTest {
 
     @Test
     public void testSubscribeWithBadFormattedTopic() throws ExecutionException, InterruptedException {
-        connection.processConnect(connectMessage).get();
+        connection.processConnect(connectMessage).completableFuture().get();
         ConnectionTestUtils.assertConnectAccepted(channel);
         assertEquals(0, subscriptions.size(), "After CONNECT subscription MUST be empty");
 
@@ -225,7 +225,7 @@ public class PostOfficeSubscribeTest {
 
     @Test
     public void testCleanSession_maintainClientSubscriptions() throws ExecutionException, InterruptedException, TimeoutException {
-        connection.processConnect(connectMessage).get();
+        connection.processConnect(connectMessage).completableFuture().get();
         ConnectionTestUtils.assertConnectAccepted(channel);
         assertEquals(0, subscriptions.size(), "After CONNECT subscription MUST be empty");
 
@@ -238,7 +238,7 @@ public class PostOfficeSubscribeTest {
 
         EmbeddedChannel anotherChannel = new EmbeddedChannel();
         MQTTConnection anotherConn = createMQTTConnection(ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID, anotherChannel);
-        anotherConn.processConnect(ConnectionTestUtils.buildConnect(FAKE_CLIENT_ID)).get();
+        anotherConn.processConnect(ConnectionTestUtils.buildConnect(FAKE_CLIENT_ID)).completableFuture().get();
         ConnectionTestUtils.assertConnectAccepted(anotherChannel);
         assertEquals(1, subscriptions.size(), "After a reconnect, subscription MUST be still present");
 
@@ -260,7 +260,7 @@ public class PostOfficeSubscribeTest {
      */
     @Test
     public void testCleanSession_correctlyClientSubscriptions() throws ExecutionException, InterruptedException, TimeoutException {
-        connection.processConnect(connectMessage).get();
+        connection.processConnect(connectMessage).completableFuture().get();
         ConnectionTestUtils.assertConnectAccepted(channel);
         assertEquals(0, subscriptions.size(), "After CONNECT subscription MUST be empty");
 
@@ -270,10 +270,10 @@ public class PostOfficeSubscribeTest {
             .addSubscription(AT_MOST_ONCE, NEWS_TOPIC)
             .messageId(1)
             .build();
-        connection.processSubscribe(subscribeMsg).get(5, TimeUnit.SECONDS);
+        connection.processSubscribe(subscribeMsg).completableFuture().get(5, TimeUnit.SECONDS);
         assertEquals(1, subscriptions.size(), "Subscribe MUST contain one subscription");
 
-        connection.processDisconnect(null).get(5, TimeUnit.SECONDS);
+        connection.processDisconnect(null).completableFuture().get(5, TimeUnit.SECONDS);
         assertEquals(1, subscriptions.size(), "Disconnection MUSTN'T clear subscriptions");
 
         connectMessage = MqttMessageBuilders.connect()
@@ -282,7 +282,7 @@ public class PostOfficeSubscribeTest {
             .build();
         channel = new EmbeddedChannel();
         connection = createMQTTConnection(CONFIG, channel);
-        connection.processConnect(connectMessage).get();
+        connection.processConnect(connectMessage).completableFuture().get();
         ConnectionTestUtils.assertConnectAccepted(channel);
         assertEquals(0, subscriptions.size(), "After CONNECT with clean, subscription MUST be empty");
 
@@ -302,7 +302,7 @@ public class PostOfficeSubscribeTest {
     @Test
     public void testReceiveRetainedPublishRespectingSubscriptionQoSAndNotPublisher() throws ExecutionException, InterruptedException {
         // publisher publish a retained message on topic /news
-        connection.processConnect(connectMessage).get();
+        connection.processConnect(connectMessage).completableFuture().get();
         ConnectionTestUtils.assertConnectAccepted(channel);
         final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
         final MqttPublishMessage retainedPubQoS1Msg = MqttMessageBuilders.publish()
@@ -316,7 +316,7 @@ public class PostOfficeSubscribeTest {
         // subscriber connects subscribe to topic /news and receive the last retained message
         EmbeddedChannel subChannel = new EmbeddedChannel();
         MQTTConnection subConn = createMQTTConnection(ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID, subChannel);
-        subConn.processConnect(ConnectionTestUtils.buildConnect(SUBSCRIBER_ID)).get();
+        subConn.processConnect(ConnectionTestUtils.buildConnect(SUBSCRIBER_ID)).completableFuture().get();
         ConnectionTestUtils.assertConnectAccepted(subChannel);
         subscribe(subConn, NEWS_TOPIC, MqttQoS.AT_MOST_ONCE);
 
