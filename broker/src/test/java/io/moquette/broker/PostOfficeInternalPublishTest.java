@@ -108,7 +108,7 @@ public class PostOfficeInternalPublishTest {
             .retained(retained)
             .qos(qos)
             .payload(Unpooled.copiedBuffer(PAYLOAD.getBytes(UTF_8))).build();
-        final PostOffice.RoutingResults res = sut.internalPublish(publish);
+        final RoutingResults res = sut.internalPublish(publish);
         try {
             res.completableFuture().get(5, TimeUnit.SECONDS);
         } catch (Exception ex) {

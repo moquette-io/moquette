@@ -122,45 +122,6 @@ class PostOffice {
         }
     }
 
-    static class RoutingResults {
-
-        private final List<String> successedRoutings;
-        private final List<String> failedRoutings;
-        private final CompletableFuture<Void> mergedAction;
-
-        public RoutingResults(List<String> successedRoutings, List<String> failedRoutings, CompletableFuture<Void> mergedAction) {
-            this.successedRoutings = successedRoutings;
-            this.failedRoutings = failedRoutings;
-            this.mergedAction = mergedAction;
-        }
-
-        public boolean isAllSuccess() {
-            return failedRoutings.isEmpty();
-        }
-
-        public boolean isAllFailed() {
-            return successedRoutings.isEmpty() && !failedRoutings.isEmpty();
-        }
-
-        public CompletableFuture<Void> completableFuture() {
-            return mergedAction;
-        }
-
-        public static RoutingResults preroutingError() {
-            // WARN this is a special case failed is empty, but this result is to be considered as error.
-            return new RoutingResults(Collections.emptyList(), Collections.emptyList(), CompletableFuture.completedFuture(null));
-        }
-
-        @Override
-        public String toString() {
-            return "RoutingResults{" +
-                "successedRoutings=" + successedRoutings +
-                ", failedRoutings=" + failedRoutings +
-                ", mergedAction=" + mergedAction +
-                '}';
-        }
-    }
-
     static class RouteResult {
         private final String clientId;
         private final Status status;
