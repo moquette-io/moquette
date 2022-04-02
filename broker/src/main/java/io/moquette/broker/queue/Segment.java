@@ -71,4 +71,14 @@ final class Segment {
     public String toString() {
         return "Segment{page=" + begin.pageId() + ", begin=" + begin.offset() + ", end=" + end.offset() + "}";
     }
+
+    ByteBuffer readAllBytesAfter(SegmentPointer start) {
+        // WARN, dataStart points to a byte position to read
+        // if currentSegment.end is at offset 1023, and data start is 1020, the bytes after are 4 and
+        // not 1023 - 1020.
+        final long availableDataLength = bytesAfter(start) + 1;
+        final ByteBuffer buffer = read(start, (int) availableDataLength);
+        buffer.rewind();
+        return buffer;
+    }
 }

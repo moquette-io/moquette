@@ -216,43 +216,20 @@ public class Queue {
                         // ~1
                         if (tailSegment.get().equals(currentSegment)) {
                             // tailSegment is still the currentSegment, and we are in the lock, so we own it
-                            // consume the segment
-                            int remaining = payloadLength;
+                            // consume the segments
                             SegmentPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
-                            // WARN, dataStart points to a byte position to read
-                            // if currentSegment.end is at offset 1023, and data start is 1020, the bytes after are 4 and
-                            // not 1023 - 1020.
-                            final long availableDataLength = currentSegment.bytesAfter(dataStart) + 1;
+                            final ByteBuffer remainingPart = currentSegment.readAllBytesAfter(dataStart);
                             List<ByteBuffer> createdBuffers = new ArrayList<>();
-                            createdBuffers.add(readData(currentSegment, dataStart, (int) availableDataLength));
+                            createdBuffers.add(remainingPart);
 
                             queuePool.consumedTailSegment(name);
 
-                            remaining -= availableDataLength;
-                            Segment newTailSegment;
-                            SegmentPointer lastTail;
-                            do {
-                                // load next tail segment
-                                newTailSegment = queuePool.openNextTailSegment(name);
-                                dataStart = newTailSegment.begin;
-                                int toRead = Math.min(remaining, (int) Segment.SIZE);
-                                final ByteBuffer readMessagePart = readData(newTailSegment, dataStart, toRead);
-                                createdBuffers.add(readMessagePart);
-                                remaining -= toRead;
-                                lastTail = dataStart.moveForward(toRead);
-                                if (remaining > 0) {
-                                    queuePool.consumedTailSegment(name);
-                                }
-                            } while (remaining > 0);
-
+                            final int payloadLeft = payloadLength - remainingPart.remaining();
+                            createdBuffers.addAll(loadPayloadFromSegments(payloadLeft, currentSegment, dataStart));
                             out = joinBuffers(createdBuffers);
-
-                            // assign to tailSegment without CAS because we are in lock
-                            tailSegment.set(newTailSegment);
-                            currentTailPtr.set(lastTail);
                         } else {
                             // tailSegments was moved in the meantime, this means some other thread
-                            //has already consumed the data and theft the payload, go ahead with another message
+                            // has already consumed the data and theft the payload, go ahead with another message
                             retry = true;
                         }
 
@@ -266,42 +243,29 @@ public class Queue {
                         // the currentSegments is still the tailSegment
                         // read the length header that's crossing 2 segments
                         ByteBuffer lengthBuffer = ByteBuffer.allocate(LENGTH_HEADER_SIZE);
-                        final int remainingHeader = (int) currentSegment.bytesAfter(currentTail) + 1;
-                        lengthBuffer.put(currentSegment.read(currentTail, remainingHeader));
+                        final ByteBuffer partialHeader = currentSegment.readAllBytesAfter(currentTail);
+                        final int consumedHeaderSize = partialHeader.remaining();
+                        lengthBuffer.put(partialHeader);
 
                         queuePool.consumedTailSegment(name);
 
-                        final int headerFragmentToRead =  LENGTH_HEADER_SIZE - remainingHeader;
+                        final int remainingHeaderSize =  LENGTH_HEADER_SIZE - consumedHeaderSize;
                         Segment newTailSegment = queuePool.openNextTailSegment(name);
-                        lengthBuffer.put(newTailSegment.read(newTailSegment.begin, headerFragmentToRead));
-                        final SegmentPointer dataStart = newTailSegment.begin.moveForward(headerFragmentToRead);
+                        lengthBuffer.put(newTailSegment.read(newTailSegment.begin, remainingHeaderSize));
+                        final SegmentPointer dataStart = newTailSegment.begin.moveForward(remainingHeaderSize);
 
-                        final int messageLength = ((ByteBuffer) lengthBuffer.flip()).getInt();
-                        int remaining = messageLength;
-                        int toRead = Math.min(remaining, (int) Segment.SIZE);
+                        int remaining = ((ByteBuffer) lengthBuffer.flip()).getInt();
                         List<ByteBuffer> createdBuffers = new ArrayList<>();
-                        createdBuffers.add(newTailSegment.read(dataStart, toRead));
 
-                        SegmentPointer lastTail = dataStart.moveForward(toRead);
+                        int availableDataLength = Math.min(remaining, (int) Segment.SIZE);
+                        createdBuffers.add(newTailSegment.read(dataStart, availableDataLength));
 
-                        remaining -= toRead;
+                        SegmentPointer lastTail = dataStart.moveForward(availableDataLength);
 
-                        while (remaining > 0) {
-                            newTailSegment = queuePool.openNextTailSegment(name);
-                            toRead = Math.min(remaining, (int) Segment.SIZE);
-                            createdBuffers.add(newTailSegment.read(newTailSegment.begin, toRead));
-                            lastTail = newTailSegment.begin.moveForward(toRead);
-                            remaining -= toRead;
-                            if (remaining > 0) {
-                                queuePool.consumedTailSegment(name);
-                            }
-                        }
+                        remaining -= availableDataLength;
 
+                        createdBuffers.addAll(loadPayloadFromSegments(remaining, newTailSegment, lastTail));
                         out = joinBuffers(createdBuffers);
-
-                        // assign to tailSegment without CAS because we are in lock
-                        tailSegment.set(newTailSegment);
-                        currentTailPtr.set(lastTail);
                     } else {
                         // somebody else changed the tailSegment, retry and read next message
                         retry = true;
@@ -330,6 +294,30 @@ public class Queue {
 
         // return data or null
         return out;
+    }
+
+    private List<ByteBuffer> loadPayloadFromSegments(int remaining, Segment segment, SegmentPointer tail) throws QueueException {
+        List<ByteBuffer> createdBuffersOut = new ArrayList<>(segmentCountFromSize(remaining));
+        while (remaining > 0) {
+            segment = queuePool.openNextTailSegment(name);
+            int toRead = Math.min(remaining, (int) Segment.SIZE);
+            final ByteBuffer readMessagePart = segment.read(segment.begin, toRead);
+            createdBuffersOut.add(readMessagePart);
+            tail = segment.begin.moveForward(toRead);
+            remaining -= toRead;
+            if (remaining > 0) {
+                queuePool.consumedTailSegment(name);
+            }
+        }
+
+        // assign to tailSegment without CAS because we are in lock
+        tailSegment.set(segment);
+        currentTailPtr.set(tail);
+        return createdBuffersOut;
+    }
+
+    private int segmentCountFromSize(int remaining) {
+        return (int) Math.ceil((double) remaining / Segment.SIZE);
     }
 
     private boolean isTailFirstUsage(Segment tailSegment, SegmentPointer tail) {
