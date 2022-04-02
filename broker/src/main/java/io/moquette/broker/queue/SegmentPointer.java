@@ -22,8 +22,8 @@ final class SegmentPointer implements Comparable<SegmentPointer> {
     /**
      * Copy constructor
      * */
-    public SegmentPointer(SegmentPointer original) {
-        this(original.idPage, original.offset);
+    public SegmentPointer copy() {
+        return new SegmentPointer(idPage, offset);
     }
 
     @Override
@@ -33,6 +33,10 @@ final class SegmentPointer implements Comparable<SegmentPointer> {
         } else {
             return Integer.compare(idPage, other.idPage);
         }
+    }
+
+    public boolean isGreaterThan(SegmentPointer other) {
+        return this.compareTo(other) > 0;
     }
 
     @Override

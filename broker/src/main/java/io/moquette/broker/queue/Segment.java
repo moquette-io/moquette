@@ -50,8 +50,7 @@ final class Segment {
      *
      * @param pointer*/
     int readHeader(SegmentPointer pointer) {
-        final int res = mappedBuffer.getInt(pointer.offset());
-        return res;
+        return mappedBuffer.getInt(pointer.offset());
     }
 
     public ByteBuffer read(SegmentPointer start, int length) {

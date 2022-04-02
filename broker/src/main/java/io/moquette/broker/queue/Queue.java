@@ -188,41 +188,47 @@ public class Queue {
             retry = false;
             final Segment currentSegment = tailSegment.get();
             final SegmentPointer currentTail = currentTailPtr.get();
-            if (hasData(currentHeadPtr.get(), currentTail)) {
+            if (currentHeadPtr.get().isGreaterThan(currentTail)) {
                 if (currentSegment.bytesAfter(currentTail) >= LENGTH_HEADER_SIZE) {
-                    // header of message (the length) is contained in the current segment
-                    SegmentPointer existingTail = new SegmentPointer(currentTail);
+                    // currentSegment contains at least the header (payload length)
+                    final SegmentPointer existingTail;
                     if (isTailFirstUsage(currentSegment, currentTail)) {
                         existingTail = currentTail.plus(1);
+                    } else {
+                        existingTail = currentTail.copy();
                     }
-                    int messageLength = currentSegment.readHeader(existingTail);
-                    if (currentSegment.hasSpace(existingTail, messageLength + LENGTH_HEADER_SIZE)) {
-                        final SegmentPointer newTail = existingTail.moveForward(messageLength + LENGTH_HEADER_SIZE);
+                    final int payloadLength = currentSegment.readHeader(existingTail);
+                    if (currentSegment.hasSpace(existingTail, payloadLength + LENGTH_HEADER_SIZE)) {
+                        // currentSegments contains fully the payload
+                        final SegmentPointer newTail = existingTail.moveForward(payloadLength + LENGTH_HEADER_SIZE);
                         if (currentTailPtr.compareAndSet(currentTail, newTail)) {
                             // fast track optimistic lock
                             // read data from currentTail + 4 bytes(the length)
-                            out = readData(currentSegment, existingTail.moveForward(LENGTH_HEADER_SIZE), messageLength);
+                            out = readData(currentSegment, existingTail.moveForward(LENGTH_HEADER_SIZE), payloadLength);
                         } else {
+                            // some concurrent thread moved forward the tail pointer before us,
+                            // retry with another message
                             retry = true;
                         }
                     } else {
+                        // payload is split across currentSegment and next ones
                         lock.lock();
                         // ~1
                         if (tailSegment.get().equals(currentSegment)) {
+                            // tailSegment is still the currentSegment, and we are in the lock, so we own it
                             // consume the segment
-                            messageLength = currentSegment.readHeader(existingTail);
-                            int remaining = messageLength;
+                            int remaining = payloadLength;
                             SegmentPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
-                            // WARN, dataStart point to a byte position to read
-                            // if currentSegment.end is 1023 offset, and data start is 1020, the bytes after are 4 and
+                            // WARN, dataStart points to a byte position to read
+                            // if currentSegment.end is at offset 1023, and data start is 1020, the bytes after are 4 and
                             // not 1023 - 1020.
-                            final long tmpLen = currentSegment.bytesAfter(dataStart) + 1;
+                            final long availableDataLength = currentSegment.bytesAfter(dataStart) + 1;
                             List<ByteBuffer> createdBuffers = new ArrayList<>();
-                            createdBuffers.add(readData(currentSegment, dataStart, (int) tmpLen));
+                            createdBuffers.add(readData(currentSegment, dataStart, (int) availableDataLength));
 
                             queuePool.consumedTailSegment(name);
 
-                            remaining -= tmpLen;
+                            remaining -= availableDataLength;
                             Segment newTailSegment;
                             SegmentPointer lastTail;
                             do {
@@ -245,15 +251,19 @@ public class Queue {
                             tailSegment.set(newTailSegment);
                             currentTailPtr.set(lastTail);
                         } else {
+                            // tailSegments was moved in the meantime, this means some other thread
+                            //has already consumed the data and theft the payload, go ahead with another message
                             retry = true;
                         }
 
                         lock.unlock();
                     }
                 } else {
+                    // header is split across 2 segments
                     lock.lock();
                     // ~1
                     if (tailSegment.get().equals(currentSegment)) {
+                        // the currentSegments is still the tailSegment
                         // read the length header that's crossing 2 segments
                         ByteBuffer lengthBuffer = ByteBuffer.allocate(LENGTH_HEADER_SIZE);
                         final int remainingHeader = (int) currentSegment.bytesAfter(currentTail) + 1;
@@ -293,13 +303,14 @@ public class Queue {
                         tailSegment.set(newTailSegment);
                         currentTailPtr.set(lastTail);
                     } else {
+                        // somebody else changed the tailSegment, retry and read next message
                         retry = true;
                     }
                     lock.unlock();
                 }
             } else {
-                //TODO the first run tail is (0, 0) while head is (0, -1)
                 if (currentTail.compareTo(currentHeadPtr.get()) == 0) {
+                    // head and tail pointer are the same, the queue is empty
                     return null;
                 }
                 lock.lock();
@@ -323,10 +334,6 @@ public class Queue {
 
     private boolean isTailFirstUsage(Segment tailSegment, SegmentPointer tail) {
         return tail.equals(tailSegment.begin.plus(-1));
-    }
-
-    private boolean hasData(SegmentPointer head, SegmentPointer tail) {
-        return head.compareTo(tail) > 0;
     }
 
     /**
