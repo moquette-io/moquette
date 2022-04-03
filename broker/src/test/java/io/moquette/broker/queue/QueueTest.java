@@ -8,6 +8,7 @@ import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
@@ -324,7 +325,33 @@ class QueueTest {
     }
 
     @Test
-    public void readCrossingPages() {
-        throw new IllegalStateException("Not yet implemented");
+    public void readCrossingPages() throws QueueException, IOException {
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final Queue queue = queuePool.getOrCreate("test");
+
+        // fill all segments less one in a page
+        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - 4));
+        int messageSize = payload.flip().remaining() + 4;
+        final int loopToFill = PagedFilesAllocator.PAGE_SIZE / messageSize;
+        for (int i = 0; i < loopToFill - 1; i++) {
+            payload.rewind();
+            queue.enqueue(payload);
+        }
+
+        assertPageFiles(tempQueueFolder, 1);
+        assertEquals(PagedFilesAllocator.PAGE_SIZE - messageSize, queue.currentHead().offset() + 1,
+            "head must be one message size (1024) from the end of the segment");
+
+        // Exercise
+        payload = ByteBuffer.wrap(generatePayload(2048 - 4, (byte) 'B'));
+        payload.rewind();
+        queue.enqueue(payload);
+
+        // Verify
+        assertPageFiles(tempQueueFolder, 2);
+    }
+
+    private void assertPageFiles(Path tempQueueFolder, int expected) throws IOException {
+        assertEquals(expected, Files.list(tempQueueFolder).filter(p -> p.toString().endsWith(".page")).count());
     }
 }
