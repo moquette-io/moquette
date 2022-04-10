@@ -20,7 +20,32 @@
         <netty.tcnative.version>2.0.46.Final</netty.tcnative.version>
         <paho.version>1.2.5</paho.version>
         <h2.version>1.4.199</h2.version>
+        <javac.version>9+181-r4173-1</javac.version>
     </properties>
+
+    <!-- required to use error-prone with JDK 8 - https://errorprone.info/docs/installation -->
+    <profiles>
+      <profile>
+        <id>jdk8</id>
+        <activation>
+          <jdk>1.8</jdk>
+        </activation>
+        <build>
+          <plugins>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-compiler-plugin</artifactId>
+              <configuration>
+                <fork>true</fork>
+                <compilerArgs combine.children="append">
+                  <arg>-J-Xbootclasspath/p:${settings.localRepository}/com/google/errorprone/javac/${javac.version}/javac-${javac.version}.jar</arg>
+                </compilerArgs>
+              </configuration>
+            </plugin>
+          </plugins>
+        </build>
+      </profile>
+    </profiles>
 
     <dependencies>
         <dependency>
