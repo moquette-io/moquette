@@ -78,7 +78,7 @@ class DefaultMoquetteSslContextCreator implements ISslContextCreator {
                 break;
             case OPENSSL:
             case OPENSSL_REFCNT:
-                contextBuilder = builderWithOpenSSLProvider(ks, keyPassword);
+                contextBuilder = builderWithOpenSSLProvider(ks, keyPassword, props.getProperty(BrokerConstants.KEY_PAIR_ALIAS_PROPERTY_NAME));
                 break;
             default:
                 LOG.error("unsupported SSL provider {}", sslProvider);
@@ -135,10 +135,11 @@ class DefaultMoquetteSslContextCreator implements ISslContextCreator {
      * <p>
      * TODO: SNI is currently not supported, we use only the first found private key.
      */
-    private static SslContextBuilder builderWithOpenSSLProvider(KeyStore ks, String keyPassword)
+    private static SslContextBuilder builderWithOpenSSLProvider(KeyStore ks, String keyPassword, String aliasToFind)
             throws GeneralSecurityException {
         for (String alias : Collections.list(ks.aliases())) {
-            if (ks.entryInstanceOf(alias, KeyStore.PrivateKeyEntry.class)) {
+            if ((aliasToFind.isEmpty() || alias.equals(aliasToFind)) &&
+                    ks.entryInstanceOf(alias, KeyStore.PrivateKeyEntry.class)) {
                 PrivateKey key = (PrivateKey) ks.getKey(alias, keyPassword.toCharArray());
                 Certificate[] chain = ks.getCertificateChain(alias);
                 X509Certificate[] certChain = new X509Certificate[chain.length];

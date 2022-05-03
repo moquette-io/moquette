@@ -27,6 +27,7 @@ public final class BrokerConstants {
     public static final String PASSWORD_FILE_PROPERTY_NAME = "password_file";
     public static final String PORT_PROPERTY_NAME = "port";
     public static final String HOST_PROPERTY_NAME = "host";
+    public static final String KEY_PAIR_ALIAS_PROPERTY_NAME = "key_pair_alias";
     public static final String DEFAULT_MOQUETTE_STORE_H2_DB_FILENAME = "moquette_store.h2";
     public static final String DEFAULT_PERSISTENT_PATH = System.getProperty("user.dir") + File.separator
             + DEFAULT_MOQUETTE_STORE_H2_DB_FILENAME;
