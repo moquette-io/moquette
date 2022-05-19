@@ -49,6 +49,7 @@ public final class BrokerConstants {
     public static final String KEY_STORE_PASSWORD_PROPERTY_NAME = "key_store_password";
     public static final String KEY_MANAGER_PASSWORD_PROPERTY_NAME = "key_manager_password";
     public static final String ALLOW_ANONYMOUS_PROPERTY_NAME = "allow_anonymous";
+    public static final String PEER_CERTIFICATE_AS_USERNAME = "peer_certificate_as_username";
     public static final String REAUTHORIZE_SUBSCRIPTIONS_ON_CONNECT = "reauthorize_subscriptions_on_connect";
     public static final String ALLOW_ZERO_BYTE_CLIENT_ID_PROPERTY_NAME = "allow_zero_byte_client_id";
     public static final String ACL_FILE_PROPERTY_NAME = "acl_file";
