@@ -43,10 +43,11 @@ public class MockAuthenticator implements IAuthenticator {
         if (!m_userPwds.containsKey(username)) {
             return false;
         }
-        if (password == null) {
-            return false;
+        if (password != null) {
+            return m_userPwds.get(username).equals(new String(password, UTF_8));
+        } else {
+            return m_userPwds.get(username) == null;
         }
-        return m_userPwds.get(username).equals(new String(password, UTF_8));
     }
 
 }
