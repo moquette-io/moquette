@@ -66,7 +66,7 @@ class BrokerConfiguration {
         return immediateBufferFlush;
     }
 
-    public boolean peerCertificateAsUsername() {
+    public boolean isPeerCertificateAsUsername() {
         return peerCertificateAsUsername;
     }
 }

@@ -291,7 +291,7 @@ final class MQTTConnection {
             }
         }
 
-        if (brokerConfig.peerCertificateAsUsername()) {
+        if (brokerConfig.isPeerCertificateAsUsername()) {
             try {
                 // Use peer cert as username
                 SslHandler sslhandler = (SslHandler) channel.pipeline().get("ssl");

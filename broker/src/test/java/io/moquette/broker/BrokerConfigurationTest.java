@@ -33,6 +33,7 @@ public class BrokerConfigurationTest {
         assertFalse(brokerConfiguration.isAllowZeroByteClientId());
         assertFalse(brokerConfiguration.isReauthorizeSubscriptionsOnConnect());
         assertFalse(brokerConfiguration.isImmediateBufferFlush());
+        assertFalse(brokerConfiguration.isPeerCertificateAsUsername());
     }
 
     @Test
@@ -45,6 +46,7 @@ public class BrokerConfigurationTest {
         assertFalse(brokerConfiguration.isAllowZeroByteClientId());
         assertFalse(brokerConfiguration.isReauthorizeSubscriptionsOnConnect());
         assertFalse(brokerConfiguration.isImmediateBufferFlush());
+        assertFalse(brokerConfiguration.isPeerCertificateAsUsername());
     }
 
     @Test
@@ -57,6 +59,7 @@ public class BrokerConfigurationTest {
         assertTrue(brokerConfiguration.isAllowZeroByteClientId());
         assertFalse(brokerConfiguration.isReauthorizeSubscriptionsOnConnect());
         assertFalse(brokerConfiguration.isImmediateBufferFlush());
+        assertFalse(brokerConfiguration.isPeerCertificateAsUsername());
     }
 
     @Test
@@ -69,6 +72,7 @@ public class BrokerConfigurationTest {
         assertFalse(brokerConfiguration.isAllowZeroByteClientId());
         assertTrue(brokerConfiguration.isReauthorizeSubscriptionsOnConnect());
         assertFalse(brokerConfiguration.isImmediateBufferFlush());
+        assertFalse(brokerConfiguration.isPeerCertificateAsUsername());
     }
 
     @Test
@@ -81,5 +85,19 @@ public class BrokerConfigurationTest {
         assertFalse(brokerConfiguration.isAllowZeroByteClientId());
         assertFalse(brokerConfiguration.isReauthorizeSubscriptionsOnConnect());
         assertTrue(brokerConfiguration.isImmediateBufferFlush());
+        assertFalse(brokerConfiguration.isPeerCertificateAsUsername());
+    }
+
+    @Test
+    public void configurePeerCertificateAsUsername() {
+        Properties properties = new Properties();
+        properties.put(BrokerConstants.PEER_CERTIFICATE_AS_USERNAME, "true");
+        MemoryConfig config = new MemoryConfig(properties);
+        BrokerConfiguration brokerConfiguration = new BrokerConfiguration(config);
+        assertTrue(brokerConfiguration.isAllowAnonymous());
+        assertFalse(brokerConfiguration.isAllowZeroByteClientId());
+        assertFalse(brokerConfiguration.isReauthorizeSubscriptionsOnConnect());
+        assertFalse(brokerConfiguration.isImmediateBufferFlush());
+        assertTrue(brokerConfiguration.isPeerCertificateAsUsername());
     }
 }
