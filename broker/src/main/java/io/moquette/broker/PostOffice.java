@@ -19,6 +19,7 @@ import io.moquette.interception.BrokerInterceptor;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
 import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.Topic;
+import io.moquette.interception.messages.InterceptAcknowledgedMessage;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.*;
@@ -42,7 +43,7 @@ import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
 
 class PostOffice {
-
+    private static final int ZERO_PACKET_ID_USE_AUTOGENERATION = 0;
     /**
      * Maps the failed packetID per clientId (id client source, id_packet) -> [id client target]
      * */
@@ -395,8 +396,12 @@ class PostOffice {
         }
     }
 
+    private RoutingResults publish2Subscribers(ByteBuf payload, Topic topic, MqttQoS publishingQos, Set<String> filterTargetClients) {
+        return publish2Subscribers(payload, topic, publishingQos, filterTargetClients, ZERO_PACKET_ID_USE_AUTOGENERATION);
+    }
+
     private RoutingResults publish2Subscribers(ByteBuf payload, Topic topic, MqttQoS publishingQos) {
-        return publish2Subscribers(payload, topic, publishingQos, NO_FILTER);
+        return publish2Subscribers(payload, topic, publishingQos, NO_FILTER, ZERO_PACKET_ID_USE_AUTOGENERATION);
     }
 
     private class BatchingPublishesCollector {
@@ -461,7 +466,7 @@ class PostOffice {
     }
 
     private RoutingResults publish2Subscribers(ByteBuf payload, Topic topic, MqttQoS publishingQos,
-                                               Set<String> filterTargetClients) {
+                                               Set<String> filterTargetClients, int packetId) {
         Set<Subscription> topicMatchingSubscriptions = subscriptions.matchQosSharpening(topic);
         if (topicMatchingSubscriptions.isEmpty()) {
             // no matching subscriptions, clean exit
@@ -479,7 +484,7 @@ class PostOffice {
         payload.retain(collector.countBatches());
 
         List<RouteResult> publishResults = collector.routeBatchedPublishes((batch) -> {
-            publishToSession(payload, topic, batch, publishingQos);
+            publishToSession(payload, topic, batch, publishingQos, packetId); // iqm
             payload.release();
         });
 
@@ -502,21 +507,21 @@ class PostOffice {
         return new RoutingResults(successedRoutings, failedRoutings, publishes);
     }
 
-    private void publishToSession(ByteBuf payload, Topic topic, Collection<Subscription> subscriptions, MqttQoS publishingQos) {
+    private void publishToSession(ByteBuf payload, Topic topic, Collection<Subscription> subscriptions, MqttQoS publishingQos, int packetId) {
         for (Subscription sub : subscriptions) {
             MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
-            publishToSession(payload, topic, sub, qos);
+            publishToSession(payload, topic, sub, qos, packetId); // iqm
         }
     }
 
-    private void publishToSession(ByteBuf payload, Topic topic, Subscription sub, MqttQoS qos) {
+    private void publishToSession(ByteBuf payload, Topic topic, Subscription sub, MqttQoS qos, int packetId) {
         Session targetSession = this.sessionRegistry.retrieve(sub.getClientId());
 
         boolean isSessionPresent = targetSession != null;
         if (isSessionPresent) {
             LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
                       sub.getClientId(), sub.getTopicFilter(), qos);
-            targetSession.sendNotRetainedPublishOnSessionAtQos(topic, qos, payload);
+            targetSession.sendNotRetainedPublishOnSessionAtQosWithPackId(topic, qos, payload, packetId); // iqm
         } else {
             // If we are, the subscriber disconnected after the subscriptions tree selected that session as a
             // destination.
@@ -547,7 +552,7 @@ class PostOffice {
         final RoutingResults publishRoutings;
         if (msg.fixedHeader().isDup()) {
             final Set<String> failedClients = failedPublishes.listFailed(clientId, messageID);
-            publishRoutings = publish2Subscribers(payload, topic, EXACTLY_ONCE, failedClients);
+            publishRoutings = publish2Subscribers(payload, topic, EXACTLY_ONCE, failedClients); // iqm
         } else {
             publishRoutings = publish2Subscribers(payload, topic, EXACTLY_ONCE);
         }
@@ -593,7 +598,12 @@ class PostOffice {
         final ByteBuf payload = msg.payload();
         LOG.info("Sending internal PUBLISH message Topic={}, qos={}", topic, qos);
 
-        final RoutingResults publishResult = publish2Subscribers(payload, topic, qos);
+        final RoutingResults publishResult;
+        if (msg.variableHeader().packetId() > 0) {
+            publishResult = publish2Subscribers(payload, topic, qos, NO_FILTER, msg.variableHeader().packetId());
+        } else {
+            publishResult = publish2Subscribers(payload, topic, qos);
+        }
         LOG.trace("after routed publishes: {}", publishResult);
 
         if (!msg.fixedHeader().isRetain()) {
@@ -622,6 +632,11 @@ class PostOffice {
 
     void dispatchConnectionLost(String clientId,String userName) {
         interceptor.notifyClientConnectionLost(clientId, userName);
+    }
+
+    void dispatchMessageAcknowledgement(String clientId, int packetId) {
+        interceptor.notifyMessageAcknowledged(new InterceptAcknowledgedMessage(
+            null, null, clientId, packetId));
     }
 
     /**

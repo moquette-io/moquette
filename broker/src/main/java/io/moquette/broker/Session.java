@@ -38,6 +38,7 @@ import java.util.concurrent.atomic.AtomicReference;
 class Session {
 
     private static final Logger LOG = LoggerFactory.getLogger(Session.class);
+    private static final int ZERO_PACKET_ID_NEED_TO_GET_NEXT = 0; // iqm
 
     static class InFlightPacket implements Delayed {
 
@@ -236,14 +237,18 @@ class Session {
     }
 
     public void sendRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload) {
-        sendPublishOnSessionAtQos(topic, qos, payload, true);
+        sendPublishOnSessionAtQos(topic, qos, payload, true, ZERO_PACKET_ID_NEED_TO_GET_NEXT);
     }
 
     public void sendNotRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload) {
-        sendPublishOnSessionAtQos(topic, qos, payload, false);
+        sendPublishOnSessionAtQos(topic, qos, payload, false, ZERO_PACKET_ID_NEED_TO_GET_NEXT);
     }
 
-    private void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained) {
+    public void sendNotRetainedPublishOnSessionAtQosWithPackId(Topic topic, MqttQoS qos, ByteBuf payload, int packetId) {
+        sendPublishOnSessionAtQos(topic, qos, payload, false, packetId); // iqm
+    }
+
+    private void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained, int packetId) {
         switch (qos) {
             case AT_MOST_ONCE:
                 if (connected()) {
@@ -251,17 +256,17 @@ class Session {
                 }
                 break;
             case AT_LEAST_ONCE:
-                sendPublishQos1(topic, qos, payload, retained);
+                sendPublishQos1(topic, qos, payload, retained, packetId); // iqm
                 break;
             case EXACTLY_ONCE:
-                sendPublishQos2(topic, qos, payload, retained);
+                sendPublishQos2(topic, qos, payload, retained, packetId); // iqm
                 break;
             case FAILURE:
                 LOG.error("Not admissible");
         }
     }
 
-    private void sendPublishQos1(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained) {
+    private void sendPublishQos1(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained, int packId) {
         if (!connected() && isClean()) {
             //pushing messages to disconnected not clean session
             return;
@@ -270,7 +275,12 @@ class Session {
         final MQTTConnection localMqttConnectionRef = mqttConnection;
         if (canSkipQueue(localMqttConnectionRef)) {
             inflightSlots.decrementAndGet();
-            int packetId = localMqttConnectionRef.nextPacketId();
+            int packetId;
+            if (packId == ZERO_PACKET_ID_NEED_TO_GET_NEXT) {
+                packetId = localMqttConnectionRef.nextPacketId();
+            } else {
+                packetId = packId;
+            }
 
             // Adding to a map, retain.
             payload.retain();
@@ -300,11 +310,16 @@ class Session {
         }
     }
 
-    private void sendPublishQos2(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained) {
+    private void sendPublishQos2(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained, int packId) {
         final MQTTConnection localMqttConnectionRef = mqttConnection;
         if (canSkipQueue(localMqttConnectionRef)) {
             inflightSlots.decrementAndGet();
-            int packetId = localMqttConnectionRef.nextPacketId();
+            int packetId;
+            if (packId == ZERO_PACKET_ID_NEED_TO_GET_NEXT) {
+                packetId = localMqttConnectionRef.nextPacketId();
+            } else {
+                packetId = packId;
+            }
 
             // Retain before adding to map
             payload.retain();

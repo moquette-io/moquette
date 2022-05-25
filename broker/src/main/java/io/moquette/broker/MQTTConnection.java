@@ -110,6 +110,7 @@ final class MQTTConnection {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
         this.postOffice.routeCommand(bindedSession.getClientID(), "PUBCOMP", () -> {
             bindedSession.processPubComp(messageID);
+            postOffice.dispatchMessageAcknowledgement(getClientId(), messageID); // iqm
             return bindedSession.getClientID();
         });
     }
@@ -132,6 +133,7 @@ final class MQTTConnection {
         final String clientId = getClientId();
         this.postOffice.routeCommand(clientId, "PUB ACK", () -> {
             bindedSession.pubAckReceived(messageID);
+            postOffice.dispatchMessageAcknowledgement(clientId, messageID); // for iqm
             return null;
         });
     }
