@@ -3,12 +3,12 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <relativePath>../pom.xml</relativePath>
-        <artifactId>moquette-parent</artifactId>
+        <artifactId>moquette-parent-iqmessenger</artifactId>
         <groupId>io.moquette</groupId>
         <version>0.16-SNAPSHOT</version>
     </parent>
 
-    <artifactId>moquette-broker</artifactId>
+    <artifactId>moquette-broker-iqmessenger</artifactId>
     <packaging>jar</packaging>
     <name>Moquette - broker</name>
 
