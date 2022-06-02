@@ -15,6 +15,7 @@
  */
 package io.moquette.broker;
 
+import static io.moquette.BrokerConstants.DEFAULT_SESSION_TIMEOUT_SECONDS;
 import io.moquette.broker.security.PermitAllAuthorizatorPolicy;
 import io.moquette.broker.subscriptions.CTrieSubscriptionDirectory;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
@@ -70,7 +71,7 @@ public class MQTTConnectionConnectTest {
 
         final PermitAllAuthorizatorPolicy authorizatorPolicy = new PermitAllAuthorizatorPolicy();
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
-        sessionRegistry = new SessionRegistry(subscriptions, queueRepository, permitAll);
+        sessionRegistry = new SessionRegistry(subscriptions, queueRepository, permitAll, DEFAULT_SESSION_TIMEOUT_SECONDS);
         postOffice = new PostOffice(subscriptions, new MemoryRetainedRepository(), sessionRegistry,
                                     ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, 1024);
 
