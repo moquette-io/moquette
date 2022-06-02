@@ -16,6 +16,7 @@
 package io.moquette.persistence;
 
 import io.moquette.broker.SessionRegistry;
+import io.moquette.broker.SessionRegistry.EnqueuedMessage;
 import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.mqtt.MqttQoS;
@@ -23,8 +24,10 @@ import org.h2.mvstore.WriteBuffer;
 import org.h2.mvstore.type.StringDataType;
 
 import java.nio.ByteBuffer;
+import org.h2.mvstore.DataUtils;
+import org.h2.mvstore.type.BasicDataType;
 
-public final class EnqueuedMessageValueType implements org.h2.mvstore.type.DataType {
+public final class EnqueuedMessageValueType extends BasicDataType<EnqueuedMessage> {
 
     private enum MessageType {PUB_REL_MARKER, PUBLISHED_MESSAGE}
 
@@ -32,12 +35,12 @@ public final class EnqueuedMessageValueType implements org.h2.mvstore.type.DataT
     private final ByteBufDataType payloadDataType = new ByteBufDataType();
 
     @Override
-    public int compare(Object a, Object b) {
-        return 0;
+    public int compare(EnqueuedMessage a, EnqueuedMessage b) {
+        throw DataUtils.newUnsupportedOperationException("Can not compare");
     }
 
     @Override
-    public int getMemory(Object obj) {
+    public int getMemory(EnqueuedMessage obj) {
         if (obj instanceof SessionRegistry.PubRelMarker) {
             return 1;
         }
@@ -49,7 +52,7 @@ public final class EnqueuedMessageValueType implements org.h2.mvstore.type.DataT
     }
 
     @Override
-    public void write(WriteBuffer buff, Object obj) {
+    public void write(WriteBuffer buff, EnqueuedMessage obj) {
         if (obj instanceof SessionRegistry.PublishedMessage) {
             buff.put((byte) MessageType.PUBLISHED_MESSAGE.ordinal());
 
@@ -67,14 +70,7 @@ public final class EnqueuedMessageValueType implements org.h2.mvstore.type.DataT
     }
 
     @Override
-    public void write(WriteBuffer buff, Object[] obj, int len, boolean key) {
-        for (int i = 0; i < len; i++) {
-            write(buff, obj[i]);
-        }
-    }
-
-    @Override
-    public Object read(ByteBuffer buff) {
+    public EnqueuedMessage read(ByteBuffer buff) {
         final byte messageType = buff.get();
         if (messageType == MessageType.PUB_REL_MARKER.ordinal()) {
             return new SessionRegistry.PubRelMarker();
@@ -89,9 +85,7 @@ public final class EnqueuedMessageValueType implements org.h2.mvstore.type.DataT
     }
 
     @Override
-    public void read(ByteBuffer buff, Object[] obj, int len, boolean key) {
-        for (int i = 0; i < len; i++) {
-            obj[i] = read(buff);
-        }
+    public EnqueuedMessage[] createStorage(int i) {
+        return new EnqueuedMessage[i];
     }
 }

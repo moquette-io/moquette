@@ -19,7 +19,7 @@
              https://github.com/netty/netty/blob/netty-4.1.73.Final/pom.xml#L545 -->
         <netty.tcnative.version>2.0.46.Final</netty.tcnative.version>
         <paho.version>1.2.5</paho.version>
-        <h2.version>1.4.199</h2.version>
+        <h2.version>2.1.212</h2.version>
     </properties>
 
     <dependencies>
