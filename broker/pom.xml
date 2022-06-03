@@ -26,14 +26,14 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>1.7.36</version>
+            <version>${slf4j.version}</version>
         </dependency>
 
         <dependency>
             <!-- This is used to use log4j12 implementation -->
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-reload4j</artifactId>
-            <version>1.7.36</version>
+            <version>${slf4j.version}</version>
             <scope>runtime</scope>
         </dependency>
 
