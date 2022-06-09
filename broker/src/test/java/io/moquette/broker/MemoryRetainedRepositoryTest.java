@@ -20,6 +20,7 @@ import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttQoS;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -113,5 +114,31 @@ public class MemoryRetainedRepositoryTest {
 
         assertEquals(1, retainedMessages.size());
         assertEquals("foo/bar/baz", retainedMessages.get(0).getTopic().toString());
+    }
+
+    @Test
+    public void testIsValid() throws Exception {
+        MemoryRetainedRepository repository = new MemoryRetainedRepository();
+        Topic retainedTopic = new Topic("foo/bar/baz");
+        Topic otherRetainedTopic = new Topic("foo/bar/bazzz");
+
+        repository.retain(retainedTopic, MqttMessageBuilders
+            .publish()
+            .qos(MqttQoS.AT_LEAST_ONCE)
+            .topicName("foo/bar/baz")
+            .retained(true)
+            .payload(Unpooled.buffer(0))
+            .build());
+        repository.retain(otherRetainedTopic, MqttMessageBuilders
+            .publish()
+            .qos(MqttQoS.AT_LEAST_ONCE)
+            .topicName("foo/baz/bar")
+            .retained(true)
+            .payload(Unpooled.buffer(0))
+            .build());
+
+        List<RetainedMessage> retainedMessages = repository.retainedOnTopic("foo/bar/baz");
+
+        Assertions.assertTrue(retainedTopic.isValid());
     }
 }
