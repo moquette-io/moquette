@@ -12,10 +12,14 @@ import java.nio.file.StandardOpenOption;
 class Utils {
 
     static MappedByteBuffer createPageFile() throws IOException {
+        return createPageFile(1024);
+    }
+
+    static MappedByteBuffer createPageFile(int size) throws IOException {
         final Path pageFile = File.createTempFile("test_queue", ".page").toPath();
         final OpenOption[] openOptions = {StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING};
         FileChannel fileChannel = FileChannel.open(pageFile, openOptions);
-        return fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, 1024);
+        return fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, size);
     }
 
     static MappedByteBuffer openPageFile(Path pageFile) throws IOException {

@@ -1,11 +1,9 @@
 package io.moquette.broker.queue;
 
-
 import java.io.IOException;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
-import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Properties;
@@ -48,8 +46,7 @@ class PagedFilesAllocator implements SegmentAllocator {
             }
         }
 
-        final OpenOption[] openOptions = {StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING};
-        try (FileChannel fileChannel = FileChannel.open(pageFile, openOptions)) {
+        try (FileChannel fileChannel = FileChannel.open(pageFile, StandardOpenOption.READ, StandardOpenOption.WRITE)) {
             this.currentPageFile = fileChannel;
             return fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, PAGE_SIZE);
         } catch (IOException e) {
@@ -76,7 +73,7 @@ class PagedFilesAllocator implements SegmentAllocator {
     public Segment reopenSegment(int pageId, int beginOffset) throws QueueException {
         final MappedByteBuffer page = openRWPageFile(pagesFolder, pageId);
         final SegmentPointer begin = new SegmentPointer(pageId, beginOffset);
-        final SegmentPointer end = new SegmentPointer(pageId, beginOffset + segmentSize);
+        final SegmentPointer end = new SegmentPointer(pageId, beginOffset + segmentSize - 1);
         return new Segment(page, begin, end);
     }
 

@@ -35,10 +35,6 @@ final class SegmentPointer implements Comparable<SegmentPointer> {
         }
     }
 
-    public boolean isGreaterThan(SegmentPointer other) {
-        return this.compareTo(other) > 0;
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

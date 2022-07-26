@@ -16,10 +16,10 @@ public class Queue {
     public static final int LENGTH_HEADER_SIZE = 4;
     private final String name;
     private final AtomicReference<Segment> headSegment;
-    /* First writeable byte, point to first free byte */
-    private final AtomicReference<SegmentPointer> currentHeadPtr;
+    /* Last wrote byte, point to head byte */
+    private final AtomicReference<VirtualPointer> currentHeadPtr;
     /* First readable byte, point to the last occupied byte */
-    private final AtomicReference<SegmentPointer> currentTailPtr;
+    private final AtomicReference<VirtualPointer> currentTailPtr;
     private final AtomicReference<Segment> tailSegment;
 
     private final SegmentAllocator allocator;
@@ -27,8 +27,8 @@ public class Queue {
     private final PagedFilesAllocator.AllocationListener allocationListener;
     private final ReentrantLock lock = new ReentrantLock();
 
-    Queue(String name, Segment headSegment, SegmentPointer currentHeadPtr,
-          Segment tailSegment, SegmentPointer currentTailPtr,
+    Queue(String name, Segment headSegment, VirtualPointer currentHeadPtr,
+          Segment tailSegment, VirtualPointer currentTailPtr,
           SegmentAllocator allocator, PagedFilesAllocator.AllocationListener allocationListener, QueuePool queuePool) {
         this.name = name;
         this.headSegment = new AtomicReference<>(headSegment);
@@ -44,7 +44,7 @@ public class Queue {
      * @throws QueueException if an error happens during access to file.
      * */
     public void enqueue(ByteBuffer payload) throws QueueException {
-        final SegmentPointer res = spinningMove(LENGTH_HEADER_SIZE + payload.remaining());
+        final VirtualPointer res = spinningMove(LENGTH_HEADER_SIZE + payload.remaining());
         if (res != null) {
             // in this case all the payload is contained in the current head segment
             LOG.trace("CAS insertion at: {}", res);
@@ -63,16 +63,16 @@ public class Queue {
 
             // the bytes written from the payload input
             long bytesRemainingInHeaderSegment;
-            SegmentPointer lastOffset = null;
+            VirtualPointer lastOffset = null;
             do {
                 // there could be another thread that's pushing data to the segment
                 // outside the lock, so conquer with that to grab the remaining space
                 // in the segment.
                 final Segment currentSegment = headSegment.get();
-                bytesRemainingInHeaderSegment = currentSegment.bytesAfter(currentHeadPtr.get());
+                bytesRemainingInHeaderSegment = currentSegment.bytesAfter(currentHeadPtr.get()); // TODO min(payload size, bytes in segment)
             } while (bytesRemainingInHeaderSegment != 0 && ((lastOffset = spinningMove(bytesRemainingInHeaderSegment)) == null));
 
-            SegmentPointer newSegmentPointer = null;
+            VirtualPointer newSegmentPointer = currentHeadPtr.get();
             if (bytesRemainingInHeaderSegment != 0) {
                 // copy the beginning part of payload into the head segment, to fill it up.
                 LOG.trace("Writing partial payload to offset {} for {} bytes", lastOffset, bytesRemainingInHeaderSegment);
@@ -82,7 +82,7 @@ public class Queue {
                 slice.limit(copySize);
                 writeDataNoHeader(headSegment.get(), lastOffset, slice);
 
-                newSegmentPointer = new SegmentPointer(headSegment.get(), currentHeadPtr.get().offset() + bytesRemainingInHeaderSegment);
+                newSegmentPointer = newSegmentPointer.moveForward(bytesRemainingInHeaderSegment);
 
                 // shift forward the consumption point
                 rawData.position(rawData.position() + copySize);
@@ -101,7 +101,7 @@ public class Queue {
                     final ByteBuffer slice = rawData.slice();
                     slice.limit(copySize);
 
-                    newSegmentPointer = new SegmentPointer(newSegment, newSegment.begin.offset() + copySize - 1);
+                    newSegmentPointer = newSegmentPointer.moveForward(copySize);
                     writeDataNoHeader(newSegment, newSegment.begin, slice);
 
                     // shift forward the consumption point
@@ -125,10 +125,18 @@ public class Queue {
         segment.write(start, data);
     }
 
+    private void writeDataNoHeader(Segment segment, VirtualPointer start, ByteBuffer data) {
+        segment.write(start, data);
+    }
+
     /**
      * Writes data and size to the current Head segment starting from start pointer.
      * */
     private void writeData(Segment segment, SegmentPointer start, ByteBuffer data) {
+        writeData(segment, start, data.remaining(), data);
+    }
+
+    private void writeData(Segment segment, VirtualPointer start, ByteBuffer data) {
         writeData(segment, start, data.remaining(), data);
     }
 
@@ -144,13 +152,19 @@ public class Queue {
         segment.write(start.plus(LENGTH_HEADER_SIZE), data); // write the payload
     }
 
+    private void writeData(Segment segment, VirtualPointer start, int size, ByteBuffer data) {
+        ByteBuffer length = (ByteBuffer) ByteBuffer.allocate(LENGTH_HEADER_SIZE).putInt(size).flip();
+        segment.write(start, length); // write 4 bytes header
+        segment.write(start.plus(LENGTH_HEADER_SIZE), data); // write the payload
+    }
+
     /**
      * Move forward the currentHead pointer of size bytes, using CAS operation.
-     * @return null if the head segment doesn't have enough space or the offset used as start of the move.
+     * @return null if the head segment doesn't have enough space.
      * */
-    private SegmentPointer spinningMove(long size) {
-        SegmentPointer currentHeadPtr;
-        SegmentPointer newHead;
+    private VirtualPointer spinningMove(long size) {
+        VirtualPointer currentHeadPtr;
+        VirtualPointer newHead;
         do {
             currentHeadPtr = this.currentHeadPtr.get();
             if (!headSegment.get().hasSpace(currentHeadPtr, size)) {
@@ -159,7 +173,7 @@ public class Queue {
             newHead = currentHeadPtr.moveForward(size);
         } while (!this.currentHeadPtr.compareAndSet(currentHeadPtr, newHead));
         // the start position must be the first free position, while the previous head reference
-        // keeps the last occupied position, move .forward by 1
+        // keeps the last occupied position, move forward by 1
         return currentHeadPtr.plus(1);
     }
 
@@ -170,11 +184,11 @@ public class Queue {
         headSegment.get().force();
     }
 
-    SegmentPointer currentHead() {
+    VirtualPointer currentHead() {
         return this.currentHeadPtr.get();
     }
 
-    SegmentPointer currentTail() {
+    VirtualPointer currentTail() {
         return this.currentTailPtr.get();
     }
 
@@ -187,24 +201,29 @@ public class Queue {
         do {
             retry = false;
             final Segment currentSegment = tailSegment.get();
-            final SegmentPointer currentTail = currentTailPtr.get();
+            final VirtualPointer currentTail = currentTailPtr.get();
             if (currentHeadPtr.get().isGreaterThan(currentTail)) {
-                if (currentSegment.bytesAfter(currentTail) >= LENGTH_HEADER_SIZE) {
+                if (currentSegment.bytesAfter(currentTail) + 1 >= LENGTH_HEADER_SIZE) {
                     // currentSegment contains at least the header (payload length)
-                    final SegmentPointer existingTail;
-                    if (isTailFirstUsage(currentSegment, currentTail)) {
+                    final VirtualPointer existingTail;
+                    if (isTailFirstUsage(currentTail)) {
+                        // move to the first readable byte
                         existingTail = currentTail.plus(1);
                     } else {
                         existingTail = currentTail.copy();
                     }
                     final int payloadLength = currentSegment.readHeader(existingTail);
-                    if (currentSegment.hasSpace(existingTail, payloadLength + LENGTH_HEADER_SIZE)) {
+                    // tail must be moved to the next byte to read, so has to move to
+                    // header size + payload size + 1
+                    if (currentSegment.hasSpace(existingTail, payloadLength + LENGTH_HEADER_SIZE + 1)) {
                         // currentSegments contains fully the payload
-                        final SegmentPointer newTail = existingTail.moveForward(payloadLength + LENGTH_HEADER_SIZE);
+                        final VirtualPointer newTail = existingTail.moveForward(payloadLength + LENGTH_HEADER_SIZE);
                         if (currentTailPtr.compareAndSet(currentTail, newTail)) {
                             // fast track optimistic lock
                             // read data from currentTail + 4 bytes(the length)
-                            out = readData(currentSegment, existingTail.moveForward(LENGTH_HEADER_SIZE), payloadLength);
+                            final VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
+
+                            out = readData(currentSegment, dataStart, payloadLength);
                         } else {
                             // some concurrent thread moved forward the tail pointer before us,
                             // retry with another message
@@ -216,7 +235,7 @@ public class Queue {
                         if (tailSegment.get().equals(currentSegment)) {
                             // tailSegment is still the currentSegment, and we are in the lock, so we own it
                             // consume the segments
-                            SegmentPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
+                            VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
 
                             out = loadPayloadFromSegments(payloadLength, currentSegment, dataStart);
                         } else {
@@ -255,7 +274,6 @@ public class Queue {
 
                     // assign to tailSegment without CAS because we are in lock
                     tailSegment.set(newTailSegment);
-                    currentTailPtr.set(newTailSegment.begin);
                 }
                 lock.unlock();
                 retry = true;
@@ -268,10 +286,10 @@ public class Queue {
 
     private static class CrossSegmentHeaderResult {
         private final Segment segment;
-        private final SegmentPointer pointer;
+        private final VirtualPointer pointer;
         private final int payloadLength;
 
-        private CrossSegmentHeaderResult(Segment segment, SegmentPointer pointer, int payloadLength) {
+        private CrossSegmentHeaderResult(Segment segment, VirtualPointer pointer, int payloadLength) {
             this.segment = segment;
             this.pointer = pointer;
             this.payloadLength = payloadLength;
@@ -279,7 +297,7 @@ public class Queue {
     }
 
     // TO BE called owning the lock
-    private CrossSegmentHeaderResult decodeCrossHeader(Segment segment, SegmentPointer pointer) throws QueueException {
+    private CrossSegmentHeaderResult decodeCrossHeader(Segment segment, VirtualPointer pointer) throws QueueException {
         // read first part
         ByteBuffer lengthBuffer = ByteBuffer.allocate(LENGTH_HEADER_SIZE);
         final ByteBuffer partialHeader = segment.readAllBytesAfter(pointer);
@@ -289,36 +307,37 @@ public class Queue {
 
         // read second part
         final int remainingHeaderSize =  LENGTH_HEADER_SIZE - consumedHeaderSize;
-        Segment newTailSegment = queuePool.openNextTailSegment(name);
-        lengthBuffer.put(newTailSegment.read(newTailSegment.begin, remainingHeaderSize));
-        final SegmentPointer dataStart = newTailSegment.begin.moveForward(remainingHeaderSize);
+        Segment nextTailSegment = queuePool.openNextTailSegment(name);
+        lengthBuffer.put(nextTailSegment.read(nextTailSegment.begin, remainingHeaderSize));
+        final VirtualPointer dataStart = pointer.moveForward(LENGTH_HEADER_SIZE);
         int payloadLength = ((ByteBuffer) lengthBuffer.flip()).getInt();
 
-        return new CrossSegmentHeaderResult(newTailSegment, dataStart, payloadLength);
+        return new CrossSegmentHeaderResult(nextTailSegment, dataStart, payloadLength);
     }
 
     // TO BE called owning the lock
-    private ByteBuffer loadPayloadFromSegments(int remaining, Segment segment, SegmentPointer tail) throws QueueException {
+    private ByteBuffer loadPayloadFromSegments(int remaining, Segment segment, VirtualPointer tail) throws QueueException {
         List<ByteBuffer> createdBuffers = new ArrayList<>(segmentCountFromSize(remaining));
-        SegmentPointer scan = tail;
+        VirtualPointer scan = tail;
 
         do {
-            int availableDataLength = Math.min(remaining, (int) Segment.SIZE);
+            int availableDataLength = Math.min(remaining, Segment.SIZE);
             final ByteBuffer buffer = segment.read(scan, availableDataLength);
             createdBuffers.add(buffer);
+            final boolean segmentCompletelyConsumed = (segment.bytesAfter(scan) + 1) == availableDataLength;
             scan = scan.moveForward(availableDataLength);
+            final boolean consumedQueue = scan.isGreaterThan(currentHead());
             remaining -= buffer.remaining();
 
-            if (remaining > 0) {
+            if (remaining > 0 || (segmentCompletelyConsumed && !consumedQueue)) {
                 queuePool.consumedTailSegment(name);
                 segment = queuePool.openNextTailSegment(name);
-                scan = segment.begin;
             }
         } while (remaining > 0);
 
         // assign to tailSegment without CAS because we are in lock
         tailSegment.set(segment);
-        currentTailPtr.set(tail);
+        currentTailPtr.set(scan);
 
         return joinBuffers(createdBuffers);
     }
@@ -327,8 +346,8 @@ public class Queue {
         return (int) Math.ceil((double) remaining / Segment.SIZE);
     }
 
-    private boolean isTailFirstUsage(Segment tailSegment, SegmentPointer tail) {
-        return tail.equals(tailSegment.begin.plus(-1));
+    private boolean isTailFirstUsage(VirtualPointer tail) {
+        return tail.isUntouched();
     }
 
     /**
@@ -347,7 +366,7 @@ public class Queue {
         return ByteBuffer.wrap(heapBuffer);
     }
 
-    private ByteBuffer readData(Segment source, SegmentPointer start, int length) {
+    private ByteBuffer readData(Segment source, VirtualPointer start, int length) {
         return source.read(start, length);
     }
 }

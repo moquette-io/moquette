@@ -5,7 +5,9 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.MappedByteBuffer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class SegmentTest {
 
@@ -15,8 +17,8 @@ public class SegmentTest {
 
         final Segment segment = new Segment(pageBuffer, new SegmentPointer(0, 0), new SegmentPointer(0, 1023));
 
-        final SegmentPointer current = new SegmentPointer(0, 511);
-        final SegmentPointer otherCurrent = new SegmentPointer(1, 511);
+        final VirtualPointer current = new VirtualPointer(511);
+        final VirtualPointer otherCurrent = current.moveForward(pageBuffer.capacity()); // pointer in next page
 
         assertTrue(segment.hasSpace(current, 512));
         assertFalse(segment.hasSpace(current, 513));

@@ -5,7 +5,7 @@ import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 
 final class Segment {
-    final static long SIZE = 4 * 1024 * 1024;
+    final static int SIZE = 4 * 1024 * 1024;
 
     final SegmentPointer begin;
     final SegmentPointer end;
@@ -19,9 +19,8 @@ final class Segment {
         this.mappedBuffer = page;
     }
 
-    boolean hasSpace(SegmentPointer mark, long length) {
-        return mark.samePage(this.end) &&
-            mark.moveForward(length).compareTo(this.end) <= 0;
+    boolean hasSpace(VirtualPointer mark, long length) {
+        return bytesAfter(mark) >= length;
     }
 
     /**
@@ -33,8 +32,20 @@ final class Segment {
         return end.distance(mark);
     }
 
+    public long bytesAfter(VirtualPointer mark) {
+        final int pageOffset = rebasedOffset(mark);
+        final SegmentPointer physicalMark = new SegmentPointer(this.end.pageId(), pageOffset);
+        return end.distance(physicalMark);
+    }
+
     void write(SegmentPointer offset, ByteBuffer content) {
         final ByteBuffer buffer = (ByteBuffer) mappedBuffer.position(offset.offset());
+        buffer.put(content);
+    }
+
+    void write(VirtualPointer offset, ByteBuffer content) {
+        final int pageOffset = rebasedOffset(offset);
+        final ByteBuffer buffer = (ByteBuffer) mappedBuffer.position(pageOffset);
         buffer.put(content);
     }
 
@@ -48,9 +59,31 @@ final class Segment {
     /**
      * return the int value contained in the 4 bytes after the pointer.
      *
-     * @param pointer*/
-    int readHeader(SegmentPointer pointer) {
-        return mappedBuffer.getInt(pointer.offset());
+     * @param pointer virtual pointer to start read from.
+     * */
+    int readHeader(VirtualPointer pointer) {
+        return mappedBuffer.getInt(rebasedOffset(pointer));
+    }
+
+    private int rebasedOffset(VirtualPointer virtualPtr) {
+        return this.begin.plus((int) virtualPtr.segmentOffset()).offset();
+    }
+
+    public ByteBuffer read(VirtualPointer start, int length) {
+        final int pageOffset = rebasedOffset(start);
+        byte[] dst = new byte[length];
+
+        // read is done with absolute position, so this is useless
+//        if (length > mappedBuffer.remaining() - pageOffset) {
+//            throw new BufferUnderflowException();
+//        }
+
+        int sourceIdx = pageOffset;
+        for (int dstIndex = 0; dstIndex < length; dstIndex++, sourceIdx++) {
+            dst[dstIndex] = mappedBuffer.get(sourceIdx);
+        }
+
+        return ByteBuffer.wrap(dst);
     }
 
     public ByteBuffer read(SegmentPointer start, int length) {
@@ -67,12 +100,26 @@ final class Segment {
         return ByteBuffer.wrap(dst);
     }
 
+    private long size() {
+        return end.distance(begin) + 1;
+    }
+
     @Override
     public String toString() {
-        return "Segment{page=" + begin.pageId() + ", begin=" + begin.offset() + ", end=" + end.offset() + "}";
+        return "Segment{page=" + begin.pageId() + ", begin=" + begin.offset() + ", end=" + end.offset() + ", size=" + size() + "}";
     }
 
     ByteBuffer readAllBytesAfter(SegmentPointer start) {
+        // WARN, dataStart points to a byte position to read
+        // if currentSegment.end is at offset 1023, and data start is 1020, the bytes after are 4 and
+        // not 1023 - 1020.
+        final long availableDataLength = bytesAfter(start) + 1;
+        final ByteBuffer buffer = read(start, (int) availableDataLength);
+        buffer.rewind();
+        return buffer;
+    }
+
+    ByteBuffer readAllBytesAfter(VirtualPointer start) {
         // WARN, dataStart points to a byte position to read
         // if currentSegment.end is at offset 1023, and data start is 1020, the bytes after are 4 and
         // not 1023 - 1020.

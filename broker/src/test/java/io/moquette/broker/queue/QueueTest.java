@@ -3,19 +3,24 @@ package io.moquette.broker.queue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Properties;
 import java.util.Random;
 import java.util.function.Consumer;
 
+import static io.moquette.broker.queue.Queue.LENGTH_HEADER_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -45,6 +50,21 @@ class QueueTest {
         }
     }
 
+    private void assertContainsOnly(char expectedChar, ByteBuffer verify, int expectedSize) {
+        int pos = verify.position();
+        int countChars = 0;
+        while (verify.hasRemaining()) {
+            final byte readChar = verify.get();
+            pos++;
+            countChars++;
+            if (readChar != expectedChar) {
+                fail(String.format("Expected %c but found %c at position %d", expectedChar, readChar, pos));
+            }
+        }
+        assertEquals(expectedSize, countChars);
+    }
+
+
     private byte[] generatePayload(int numBytes) {
         return generatePayload(numBytes, (byte) 'A');
     }
@@ -62,7 +82,7 @@ class QueueTest {
         final MappedByteBuffer pageBuffer = Utils.createPageFile();
 
         final Segment head = new Segment(pageBuffer, new SegmentPointer(0,0), new SegmentPointer(0, 1024));
-        final SegmentPointer currentHead = new SegmentPointer(0, -1);
+        final VirtualPointer currentHead = VirtualPointer.buildUntouched();
         final Queue queue = new Queue("test", head, currentHead, head, currentHead, new DummySegmentAllocator(), (name, segment) -> {
             // NOOP
         }, null);
@@ -121,12 +141,9 @@ class QueueTest {
         // one page is 64 MB so the loop count to fill it is 64 * 1024
 
        // 4 bytes are left for length so that each time are inserted 1024 bytes, 4 header and 1020 payload
-        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - 4));
+        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - LENGTH_HEADER_SIZE));
         for (int i = 0; i < 64; i++) {
-            for (int j = 0; j < 1024; j++) {
-                payload.rewind();
-                queue.enqueue(payload);
-            }
+            writeMessages(queue, payload, 1024);
         }
 
         // check the 2 files are created
@@ -155,18 +172,15 @@ class QueueTest {
         final Queue queue = queuePool.getOrCreate("test");
 
         // fill the segment, inserting last message crossing the boundary
-        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - 4));
-        for (int i = 0; i < (4 * 1024) - 1; i++) {
-            payload.rewind();
-            queue.enqueue(payload);
-        }
+        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - LENGTH_HEADER_SIZE));
+        writeMessages(queue, payload, (4 * 1024) - 1);
         // at the end we have 1024 bytes free, so fill only 1022 bytes of that
-        payload = ByteBuffer.wrap(generatePayload(1022 - 4));
+        payload = ByteBuffer.wrap(generatePayload(1022 - LENGTH_HEADER_SIZE));
         payload.rewind();
         queue.enqueue(payload);
 
         // Exercise
-        ByteBuffer crossingPayload = ByteBuffer.wrap(generatePayload(1024 - 4, (byte) 'B'));
+        ByteBuffer crossingPayload = ByteBuffer.wrap(generatePayload(1024 - LENGTH_HEADER_SIZE, (byte) 'B'));
         queue.enqueue(crossingPayload);
 
         // Verify
@@ -175,7 +189,7 @@ class QueueTest {
         final ByteBuffer crossingSegment = (ByteBuffer) page.position(beforeLastMessagePayload);
 //        final int msgLength = crossingSegment.getInt();
 
-//        assertEquals(1028 - 4, msgLength);
+//        assertEquals(1028 - LENGTH_HEADER_SIZE, msgLength);
 //        byte[] probe = new byte[msgLength];
         byte[] probe = new byte[1020];
         crossingSegment.get(probe);
@@ -192,14 +206,11 @@ class QueueTest {
         // a payload of 1028 (4 bytes over remaining space)
 
         // 4 bytes are left for length so that each time are inserted 1024 bytes, 4 header and 1020 payload
-        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - 4));
-        for (int i = 0; i < (4 * 1024) - 1; i++) {
-            payload.rewind();
-            queue.enqueue(payload);
-        }
+        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - LENGTH_HEADER_SIZE));
+        writeMessages(queue, payload, (4 * 1024) - 1);
 
         // Experiment
-        ByteBuffer crossingPayload = ByteBuffer.wrap(generatePayload(1028 - 4, (byte) 'B'));
+        ByteBuffer crossingPayload = ByteBuffer.wrap(generatePayload(1028 - LENGTH_HEADER_SIZE, (byte) 'B'));
         queue.enqueue(crossingPayload);
         queue.force();
         queuePool.close();
@@ -210,7 +221,7 @@ class QueueTest {
         final ByteBuffer crossingSegment = (ByteBuffer) page.position(beforeLastMessage);
         final int msgLength = crossingSegment.getInt();
 
-        assertEquals(1028 - 4, msgLength);
+        assertEquals(1028 - LENGTH_HEADER_SIZE, msgLength);
         byte[] probe = new byte[msgLength];
         crossingSegment.get(probe);
         assertContainsOnly('B', probe);
@@ -226,11 +237,8 @@ class QueueTest {
         // a payload of 1028 (4 bytes over remaining space)
 
         // 4 bytes are left for length so that each time are inserted 1024 bytes, 4 header and 1020 payload
-        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - 4));
-        for (int i = 0; i < (4 * 1024) - 1; i++) {
-            payload.rewind();
-            queue.enqueue(payload);
-        }
+        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - LENGTH_HEADER_SIZE));
+        writeMessages(queue, payload, (4 * 1024) - 1);
 
         // Experiment
         // 1024 + 4 * 1024 * 1024 + 16 bytes
@@ -280,19 +288,19 @@ class QueueTest {
         final Queue queue = queuePool.getOrCreate("test");
 
         // fill the segment, inserting last message crossing the boundary
-        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - 4));
+        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - LENGTH_HEADER_SIZE));
         for (int i = 0; i < (4 * 1024) - 1; i++) {
             payload.rewind();
             queue.enqueue(payload);
             queue.dequeue();
         }
 
-        ByteBuffer crossingPayload = ByteBuffer.wrap(generatePayload(1028 - 4, (byte) 'B'));
+        ByteBuffer crossingPayload = ByteBuffer.wrap(generatePayload(1028 - LENGTH_HEADER_SIZE, (byte) 'B'));
         queue.enqueue(crossingPayload);
 
         //Exercise
         final ByteBuffer message = queue.dequeue();
-        assertEquals(1028 - 4, message.remaining(), "There must be 1024 'B' letters");
+        assertEquals(1028 - LENGTH_HEADER_SIZE, message.remaining(), "There must be 1024 'B' letters");
         assertContainsOnly('B', message);
     }
 
@@ -302,25 +310,25 @@ class QueueTest {
         final Queue queue = queuePool.getOrCreate("test");
 
         // fill the segment, inserting last message crossing the boundary
-        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - 4));
+        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - LENGTH_HEADER_SIZE));
         for (int i = 0; i < (4 * 1024) - 1; i++) {
             payload.rewind();
             queue.enqueue(payload);
             queue.dequeue();
         }
         // at the end we have 1024 bytes free, so fill only 1022 bytes of that
-        payload = ByteBuffer.wrap(generatePayload(1022 - 4));
+        payload = ByteBuffer.wrap(generatePayload(1022 - LENGTH_HEADER_SIZE));
         payload.rewind();
         queue.enqueue(payload);
         queue.dequeue();
 
-        // Exercise
-        ByteBuffer crossingPayload = ByteBuffer.wrap(generatePayload(1024 - 4, (byte) 'B'));
+        // write a payload's header with 2 bytes in previous and 2 in next segment
+        ByteBuffer crossingPayload = ByteBuffer.wrap(generatePayload(1024 - LENGTH_HEADER_SIZE, (byte) 'B'));
         queue.enqueue(crossingPayload);
 
         //Exercise
         final ByteBuffer message = queue.dequeue();
-        assertEquals(1024 - 4, message.remaining(), "There must be 1020 'B' letters");
+        assertEquals(1024 - LENGTH_HEADER_SIZE, message.remaining(), "There must be 1020 'B' letters");
         assertContainsOnly('B', message);
     }
 
@@ -330,28 +338,138 @@ class QueueTest {
         final Queue queue = queuePool.getOrCreate("test");
 
         // fill all segments less one in a page
-        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - 4));
-        int messageSize = payload.flip().remaining() + 4;
+        ByteBuffer payload = ByteBuffer.wrap(generatePayload(1024 - LENGTH_HEADER_SIZE));
+        int messageSize = payload.remaining() + LENGTH_HEADER_SIZE;
         final int loopToFill = PagedFilesAllocator.PAGE_SIZE / messageSize;
-        for (int i = 0; i < loopToFill - 1; i++) {
-            payload.rewind();
-            queue.enqueue(payload);
-        }
+        writeMessages(queue, payload, loopToFill - 1);
 
-        assertPageFiles(tempQueueFolder, 1);
-        assertEquals(PagedFilesAllocator.PAGE_SIZE - messageSize, queue.currentHead().offset() + 1,
+        assertEquals(1, countPages(tempQueueFolder));
+        assertEquals(PagedFilesAllocator.PAGE_SIZE - messageSize, queue.currentHead().logicalOffset() + 1,
             "head must be one message size (1024) from the end of the segment");
 
         // Exercise
-        payload = ByteBuffer.wrap(generatePayload(2048 - 4, (byte) 'B'));
-        payload.rewind();
+        payload = ByteBuffer.wrap(generatePayload(2048 - LENGTH_HEADER_SIZE, (byte) 'B'));
         queue.enqueue(payload);
 
         // Verify
-        assertPageFiles(tempQueueFolder, 2);
+        assertEquals(2, countPages(tempQueueFolder));
     }
 
-    private void assertPageFiles(Path tempQueueFolder, int expected) throws IOException {
-        assertEquals(expected, Files.list(tempQueueFolder).filter(p -> p.toString().endsWith(".page")).count());
+    private long countPages(Path tempQueueFolder) throws IOException {
+        return Files.list(tempQueueFolder).filter(p -> p.toString().endsWith(".page")).count();
+    }
+
+    @Test
+    public void interleavedQueueSegments() throws QueueException, IOException {
+        // first segment queue A, second segment queue B and so on, in stripped fashion.
+        // writes and read pass single page borders, checking everything is fine
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final Queue queueA = queuePool.getOrCreate("testA");
+        final Queue queueB = queuePool.getOrCreate("testB");
+
+        ByteBuffer payloadQueueA = ByteBuffer.wrap(generatePayload(1024 - LENGTH_HEADER_SIZE, (byte)'A'));
+        ByteBuffer payloadQueueB = ByteBuffer.wrap(generatePayload(1024 - LENGTH_HEADER_SIZE, (byte)'B'));
+        int messageSize = payloadQueueA.remaining() + LENGTH_HEADER_SIZE;
+
+        // Exercise
+        final int numPages = 2;
+        final int segmentsToFill = numPages * PagedFilesAllocator.PAGE_SIZE / Segment.SIZE;
+        final int messagesInSegment = Segment.SIZE / messageSize;
+        for (int i = 0; i < segmentsToFill; i++) {
+            if (isEven(i)) {
+                writeMessages(queueA, payloadQueueA, messagesInSegment);
+            } else {
+                writeMessages(queueB, payloadQueueB, messagesInSegment);
+            }
+        }
+
+        // Verify
+        assertEquals(numPages, countPages(tempQueueFolder));
+        final int numMessagesInQueue = PagedFilesAllocator.PAGE_SIZE / messageSize;
+        verifyReadingFromQueue(numMessagesInQueue, queueA, 'A', 1024 - LENGTH_HEADER_SIZE);
+        verifyReadingFromQueue(numMessagesInQueue, queueB, 'B', 1024 - LENGTH_HEADER_SIZE);
+    }
+
+    private void verifyReadingFromQueue(int numMessagesInQueue, Queue queue, char ch, int expectedPayloadSize) throws QueueException {
+        for (int i = 0; i < numMessagesInQueue; i++) {
+            final ByteBuffer payload = queue.dequeue();
+            assertContainsOnly(ch, payload, expectedPayloadSize);
+        }
+    }
+
+    private void writeMessages(Queue targetQueue, ByteBuffer payload, int messagesToWrite) throws QueueException {
+        for (int i = 0; i < messagesToWrite; i++) {
+            payload.rewind();
+            targetQueue.enqueue(payload);
+        }
+    }
+
+    private boolean isEven(int i) {
+        return i % 2 == 0;
+    }
+
+    @Test
+    public void physicalBackwardSegment() throws IOException, QueueException {
+        // Artificially create a queue composed of segment(2) and segment(1), inverted in order, verify
+        // if read and write properly.pageBuffer.
+        final Path pageFile = this.tempQueueFolder.resolve("0.page");
+        final OpenOption[] openOptions = {StandardOpenOption.CREATE_NEW, StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING};
+        FileChannel fileChannel = FileChannel.open(pageFile, openOptions);
+        final MappedByteBuffer pageBuffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, PagedFilesAllocator.PAGE_SIZE);
+        // segment with only one message of B letters
+        pageBuffer.putInt(Segment.SIZE - LENGTH_HEADER_SIZE);
+        pageBuffer.put(generatePayload(Segment.SIZE - LENGTH_HEADER_SIZE, (byte)'B'));
+        // segment with only one message of A letters
+        pageBuffer.putInt(Segment.SIZE - LENGTH_HEADER_SIZE);
+        pageBuffer.put(generatePayload(Segment.SIZE - LENGTH_HEADER_SIZE, (byte)'A'));
+        pageBuffer.force();
+        fileChannel.close();
+
+        // create the checkpoint file with the inverted segments
+        Properties checkpoint = new Properties();
+//        checkpoint.properties
+        checkpoint.put("queues.0.name", "test_inverted");
+        checkpoint.put("queues.0.segments", "(0, 0), (0, " + Segment.SIZE + ")");
+//        checkpoint.put("queues.0.segments", "(0, " + Segment.SIZE + "), (0, 0)");
+        checkpoint.put("queues.0.head_offset", Integer.toString(Segment.SIZE - 1));
+        checkpoint.put("queues.0.tail_offset", Integer.toString(-1));
+        checkpoint.put("segments.last_page", Integer.toString(0));
+        checkpoint.put("segments.last_segment", Integer.toString(2));
+        File propsFile = this.tempQueueFolder.resolve("checkpoint.properties").toFile();
+        final FileWriter propsWriter = new FileWriter(propsFile);
+        checkpoint.store(propsWriter, "test checkpoint file to verify loading of inverted segments");
+
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final Queue queue = queuePool.getOrCreate("test_inverted");
+
+        assertContainsOnly('A', queue.dequeue(), Segment.SIZE - LENGTH_HEADER_SIZE);
+        assertContainsOnly('B', queue.dequeue(), Segment.SIZE - LENGTH_HEADER_SIZE);
+    }
+
+    @Test
+    public void reopenQueueWithSomeDataInto() throws QueueException {
+        // given a queue wth some data split across multiple segments
+        final QueuePool queuePoolA = QueuePool.loadQueues(tempQueueFolder);
+        final Queue queueA = queuePoolA.getOrCreate("testA");
+        queueA.enqueue(ByteBuffer.wrap(generatePayload(Segment.SIZE / 2 - LENGTH_HEADER_SIZE, (byte)'a')));
+        queueA.enqueue(ByteBuffer.wrap(generatePayload(Segment.SIZE / 2 - LENGTH_HEADER_SIZE, (byte)'A')));
+        queueA.enqueue(ByteBuffer.wrap(generatePayload(Segment.SIZE / 2 - LENGTH_HEADER_SIZE, (byte)'b')));
+        queueA.enqueue(ByteBuffer.wrap(generatePayload(Segment.SIZE / 2 - LENGTH_HEADER_SIZE, (byte)'B')));
+        // when it's closed and reopened
+        queueA.force();
+        queuePoolA.close();
+
+        // then the consumption must happen in the same order
+        final Queue reopened = queuePoolA.getOrCreate("testA");
+        assertContainsOnly('a', reopened.dequeue(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
+        assertContainsOnly('A', reopened.dequeue(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
+        assertContainsOnly('b', reopened.dequeue(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
+        assertContainsOnly('B', reopened.dequeue(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
+    }
+
+    @Test
+    public void writeTestSuiteToVerifyPagedFilesAllocatorDoesntCreateExternalFragmentation() {
+        // write 2 segments, consume one segment, next segment allocated should be one just freed.
+        throw new IllegalStateException("Not yet implemented");
     }
 }

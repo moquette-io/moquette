@@ -49,6 +49,7 @@ public class QueuePool {
             return String.format("(%d, %d)", pageId, offset);
         }
     }
+
     private static class QueueName {
         final String name;
 
@@ -68,16 +69,27 @@ public class QueuePool {
         public int hashCode() {
             return Objects.hash(name);
         }
+
+        @Override
+        public String toString() {
+            return "QueueName{name='" + name + '\'' + '}';
+        }
     }
 
     private final SegmentAllocator allocator;
     private final Path dataPath;
+    private final int segmentSize;
     private final ConcurrentMap<QueueName, LinkedList<SegmentRef>> queueSegments = new ConcurrentHashMap<>();
     private final ConcurrentMap<QueueName, Queue> queues = new ConcurrentHashMap<>();
 
-    private QueuePool(SegmentAllocator allocator, Path dataPath) {
+//    private QueuePool(SegmentAllocator allocator, Path dataPath) {
+//        this(allocator, dataPath, Segment.SIZE);
+//    }
+
+    private QueuePool(SegmentAllocator allocator, Path dataPath, int segmentSize) {
         this.allocator = allocator;
         this.dataPath = dataPath;
+        this.segmentSize = segmentSize;
     }
 
     private static class SegmentAllocationCallback implements PagedFilesAllocator.AllocationListener {
@@ -98,20 +110,21 @@ public class QueuePool {
         final QueueName queueName = new QueueName(name);
         List<SegmentRef> segmentRefs = this.queueSegments.computeIfAbsent(queueName, k -> new LinkedList<>());
 
-        segmentRefs.add(new SegmentRef(segment));
+        // adds in head
+        segmentRefs.add(0, new SegmentRef(segment));
     }
 
     public static QueuePool loadQueues(Path dataPath) throws QueueException {
         // read in checkpoint.properties
         final Properties checkpointProps = createOrLoadCheckpointFile(dataPath);
 
-        // load last references to segments and instantiate the allocator
+        // load last references to segment and instantiate the allocator
         final int lastPage = Integer.parseInt(checkpointProps.getProperty("segments.last_page", "0"));
         final int lastSegment = Integer.parseInt(checkpointProps.getProperty("segments.last_segment", "0"));
 
-        final PagedFilesAllocator allocator = new PagedFilesAllocator(dataPath, (int) Segment.SIZE, lastPage, lastSegment);
+        final PagedFilesAllocator allocator = new PagedFilesAllocator(dataPath, Segment.SIZE, lastPage, lastSegment);
 
-        final QueuePool queuePool = new QueuePool(allocator, dataPath);
+        final QueuePool queuePool = new QueuePool(allocator, dataPath, Segment.SIZE);
         callback = new SegmentAllocationCallback(queuePool);
         queuePool.loadQueueDefinitions(checkpointProps);
         return queuePool;
@@ -163,6 +176,7 @@ public class QueuePool {
             }
             final QueueName queueName = new QueueName(checkpointProps.getProperty(queueKey));
             LinkedList<SegmentRef> segmentRefs = decodeSegments(checkpointProps.getProperty(String.format("queues.%d.segments", queueId)));
+            final int numSegments = segmentRefs.size();
             queueSegments.put(queueName, segmentRefs);
 
             final long headOffset = Long.parseLong(checkpointProps.getProperty(String.format("queues.%d.head_offset", queueId)));
@@ -172,11 +186,16 @@ public class QueuePool {
             Segment headSegment = allocator.reopenSegment(headSegmentRef.pageId, headSegmentRef.offset);
 
             final long tailOffset = Long.parseLong(checkpointProps.getProperty(String.format("queues.%d.tail_offset", queueId)));
-            final SegmentRef tailSegmentRef = segmentRefs.poll();
+            final SegmentRef tailSegmentRef = segmentRefs.getLast();
             final SegmentPointer currentTail = new SegmentPointer(tailSegmentRef.pageId, tailOffset);
             Segment tailSegment = allocator.reopenSegment(tailSegmentRef.pageId, tailSegmentRef.offset);
 
-            final Queue queue = new Queue(queueName.name, headSegment, currentHead, tailSegment, currentTail,
+            // Create relative positioned head and tail pointers
+            // Tail is an offset relative to start of the first segment in the list
+            // Head is n-1 full segments plus the offset of the physical head
+            final VirtualPointer logicalTail = new VirtualPointer(currentTail.offset());
+            final VirtualPointer logicalHead = new VirtualPointer((long)(numSegments - 1) * Segment.SIZE + currentHead.offset());
+            final Queue queue = new Queue(queueName.name, headSegment, logicalHead, tailSegment, logicalTail,
                 allocator, callback, this);
             queues.put(queueName, queue);
 
@@ -210,9 +229,9 @@ public class QueuePool {
             segmentedCreated(queueName, segment);
 
             // When a segment is freshly created the head must the last occupied byte,
-            // so can't be the begin of a segment, but one position before, or in case
+            // so can't be the start of a segment, but one position before, or in case
             // of a new page, -1
-            final Queue queue = new Queue(queueName, segment, segment.begin.plus(-1), segment, segment.begin.plus(-1),
+            final Queue queue = new Queue(queueName, segment, VirtualPointer.buildUntouched(), segment, VirtualPointer.buildUntouched(),
                 this.allocator, callback, this);
             queues.put(queueN, queue);
             return queue;
@@ -244,8 +263,8 @@ public class QueuePool {
 
             // queues.0.head_offset = bytes offset from the start of the page where last data was written
             final Queue queue = queues.get(queueName);
-            checkpoint.setProperty("queues." + queueCounter + ".head_offset", String.valueOf(queue.currentHead().offset()));
-            checkpoint.setProperty("queues." + queueCounter + ".tail_offset", String.valueOf(queue.currentTail().offset()));
+            checkpoint.setProperty("queues." + queueCounter + ".head_offset", String.valueOf(queue.currentHead().segmentOffset()));
+            checkpoint.setProperty("queues." + queueCounter + ".tail_offset", String.valueOf(queue.currentTail().segmentOffset()));
         }
 
         final File propertiesFile = dataPath.resolve("checkpoint.properties").toFile();
@@ -277,17 +296,15 @@ public class QueuePool {
             throw new QueueException("Can't find file for page file" +  pageFile);
         }
 
-
         final MappedByteBuffer tailPage;
-        final OpenOption[] openOptions = {StandardOpenOption.READ, StandardOpenOption.TRUNCATE_EXISTING};
-        try (FileChannel fileChannel = FileChannel.open(pageFile, openOptions)) {
+        try (FileChannel fileChannel = FileChannel.open(pageFile, StandardOpenOption.READ)) {
             tailPage = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, PAGE_SIZE);
         } catch (IOException ex) {
             throw new QueueException("Can't open page file " + pageFile, ex);
         }
 
         final SegmentPointer begin = new SegmentPointer(pollSegment.pageId, pollSegment.offset);
-        final SegmentPointer end = new SegmentPointer(pollSegment.pageId, pollSegment.offset + Segment.SIZE);
+        final SegmentPointer end = new SegmentPointer(pollSegment.pageId, pollSegment.offset + segmentSize - 1);
         return new Segment(tailPage, begin, end);
     }
 
@@ -297,6 +314,6 @@ public class QueuePool {
     void consumedTailSegment(String name) {
         final QueueName queueName = new QueueName(name);
         final LinkedList<SegmentRef> segmentRefs = queueSegments.get(queueName);
-        segmentRefs.poll();
+        segmentRefs.pollLast();
     }
 }
