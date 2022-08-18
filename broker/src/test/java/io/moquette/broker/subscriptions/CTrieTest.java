@@ -18,16 +18,14 @@ package io.moquette.broker.subscriptions;
 
 import io.netty.handler.codec.mqtt.MqttQoS;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 import static io.moquette.broker.subscriptions.Topic.asTopic;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class CTrieTest {
 
@@ -46,17 +44,17 @@ public class CTrieTest {
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/"));
         assertTrue(matchedNode.isPresent(), "Node on path / must be present");
-        //verify structure, only root INode and the first CNode should be present
-        assertThat(this.sut.root.mainNode().subscriptions).isEmpty();
-        assertThat(this.sut.root.mainNode().allChildren()).isNotEmpty();
+        //verify structure, only root CNode and the first CNode should be present
+        assertThat(this.sut.root.allSubscription()).isEmpty();
+        assertThat(this.sut.root.allChildren()).isNotEmpty();
 
-        INode firstLayer = this.sut.root.mainNode().allChildren().get(0);
-        assertThat(firstLayer.mainNode().subscriptions).isEmpty();
-        assertThat(firstLayer.mainNode().allChildren()).isNotEmpty();
+        CNode firstLayer = this.sut.root.allChildren().values().stream().findFirst().get();
+        assertThat(firstLayer.allSubscription()).isEmpty();
+        assertThat(firstLayer.allChildren()).isNotEmpty();
 
-        INode secondLayer = firstLayer.mainNode().allChildren().get(0);
-        assertThat(secondLayer.mainNode().subscriptions).isNotEmpty();
-        assertThat(secondLayer.mainNode().allChildren()).isEmpty();
+        CNode secondLayer = firstLayer.allChildren().values().stream().findFirst().get();
+        assertThat(secondLayer.allSubscription()).isNotEmpty();
+        assertThat(secondLayer.allChildren()).isEmpty();
     }
 
     @Test
@@ -67,7 +65,7 @@ public class CTrieTest {
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/temp"));
         assertTrue(matchedNode.isPresent(), "Node on path /temp must be present");
-        assertFalse(matchedNode.get().subscriptions.isEmpty());
+        assertFalse(matchedNode.get().subscriptionIsEmpty());
     }
 
     @Test
@@ -94,7 +92,7 @@ public class CTrieTest {
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/temp"));
         assertTrue(matchedNode.isPresent(), "Node on path /temp must be present");
-        final Set<Subscription> subscriptions = matchedNode.get().subscriptions;
+        final Set<Subscription> subscriptions = matchedNode.get().allSubscription();
         assertTrue(subscriptions.contains(newSubscription));
     }
 
@@ -109,7 +107,7 @@ public class CTrieTest {
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/italy/happiness"));
         assertTrue(matchedNode.isPresent(), "Node on path /italy/happiness must be present");
-        final Set<Subscription> subscriptions = matchedNode.get().subscriptions;
+        final Set<Subscription> subscriptions = matchedNode.get().allSubscription();
         assertTrue(subscriptions.contains(happinessSensor));
     }
 
@@ -135,7 +133,7 @@ public class CTrieTest {
         sut.removeFromTree(asTopic("test"), "TempSensor1");
 
         sut.addToTree(clientSubOnTopic("TempSensor1", "test"));
-        assertEquals(1, sut.root.mainNode().allChildren().size());  // looking to see if TNode is cleaned up
+        assertEquals(1, sut.root.allChildren().size());  // looking to see if TNode is cleaned up
     }
 
     @Test
@@ -302,4 +300,22 @@ public class CTrieTest {
         assertThat(matchingSubs3).contains(expectedMatchingsub1);
         assertThat(matchingSubs4).doesNotContain(expectedMatchingsub2);
     }
+
+    @Disabled("An extremely time-consuming process.")
+    @Test
+    public void testAdd620kSubscribe() {
+        List<Subscription> subscriptionList = new ArrayList<>();
+        for (int i = 0; i < 620000; i++) {
+            Topic topic = asTopic("topic/test/" + new Random().nextInt(10) + "/test");
+            subscriptionList.add(new Subscription("TestClient-" + i, topic, MqttQoS.AT_LEAST_ONCE));
+        }
+
+        long start = System.currentTimeMillis();
+        for (int i = 0; i < subscriptionList.size(); i++) {
+            Subscription subscription = subscriptionList.get(i);
+            sut.addToTree(subscription);
+        }
+        System.out.println(System.currentTimeMillis() - start);
+    }
+
 }

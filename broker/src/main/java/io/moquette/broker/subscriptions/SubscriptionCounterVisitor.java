@@ -23,7 +23,7 @@ class SubscriptionCounterVisitor implements CTrie.IVisitor<Integer> {
 
     @Override
     public void visit(CNode node, int deep) {
-        accumulator.addAndGet(node.subscriptions.size());
+        accumulator.addAndGet(node.subscriptionSize());
     }
 
     @Override

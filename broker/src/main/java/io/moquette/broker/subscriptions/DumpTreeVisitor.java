@@ -17,6 +17,8 @@ package io.moquette.broker.subscriptions;
 
 import io.netty.util.internal.StringUtil;
 
+import java.util.Set;
+
 class DumpTreeVisitor implements CTrie.IVisitor<String> {
 
     String s = "";
@@ -28,21 +30,19 @@ class DumpTreeVisitor implements CTrie.IVisitor<String> {
     }
 
     private String prettySubscriptions(CNode node) {
-        if (node instanceof TNode) {
-            return "TNode";
-        }
-        if (node.subscriptions.isEmpty()) {
+        if (node.subscriptionIsEmpty()) {
             return StringUtil.EMPTY_STRING;
         }
         StringBuilder subScriptionsStr = new StringBuilder(" ~~[");
         int counter = 0;
-        for (Subscription couple : node.subscriptions) {
+        Set<Subscription> subscriptions = node.allSubscription();
+        for (Subscription couple : subscriptions) {
             subScriptionsStr
-                .append("{filter=").append(couple.topicFilter).append(", ")
-                .append("qos=").append(couple.getRequestedQos()).append(", ")
-                .append("client='").append(couple.clientId).append("'}");
+                    .append("{filter=").append(couple.topicFilter).append(", ")
+                    .append("qos=").append(couple.getRequestedQos()).append(", ")
+                    .append("client='").append(couple.clientId).append("'}");
             counter++;
-            if (counter < node.subscriptions.size()) {
+            if (counter < subscriptions.size()) {
                 subScriptionsStr.append(";");
             }
         }

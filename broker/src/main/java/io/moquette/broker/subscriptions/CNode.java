@@ -15,24 +15,20 @@
  */
 package io.moquette.broker.subscriptions;
 
-import java.util.*;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 class CNode {
 
     private Token token;
-    private List<INode> children;
-    Set<Subscription> subscriptions;
+    private final Map<Token, CNode> children;
+    private final Map<Subscription, Subscription> subscriptions;
 
     CNode() {
-        this.children = new ArrayList<>();
-        this.subscriptions = new HashSet<>();
-    }
-
-    //Copy constructor
-    private CNode(Token token, List<INode> children, Set<Subscription> subscriptions) {
-        this.token = token; // keep reference, root comparison in directory logic relies on it for now.
-        this.subscriptions = new HashSet<>(subscriptions);
-        this.children = new ArrayList<>(children);
+        this.children = new ConcurrentHashMap<>();
+        this.subscriptions = new ConcurrentHashMap<>();
     }
 
     public Token getToken() {
@@ -43,97 +39,69 @@ class CNode {
         this.token = token;
     }
 
-    boolean anyChildrenMatch(Token token) {
-        for (INode iNode : children) {
-            final CNode child = iNode.mainNode();
-            if (child.equalsToken(token)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    List<INode> allChildren() {
-        return this.children;
-    }
-
-    INode childOf(Token token) {
-        for (INode iNode : children) {
-            final CNode child = iNode.mainNode();
-            if (child.equalsToken(token)) {
-                return iNode;
-            }
-        }
-        throw new IllegalArgumentException("Asked for a token that doesn't exists in any child [" + token + "]");
-    }
-
-    private boolean equalsToken(Token token) {
-        return token != null && this.token != null && this.token.equals(token);
-    }
-
     @Override
     public int hashCode() {
         return Objects.hash(token);
     }
 
-    CNode copy() {
-        return new CNode(this.token, this.children, this.subscriptions);
+    public boolean childrenIsEmpty() {
+        return children.isEmpty();
     }
 
-    public void add(INode newINode) {
-        this.children.add(newINode);
+    Map<Token, CNode> allChildren() {
+        return this.children;
     }
 
-    public void remove(INode node) {
-        this.children.remove(node);
+    CNode getChild(Token token) {
+        return this.children.get(token);
     }
 
-    CNode addSubscription(Subscription newSubscription) {
+    CNode computeChildIfAbsent(Token token) {
+        synchronized (this.children) {
+            return this.children.computeIfAbsent(token, token1 -> {
+                CNode cNode = new CNode();
+                cNode.setToken(token1);
+                return cNode;
+            });
+        }
+    }
+
+    CNode removeEmptyChild(Token token) {
+        synchronized (this.children) {
+            CNode child = children.get(token);
+            if (child.subscriptionIsEmpty() && child.childrenIsEmpty()) {
+                return this.children.remove(token);
+            }
+            return null;
+        }
+    }
+
+    public boolean subscriptionIsEmpty() {
+        return subscriptions.isEmpty();
+    }
+
+    public int subscriptionSize() {
+        return subscriptions.size();
+    }
+
+    public Set<Subscription> allSubscription() {
+        return subscriptions.keySet();
+    }
+
+    void addSubscription(Subscription newSubscription) {
+        Subscription existing = subscriptions.get(newSubscription);
         // if already contains one with same topic and same client, keep that with higher QoS
-        if (subscriptions.contains(newSubscription)) {
-            final Subscription existing = subscriptions.stream()
-                .filter(s -> s.equals(newSubscription))
-                .findFirst().get();
-            if (existing.getRequestedQos().value() < newSubscription.getRequestedQos().value()) {
-                subscriptions.remove(existing);
-                subscriptions.add(new Subscription(newSubscription));
+        if (existing != null && existing.getRequestedQos().value() < newSubscription.getRequestedQos().value()) {
+            Subscription remove = this.subscriptions.remove(newSubscription);
+            if (remove == null || remove.getRequestedQos().value() > newSubscription.getRequestedQos().value()) {
+                return;
             }
-        } else {
-            this.subscriptions.add(new Subscription(newSubscription));
         }
-        return this;
+        this.subscriptions.put(newSubscription, newSubscription);
     }
 
-    /**
-     * @return true iff the subscriptions contained in this node are owned by clientId
-     *   AND at least one subscription is actually present for that clientId
-     * */
-    boolean containsOnly(String clientId) {
-        for (Subscription sub : this.subscriptions) {
-            if (!sub.clientId.equals(clientId)) {
-                return false;
-            }
-        }
-        return !this.subscriptions.isEmpty();
+    void removeSubscription(Subscription subscription) {
+        this.subscriptions.remove(subscription);
     }
 
-    //TODO this is equivalent to negate(containsOnly(clientId))
-    public boolean contains(String clientId) {
-        for (Subscription sub : this.subscriptions) {
-            if (sub.clientId.equals(clientId)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    void removeSubscriptionsFor(String clientId) {
-        Set<Subscription> toRemove = new HashSet<>();
-        for (Subscription sub : this.subscriptions) {
-            if (sub.clientId.equals(clientId)) {
-                toRemove.add(sub);
-            }
-        }
-        this.subscriptions.removeAll(toRemove);
-    }
 }
