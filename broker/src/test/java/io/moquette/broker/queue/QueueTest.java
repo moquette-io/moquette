@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -430,7 +431,6 @@ class QueueTest {
 //        checkpoint.properties
         checkpoint.put("queues.0.name", "test_inverted");
         checkpoint.put("queues.0.segments", "(0, 0), (0, " + Segment.SIZE + ")");
-//        checkpoint.put("queues.0.segments", "(0, " + Segment.SIZE + "), (0, 0)");
         checkpoint.put("queues.0.head_offset", Integer.toString(Segment.SIZE - 1));
         checkpoint.put("queues.0.tail_offset", Integer.toString(-1));
         checkpoint.put("segments.last_page", Integer.toString(0));
@@ -468,8 +468,78 @@ class QueueTest {
     }
 
     @Test
-    public void writeTestSuiteToVerifyPagedFilesAllocatorDoesntCreateExternalFragmentation() {
-        // write 2 segments, consume one segment, next segment allocated should be one just freed.
-        throw new IllegalStateException("Not yet implemented");
+    public void writeTestSuiteToVerifyPagedFilesAllocatorDoesntCreateExternalFragmentation() throws QueueException, IOException {
+        // write 2 segments, consume one segment, next segment allocated should be one just freed.0
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final Queue queue = queuePool.getOrCreate("test_external_fragmentation");
+
+        // fill first segment (0, 0)
+        queue.enqueue(ByteBuffer.wrap(generatePayload(Segment.SIZE / 2 - LENGTH_HEADER_SIZE, (byte)'a')));
+        queue.enqueue(ByteBuffer.wrap(generatePayload(Segment.SIZE / 2 - LENGTH_HEADER_SIZE, (byte)'A')));
+
+        // fill second segment (0, 4194304)
+        queue.enqueue(ByteBuffer.wrap(generatePayload(Segment.SIZE / 2 - LENGTH_HEADER_SIZE, (byte)'b')));
+        queue.enqueue(ByteBuffer.wrap(generatePayload(Segment.SIZE / 2 - LENGTH_HEADER_SIZE, (byte)'B')));
+
+        // consume first segment
+        assertContainsOnly('a', queue.dequeue(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
+        assertContainsOnly('A', queue.dequeue(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
+
+        // Exercise
+        // write new data, should go in first freed segment
+        queue.enqueue(ByteBuffer.wrap(generatePayload(Segment.SIZE / 2 - LENGTH_HEADER_SIZE, (byte)'c')));
+        queuePool.close();
+
+        // Verify
+        // checkpoint contains che correct order, (0,0), (0, 4194304)
+        final Properties checkpointProps = loadCheckpointFile(tempQueueFolder);
+
+        final String segmentRefs = checkpointProps.getProperty("queues.0.segments");
+        assertEquals("(0, 0), (0, 4194304)", segmentRefs);
+    }
+
+    @Test
+    public void reopenQueueWithFragmentation() throws QueueException, IOException {
+        // write 2 segments, consume one segment, next segment allocated should be one just freed.0
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final Queue queue = queuePool.getOrCreate("test_external_fragmentation");
+
+        // fill first segment (0, 0)
+        queue.enqueue(ByteBuffer.wrap(generatePayload(Segment.SIZE / 2 - LENGTH_HEADER_SIZE, (byte)'a')));
+        queue.enqueue(ByteBuffer.wrap(generatePayload(Segment.SIZE / 2 - LENGTH_HEADER_SIZE, (byte)'A')));
+
+        // fill second segment (0, 4194304)
+        queue.enqueue(ByteBuffer.wrap(generatePayload(Segment.SIZE / 2 - LENGTH_HEADER_SIZE, (byte)'b')));
+        queue.enqueue(ByteBuffer.wrap(generatePayload(Segment.SIZE / 2 - LENGTH_HEADER_SIZE, (byte)'B')));
+
+        // consume first segment
+        assertContainsOnly('a', queue.dequeue(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
+        assertContainsOnly('A', queue.dequeue(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
+
+        queue.force();
+        queuePool.close();
+
+        // Exercise
+        // reopen the queue
+        final QueuePool recreatedQueuePool = QueuePool.loadQueues(tempQueueFolder);
+        final Queue reopened = recreatedQueuePool.getOrCreate("test_external_fragmentation");
+        // write new data, should go in first freed segment
+        reopened.enqueue(ByteBuffer.wrap(generatePayload(Segment.SIZE / 2 - LENGTH_HEADER_SIZE, (byte)'c')));
+        recreatedQueuePool.close();
+
+        // Verify
+        // checkpoint contains che correct order, (0,0), (0, 4194304)
+        final Properties checkpointProps = loadCheckpointFile(tempQueueFolder);
+
+        final String segmentRefs = checkpointProps.getProperty("queues.0.segments");
+        assertEquals("(0, 0), (0, 4194304)", segmentRefs);
+    }
+
+    private Properties loadCheckpointFile(Path dir) throws IOException {
+        final Path checkpointPath = dir.resolve("checkpoint.properties");
+        final FileReader fileReader = new FileReader(checkpointPath.toFile());
+        final Properties checkpointProps = new Properties();
+        checkpointProps.load(fileReader);
+        return checkpointProps;
     }
 }

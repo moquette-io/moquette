@@ -22,7 +22,6 @@ public class Queue {
     private final AtomicReference<VirtualPointer> currentTailPtr;
     private final AtomicReference<Segment> tailSegment;
 
-    private final SegmentAllocator allocator;
     private final QueuePool queuePool;
     private final PagedFilesAllocator.AllocationListener allocationListener;
     private final ReentrantLock lock = new ReentrantLock();
@@ -35,7 +34,6 @@ public class Queue {
         this.currentHeadPtr = new AtomicReference<>(currentHeadPtr);
         this.currentTailPtr = new AtomicReference<>(currentTailPtr);
         this.tailSegment = new AtomicReference<>(tailSegment);
-        this.allocator = allocator;
         this.allocationListener = allocationListener;
         this.queuePool = queuePool;
     }
@@ -93,7 +91,7 @@ public class Queue {
                 // till the payload is not completely stored,
                 // save the remaining part into a new segment.
                 while (rawData.hasRemaining()) {
-                    newSegment = allocator.nextFreeSegment();
+                    newSegment = queuePool.nextFreeSegment();
                     //notify segment creation for queue in queue pool
                     allocationListener.segmentedCreated(name, newSegment);
 

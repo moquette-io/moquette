@@ -11,7 +11,6 @@ import java.io.IOException;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
-import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.LinkedList;
@@ -19,8 +18,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.stream.Collectors;
 
 import static io.moquette.broker.queue.PagedFilesAllocator.PAGE_SIZE;
@@ -30,11 +31,13 @@ public class QueuePool {
     private static final Logger LOG = LoggerFactory.getLogger(QueuePool.class);
     private static SegmentAllocationCallback callback;
 
-    private static class SegmentRef {
+    // visible for testing
+    static class SegmentRef implements Comparable<SegmentRef> {
         final int pageId;
         final int offset;
 
-        private SegmentRef(int pageId, int offset) {
+        // visible for testing
+        SegmentRef(int pageId, int offset) {
             this.pageId = pageId;
             this.offset = offset;
         }
@@ -47,6 +50,15 @@ public class QueuePool {
         @Override
         public String toString() {
             return String.format("(%d, %d)", pageId, offset);
+        }
+
+        @Override
+        public int compareTo(SegmentRef o) {
+            final int pageCompare = Integer.compare(pageId, o.pageId);
+            if (pageCompare != 0) {
+                return pageCompare;
+            }
+            return Integer.compare(offset, o.offset);
         }
     }
 
@@ -81,10 +93,7 @@ public class QueuePool {
     private final int segmentSize;
     private final ConcurrentMap<QueueName, LinkedList<SegmentRef>> queueSegments = new ConcurrentHashMap<>();
     private final ConcurrentMap<QueueName, Queue> queues = new ConcurrentHashMap<>();
-
-//    private QueuePool(SegmentAllocator allocator, Path dataPath) {
-//        this(allocator, dataPath, Segment.SIZE);
-//    }
+    private final ConcurrentSkipListSet<SegmentRef> recycledSegments = new ConcurrentSkipListSet<>();
 
     private QueuePool(SegmentAllocator allocator, Path dataPath, int segmentSize) {
         this.allocator = allocator;
@@ -127,6 +136,7 @@ public class QueuePool {
         final QueuePool queuePool = new QueuePool(allocator, dataPath, Segment.SIZE);
         callback = new SegmentAllocationCallback(queuePool);
         queuePool.loadQueueDefinitions(checkpointProps);
+        queuePool.loadRecycledSegments(checkpointProps);
         return queuePool;
     }
 
@@ -203,6 +213,95 @@ public class QueuePool {
         }
     }
 
+    private void loadRecycledSegments(Properties checkpointProps) throws QueueException {
+        TreeSet<SegmentRef> usedSegments = new TreeSet<>();
+
+        boolean noMoreQueues = false;
+        int queueId = 0;
+
+        // load all queues definitions from checkpoint file
+        // TODO second use of this, extract as an iterator
+        while (!noMoreQueues) {
+            final String queueKey = String.format("queues.%d.name", queueId);
+            if (!checkpointProps.containsKey(queueKey)) {
+                noMoreQueues = true;
+                continue;
+            }
+            LinkedList<SegmentRef> segmentRefs = decodeSegments(checkpointProps.getProperty(String.format("queues.%d.segments", queueId)));
+            usedSegments.addAll(segmentRefs);
+
+            queueId++;
+        }
+
+        if (usedSegments.isEmpty()) {
+            // no queue definitions were loaded
+            return;
+        }
+
+        final List<SegmentRef> recreatedSegments = recreateSegmentHoles(usedSegments);
+
+        recycledSegments.addAll(recreatedSegments);
+    }
+
+    /**
+     * @param usedSegments sorted set of used segments
+     * */
+    // package-private for testing
+    List<SegmentRef> recreateSegmentHoles(TreeSet<SegmentRef> usedSegments) throws QueueException {
+        // find the holes in the list of used segments
+        SegmentRef prev = usedSegments.pollFirst();
+        if (prev == null) {
+            throw new QueueException("Status error, expected to find at least one segment");
+        }
+        // TODO make it more rational, it's complicated.
+        final List<SegmentRef> recreatedSegments = new LinkedList<>();
+        if (usedSegments.isEmpty()) {
+            // recreate recycled segments before
+            int page = 0;
+            while (page < prev.pageId) {
+                recreatedSegments.addAll(recreateRecycledSegments(0, PAGE_SIZE, page));
+                page++;
+            }
+            recreatedSegments.addAll(recreateRecycledSegments(0, prev.offset, prev.pageId));
+        }
+
+        for (SegmentRef segment : usedSegments) {
+            if (prev.pageId == segment.pageId) {
+                // same page
+                if (prev.offset + segmentSize == segment.offset) {
+                    // contiguous, skip it
+                    prev = segment;
+                } else {
+                    recreatedSegments.addAll(recreateRecycledSegments(prev.offset + segmentSize, segment.offset, prev.pageId));
+                }
+            } else {
+                int prevPageId = prev.pageId;
+                // holes after previous segment, to complete the page
+                recreatedSegments.addAll(recreateRecycledSegments(prev.offset + segmentSize, PAGE_SIZE, prev.pageId));
+                prevPageId++;
+
+                // all the intermediate pages
+                for (; prevPageId < segment.pageId; prevPageId++) {
+                    recreatedSegments.addAll(recreateRecycledSegments(0, PAGE_SIZE, prevPageId));
+                }
+
+                // holes before the current segment
+                recreatedSegments.addAll(recreateRecycledSegments(0, segment.offset, prevPageId));
+
+            }
+        }
+        return recreatedSegments;
+    }
+
+    private List<SegmentRef> recreateRecycledSegments(int fromOffset, int toOffset, int pageId) {
+        final List<SegmentRef> recreatedSegments = new LinkedList<>();
+        while (fromOffset != toOffset) {
+            recreatedSegments.add(new SegmentRef(pageId, fromOffset));
+            fromOffset = fromOffset + segmentSize;
+        }
+        return recreatedSegments;
+    }
+
     private LinkedList<SegmentRef> decodeSegments(String s) {
         final String[] segments = s.substring(s.indexOf("(") + 1, s.lastIndexOf(")"))
                 .split("\\), \\(");
@@ -224,7 +323,7 @@ public class QueuePool {
             return queues.get(queueN);
         } else {
             // create new queue with first empty segment
-            final Segment segment = allocator.nextFreeSegment();
+            final Segment segment = nextFreeSegment();
             //notify segment creation for queue in queue pool
             segmentedCreated(queueName, segment);
 
@@ -314,6 +413,18 @@ public class QueuePool {
     void consumedTailSegment(String name) {
         final QueueName queueName = new QueueName(name);
         final LinkedList<SegmentRef> segmentRefs = queueSegments.get(queueName);
-        segmentRefs.pollLast();
+        final SegmentRef segmentRef = segmentRefs.pollLast();
+        recycledSegments.add(segmentRef);
+    }
+
+    Segment nextFreeSegment() throws QueueException {
+        if (recycledSegments.isEmpty()) {
+            return allocator.nextFreeSegment();
+        }
+        final SegmentRef recycledSegment = recycledSegments.pollFirst();
+        if (recycledSegment == null) {
+            throw new QueueException("Invalid state, expected available recycled segment");
+        }
+        return allocator.reopenSegment(recycledSegment.pageId, recycledSegment.offset);
     }
 }

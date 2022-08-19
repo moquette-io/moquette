@@ -9,7 +9,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
+import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -76,5 +79,84 @@ class QueuePoolTest {
 
         assertEquals("test", checkpoint.get("queues.0.name"), "Queue name must match");
         assertEquals("15", checkpoint.get("queues.0.head_offset"), "Queue head must be 16 bytes over the start");
+    }
+
+    private TreeSet<QueuePool.SegmentRef> asTreeSet(QueuePool.SegmentRef... segments) {
+        final TreeSet<QueuePool.SegmentRef> usedSegments = new TreeSet<>();
+        usedSegments.addAll(Arrays.asList(segments));
+        return usedSegments;
+    }
+
+    @Test
+    public void checkRecreateHolesAtTheStartOfThePage() throws QueueException {
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final QueuePool.SegmentRef middleSegment = new QueuePool.SegmentRef(0, Segment.SIZE);
+
+        // Exercise
+        final List<QueuePool.SegmentRef> holes = queuePool.recreateSegmentHoles(asTreeSet(middleSegment));
+
+        // Verify
+        assertEquals(1, holes.size(), "Only the preceding segment should be created");
+        QueuePool.SegmentRef singleHole = holes.get(0);
+        assertEquals(0, singleHole.pageId);
+        assertEquals(0, singleHole.offset);
+    }
+
+    @Test
+    public void checkRecreateHolesBeforeSecondPage() throws QueueException {
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final QueuePool.SegmentRef middleSegment = new QueuePool.SegmentRef(1, Segment.SIZE);
+
+        // Exercise
+        final List<QueuePool.SegmentRef> holes = queuePool.recreateSegmentHoles(asTreeSet(middleSegment));
+
+        // Verify
+        final int expectedHolesCount = (int) (PagedFilesAllocator.PAGE_SIZE / Segment.SIZE) + 1;
+        assertEquals(expectedHolesCount, holes.size(), "The previous empty page is full of holes");
+        for (int i = 0; i < expectedHolesCount - 1; i++) {
+            final QueuePool.SegmentRef hole = holes.get(i);
+            assertEquals(0, hole.pageId);
+            assertEquals(i * Segment.SIZE, hole.offset);
+        }
+        QueuePool.SegmentRef singleHole = holes.get(expectedHolesCount - 1);
+        assertEquals(1, singleHole.pageId);
+        assertEquals(0, singleHole.offset);
+    }
+
+    @Test
+    public void checkRecreateHolesBetweenUsedSegmentsOnSamePage() throws QueueException {
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final QueuePool.SegmentRef initialSegment = new QueuePool.SegmentRef(0, 0);
+        final QueuePool.SegmentRef middleSegment = new QueuePool.SegmentRef(0, 3 * Segment.SIZE);
+
+        // Exercise
+        final List<QueuePool.SegmentRef> holes = queuePool.recreateSegmentHoles(asTreeSet(initialSegment, middleSegment));
+
+        // Verify
+        assertEquals(2, holes.size());
+
+        // first hole
+        assertEquals(0, holes.get(0).pageId);
+        assertEquals(Segment.SIZE, holes.get(0).offset);
+        // second hole
+        assertEquals(0, holes.get(1).pageId);
+        assertEquals(2 * Segment.SIZE, holes.get(1).offset);
+    }
+
+    @Test
+    public void checkRecreateHolesSpanningMultiplePages() throws QueueException {
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final QueuePool.SegmentRef initialSegment = new QueuePool.SegmentRef(0, 0);
+        final QueuePool.SegmentRef middleSegment = new QueuePool.SegmentRef(2, 3 * Segment.SIZE);
+
+        // Exercise
+        final List<QueuePool.SegmentRef> holes = queuePool.recreateSegmentHoles(asTreeSet(initialSegment, middleSegment));
+
+        // Verify
+        final int holesInEmptyPage = (PagedFilesAllocator.PAGE_SIZE / Segment.SIZE);
+        final int holesInFirstPage = holesInEmptyPage - 1;
+        final int holesInLastPage = 3;
+        final int expectedHolesCount = holesInFirstPage + holesInEmptyPage + holesInLastPage;
+        assertEquals(expectedHolesCount, holes.size());
     }
 }
