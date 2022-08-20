@@ -158,5 +158,33 @@ class QueuePoolTest {
         final int holesInLastPage = 3;
         final int expectedHolesCount = holesInFirstPage + holesInEmptyPage + holesInLastPage;
         assertEquals(expectedHolesCount, holes.size());
+
+        // first page hole
+        int i = 0;
+        int expectedOffset = Segment.SIZE;
+        for (; i < holesInFirstPage; i++) {
+            final QueuePool.SegmentRef hole = holes.get(i);
+            assertEquals(0, hole.pageId);
+            assertEquals(expectedOffset, hole.offset);
+            expectedOffset += Segment.SIZE;
+        }
+
+        // central empty pages
+        expectedOffset = 0;
+        for (; i < holesInFirstPage + holesInEmptyPage; i++) {
+            final QueuePool.SegmentRef hole = holes.get(i);
+            assertEquals(1, hole.pageId);
+            assertEquals(expectedOffset, hole.offset);
+            expectedOffset += Segment.SIZE;
+        }
+
+        // tail page hole
+        expectedOffset = 0;
+        for (; i < expectedHolesCount; i++) {
+            final QueuePool.SegmentRef hole = holes.get(i);
+            assertEquals(2, hole.pageId);
+            assertEquals(expectedOffset, hole.offset);
+            expectedOffset += Segment.SIZE;
+        }
     }
 }

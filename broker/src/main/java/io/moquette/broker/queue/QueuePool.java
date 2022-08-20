@@ -3,6 +3,7 @@ package io.moquette.broker.queue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.swing.text.html.Option;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -17,6 +18,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -253,16 +255,10 @@ public class QueuePool {
         if (prev == null) {
             throw new QueueException("Status error, expected to find at least one segment");
         }
-        // TODO make it more rational, it's complicated.
         final List<SegmentRef> recreatedSegments = new LinkedList<>();
         if (usedSegments.isEmpty()) {
-            // recreate recycled segments before
-            int page = 0;
-            while (page < prev.pageId) {
-                recreatedSegments.addAll(recreateRecycledSegments(0, PAGE_SIZE, page));
-                page++;
-            }
-            recreatedSegments.addAll(recreateRecycledSegments(0, prev.offset, prev.pageId));
+            // recreate recycled segments before first available segment
+            recreatedSegments.addAll(recreateRecycledSegmentsBetween(prev));
         }
 
         for (SegmentRef segment : usedSegments) {
@@ -275,21 +271,34 @@ public class QueuePool {
                     recreatedSegments.addAll(recreateRecycledSegments(prev.offset + segmentSize, segment.offset, prev.pageId));
                 }
             } else {
-                int prevPageId = prev.pageId;
-                // holes after previous segment, to complete the page
-                recreatedSegments.addAll(recreateRecycledSegments(prev.offset + segmentSize, PAGE_SIZE, prev.pageId));
-                prevPageId++;
-
-                // all the intermediate pages
-                for (; prevPageId < segment.pageId; prevPageId++) {
-                    recreatedSegments.addAll(recreateRecycledSegments(0, PAGE_SIZE, prevPageId));
-                }
-
-                // holes before the current segment
-                recreatedSegments.addAll(recreateRecycledSegments(0, segment.offset, prevPageId));
-
+                // recreate recycled segments between 2 available segments
+                recreatedSegments.addAll(recreateRecycledSegmentsBetween(prev, segment));
             }
         }
+        return recreatedSegments;
+    }
+
+    private List<SegmentRef> recreateRecycledSegmentsBetween(SegmentRef toSegment) {
+        return recreateRecycledSegmentsBetween(null, toSegment);
+    }
+
+    private List<SegmentRef> recreateRecycledSegmentsBetween(SegmentRef fromSegment, SegmentRef toSegment) {
+        final List<SegmentRef> recreatedSegments = new LinkedList<>();
+        int prevPageId = 0;
+        if (fromSegment != null) {
+            prevPageId = fromSegment.pageId;
+            // holes after previous segment, to complete the page
+            recreatedSegments.addAll(recreateRecycledSegments(fromSegment.offset + segmentSize, PAGE_SIZE, fromSegment.pageId));
+            prevPageId++;
+        }
+
+        // all the intermediate pages
+        for (; prevPageId < toSegment.pageId; prevPageId++) {
+            recreatedSegments.addAll(recreateRecycledSegments(0, PAGE_SIZE, prevPageId));
+        }
+
+        // holes before the current segment
+        recreatedSegments.addAll(recreateRecycledSegments(0, toSegment.offset, toSegment.pageId));
         return recreatedSegments;
     }
 
