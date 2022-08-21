@@ -1,9 +1,6 @@
 package io.moquette.broker.subscriptions;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 public class CTrie {
 
@@ -16,6 +13,8 @@ public class CTrie {
 
     private static final Token ROOT = new Token("root");
 
+    private final transient Object lock = new Object();
+
     CNode root;
 
     CTrie() {
@@ -25,18 +24,18 @@ public class CTrie {
     }
 
     Optional<CNode> lookup(Topic topic) {
-        CNode cnode = this.root;
+        CNode currentCnode = this.root;
+        CNode childCnode;
         Token token = topic.headToken();
-        CNode nextCnode;
-        while (!topic.isEmpty() && (nextCnode = cnode.getChild(token)) != null) {
+        while (!topic.isEmpty() && (childCnode = currentCnode.getChild(token)) != null) {
             topic = topic.exceptHeadToken();
             token = topic.headToken();
-            cnode = nextCnode;
+            currentCnode = childCnode;
         }
-        if (cnode == null || !topic.isEmpty()) {
+        if (currentCnode == null || !topic.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(cnode);
+        return Optional.of(currentCnode);
     }
 
     enum NavigationAction {
@@ -77,39 +76,45 @@ public class CTrie {
         if (remainingTopic.isEmpty()) {
             subscriptions.addAll(cnode.allSubscription());
         }
-        for (CNode subCnode : cnode.allChildren().values()) {
-            subscriptions.addAll(recursiveMatch(remainingTopic, subCnode));
+        Iterator<Map.Entry<Token, CNode>> iterator = cnode.allChildren().entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<Token, CNode> child = iterator.next();
+            subscriptions.addAll(recursiveMatch(remainingTopic, child.getValue()));
         }
         return subscriptions;
     }
 
     public void addToTree(Subscription newSubscription) {
-        Topic topic = newSubscription.topicFilter;
-        CNode cnode = this.root;
-        while (!topic.isEmpty()) {
-            cnode = cnode.computeChildIfAbsent(topic.headToken());
-            topic = topic.exceptHeadToken();
+        synchronized (lock) {
+            Topic topic = newSubscription.topicFilter;
+            CNode cnode = this.root;
+            while (!topic.isEmpty()) {
+                cnode = cnode.getChildOrDefault(topic.headToken());
+                topic = topic.exceptHeadToken();
+            }
+            cnode.addSubscription(newSubscription);
         }
-        cnode.addSubscription(newSubscription);
     }
 
     public void removeFromTree(Topic topic, String clientID) {
-        CNode parentCnode = null;
-        CNode currCnode = this.root;
-        CNode childCnode = null;
-        Topic parentTopic = null;
-        Topic currTopic = topic;
-        while (!currTopic.isEmpty() && (childCnode = currCnode.getChild(currTopic.headToken())) != null) {
-            parentTopic = currTopic;
-            currTopic = currTopic.exceptHeadToken();
-            parentCnode = currCnode;
-            currCnode = childCnode;
+        synchronized (lock) {
+            CNode parentCnode = null;
+            CNode currCnode = this.root;
+            CNode childCnode = null;
+            Topic currTopic = topic;
+            while (!currTopic.isEmpty() && (childCnode = currCnode.getChild(currTopic.headToken())) != null) {
+                currTopic = currTopic.exceptHeadToken();
+                parentCnode = currCnode;
+                currCnode = childCnode;
+            }
+            if (childCnode == null || !currTopic.isEmpty()) {
+                return;
+            }
+            currCnode.removeSubscription(new Subscription(clientID, topic, null));
+            if (currCnode.subscriptionIsEmpty() && currCnode.childrenIsEmpty()) {
+                parentCnode.removeChild(currCnode.getToken());
+            }
         }
-        if (childCnode == null || !currTopic.isEmpty()) {
-            return;
-        }
-        currCnode.removeSubscription(new Subscription(clientID, topic, null));
-        parentCnode.removeEmptyChild(parentTopic.headToken());
     }
 
     public int size() {
@@ -131,8 +136,10 @@ public class CTrie {
 
         visitor.visit(node, deep);
         ++deep;
-        for (CNode child : node.allChildren().values()) {
-            dfsVisit(child, visitor, deep);
+        Iterator<Map.Entry<Token, CNode>> iterator = node.allChildren().entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<Token, CNode> child = iterator.next();
+            dfsVisit(child.getValue(), visitor, deep);
         }
     }
 }

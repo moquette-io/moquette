@@ -15,10 +15,10 @@
  */
 package io.moquette.broker.subscriptions;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 class CNode {
 
@@ -27,8 +27,8 @@ class CNode {
     private final Map<Subscription, Subscription> subscriptions;
 
     CNode() {
-        this.children = new ConcurrentHashMap<>();
-        this.subscriptions = new ConcurrentHashMap<>();
+        this.children = new HashMap<>();
+        this.subscriptions = new HashMap<>();
     }
 
     public Token getToken() {
@@ -56,24 +56,16 @@ class CNode {
         return this.children.get(token);
     }
 
-    CNode computeChildIfAbsent(Token token) {
-        synchronized (this.children) {
-            return this.children.computeIfAbsent(token, token1 -> {
-                CNode cNode = new CNode();
-                cNode.setToken(token1);
-                return cNode;
-            });
-        }
+    CNode getChildOrDefault(Token token) {
+        return this.children.computeIfAbsent(token, token1 -> {
+            CNode cNode = new CNode();
+            cNode.setToken(token1);
+            return cNode;
+        });
     }
 
-    CNode removeEmptyChild(Token token) {
-        synchronized (this.children) {
-            CNode child = children.get(token);
-            if (child.subscriptionIsEmpty() && child.childrenIsEmpty()) {
-                return this.children.remove(token);
-            }
-            return null;
-        }
+    CNode removeChild(Token token) {
+        return this.children.remove(token);
     }
 
     public boolean subscriptionIsEmpty() {
@@ -92,10 +84,7 @@ class CNode {
         Subscription existing = subscriptions.get(newSubscription);
         // if already contains one with same topic and same client, keep that with higher QoS
         if (existing != null && existing.getRequestedQos().value() < newSubscription.getRequestedQos().value()) {
-            Subscription remove = this.subscriptions.remove(newSubscription);
-            if (remove == null || remove.getRequestedQos().value() > newSubscription.getRequestedQos().value()) {
-                return;
-            }
+            this.subscriptions.remove(newSubscription);
         }
         this.subscriptions.put(newSubscription, newSubscription);
     }
