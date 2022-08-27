@@ -251,31 +251,50 @@ public class QueuePool {
     // package-private for testing
     List<SegmentRef> recreateSegmentHoles(TreeSet<SegmentRef> usedSegments) throws QueueException {
         // find the holes in the list of used segments
-        SegmentRef prev = usedSegments.pollFirst();
-        if (prev == null) {
+        if (usedSegments.isEmpty()) {
             throw new QueueException("Status error, expected to find at least one segment");
         }
-        final List<SegmentRef> recreatedSegments = new LinkedList<>();
-        if (usedSegments.isEmpty()) {
-            // recreate recycled segments before first available segment
-            recreatedSegments.addAll(recreateRecycledSegmentsBetween(prev));
-        }
 
-        for (SegmentRef segment : usedSegments) {
-            if (prev.pageId == segment.pageId) {
-                // same page
-                if (prev.offset + segmentSize == segment.offset) {
-                    // contiguous, skip it
-                    prev = segment;
-                } else {
-                    recreatedSegments.addAll(recreateRecycledSegments(prev.offset + segmentSize, segment.offset, prev.pageId));
-                }
+        // prev point to the last examined segment.
+        // recreates segments on left of current segment.
+        SegmentRef prev = null;
+        final List<SegmentRef> recreatedSegments = new LinkedList<>();
+        for (SegmentRef current : usedSegments) {
+            if (prev == null) {
+                // recreate recycled segments before first used segment
+                recreatedSegments.addAll(recreateRecycledSegmentsBetween(current));
+                prev = current;
+                continue;
+            }
+            if (isAdjacent(prev, current)) {
+                // contiguous, skip it
+                prev = current;
+                continue;
+            }
+            if (prev.pageId == current.pageId) {
+                recreatedSegments.addAll(recreateRecycledSegments(prev.offset + segmentSize, current.offset, prev.pageId));
             } else {
-                // recreate recycled segments between 2 available segments
-                recreatedSegments.addAll(recreateRecycledSegmentsBetween(prev, segment));
+                // recreate recycled segments between 2 used segments
+                recreatedSegments.addAll(recreateRecycledSegmentsBetween(prev, current));
             }
         }
         return recreatedSegments;
+    }
+
+    private boolean isAdjacent(SegmentRef prev, SegmentRef segment) {
+        if (prev.pageId == segment.pageId) {
+            // same page
+            if (prev.offset + segmentSize == segment.offset) {
+                // contiguous, skip it
+                return true;
+            }
+        } else if (prev.pageId + 1 == segment.pageId) {
+            // adjacent pages, last segment in one and first in the other
+            if (prev.offset == PagedFilesAllocator.PAGE_SIZE - Segment.SIZE && segment.offset == 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private List<SegmentRef> recreateRecycledSegmentsBetween(SegmentRef toSegment) {

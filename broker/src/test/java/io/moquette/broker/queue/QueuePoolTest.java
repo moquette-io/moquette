@@ -103,6 +103,22 @@ class QueuePoolTest {
     }
 
     @Test
+    public void checkRecreateHolesAtTheStartOfThePageWith2OccupiedContiguousSegments() throws QueueException {
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final QueuePool.SegmentRef firstSegment = new QueuePool.SegmentRef(0, Segment.SIZE);
+        final QueuePool.SegmentRef secondSegment = new QueuePool.SegmentRef(0, 2 * Segment.SIZE);
+
+        // Exercise
+        final List<QueuePool.SegmentRef> holes = queuePool.recreateSegmentHoles(asTreeSet(firstSegment, secondSegment));
+
+        // Verify
+        assertEquals(1, holes.size(), "Only the preceding segment should be created");
+        QueuePool.SegmentRef singleHole = holes.get(0);
+        assertEquals(0, singleHole.pageId);
+        assertEquals(0, singleHole.offset);
+    }
+
+    @Test
     public void checkRecreateHolesBeforeSecondPage() throws QueueException {
         final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
         final QueuePool.SegmentRef middleSegment = new QueuePool.SegmentRef(1, Segment.SIZE);
@@ -186,5 +202,18 @@ class QueuePoolTest {
             assertEquals(expectedOffset, hole.offset);
             expectedOffset += Segment.SIZE;
         }
+    }
+
+    @Test
+    public void checkRecreateHolesWhenSegmentAreAdjacentAndSpanningMultiplePages() throws QueueException {
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final QueuePool.SegmentRef initialSegment = new QueuePool.SegmentRef(0, PagedFilesAllocator.PAGE_SIZE - Segment.SIZE);
+        final QueuePool.SegmentRef adjacentSegment = new QueuePool.SegmentRef(1, 0);
+
+        // Exercise
+        final List<QueuePool.SegmentRef> holes = queuePool.recreateSegmentHoles(asTreeSet(initialSegment, adjacentSegment));
+
+        // Verify
+        assertEquals((PagedFilesAllocator.PAGE_SIZE - Segment.SIZE) / Segment.SIZE, holes.size());
     }
 }
