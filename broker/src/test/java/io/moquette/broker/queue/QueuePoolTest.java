@@ -216,4 +216,9 @@ class QueuePoolTest {
         // Verify
         assertEquals((PagedFilesAllocator.PAGE_SIZE - Segment.SIZE) / Segment.SIZE, holes.size());
     }
+
+    @Test
+    public void verifySingleReaderSingleWriterOnSingleQueuePool() {
+        throw new IllegalStateException("Not yet implemented");
+    }
 }
