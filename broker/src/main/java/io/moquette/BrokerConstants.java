@@ -16,8 +16,6 @@
 
 package io.moquette;
 
-import java.io.File;
-
 public final class BrokerConstants {
 
     public static final String INTERCEPT_HANDLER_PROPERTY_NAME = "intercept.handler";
@@ -71,7 +69,7 @@ public final class BrokerConstants {
     public static final String NETTY_CHANNEL_TIMEOUT_SECONDS_PROPERTY_NAME = "netty.channel_timeout.seconds";
     public static final String NETTY_EPOLL_PROPERTY_NAME = "netty.epoll";
     public static final String NETTY_MAX_BYTES_PROPERTY_NAME = "netty.mqtt.message_size";
-    public static final int DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE = 8092;
+    public static final int DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE = 99999999;
     public static final String IMMEDIATE_BUFFER_FLUSH_PROPERTY_NAME = "immediate_buffer_flush";
     public static final String METRICS_ENABLE_PROPERTY_NAME = "use_metrics";
     public static final String METRICS_LIBRATO_EMAIL_PROPERTY_NAME = "metrics.librato.email";
