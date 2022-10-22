@@ -80,7 +80,7 @@ public class Queue {
                 slice.limit(copySize);
                 writeDataNoHeader(headSegment.get(), lastOffset, slice);
 
-                newSegmentPointer = newSegmentPointer.moveForward(bytesRemainingInHeaderSegment);
+                // No need to move newSegmentPointer the pointer because the last spinningMove has already moved it
 
                 // shift forward the consumption point
                 rawData.position(rawData.position() + copySize);
@@ -201,6 +201,7 @@ public class Queue {
             final Segment currentSegment = tailSegment.get();
             final VirtualPointer currentTail = currentTailPtr.get();
             if (currentHeadPtr.get().isGreaterThan(currentTail)) {
+                LOG.debug("currentTail is {}", currentTail);
                 if (currentSegment.bytesAfter(currentTail) + 1 >= LENGTH_HEADER_SIZE) {
                     // currentSegment contains at least the header (payload length)
                     final VirtualPointer existingTail;
@@ -217,6 +218,7 @@ public class Queue {
                         // currentSegments contains fully the payload
                         final VirtualPointer newTail = existingTail.moveForward(payloadLength + LENGTH_HEADER_SIZE);
                         if (currentTailPtr.compareAndSet(currentTail, newTail)) {
+                            LOG.debug("Moved currentTailPointer to {} from {} adding {} bytes", newTail, existingTail, payloadLength + LENGTH_HEADER_SIZE);
                             // fast track optimistic lock
                             // read data from currentTail + 4 bytes(the length)
                             final VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
@@ -231,10 +233,11 @@ public class Queue {
                         // payload is split across currentSegment and next ones
                         lock.lock();
                         if (tailSegment.get().equals(currentSegment)) {
-                            // tailSegment is still the currentSegment, and we are in the lock, so we own it
+                            // tailSegment is still the currentSegment, and we are in the lock, so we own it, let's
                             // consume the segments
                             VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
 
+                            LOG.debug("Loading payload size {}", payloadLength);
                             out = loadPayloadFromSegments(payloadLength, currentSegment, dataStart);
                         } else {
                             // tailSegments was moved in the meantime, this means some other thread
@@ -253,6 +256,7 @@ public class Queue {
                         final CrossSegmentHeaderResult result = decodeCrossHeader(currentSegment, currentTail);
 
                         // load all payload parts from the segments
+                        LOG.debug("Loading payload size {}", result.payloadLength);
                         out = loadPayloadFromSegments(result.payloadLength, result.segment, result.pointer);
                     } else {
                         // somebody else changed the tailSegment, retry and read next message
@@ -319,7 +323,8 @@ public class Queue {
         VirtualPointer scan = tail;
 
         do {
-            int availableDataLength = Math.min(remaining, Segment.SIZE);
+            LOG.debug("Looping remaining {}", remaining);
+            int availableDataLength = Math.min(remaining, (int) segment.bytesAfter(scan) + 1);
             final ByteBuffer buffer = segment.read(scan, availableDataLength);
             createdBuffers.add(buffer);
             final boolean segmentCompletelyConsumed = (segment.bytesAfter(scan) + 1) == availableDataLength;
@@ -336,6 +341,7 @@ public class Queue {
         // assign to tailSegment without CAS because we are in lock
         tailSegment.set(segment);
         currentTailPtr.set(scan);
+        LOG.debug("Moved currentTailPointer to {} from {}", scan, tail);
 
         return joinBuffers(createdBuffers);
     }
