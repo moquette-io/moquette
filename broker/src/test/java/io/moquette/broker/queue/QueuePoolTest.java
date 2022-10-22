@@ -3,20 +3,37 @@ package io.moquette.broker.queue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.TreeSet;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static io.moquette.broker.queue.Queue.LENGTH_HEADER_SIZE;
+import static io.moquette.broker.queue.QueueTest.generatePayload;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class QueuePoolTest {
+
+    private static final Logger LOG = LoggerFactory.getLogger(QueuePoolTest.class);
 
     @TempDir
     Path tempQueueFolder;
@@ -218,7 +235,69 @@ class QueuePoolTest {
     }
 
     @Test
-    public void verifySingleReaderSingleWriterOnSingleQueuePool() {
-        throw new IllegalStateException("Not yet implemented");
+    public void verifySingleReaderSingleWriterOnSingleQueuePool_with_955157_size_packet() throws QueueException, ExecutionException, InterruptedException, TimeoutException {
+        templateSingleReaderSingleWriterOnSingleQueuePool(955157);
+    }
+
+    @Test
+    public void verifySingleReaderSingleWriterOnSingleQueuePool_with_random_size_packet() throws QueueException, ExecutionException, InterruptedException, TimeoutException, NoSuchAlgorithmException {
+        final int payloadSize = SecureRandom.getInstanceStrong().nextInt(Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
+        templateSingleReaderSingleWriterOnSingleQueuePool(payloadSize);
+
+    }
+
+    private void templateSingleReaderSingleWriterOnSingleQueuePool(int payloadSize) throws QueueException, InterruptedException, ExecutionException, TimeoutException {
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        Queue queue = queuePool.getOrCreate("single_writer_single_reader");
+        ExecutorService pool = Executors.newCachedThreadPool();
+        int messagesToSend = 1000;
+
+        LOG.info("Payload size: " + payloadSize);
+        ByteBuffer payload = ByteBuffer.wrap(generatePayload(payloadSize, (byte) 'a'));
+
+        Future<?> senderFuture = pool.submit(createMessageSender(queue, payload, messagesToSend));
+        Future<Integer> readerFuture = pool.submit(createMessageReader(queue, messagesToSend));
+
+        senderFuture.get(60, TimeUnit.SECONDS);
+        final int readBytes = readerFuture.get(60, TimeUnit.SECONDS);
+        assertEquals(messagesToSend * payloadSize, readBytes);
+    }
+
+    private Runnable createMessageSender(Queue queue, ByteBuffer payload, int count) {
+        return () -> {
+            int payloadSize = payload.remaining();
+            int sentBytes = 0;
+            for (int i = 0; i < count; i++) {
+                try {
+                    ByteBuffer duplicate = payload.duplicate();
+                    sentBytes += duplicate.remaining();
+                    queue.enqueue(duplicate);
+                } catch (QueueException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            LOG.debug("Finish to send data, " + count + " messages of size: " + payloadSize + " for a total of: " + sentBytes);
+        };
+    }
+
+    private Callable<Integer> createMessageReader(Queue queue, int expectedMessages) {
+        return () -> {
+            try {
+                int readBytes = 0;
+                ByteBuffer readPayload;
+                int receivedMessages = 0;
+                do {
+                    readPayload = queue.dequeue();
+                    if (readPayload != null) {
+                        readBytes += readPayload.remaining();
+                        receivedMessages++;
+                    }
+                } while (receivedMessages < expectedMessages);
+                LOG.debug("Received messages: " + receivedMessages);
+                return readBytes;
+            } catch (QueueException e) {
+                throw new RuntimeException(e);
+            }
+        };
     }
 }

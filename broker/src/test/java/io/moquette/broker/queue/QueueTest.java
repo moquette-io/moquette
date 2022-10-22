@@ -66,11 +66,11 @@ class QueueTest {
     }
 
 
-    private byte[] generatePayload(int numBytes) {
+    static byte[] generatePayload(int numBytes) {
         return generatePayload(numBytes, (byte) 'A');
     }
 
-    private byte[] generatePayload(int numBytes, byte c) {
+    static byte[] generatePayload(int numBytes, byte c) {
         final byte[] payload = new byte[numBytes];
         for (int i = 0; i < numBytes; i++) {
             payload[i] = c;
