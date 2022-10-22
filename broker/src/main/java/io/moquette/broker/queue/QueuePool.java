@@ -118,11 +118,14 @@ public class QueuePool {
     }
 
     private void segmentedCreated(String name, Segment segment) {
+        LOG.debug("Registering new segment {} for queue {}", segment, name);
         final QueueName queueName = new QueueName(name);
         List<SegmentRef> segmentRefs = this.queueSegments.computeIfAbsent(queueName, k -> new LinkedList<>());
 
         // adds in head
         segmentRefs.add(0, new SegmentRef(segment));
+
+        LOG.debug("queueSegments for queue {} after insertion {}", queueName, queueSegments.get(queueName));
     }
 
     public static QueuePool loadQueues(Path dataPath) throws QueueException {
@@ -138,7 +141,10 @@ public class QueuePool {
         final QueuePool queuePool = new QueuePool(allocator, dataPath, Segment.SIZE);
         callback = new SegmentAllocationCallback(queuePool);
         queuePool.loadQueueDefinitions(checkpointProps);
+        LOG.debug("Loaded queues definitions: {}", queuePool.queueSegments);
+
         queuePool.loadRecycledSegments(checkpointProps);
+        LOG.debug("Recyclable segments are: {}", queuePool.recycledSegments);
         return queuePool;
     }
 
@@ -413,9 +419,10 @@ public class QueuePool {
         final QueueName queueName = new QueueName(name);
         final LinkedList<SegmentRef> segmentRefs = queueSegments.get(queueName);
 
-        final SegmentRef pollSegment = segmentRefs.peek();
+        final SegmentRef pollSegment = segmentRefs.peekLast();
         if (pollSegment == null) {
-            throw new IllegalStateException("Opening tail segment can't never go in empty queue, because it's checked upfront in Queue class");
+            LOG.error("Queue segments is empty for queue {}, segment references: {}", queueName, segmentRefs);
+            throw new IllegalStateException("Opening tail segment can't never go in empty queue, because it's checked upfront in Queue");
         }
 
         final Path pageFile = dataPath.resolve(String.format("%d.page", pollSegment.pageId));
@@ -442,17 +449,20 @@ public class QueuePool {
         final QueueName queueName = new QueueName(name);
         final LinkedList<SegmentRef> segmentRefs = queueSegments.get(queueName);
         final SegmentRef segmentRef = segmentRefs.pollLast();
+        LOG.debug("Consumed tail segment {} from queue {}", segmentRef, queueName);
         recycledSegments.add(segmentRef);
     }
 
     Segment nextFreeSegment() throws QueueException {
         if (recycledSegments.isEmpty()) {
+            LOG.debug("no recycled segments available, request the creation of new one");
             return allocator.nextFreeSegment();
         }
         final SegmentRef recycledSegment = recycledSegments.pollFirst();
         if (recycledSegment == null) {
             throw new QueueException("Invalid state, expected available recycled segment");
         }
+        LOG.debug("Reusing recycled segment from page: {} at page offset: {}", recycledSegment.pageId, recycledSegment.offset);
         return allocator.reopenSegment(recycledSegment.pageId, recycledSegment.offset);
     }
 }
