@@ -153,57 +153,59 @@ public class Queue {
      * */
     public ByteBuffer dequeue() throws QueueException {
         ByteBuffer out = null;
-        if (currentHeadPtr.isGreaterThan(currentTailPtr)) {
-            LOG.debug("currentTail is {}", currentTailPtr);
-            if (containsHeader(tailSegment, currentTailPtr)) {
-                // currentSegment contains at least the header (payload length)
-                final VirtualPointer existingTail;
-                if (isTailFirstUsage(currentTailPtr)) {
-                    // move to the first readable byte
-                    existingTail = currentTailPtr.plus(1);
-                } else {
-                    existingTail = currentTailPtr.copy();
-                }
-                final int payloadLength = tailSegment.readHeader(existingTail);
-                // tail must be moved to the next byte to read, so has to move to
-                // header size + payload size + 1
-                final int fullMessageSize = payloadLength + LENGTH_HEADER_SIZE;
-                if (tailSegment.hasSpace(existingTail, fullMessageSize + 1)) {
-                    // currentSegments contains fully the payload
-                    currentTailPtr = existingTail.moveForward(fullMessageSize);
-                    // read data from currentTail + 4 bytes(the length)
-                    final VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
+        if (!currentHeadPtr.isGreaterThan(currentTailPtr)) {
+            if (currentTailPtr.compareTo(currentHeadPtr) > 0) {
+                // sanity check
+                throw new QueueException("Current tail " + currentTailPtr + " is forward head " + currentHeadPtr);
+            }
+            // head and tail pointer are the same, the queue is empty
+            return null;
+        }
 
-                    out = readData(tailSegment, dataStart, payloadLength);
-
-                } else {
-                    // payload is split across currentSegment and next ones
-                    lock.lock();
-                    VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
-
-                    LOG.debug("Loading payload size {}", payloadLength);
-                    out = loadPayloadFromSegments(payloadLength, tailSegment, dataStart);
-
-                    lock.unlock();
-                }
+        LOG.debug("currentTail is {}", currentTailPtr);
+        if (containsHeader(tailSegment, currentTailPtr)) {
+            // currentSegment contains at least the header (payload length)
+            final VirtualPointer existingTail;
+            if (isTailFirstUsage(currentTailPtr)) {
+                // move to the first readable byte
+                existingTail = currentTailPtr.plus(1);
             } else {
-                // header is split across 2 segments
-                lock.lock();
-                // the currentSegment is still the tailSegment
-                // read the length header that's crossing 2 segments
-                final CrossSegmentHeaderResult result = decodeCrossHeader(tailSegment, currentTailPtr);
+                existingTail = currentTailPtr.copy();
+            }
+            final int payloadLength = tailSegment.readHeader(existingTail);
+            // tail must be moved to the next byte to read, so has to move to
+            // header size + payload size + 1
+            final int fullMessageSize = payloadLength + LENGTH_HEADER_SIZE;
+            if (tailSegment.hasSpace(existingTail, fullMessageSize + 1)) {
+                // currentSegments contains fully the payload
+                currentTailPtr = existingTail.moveForward(fullMessageSize);
+                // read data from currentTail + 4 bytes(the length)
+                final VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
 
-                // load all payload parts from the segments
-                LOG.debug("Loading payload size {}", result.payloadLength);
-                out = loadPayloadFromSegments(result.payloadLength, result.segment, result.pointer);
+                out = readData(tailSegment, dataStart, payloadLength);
+
+            } else {
+                // payload is split across currentSegment and next ones
+                lock.lock();
+                VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
+
+                LOG.debug("Loading payload size {}", payloadLength);
+                out = loadPayloadFromSegments(payloadLength, tailSegment, dataStart);
 
                 lock.unlock();
             }
         } else {
-            if (currentTailPtr.compareTo(currentHeadPtr) == 0) {
-                // head and tail pointer are the same, the queue is empty
-                return null;
-            }
+            // header is split across 2 segments
+            lock.lock();
+            // the currentSegment is still the tailSegment
+            // read the length header that's crossing 2 segments
+            final CrossSegmentHeaderResult result = decodeCrossHeader(tailSegment, currentTailPtr);
+
+            // load all payload parts from the segments
+            LOG.debug("Loading payload size {}", result.payloadLength);
+            out = loadPayloadFromSegments(result.payloadLength, result.segment, result.pointer);
+
+            lock.unlock();
         }
 
         // return data or null
