@@ -168,14 +168,6 @@ public class Queue {
                         existingTail = currentTail.copy();
                     }
                     final int payloadLength = currentSegment.readHeader(existingTail);
-                    //DBG breakpoint
-//                    if (payloadLength != 152433) {
-//                        LOG.debug("Hit header problem at segment {}, offset position {}, payloadLength {}",
-//                            currentSegment, currentSegment.rebasedOffset(existingTail), payloadLength);
-//                        currentSegment.readHeader(existingTail);
-//                        System.exit(1);
-//                    }
-                    //DBG
                     // tail must be moved to the next byte to read, so has to move to
                     // header size + payload size + 1
                     final int fullMessageSize = payloadLength + LENGTH_HEADER_SIZE;
@@ -188,18 +180,6 @@ public class Queue {
 
                         out = readData(currentSegment, dataStart, payloadLength);
 
-//                        if (currentTailPtr.compareAndSet(currentTail, newTail)) {
-//                            LOG.debug("Moved currentTailPointer to {} from {} reading {} bytes", newTail, existingTail, fullMessageSize);
-//                            // fast track optimistic lock
-//                            // read data from currentTail + 4 bytes(the length)
-//                            final VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
-//
-//                            out = readData(currentSegment, dataStart, payloadLength);
-//                        } else {
-//                            // some concurrent thread moved forward the tail pointer before us,
-//                            // retry with another message
-//                            retry = true;
-//                        }
                     } else {
                         // payload is split across currentSegment and next ones
                         lock.lock();
@@ -207,19 +187,6 @@ public class Queue {
 
                         LOG.debug("Loading payload size {}", payloadLength);
                         out = loadPayloadFromSegments(payloadLength, currentSegment, dataStart);
-
-//                        if (tailSegment.equals(currentSegment)) {
-//                            // tailSegment is still the currentSegment, and we are in the lock, so we own it, let's
-//                            // consume the segments
-//                            VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
-//
-//                            LOG.debug("Loading payload size {}", payloadLength);
-//                            out = loadPayloadFromSegments(payloadLength, currentSegment, dataStart);
-//                        } else {
-//                            // tailSegments was moved in the meantime, this means some other thread
-//                            // has already consumed the data and theft the payload, go ahead with another message
-//                            retry = true;
-//                        }
 
                         lock.unlock();
                     }
@@ -234,18 +201,6 @@ public class Queue {
                     LOG.debug("Loading payload size {}", result.payloadLength);
                     out = loadPayloadFromSegments(result.payloadLength, result.segment, result.pointer);
 
-//                    if (tailSegment.get().equals(currentSegment)) {
-//                        // the currentSegment is still the tailSegment
-//                        // read the length header that's crossing 2 segments
-//                        final CrossSegmentHeaderResult result = decodeCrossHeader(currentSegment, currentTail);
-//
-//                        // load all payload parts from the segments
-//                        LOG.debug("Loading payload size {}", result.payloadLength);
-//                        out = loadPayloadFromSegments(result.payloadLength, result.segment, result.pointer);
-//                    } else {
-//                        // somebody else changed the tailSegment, retry and read next message
-//                        retry = true;
-//                    }
                     lock.unlock();
                 }
             } else {
