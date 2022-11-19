@@ -7,7 +7,6 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -19,12 +18,12 @@ public class Queue {
     public static final int LENGTH_HEADER_SIZE = 4;
     private final String name;
     /* Last wrote byte, point to head byte */
-    private final VirtualPointer currentHeadPtr;
+    private VirtualPointer currentHeadPtr;
     private final Segment headSegment;
 
     /* First readable byte, point to the last occupied byte */
-    private final AtomicReference<VirtualPointer> currentTailPtr;
-    private final AtomicReference<Segment> tailSegment;
+    private VirtualPointer currentTailPtr;
+    private Segment tailSegment;
 
     private final QueuePool queuePool;
     private final PagedFilesAllocator.AllocationListener allocationListener;
@@ -36,8 +35,8 @@ public class Queue {
         this.name = name;
         this.headSegment = headSegment;
         this.currentHeadPtr = currentHeadPtr;
-        this.currentTailPtr = new AtomicReference<>(currentTailPtr);
-        this.tailSegment = new AtomicReference<>(tailSegment);
+        this.currentTailPtr = currentTailPtr;
+        this.tailSegment = tailSegment;
         this.allocationListener = allocationListener;
         this.queuePool = queuePool;
     }
@@ -48,7 +47,7 @@ public class Queue {
     public void enqueue(ByteBuffer payload) throws QueueException {
         final int messageSize = LENGTH_HEADER_SIZE + payload.remaining();
         if (headSegment.hasSpace(currentHeadPtr, messageSize)) {
-            LOG.debug("Head segment has sufficient space for message length {}", LENGTH_HEADER_SIZE + payload.remaining();
+            LOG.debug("Head segment has sufficient space for message length {}", LENGTH_HEADER_SIZE + payload.remaining());
             writeData(headSegment, currentHeadPtr, payload);
             // move head segment
             currentHeadPtr.moveForward(messageSize);
@@ -94,7 +93,7 @@ public class Queue {
                 slice = rawData.slice();
                 slice.limit(copySize);
 
-                currentHeadPtr.moveForward(copySize);
+                currentHeadPtr = currentHeadPtr.moveForward(copySize);
                 writeDataNoHeader(newSegment, newSegment.begin, slice);
 
                 // shift forward the consumption point
@@ -144,7 +143,7 @@ public class Queue {
     }
 
     VirtualPointer currentTail() {
-        return this.currentTailPtr.get();
+        return currentTailPtr;
     }
 
     /**
@@ -155,9 +154,9 @@ public class Queue {
         ByteBuffer out = null;
         do {
             retry = false;
-            final Segment currentSegment = tailSegment.get();
-            final VirtualPointer currentTail = currentTailPtr.get();
-            if (head.get().pointer.isGreaterThan(currentTail)) {
+            final Segment currentSegment = tailSegment;
+            final VirtualPointer currentTail = currentTailPtr;
+            if (currentHeadPtr.isGreaterThan(currentTail)) {
                 LOG.debug("currentTail is {}", currentTail);
                 if (currentSegment.bytesAfter(currentTail) + 1 >= LENGTH_HEADER_SIZE) {
                     // currentSegment contains at least the header (payload length)
@@ -170,12 +169,12 @@ public class Queue {
                     }
                     final int payloadLength = currentSegment.readHeader(existingTail);
                     //DBG breakpoint
-                    if (payloadLength != 152433) {
-                        LOG.debug("Hit header problem at segment {}, offset position {}, payloadLength {}",
-                            currentSegment, currentSegment.rebasedOffset(existingTail), payloadLength);
-                        currentSegment.readHeader(existingTail);
-                        System.exit(1);
-                    }
+//                    if (payloadLength != 152433) {
+//                        LOG.debug("Hit header problem at segment {}, offset position {}, payloadLength {}",
+//                            currentSegment, currentSegment.rebasedOffset(existingTail), payloadLength);
+//                        currentSegment.readHeader(existingTail);
+//                        System.exit(1);
+//                    }
                     //DBG
                     // tail must be moved to the next byte to read, so has to move to
                     // header size + payload size + 1
@@ -183,65 +182,84 @@ public class Queue {
                     if (currentSegment.hasSpace(existingTail, fullMessageSize + 1)) {
                         // currentSegments contains fully the payload
                         final VirtualPointer newTail = existingTail.moveForward(fullMessageSize);
-                        if (currentTailPtr.compareAndSet(currentTail, newTail)) {
-                            LOG.debug("Moved currentTailPointer to {} from {} reading {} bytes", newTail, existingTail, fullMessageSize);
-                            // fast track optimistic lock
-                            // read data from currentTail + 4 bytes(the length)
-                            final VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
+                        currentTailPtr = newTail;
+                        // read data from currentTail + 4 bytes(the length)
+                        final VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
 
-                            out = readData(currentSegment, dataStart, payloadLength);
-                        } else {
-                            // some concurrent thread moved forward the tail pointer before us,
-                            // retry with another message
-                            retry = true;
-                        }
+                        out = readData(currentSegment, dataStart, payloadLength);
+
+//                        if (currentTailPtr.compareAndSet(currentTail, newTail)) {
+//                            LOG.debug("Moved currentTailPointer to {} from {} reading {} bytes", newTail, existingTail, fullMessageSize);
+//                            // fast track optimistic lock
+//                            // read data from currentTail + 4 bytes(the length)
+//                            final VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
+//
+//                            out = readData(currentSegment, dataStart, payloadLength);
+//                        } else {
+//                            // some concurrent thread moved forward the tail pointer before us,
+//                            // retry with another message
+//                            retry = true;
+//                        }
                     } else {
                         // payload is split across currentSegment and next ones
                         lock.lock();
-                        if (tailSegment.get().equals(currentSegment)) {
-                            // tailSegment is still the currentSegment, and we are in the lock, so we own it, let's
-                            // consume the segments
-                            VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
+                        VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
 
-                            LOG.debug("Loading payload size {}", payloadLength);
-                            out = loadPayloadFromSegments(payloadLength, currentSegment, dataStart);
-                        } else {
-                            // tailSegments was moved in the meantime, this means some other thread
-                            // has already consumed the data and theft the payload, go ahead with another message
-                            retry = true;
-                        }
+                        LOG.debug("Loading payload size {}", payloadLength);
+                        out = loadPayloadFromSegments(payloadLength, currentSegment, dataStart);
+
+//                        if (tailSegment.equals(currentSegment)) {
+//                            // tailSegment is still the currentSegment, and we are in the lock, so we own it, let's
+//                            // consume the segments
+//                            VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
+//
+//                            LOG.debug("Loading payload size {}", payloadLength);
+//                            out = loadPayloadFromSegments(payloadLength, currentSegment, dataStart);
+//                        } else {
+//                            // tailSegments was moved in the meantime, this means some other thread
+//                            // has already consumed the data and theft the payload, go ahead with another message
+//                            retry = true;
+//                        }
 
                         lock.unlock();
                     }
                 } else {
                     // header is split across 2 segments
                     lock.lock();
-                    if (tailSegment.get().equals(currentSegment)) {
-                        // the currentSegment is still the tailSegment
-                        // read the length header that's crossing 2 segments
-                        final CrossSegmentHeaderResult result = decodeCrossHeader(currentSegment, currentTail);
+                    // the currentSegment is still the tailSegment
+                    // read the length header that's crossing 2 segments
+                    final CrossSegmentHeaderResult result = decodeCrossHeader(currentSegment, currentTail);
 
-                        // load all payload parts from the segments
-                        LOG.debug("Loading payload size {}", result.payloadLength);
-                        out = loadPayloadFromSegments(result.payloadLength, result.segment, result.pointer);
-                    } else {
-                        // somebody else changed the tailSegment, retry and read next message
-                        retry = true;
-                    }
+                    // load all payload parts from the segments
+                    LOG.debug("Loading payload size {}", result.payloadLength);
+                    out = loadPayloadFromSegments(result.payloadLength, result.segment, result.pointer);
+
+//                    if (tailSegment.get().equals(currentSegment)) {
+//                        // the currentSegment is still the tailSegment
+//                        // read the length header that's crossing 2 segments
+//                        final CrossSegmentHeaderResult result = decodeCrossHeader(currentSegment, currentTail);
+//
+//                        // load all payload parts from the segments
+//                        LOG.debug("Loading payload size {}", result.payloadLength);
+//                        out = loadPayloadFromSegments(result.payloadLength, result.segment, result.pointer);
+//                    } else {
+//                        // somebody else changed the tailSegment, retry and read next message
+//                        retry = true;
+//                    }
                     lock.unlock();
                 }
             } else {
-                if (currentTail.compareTo(head.get().pointer) == 0) {
+                if (currentTail.compareTo(currentHeadPtr) == 0) {
                     // head and tail pointer are the same, the queue is empty
                     return null;
                 }
                 lock.lock();
-                if (tailSegment.get().equals(currentSegment)) {
+                if (tailSegment.equals(currentSegment)) {
                     // load next tail segment
                     final Segment newTailSegment = queuePool.openNextTailSegment(name);
 
                     // assign to tailSegment without CAS because we are in lock
-                    tailSegment.set(newTailSegment);
+                    tailSegment = newTailSegment;
                 }
                 lock.unlock();
                 retry = true;
@@ -286,7 +304,7 @@ public class Queue {
         return new CrossSegmentHeaderResult(nextTailSegment, dataStart, payloadLength);
     }
 
-    // TO BE called owning the lock
+    // TO BE called owning the lock on segments allocator
     private ByteBuffer loadPayloadFromSegments(int remaining, Segment segment, VirtualPointer tail) throws QueueException {
         List<ByteBuffer> createdBuffers = new ArrayList<>(segmentCountFromSize(remaining));
         VirtualPointer scan = tail;
@@ -311,8 +329,8 @@ public class Queue {
         } while (remaining > 0);
 
         // assign to tailSegment without CAS because we are in lock
-        tailSegment.set(segment);
-        currentTailPtr.set(scan);
+        tailSegment = segment;
+        currentTailPtr = scan;
         LOG.debug("Moved currentTailPointer to {} from {}", scan, tail);
 
         return joinBuffers(createdBuffers);
