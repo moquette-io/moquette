@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * Not thread safe disk persisted queue.
+ * Not thread safe disk persisted queue.S
  * */
 public class Queue {
     private static final Logger LOG = LoggerFactory.getLogger(Queue.class);
@@ -65,7 +65,7 @@ public class Queue {
             .putInt(dataSize)
             .put(payload)
             .flip();
-        
+
         // the bytes written from the payload input
         long bytesRemainingInHeaderSegment = Math.min(rawData.remaining(), headSegment.bytesAfter(currentHeadPtr));
         LOG.trace("Writing partial payload to offset {} for {} bytes", currentHeadPtr, bytesRemainingInHeaderSegment);
@@ -132,67 +132,15 @@ public class Queue {
         segment.write(start.plus(LENGTH_HEADER_SIZE), data); // write the payload
     }
 
-
-    private static class PointerAndSegment implements Comparable<PointerAndSegment> {
-        final VirtualPointer pointer;
-        final Segment segment;
-
-        public PointerAndSegment(VirtualPointer pointer, Segment segment) {
-            this.pointer = pointer;
-            this.segment = segment;
-        }
-
-        @Override
-        public int compareTo(PointerAndSegment o) {
-            return this.pointer.compareTo(o.pointer);
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (!(o instanceof PointerAndSegment)) {
-                return false;
-            }
-            return this.pointer.equals(((PointerAndSegment) o).pointer);
-        }
-    }
-    /**
-     * Move forward the currentHead pointer of size bytes, using CAS operation.
-     * @return null if the head segment doesn't have enough space.
-     * */
-    private PointerAndSegment spinningMove(long size) {
-        VirtualPointer currentHeadPtr;
-        VirtualPointer oldHeadPtr;
-        VirtualPointer newHeadPtr;
-        Segment currentHeadSegment;
-        PointerAndSegment newHead;
-        PointerAndSegment currentHead;
-
-        do {
-            currentHead = this.head.get();
-            currentHeadPtr = currentHead.pointer;
-            currentHeadSegment = currentHead.segment;
-            if (!currentHeadSegment.hasSpace(currentHeadPtr, size)) {
-                return null;
-            }
-            newHeadPtr = currentHeadPtr.moveForward(size);
-            oldHeadPtr = currentHeadPtr;
-            newHead = new PointerAndSegment(newHeadPtr, currentHeadSegment);
-        } while (!this.head.compareAndSet(currentHead, newHead));
-        // the start position must be the first free position, while the previous head reference
-        // keeps the last occupied position, move forward by 1
-        LOG.trace("Lock free move ({} bytes) from {} to {}", newHeadPtr.logicalOffset - oldHeadPtr.logicalOffset,  oldHeadPtr, newHeadPtr.plus(1));
-        return new PointerAndSegment(currentHeadPtr.plus(1), currentHeadSegment);
-    }
-
     /**
      * Used in test
      * */
     void force() {
-        head.get().segment.force();
+        headSegment.force();
     }
 
     VirtualPointer currentHead() {
-        return this.head.get().pointer;
+        return currentHeadPtr;
     }
 
     VirtualPointer currentTail() {
