@@ -1,5 +1,6 @@
 package io.moquette.broker.unsafequeues;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -236,11 +237,13 @@ class QueuePoolTest {
     }
 
     @Test
+    @Disabled
     public void verifySingleReaderSingleWriterOnSingleQueuePool_with_955157_size_packet() throws QueueException, ExecutionException, InterruptedException, TimeoutException {
         templateSingleReaderSingleWriterOnSingleQueuePool(955157);
     }
 
     @Test
+    @Disabled
     public void verifySingleReaderSingleWriterOnSingleQueuePool_with_random_size_packet() throws QueueException, ExecutionException, InterruptedException, TimeoutException, NoSuchAlgorithmException {
         final int payloadSize = SecureRandom.getInstanceStrong().nextInt(Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
         templateSingleReaderSingleWriterOnSingleQueuePool(payloadSize);
@@ -306,6 +309,7 @@ class QueuePoolTest {
     int result = 0;
 
     @Test
+    @Disabled
     public void testMultipleWritersSingleReader() throws QueueException, NoSuchAlgorithmException, ExecutionException, InterruptedException, TimeoutException {
         final int payloadSize = 152433/*SecureRandom.getInstanceStrong().nextInt(Segment.SIZE / 2 - LENGTH_HEADER_SIZE)*/;
         LOG.info("Payload size: " + payloadSize);
