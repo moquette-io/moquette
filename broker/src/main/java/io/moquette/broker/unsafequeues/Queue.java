@@ -19,7 +19,8 @@ public class Queue {
     public static final int LENGTH_HEADER_SIZE = 4;
     private final String name;
     /* Last wrote byte, point to head byte */
-    private final AtomicReference<PointerAndSegment> head;
+    private final VirtualPointer currentHeadPtr;
+    private final Segment headSegment;
 
     /* First readable byte, point to the last occupied byte */
     private final AtomicReference<VirtualPointer> currentTailPtr;
@@ -33,7 +34,8 @@ public class Queue {
           Segment tailSegment, VirtualPointer currentTailPtr,
           SegmentAllocator allocator, PagedFilesAllocator.AllocationListener allocationListener, QueuePool queuePool) {
         this.name = name;
-        this.head = new AtomicReference<>(new PointerAndSegment(currentHeadPtr, headSegment));
+        this.headSegment = headSegment;
+        this.currentHeadPtr = currentHeadPtr;
         this.currentTailPtr = new AtomicReference<>(currentTailPtr);
         this.tailSegment = new AtomicReference<>(tailSegment);
         this.allocationListener = allocationListener;
@@ -44,84 +46,62 @@ public class Queue {
      * @throws QueueException if an error happens during access to file.
      * */
     public void enqueue(ByteBuffer payload) throws QueueException {
-        final PointerAndSegment res = spinningMove(LENGTH_HEADER_SIZE + payload.remaining());
-        if (res != null) {
-            // in this case all the payload is contained in the current head segment
-            LOG.trace("CAS insertion at: {}", res.pointer);
-            writeData(res.segment, res.pointer, payload);
-            LOG.trace("CAS written at {}", res.pointer);
+        final int messageSize = LENGTH_HEADER_SIZE + payload.remaining();
+        if (headSegment.hasSpace(currentHeadPtr, messageSize)) {
+            LOG.debug("Head segment has sufficient space for message length {}", LENGTH_HEADER_SIZE + payload.remaining();
+            writeData(headSegment, currentHeadPtr, payload);
+            // move head segment
+            currentHeadPtr.moveForward(messageSize);
             return;
-        } else {
-            LOG.trace("No lock free enqueue");
-            // the payload can't be fully contained into the current head segment and needs to be splitted
-            // with another segment. To request the next segment, it's needed to be done in global lock.
-            lock.lock();
+        }
 
-            final int dataSize = payload.remaining();
-            final ByteBuffer rawData = (ByteBuffer) ByteBuffer.allocate(LENGTH_HEADER_SIZE + dataSize)
-                .putInt(dataSize)
-                .put(payload)
-                .flip();
+        LOG.debug("Head segment doesn't have enough space");
+        // the payload can't be fully contained into the current head segment and needs to be splitted
+        // with another segment. To request the next segment, it's needed to be done in global lock.
+        lock.lock();
 
-            // the bytes written from the payload input
-            long bytesRemainingInHeaderSegment;
-            PointerAndSegment moveResult = null;
-            do {
-                // there could be another thread that's pushing data to the segment
-                // outside the lock, so conquer with that to grab the remaining space
-                // in the segment.
-                final Segment currentSegment = head.get().segment;
-                bytesRemainingInHeaderSegment = Math.min(rawData.remaining(), currentSegment.bytesAfter(head.get().pointer));
-                // WARN spinningMove is a state mutating call
-            } while (bytesRemainingInHeaderSegment != 0 && ((moveResult = spinningMove(bytesRemainingInHeaderSegment)) == null));
-            VirtualPointer newSegmentPointer = moveResult.pointer;
-            if (bytesRemainingInHeaderSegment != 0) {
-                // copy the beginning part of payload into the head segment, to fill it up.
-                VirtualPointer lastOffset = moveResult.pointer;
-                LOG.trace("Writing partial payload to offset {} for {} bytes", lastOffset, bytesRemainingInHeaderSegment);
+        final int dataSize = payload.remaining();
+        final ByteBuffer rawData = (ByteBuffer) ByteBuffer.allocate(LENGTH_HEADER_SIZE + dataSize)
+            .putInt(dataSize)
+            .put(payload)
+            .flip();
+        
+        // the bytes written from the payload input
+        long bytesRemainingInHeaderSegment = Math.min(rawData.remaining(), headSegment.bytesAfter(currentHeadPtr));
+        LOG.trace("Writing partial payload to offset {} for {} bytes", currentHeadPtr, bytesRemainingInHeaderSegment);
 
-                final int copySize = (int) bytesRemainingInHeaderSegment;
-                final ByteBuffer slice = rawData.slice();
+        int copySize = (int) bytesRemainingInHeaderSegment;
+        ByteBuffer slice = rawData.slice();
+        slice.limit(copySize);
+        writeDataNoHeader(headSegment, currentHeadPtr, slice);
+        currentHeadPtr.moveForward(bytesRemainingInHeaderSegment);
+
+        // No need to move newSegmentPointer the pointer because the last spinningMove has already moved it
+
+        // shift forward the consumption point
+        rawData.position(rawData.position() + copySize);
+
+        Segment newSegment = null;
+        try {
+            // till the payload is not completely stored,
+            // save the remaining part into a new segment.
+            while (rawData.hasRemaining()) {
+                newSegment = queuePool.nextFreeSegment();
+                //notify segment creation for queue in queue pool
+                allocationListener.segmentedCreated(name, newSegment);
+
+                copySize = (int) Math.min(rawData.remaining(), Segment.SIZE);
+                slice = rawData.slice();
                 slice.limit(copySize);
-                writeDataNoHeader(moveResult.segment, lastOffset, slice);
 
-                // No need to move newSegmentPointer the pointer because the last spinningMove has already moved it
+                currentHeadPtr.moveForward(copySize);
+                writeDataNoHeader(newSegment, newSegment.begin, slice);
 
                 // shift forward the consumption point
                 rawData.position(rawData.position() + copySize);
             }
-
-            Segment newSegment = null;
-            try {
-                // till the payload is not completely stored,
-                // save the remaining part into a new segment.
-                while (rawData.hasRemaining()) {
-                    newSegment = queuePool.nextFreeSegment();
-                    //notify segment creation for queue in queue pool
-                    allocationListener.segmentedCreated(name, newSegment);
-
-                    int copySize = (int) Math.min(rawData.remaining(), Segment.SIZE);
-                    final ByteBuffer slice = rawData.slice();
-                    slice.limit(copySize);
-
-                    newSegmentPointer = newSegmentPointer.moveForward(copySize);
-                    writeDataNoHeader(newSegment, newSegment.begin, slice);
-
-                    // shift forward the consumption point
-                    rawData.position(rawData.position() + copySize);
-                }
-
-                // publish the last segment created and the pointer to head.
-                head.set(new PointerAndSegment(newSegmentPointer, newSegment));
-//                if (newSegment != null) {
-//                    headSegment.set(newSegment);
-//                }
-//                if (newSegmentPointer != null) {
-//                    currentHeadPtr.set(newSegmentPointer);
-//                }
-            } finally {
-                lock.unlock();
-            }
+        } finally {
+            lock.unlock();
         }
     }
 
