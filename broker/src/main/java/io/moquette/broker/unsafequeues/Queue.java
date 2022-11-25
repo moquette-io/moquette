@@ -236,11 +236,10 @@ public class Queue {
         final int consumedHeaderSize = partialHeader.remaining();
         lengthBuffer.put(partialHeader);
         queuePool.consumedTailSegment(name);
-        // DBG
-        if (Boolean.parseBoolean(System.getProperty("queue.debug", "false"))) {
+
+        if (QueuePool.queueDebug) {
             segment.fillWith((byte) 'D');
         }
-        // DBG
 
         // read second part
         final int remainingHeaderSize =  LENGTH_HEADER_SIZE - consumedHeaderSize;
@@ -269,11 +268,9 @@ public class Queue {
 
             if (remaining > 0 || (segmentCompletelyConsumed && !consumedQueue)) {
                 queuePool.consumedTailSegment(name);
-                // DBG
-                if (Boolean.parseBoolean(System.getProperty("queue.debug", "false"))) {
+                if (QueuePool.queueDebug) {
                     segment.fillWith((byte) 'D');
                 }
-                // DBG
                 segment = queuePool.openNextTailSegment(name);
             }
         } while (remaining > 0);

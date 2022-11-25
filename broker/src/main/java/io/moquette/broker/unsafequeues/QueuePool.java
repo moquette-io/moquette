@@ -29,6 +29,9 @@ import static io.moquette.broker.unsafequeues.PagedFilesAllocator.PAGE_SIZE;
 public class QueuePool {
 
     private static final Logger LOG = LoggerFactory.getLogger(QueuePool.class);
+
+    static final boolean queueDebug = Boolean.parseBoolean(System.getProperty("moquette.queue.debug", "false"));
+
     private static SegmentAllocationCallback callback;
 
     // visible for testing

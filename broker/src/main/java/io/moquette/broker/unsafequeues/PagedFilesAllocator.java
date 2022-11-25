@@ -52,7 +52,7 @@ class PagedFilesAllocator implements SegmentAllocator {
             this.currentPageFile = fileChannel;
             final MappedByteBuffer mappedPage = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, PAGE_SIZE);
             // DBG
-            if (createNew && Boolean.parseBoolean(System.getProperty("queue.debug", "false"))) {
+            if (createNew && QueuePool.queueDebug) {
                 for (int i = 0; i < PAGE_SIZE; i++){
                     mappedPage.put(i, (byte) 'C');
                 }
