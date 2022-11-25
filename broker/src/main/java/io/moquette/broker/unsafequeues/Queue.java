@@ -7,6 +7,7 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -151,15 +152,14 @@ public class Queue {
     /**
      * Read next message or return null if the queue has no data.
      * */
-    public ByteBuffer dequeue() throws QueueException {
-        ByteBuffer out = null;
+    public Optional<ByteBuffer> dequeue() throws QueueException {
         if (!currentHeadPtr.isGreaterThan(currentTailPtr)) {
             if (currentTailPtr.compareTo(currentHeadPtr) > 0) {
                 // sanity check
                 throw new QueueException("Current tail " + currentTailPtr + " is forward head " + currentHeadPtr);
             }
             // head and tail pointer are the same, the queue is empty
-            return null;
+            return Optional.empty();
         }
 
         LOG.debug("currentTail is {}", currentTailPtr);
@@ -182,8 +182,7 @@ public class Queue {
                 // read data from currentTail + 4 bytes(the length)
                 final VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
 
-                out = readData(tailSegment, dataStart, payloadLength);
-
+                return Optional.of(readData(tailSegment, dataStart, payloadLength));
             } else {
                 // payload is split across currentSegment and next ones
                 lock.lock();
@@ -191,7 +190,7 @@ public class Queue {
                     VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
 
                     LOG.debug("Loading payload size {}", payloadLength);
-                    out = loadPayloadFromSegments(payloadLength, tailSegment, dataStart);
+                    return Optional.of(loadPayloadFromSegments(payloadLength, tailSegment, dataStart));
                 } finally {
                     lock.unlock();
                 }
@@ -206,14 +205,11 @@ public class Queue {
 
                 // load all payload parts from the segments
                 LOG.debug("Loading payload size {}", result.payloadLength);
-                out = loadPayloadFromSegments(result.payloadLength, result.segment, result.pointer);
+                return Optional.of(loadPayloadFromSegments(result.payloadLength, result.segment, result.pointer));
             } finally {
                 lock.unlock();
             }
         }
-
-        // return data or null
-        return out;
     }
 
     private static boolean containsHeader(Segment segment, VirtualPointer tail) {

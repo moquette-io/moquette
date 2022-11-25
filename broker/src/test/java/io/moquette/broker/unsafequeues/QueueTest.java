@@ -15,15 +15,12 @@ import java.nio.file.Files;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Properties;
-import java.util.Random;
+import java.util.*;
 import java.util.function.Consumer;
 
 import static io.moquette.broker.unsafequeues.Queue.LENGTH_HEADER_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -266,7 +263,7 @@ class QueueTest {
         final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
         final Queue queue = queuePool.getOrCreate("test");
 
-        assertNull(queue.dequeue(), "Pulling from empty queue MUST return null value");
+        assertFalse(queue.dequeue().isPresent(), "Pulling from empty queue MUST return null value");
     }
 
     @Test
@@ -278,7 +275,7 @@ class QueueTest {
         queue.enqueue(message);
 
         //Exercise
-        final ByteBuffer result = queue.dequeue();
+        final ByteBuffer result = queue.dequeue().get();
         final String readMessage = Utils.bufferToString(result);
         assertEquals("Hello World!", readMessage, "Read the same message tha was enqueued");
     }
@@ -300,7 +297,7 @@ class QueueTest {
         queue.enqueue(crossingPayload);
 
         //Exercise
-        final ByteBuffer message = queue.dequeue();
+        final ByteBuffer message = queue.dequeue().get();
         assertEquals(1028 - LENGTH_HEADER_SIZE, message.remaining(), "There must be 1024 'B' letters");
         assertContainsOnly('B', message);
     }
@@ -328,7 +325,7 @@ class QueueTest {
         queue.enqueue(crossingPayload);
 
         //Exercise
-        final ByteBuffer message = queue.dequeue();
+        final ByteBuffer message = queue.dequeue().get();
         assertEquals(1024 - LENGTH_HEADER_SIZE, message.remaining(), "There must be 1020 'B' letters");
         assertContainsOnly('B', message);
     }
@@ -393,7 +390,7 @@ class QueueTest {
 
     private void verifyReadingFromQueue(int numMessagesInQueue, Queue queue, char ch, int expectedPayloadSize) throws QueueException {
         for (int i = 0; i < numMessagesInQueue; i++) {
-            final ByteBuffer payload = queue.dequeue();
+            final ByteBuffer payload = queue.dequeue().get();
             assertContainsOnly(ch, payload, expectedPayloadSize);
         }
     }
@@ -442,8 +439,8 @@ class QueueTest {
         final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
         final Queue queue = queuePool.getOrCreate("test_inverted");
 
-        assertContainsOnly('A', queue.dequeue(), Segment.SIZE - LENGTH_HEADER_SIZE);
-        assertContainsOnly('B', queue.dequeue(), Segment.SIZE - LENGTH_HEADER_SIZE);
+        assertContainsOnly('A', queue.dequeue().get(), Segment.SIZE - LENGTH_HEADER_SIZE);
+        assertContainsOnly('B', queue.dequeue().get(), Segment.SIZE - LENGTH_HEADER_SIZE);
     }
 
     @Test
@@ -461,10 +458,10 @@ class QueueTest {
 
         // then the consumption must happen in the same order
         final Queue reopened = queuePoolA.getOrCreate("testA");
-        assertContainsOnly('a', reopened.dequeue(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
-        assertContainsOnly('A', reopened.dequeue(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
-        assertContainsOnly('b', reopened.dequeue(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
-        assertContainsOnly('B', reopened.dequeue(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
+        assertContainsOnly('a', reopened.dequeue().get(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
+        assertContainsOnly('A', reopened.dequeue().get(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
+        assertContainsOnly('b', reopened.dequeue().get(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
+        assertContainsOnly('B', reopened.dequeue().get(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
     }
 
     @Test
@@ -482,8 +479,8 @@ class QueueTest {
         queue.enqueue(ByteBuffer.wrap(generatePayload(Segment.SIZE / 2 - LENGTH_HEADER_SIZE, (byte)'B')));
 
         // consume first segment
-        assertContainsOnly('a', queue.dequeue(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
-        assertContainsOnly('A', queue.dequeue(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
+        assertContainsOnly('a', queue.dequeue().get(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
+        assertContainsOnly('A', queue.dequeue().get(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
 
         // Exercise
         // write new data, should go in first freed segment
@@ -513,8 +510,8 @@ class QueueTest {
         queue.enqueue(ByteBuffer.wrap(generatePayload(Segment.SIZE / 2 - LENGTH_HEADER_SIZE, (byte)'B')));
 
         // consume first segment
-        assertContainsOnly('a', queue.dequeue(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
-        assertContainsOnly('A', queue.dequeue(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
+        assertContainsOnly('a', queue.dequeue().get(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
+        assertContainsOnly('A', queue.dequeue().get(), Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
 
         queue.force();
         queuePool.close();

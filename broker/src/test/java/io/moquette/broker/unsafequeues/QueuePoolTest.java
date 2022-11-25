@@ -16,10 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -288,13 +285,12 @@ class QueuePoolTest {
         return () -> {
             try {
                 int readBytes = 0;
-                ByteBuffer readPayload;
                 int receivedMessages = 0;
                 do {
                     LOG.debug("receivedMessages {} ({} expected)", receivedMessages, expectedMessages);
-                    readPayload = queue.dequeue();
-                    if (readPayload != null) {
-                        readBytes += readPayload.remaining();
+                    Optional<ByteBuffer> readPayload = queue.dequeue();
+                    if (readPayload.isPresent()) {
+                        readBytes += readPayload.get().remaining();
                         receivedMessages++;
                     }
                 } while (receivedMessages < expectedMessages);
