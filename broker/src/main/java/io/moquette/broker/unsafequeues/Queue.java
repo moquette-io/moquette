@@ -11,7 +11,7 @@ import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * Not thread safe disk persisted queue.S
+ * Not thread safe disk persisted queue.
  * */
 public class Queue {
     private static final Logger LOG = LoggerFactory.getLogger(Queue.class);
@@ -147,6 +147,14 @@ public class Queue {
 
     VirtualPointer currentTail() {
         return currentTailPtr;
+    }
+
+    public boolean isEmpty() {
+        if (isTailFirstUsage(currentTailPtr)) {
+            return currentHeadPtr.compareTo(currentTailPtr) == 0;
+        } else {
+            return currentHeadPtr.moveForward(1).compareTo(currentTailPtr) == 0;
+        }
     }
 
     /**

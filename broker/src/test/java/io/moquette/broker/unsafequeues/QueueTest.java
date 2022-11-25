@@ -99,6 +99,27 @@ class QueueTest {
     }
 
     @Test
+    public void newlyQueueIsEmpty() throws QueueException {
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final Queue queue = queuePool.getOrCreate("test");
+
+        assertTrue(queue.isEmpty(), "Freshly created queue must be empty");
+    }
+
+    @Test
+    public void consumedQueueIsEmpty() throws QueueException {
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final Queue queue = queuePool.getOrCreate("test");
+        queue.enqueue(ByteBuffer.wrap("AAAA".getBytes(StandardCharsets.UTF_8)));
+        Optional<ByteBuffer> data = queue.dequeue();
+        assertTrue(data.isPresent(), "Some payload is retrieved");
+
+        assertEquals(4, data.get().remaining(), "Payload contains what's expected");
+
+        assertTrue(queue.isEmpty(), "Queue must be empty after consuming it");
+    }
+
+    @Test
     public void insertSomeDataIntoNewQueue() throws QueueException, IOException {
         final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
         final Queue queue = queuePool.getOrCreate("test");
