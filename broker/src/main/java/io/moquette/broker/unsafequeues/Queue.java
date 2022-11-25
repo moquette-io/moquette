@@ -187,25 +187,29 @@ public class Queue {
             } else {
                 // payload is split across currentSegment and next ones
                 lock.lock();
-                VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
+                try {
+                    VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
 
-                LOG.debug("Loading payload size {}", payloadLength);
-                out = loadPayloadFromSegments(payloadLength, tailSegment, dataStart);
-
-                lock.unlock();
+                    LOG.debug("Loading payload size {}", payloadLength);
+                    out = loadPayloadFromSegments(payloadLength, tailSegment, dataStart);
+                } finally {
+                    lock.unlock();
+                }
             }
         } else {
             // header is split across 2 segments
             lock.lock();
-            // the currentSegment is still the tailSegment
-            // read the length header that's crossing 2 segments
-            final CrossSegmentHeaderResult result = decodeCrossHeader(tailSegment, currentTailPtr);
+            try {
+                // the currentSegment is still the tailSegment
+                // read the length header that's crossing 2 segments
+                final CrossSegmentHeaderResult result = decodeCrossHeader(tailSegment, currentTailPtr);
 
-            // load all payload parts from the segments
-            LOG.debug("Loading payload size {}", result.payloadLength);
-            out = loadPayloadFromSegments(result.payloadLength, result.segment, result.pointer);
-
-            lock.unlock();
+                // load all payload parts from the segments
+                LOG.debug("Loading payload size {}", result.payloadLength);
+                out = loadPayloadFromSegments(result.payloadLength, result.segment, result.pointer);
+            } finally {
+                lock.unlock();
+            }
         }
 
         // return data or null
