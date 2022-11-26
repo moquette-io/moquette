@@ -9,9 +9,6 @@ import io.netty.handler.codec.mqtt.MqttQoS;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
-
 import static io.moquette.BrokerConstants.FLIGHT_BEFORE_RESEND_MS;
 import io.moquette.broker.subscriptions.Subscription;
 import java.util.Arrays;
@@ -24,12 +21,12 @@ public class SessionTest {
 
     private EmbeddedChannel testChannel;
     private Session client;
-    private Queue<SessionRegistry.EnqueuedMessage> queuedMessages;
+    private SessionMessageQueue<SessionRegistry.EnqueuedMessage> queuedMessages;
 
     @BeforeEach
     public void setUp() {
         testChannel = new EmbeddedChannel();
-        queuedMessages = new ConcurrentLinkedQueue<>();
+        queuedMessages = new InMemoryQueue();
         client = new Session(CLIENT_ID, true, null, queuedMessages);
         createConnection(client);
     }
@@ -43,7 +40,7 @@ public class SessionTest {
             sendQoS1To(client, destinationTopic, "Hello World " + i + "!");
         }
 
-        assertEquals(1, queuedMessages.size(), "Inflight zone must be full, and the 11th message must be queued");
+        assertFalse(queuedMessages.isEmpty(), "Inflight zone must be full, and the 11th message must be queued");
         // Exercise
         client.pubAckReceived(1);
 

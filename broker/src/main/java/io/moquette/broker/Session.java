@@ -90,7 +90,7 @@ class Session {
     private final String clientId;
     private boolean clean;
     private Will will;
-    private final Queue<SessionRegistry.EnqueuedMessage> sessionQueue;
+    private final SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue;
     private final AtomicReference<SessionStatus> status = new AtomicReference<>(SessionStatus.DISCONNECTED);
     private MQTTConnection mqttConnection;
     private final Set<Subscription> subscriptions = new HashSet<>();
@@ -99,12 +99,12 @@ class Session {
     private final Map<Integer, MqttPublishMessage> qos2Receiving = new HashMap<>();
     private final AtomicInteger inflightSlots = new AtomicInteger(INFLIGHT_WINDOW_SIZE); // this should be configurable
 
-    Session(String clientId, boolean clean, Will will, Queue<SessionRegistry.EnqueuedMessage> sessionQueue) {
+    Session(String clientId, boolean clean, Will will, SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue) {
         this(clientId, clean, sessionQueue);
         this.will = will;
     }
 
-    Session(String clientId, boolean clean, Queue<SessionRegistry.EnqueuedMessage> sessionQueue) {
+    Session(String clientId, boolean clean, SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue) {
         if (sessionQueue == null) {
             throw new IllegalArgumentException("sessionQueue parameter can't be null");
         }
@@ -295,7 +295,7 @@ class Session {
             final SessionRegistry.PublishedMessage msg = new SessionRegistry.PublishedMessage(topic, qos, payload, retained);
             // Adding to a queue, retain.
             msg.retain();
-            sessionQueue.add(msg);
+            sessionQueue.enqueue(msg);
             LOG.debug("Enqueue to peer session");
         }
     }
@@ -325,7 +325,7 @@ class Session {
             final SessionRegistry.PublishedMessage msg = new SessionRegistry.PublishedMessage(topic, qos, payload, retained);
             // Adding to a queue, retain.
             msg.retain();
-            sessionQueue.add(msg);
+            sessionQueue.enqueue(msg);
         }
     }
 
@@ -411,7 +411,7 @@ class Session {
     private void drainQueueToConnection() {
         // consume the queue
         while (!sessionQueue.isEmpty() && inflighHasSlotsAndConnectionIsUp()) {
-            final SessionRegistry.EnqueuedMessage msg = sessionQueue.poll();
+            final SessionRegistry.EnqueuedMessage msg = sessionQueue.dequeue();
             if (msg == null) {
                 // Our message was already fetched by another Thread.
                 return;
@@ -471,9 +471,9 @@ class Session {
     }
 
     public void cleanUp() {
-        for (EnqueuedMessage msg : sessionQueue) {
-            msg.release();
-        }
+        // in case of in memory session queues all contained messages
+        // has to be released.
+        sessionQueue.close();
         for (EnqueuedMessage msg : inflightWindow.values()) {
             msg.release();
         }

@@ -15,15 +15,14 @@
  */
 package io.moquette.persistence;
 
+import io.moquette.broker.SessionMessageQueue;
 import io.moquette.broker.SessionRegistry;
 import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVStore;
 
-import java.util.AbstractQueue;
-import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicLong;
 
-class H2PersistentQueue extends AbstractQueue<SessionRegistry.EnqueuedMessage> {
+class H2PersistentQueue implements SessionMessageQueue<SessionRegistry.EnqueuedMessage> {
 
     private final MVMap<Long, SessionRegistry.EnqueuedMessage> queueMap;
     private final MVMap<String, Long> metadataMap;
@@ -66,28 +65,17 @@ class H2PersistentQueue extends AbstractQueue<SessionRegistry.EnqueuedMessage> {
     }
 
     @Override
-    public Iterator<SessionRegistry.EnqueuedMessage> iterator() {
-        return null;
-    }
-
-    @Override
-    public int size() {
-        return this.head.intValue() - this.tail.intValue();
-    }
-
-    @Override
-    public boolean offer(SessionRegistry.EnqueuedMessage t) {
+    public void enqueue(SessionRegistry.EnqueuedMessage t) {
         if (t == null) {
             throw new NullPointerException("Inserted element can't be null");
         }
         final long nextHead = head.getAndIncrement();
         this.queueMap.put(nextHead, t);
         this.metadataMap.put("head", nextHead + 1);
-        return true;
     }
 
     @Override
-    public SessionRegistry.EnqueuedMessage poll() {
+    public SessionRegistry.EnqueuedMessage dequeue() {
         if (head.equals(tail)) {
             return null;
         }
@@ -99,11 +87,12 @@ class H2PersistentQueue extends AbstractQueue<SessionRegistry.EnqueuedMessage> {
     }
 
     @Override
-    public SessionRegistry.EnqueuedMessage peek() {
-        if (head.equals(tail)) {
-            return null;
-        }
-        return this.queueMap.get(tail.get());
+    public boolean isEmpty() {
+        return (this.head.intValue() - this.tail.intValue()) == 0;
     }
 
+    @Override
+    public void close() {
+        // noop;
+    }
 }

@@ -16,6 +16,7 @@
 package io.moquette.persistence;
 
 import io.moquette.broker.IQueueRepository;
+import io.moquette.broker.SessionMessageQueue;
 import io.moquette.broker.SessionRegistry.EnqueuedMessage;
 import org.h2.mvstore.MVStore;
 
@@ -48,7 +49,7 @@ public class H2QueueRepository implements IQueueRepository {
     }
 
     @Override
-    public Queue<EnqueuedMessage> getOrCreateQueue(String clientId) {
+    public SessionMessageQueue<EnqueuedMessage> getOrCreateQueue(String clientId) {
         return new H2PersistentQueue(mvStore, clientId);
     }
 }
