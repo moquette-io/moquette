@@ -29,10 +29,11 @@ import org.slf4j.LoggerFactory;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
@@ -128,17 +129,18 @@ public class SessionRegistry {
     }
 
     private void recreateSessionPool() {
-        final Map<String, Queue<EnqueuedMessage>> queues = queueRepository.listAllQueues();
+        final Set<String> queues = queueRepository.listQueueNames();
         for (String clientId : subscriptionsDirectory.listAllSessionIds()) {
             // if the subscriptions are present is obviously false
-            final Queue<EnqueuedMessage> persistentQueue = queues.remove(clientId);
-            if (persistentQueue != null) {
+            if (queueRepository.containsQueue(clientId)) {
+                final Queue<EnqueuedMessage> persistentQueue = queueRepository.getOrCreateQueue(clientId);
+                queues.remove(clientId);
                 Session rehydrated = new Session(clientId, false, persistentQueue);
                 pool.put(clientId, rehydrated);
             }
         }
         if (!queues.isEmpty()) {
-            LOG.error("Recreating sessions left {} unused queues. This is probably bug. Session IDs: {}", queues.size(), Arrays.toString(queues.keySet().toArray()));
+            LOG.error("Recreating sessions left {} unused queues. This is probably bug. Session IDs: {}", queues.size(), Arrays.toString(queues.toArray()));
         }
     }
 
@@ -229,7 +231,12 @@ public class SessionRegistry {
     private Session createNewSession(MqttConnectMessage msg, String clientId) {
         final boolean clean = msg.variableHeader().isCleanSession();
         final Session newSession;
-        final Queue<EnqueuedMessage> queue = queueRepository.createQueue(clientId, clean);
+        final Queue<EnqueuedMessage> queue;
+        if (!clean) {
+            queue = queueRepository.getOrCreateQueue(clientId);
+        } else {
+            queue = new ConcurrentLinkedQueue<>();
+        }
         if (msg.variableHeader().isWillFlag()) {
             final Session.Will will = createWill(msg);
             newSession = new Session(clientId, clean, will, queue);
