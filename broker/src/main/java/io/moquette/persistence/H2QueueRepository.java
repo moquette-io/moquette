@@ -22,7 +22,9 @@ import org.h2.mvstore.MVStore;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.stream.Collectors;
 
 public class H2QueueRepository implements IQueueRepository {
 
@@ -33,25 +35,20 @@ public class H2QueueRepository implements IQueueRepository {
     }
 
     @Override
-    public Queue<EnqueuedMessage> createQueue(String cli, boolean clean) {
-        if (!clean) {
-            return new H2PersistentQueue(mvStore, cli);
-        }
-        return new ConcurrentLinkedQueue<>();
-    }
-
-    @Override
-    public void removeQueue(String cli) {
-        H2PersistentQueue.dropQueue(mvStore, cli);
-    }
-
-    @Override
-    public Map<String, Queue<EnqueuedMessage>> listAllQueues() {
-        Map<String, Queue<EnqueuedMessage>> result = new HashMap<>();
-        mvStore.getMapNames().stream()
+    public Set<String> listQueueNames() {
+        return mvStore.getMapNames().stream()
             .filter(name -> name.startsWith("queue_") && !name.endsWith("_meta"))
             .map(name -> name.substring("queue_".length()))
-            .forEach(name -> result.put(name, new H2PersistentQueue(mvStore, name)));
-        return result;
+            .collect(Collectors.toSet());
+    }
+
+    @Override
+    public boolean containsQueue(String queueName) {
+        return mvStore.hasMap("queue_" + queueName);
+    }
+
+    @Override
+    public Queue<EnqueuedMessage> getOrCreateQueue(String clientId) {
+        return new H2PersistentQueue(mvStore, clientId);
     }
 }
