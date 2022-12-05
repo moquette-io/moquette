@@ -24,8 +24,6 @@ import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 
 @Sharable
@@ -97,9 +95,6 @@ public class NewNettyMQTTHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelWritabilityChanged(ChannelHandlerContext ctx) {
-//        if (ctx.channel().isWritable()) {
-//            m_processor.notifyChannelWritable(ctx.channel());
-//        }
         final MQTTConnection mqttConnection = mqttConnection(ctx.channel());
         mqttConnection.writabilityChanged();
         ctx.fireChannelWritabilityChanged();

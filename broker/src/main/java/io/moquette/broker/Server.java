@@ -42,7 +42,7 @@ import static io.moquette.logging.LoggingUtils.getInterceptorIds;
 
 public class Server {
 
-    private static final Logger LOG = LoggerFactory.getLogger(io.moquette.broker.Server.class);
+    private static final Logger LOG = LoggerFactory.getLogger(Server.class);
 
     private ScheduledExecutorService scheduler;
     private NewNettyAcceptor acceptor;

@@ -111,7 +111,7 @@ public class DBAuthenticator implements IAuthenticator {
                     conn.close();
                 }
             } catch (SQLException e) {
-                LOG.error("Error releasing connection to the datasource", username, e);
+                LOG.error("Error releasing connection to the datasource, username = {},exception = {}", username, e);
             }
         }
         return false;

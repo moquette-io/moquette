@@ -16,6 +16,8 @@
 
 package io.moquette.broker.subscriptions;
 
+import java.util.Objects;
+
 /**
  * Internal use only class.
  */
@@ -62,10 +64,7 @@ public class Token {
             return false;
         }
         final Token other = (Token) obj;
-        if ((this.name == null) ? (other.name != null) : !this.name.equals(other.name)) {
-            return false;
-        }
-        return true;
+        return Objects.equals(this.name, other.name);
     }
 
     @Override
