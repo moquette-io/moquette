@@ -59,7 +59,7 @@ public class Server {
         } catch (RuntimeException e) {
             System.exit(1);
         }
-        System.out.println("Server started, version 0.16-SNAPSHOT");
+        LOG.debug("Server started, version 0.16-SNAPSHOT");
         //Bind a shutdown hook
         Runtime.getRuntime().addShutdownHook(new Thread(server::stopServer));
     }
