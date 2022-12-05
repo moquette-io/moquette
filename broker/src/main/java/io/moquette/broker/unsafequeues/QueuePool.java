@@ -22,6 +22,7 @@ import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 import static io.moquette.broker.unsafequeues.PagedFilesAllocator.PAGE_SIZE;
@@ -97,6 +98,7 @@ public class QueuePool {
     private final ConcurrentMap<QueueName, LinkedList<SegmentRef>> queueSegments = new ConcurrentHashMap<>();
     private final ConcurrentMap<QueueName, Queue> queues = new ConcurrentHashMap<>();
     private final ConcurrentSkipListSet<SegmentRef> recycledSegments = new ConcurrentSkipListSet<>();
+    private final ReentrantLock segmentsAllocationLock = new ReentrantLock();
 
     private QueuePool(SegmentAllocator allocator, Path dataPath, int segmentSize) {
         this.allocator = allocator;
@@ -249,7 +251,12 @@ public class QueuePool {
 
         final List<SegmentRef> recreatedSegments = recreateSegmentHoles(usedSegments);
 
-        recycledSegments.addAll(recreatedSegments);
+        segmentsAllocationLock.lock();
+        try {
+            recycledSegments.addAll(recreatedSegments);
+        } finally {
+            segmentsAllocationLock.unlock();
+        }
     }
 
     /**
@@ -428,7 +435,7 @@ public class QueuePool {
 
         final Path pageFile = dataPath.resolve(String.format("%d.page", pollSegment.pageId));
         if (!Files.exists(pageFile)) {
-            throw new QueueException("Can't find file for page file" +  pageFile);
+            throw new QueueException("Can't find file for page file" + pageFile);
         }
 
         final MappedByteBuffer tailPage;
@@ -451,19 +458,29 @@ public class QueuePool {
         final LinkedList<SegmentRef> segmentRefs = queueSegments.get(queueName);
         final SegmentRef segmentRef = segmentRefs.pollLast();
         LOG.debug("Consumed tail segment {} from queue {}", segmentRef, queueName);
-        recycledSegments.add(segmentRef);
+        segmentsAllocationLock.lock();
+        try {
+            recycledSegments.add(segmentRef);
+        } finally {
+            segmentsAllocationLock.unlock();
+        }
     }
 
     Segment nextFreeSegment() throws QueueException {
-        if (recycledSegments.isEmpty()) {
-            LOG.debug("no recycled segments available, request the creation of new one");
-            return allocator.nextFreeSegment();
+        segmentsAllocationLock.lock();
+        try {
+            if (recycledSegments.isEmpty()) {
+                LOG.debug("no recycled segments available, request the creation of new one");
+                return allocator.nextFreeSegment();
+            }
+            final SegmentRef recycledSegment = recycledSegments.pollFirst();
+            if (recycledSegment == null) {
+                throw new QueueException("Invalid state, expected available recycled segment");
+            }
+            LOG.debug("Reusing recycled segment from page: {} at page offset: {}", recycledSegment.pageId, recycledSegment.offset);
+            return allocator.reopenSegment(recycledSegment.pageId, recycledSegment.offset);
+        } finally {
+            segmentsAllocationLock.unlock();
         }
-        final SegmentRef recycledSegment = recycledSegments.pollFirst();
-        if (recycledSegment == null) {
-            throw new QueueException("Invalid state, expected available recycled segment");
-        }
-        LOG.debug("Reusing recycled segment from page: {} at page offset: {}", recycledSegment.pageId, recycledSegment.offset);
-        return allocator.reopenSegment(recycledSegment.pageId, recycledSegment.offset);
     }
 }

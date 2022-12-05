@@ -8,7 +8,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Not thread safe disk persisted queue.
@@ -28,7 +27,7 @@ public class Queue {
 
     private final QueuePool queuePool;
     private final PagedFilesAllocator.AllocationListener allocationListener;
-    private final ReentrantLock lock = new ReentrantLock();
+//    private final ReentrantLock lock = new ReentrantLock();
 
     Queue(String name, Segment headSegment, VirtualPointer currentHeadPtr,
           Segment tailSegment, VirtualPointer currentTailPtr,
@@ -57,8 +56,8 @@ public class Queue {
 
         LOG.debug("Head segment doesn't have enough space");
         // the payload can't be fully contained into the current head segment and needs to be splitted
-        // with another segment. To request the next segment, it's needed to be done in global lock.
-        lock.lock();
+        // with another segment.
+
 
         final int dataSize = payload.remaining();
         final ByteBuffer rawData = (ByteBuffer) ByteBuffer.allocate(LENGTH_HEADER_SIZE + dataSize)
@@ -83,27 +82,25 @@ public class Queue {
         }
 
         Segment newSegment = null;
-        try {
-            // till the payload is not completely stored,
-            // save the remaining part into a new segment.
-            while (rawData.hasRemaining()) {
-                newSegment = queuePool.nextFreeSegment();
-                //notify segment creation for queue in queue pool
-                allocationListener.segmentedCreated(name, newSegment);
 
-                int copySize = (int) Math.min(rawData.remaining(), Segment.SIZE);
-                ByteBuffer slice = rawData.slice();
-                slice.limit(copySize);
+        // till the payload is not completely stored,
+        // save the remaining part into a new segment.
+        while (rawData.hasRemaining()) {
+            // To request the next segment, it's needed to be done in global lock.
+            newSegment = queuePool.nextFreeSegment();
+            //notify segment creation for queue in queue pool
+            allocationListener.segmentedCreated(name, newSegment);
 
-                currentHeadPtr = currentHeadPtr.moveForward(copySize);
-                writeDataNoHeader(newSegment, newSegment.begin, slice);
-                headSegment = newSegment;
+            int copySize = (int) Math.min(rawData.remaining(), Segment.SIZE);
+            ByteBuffer slice = rawData.slice();
+            slice.limit(copySize);
 
-                // shift forward the consumption point
-                rawData.position(rawData.position() + copySize);
-            }
-        } finally {
-            lock.unlock();
+            currentHeadPtr = currentHeadPtr.moveForward(copySize);
+            writeDataNoHeader(newSegment, newSegment.begin, slice);
+            headSegment = newSegment;
+
+            // shift forward the consumption point
+            rawData.position(rawData.position() + copySize);
         }
     }
 
@@ -193,30 +190,20 @@ public class Queue {
                 return Optional.of(readData(tailSegment, dataStart, payloadLength));
             } else {
                 // payload is split across currentSegment and next ones
-                lock.lock();
-                try {
-                    VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
+                VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
 
-                    LOG.debug("Loading payload size {}", payloadLength);
-                    return Optional.of(loadPayloadFromSegments(payloadLength, tailSegment, dataStart));
-                } finally {
-                    lock.unlock();
-                }
+                LOG.debug("Loading payload size {}", payloadLength);
+                return Optional.of(loadPayloadFromSegments(payloadLength, tailSegment, dataStart));
             }
         } else {
             // header is split across 2 segments
-            lock.lock();
-            try {
-                // the currentSegment is still the tailSegment
-                // read the length header that's crossing 2 segments
-                final CrossSegmentHeaderResult result = decodeCrossHeader(tailSegment, currentTailPtr);
+            // the currentSegment is still the tailSegment
+            // read the length header that's crossing 2 segments
+            final CrossSegmentHeaderResult result = decodeCrossHeader(tailSegment, currentTailPtr);
 
-                // load all payload parts from the segments
-                LOG.debug("Loading payload size {}", result.payloadLength);
-                return Optional.of(loadPayloadFromSegments(result.payloadLength, result.segment, result.pointer));
-            } finally {
-                lock.unlock();
-            }
+            // load all payload parts from the segments
+            LOG.debug("Loading payload size {}", result.payloadLength);
+            return Optional.of(loadPayloadFromSegments(result.payloadLength, result.segment, result.pointer));
         }
     }
 
