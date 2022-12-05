@@ -162,7 +162,7 @@ public class Queue {
      * */
     public Optional<ByteBuffer> dequeue() throws QueueException {
         if (!currentHeadPtr.isGreaterThan(currentTailPtr)) {
-            if (currentTailPtr.compareTo(currentHeadPtr) > 0) {
+            if (currentTailPtr.isGreaterThan(currentHeadPtr)) {
                 // sanity check
                 throw new QueueException("Current tail " + currentTailPtr + " is forward head " + currentHeadPtr);
             }
