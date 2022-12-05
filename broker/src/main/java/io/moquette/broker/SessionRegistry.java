@@ -30,10 +30,8 @@ import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Optional;
-import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
@@ -133,7 +131,7 @@ public class SessionRegistry {
         for (String clientId : subscriptionsDirectory.listAllSessionIds()) {
             // if the subscriptions are present is obviously false
             if (queueRepository.containsQueue(clientId)) {
-                final Queue<EnqueuedMessage> persistentQueue = queueRepository.getOrCreateQueue(clientId);
+                final SessionMessageQueue<EnqueuedMessage> persistentQueue = queueRepository.getOrCreateQueue(clientId);
                 queues.remove(clientId);
                 Session rehydrated = new Session(clientId, false, persistentQueue);
                 pool.put(clientId, rehydrated);
@@ -231,11 +229,11 @@ public class SessionRegistry {
     private Session createNewSession(MqttConnectMessage msg, String clientId) {
         final boolean clean = msg.variableHeader().isCleanSession();
         final Session newSession;
-        final Queue<EnqueuedMessage> queue;
+        final SessionMessageQueue<EnqueuedMessage> queue;
         if (!clean) {
             queue = queueRepository.getOrCreateQueue(clientId);
         } else {
-            queue = new ConcurrentLinkedQueue<>();
+            queue = new InMemoryQueue();
         }
         if (msg.variableHeader().isWillFlag()) {
             final Session.Will will = createWill(msg);

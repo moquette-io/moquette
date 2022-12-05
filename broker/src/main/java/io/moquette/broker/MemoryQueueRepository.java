@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class MemoryQueueRepository implements IQueueRepository {
 
-    private Map<String, Queue<SessionRegistry.EnqueuedMessage>> queues = new HashMap<>();
+    private Map<String, SessionMessageQueue<SessionRegistry.EnqueuedMessage>> queues = new HashMap<>();
 
     @Override
     public Set<String> listQueueNames() {
@@ -18,13 +18,17 @@ public class MemoryQueueRepository implements IQueueRepository {
     }
 
     @Override
-    public Queue<SessionRegistry.EnqueuedMessage> getOrCreateQueue(String clientId) {
+    public SessionMessageQueue<SessionRegistry.EnqueuedMessage> getOrCreateQueue(String clientId) {
         if (containsQueue(clientId)) {
             return queues.get(clientId);
         }
 
-        final ConcurrentLinkedQueue<SessionRegistry.EnqueuedMessage> queue = new ConcurrentLinkedQueue<>();
+        SessionMessageQueue<SessionRegistry.EnqueuedMessage> queue = new InMemoryQueue(this, clientId);
         queues.put(clientId, queue);
         return queue;
+    }
+
+    void dropQueue(String queueName) {
+        queues.remove(queueName);
     }
 }

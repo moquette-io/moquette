@@ -57,12 +57,12 @@ public class H2PersistentQueueTest {
     public void testAdd() {
         H2PersistentQueue sut = new H2PersistentQueue(this.mvStore, "test");
 
-        sut.add(createMessage("Hello"));
-        sut.add(createMessage("world"));
+        sut.enqueue(createMessage("Hello"));
+        sut.enqueue(createMessage("world"));
 
-        assertEquals("Hello", ((SessionRegistry.PublishedMessage) sut.peek()).getTopic().toString());
-        assertEquals("Hello", ((SessionRegistry.PublishedMessage) sut.peek()).getTopic().toString());
-        assertEquals(2, sut.size(), "peek just return elements, doesn't remove them");
+        assertEquals("Hello", ((SessionRegistry.PublishedMessage) sut.dequeue()).getTopic().toString());
+        assertEquals("world", ((SessionRegistry.PublishedMessage) sut.dequeue()).getTopic().toString());
+        assertTrue(sut.isEmpty(), "dequeue effectively remove elements from queue");
     }
 
     private SessionRegistry.PublishedMessage createMessage(String name) {
@@ -73,11 +73,11 @@ public class H2PersistentQueueTest {
     @Test
     public void testPoll() {
         H2PersistentQueue sut = new H2PersistentQueue(this.mvStore, "test");
-        sut.add(createMessage("Hello"));
-        sut.add(createMessage("world"));
+        sut.enqueue(createMessage("Hello"));
+        sut.enqueue(createMessage("world"));
 
-        assertEquals("Hello", ((SessionRegistry.PublishedMessage) sut.poll()).getTopic().toString());
-        assertEquals("world", ((SessionRegistry.PublishedMessage) sut.poll()).getTopic().toString());
+        assertEquals("Hello", ((SessionRegistry.PublishedMessage) sut.dequeue()).getTopic().toString());
+        assertEquals("world", ((SessionRegistry.PublishedMessage) sut.dequeue()).getTopic().toString());
         assertTrue(sut.isEmpty(), "after poll 2 elements inserted before, should be empty");
     }
 
@@ -88,12 +88,12 @@ public class H2PersistentQueueTest {
 
         int numIterations = 10000000;
         for (int i = 0; i < numIterations; i++) {
-            sut.add(createMessage("Hello"));
+            sut.enqueue(createMessage("Hello"));
         }
         mvStore.commit();
 
         for (int i = 0; i < numIterations; i++) {
-            assertEquals("Hello", ((SessionRegistry.PublishedMessage) sut.poll()).getTopic().toString());
+            assertEquals("Hello", ((SessionRegistry.PublishedMessage) sut.dequeue()).getTopic().toString());
         }
 
         assertTrue(sut.isEmpty(), "should be empty");
@@ -102,10 +102,10 @@ public class H2PersistentQueueTest {
     @Test
     public void testReloadFromPersistedState() {
         H2PersistentQueue before = new H2PersistentQueue(this.mvStore, "test");
-        before.add(createMessage("Hello"));
-        before.add(createMessage("crazy"));
-        before.add(createMessage("world"));
-        assertEquals("Hello", ((SessionRegistry.PublishedMessage) before.poll()).getTopic().toString());
+        before.enqueue(createMessage("Hello"));
+        before.enqueue(createMessage("crazy"));
+        before.enqueue(createMessage("world"));
+        assertEquals("Hello", ((SessionRegistry.PublishedMessage) before.dequeue()).getTopic().toString());
         this.mvStore.commit();
         this.mvStore.close();
 
@@ -117,8 +117,8 @@ public class H2PersistentQueueTest {
         //now reload the persisted state
         H2PersistentQueue after = new H2PersistentQueue(this.mvStore, "test");
 
-        assertEquals("crazy", ((SessionRegistry.PublishedMessage) after.poll()).getTopic().toString());
-        assertEquals("world", ((SessionRegistry.PublishedMessage) after.poll()).getTopic().toString());
+        assertEquals("crazy", ((SessionRegistry.PublishedMessage) after.dequeue()).getTopic().toString());
+        assertEquals("world", ((SessionRegistry.PublishedMessage) after.dequeue()).getTopic().toString());
         assertTrue(after.isEmpty(), "should be empty");
     }
 }
