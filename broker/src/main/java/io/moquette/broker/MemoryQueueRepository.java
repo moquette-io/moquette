@@ -23,8 +23,12 @@ public class MemoryQueueRepository implements IQueueRepository {
             return queues.get(clientId);
         }
 
-        SessionMessageQueue<SessionRegistry.EnqueuedMessage> queue = new InMemoryQueue();
+        SessionMessageQueue<SessionRegistry.EnqueuedMessage> queue = new InMemoryQueue(this, clientId);
         queues.put(clientId, queue);
         return queue;
+    }
+
+    void dropQueue(String queueName) {
+        queues.remove(queueName);
     }
 }

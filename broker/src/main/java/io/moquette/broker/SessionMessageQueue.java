@@ -18,7 +18,7 @@ public interface SessionMessageQueue<T> {
 
     /**
      * Executes cleanup code to release the queue.
-     * A closed queue will not accept new items and will be removed from the repository
+     * A closed queue will not accept new items and will be removed from the repository.
      * */
-    void close();
+    void closeAndPurge();
 }

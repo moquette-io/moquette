@@ -473,7 +473,7 @@ class Session {
     public void cleanUp() {
         // in case of in memory session queues all contained messages
         // has to be released.
-        sessionQueue.close();
+        sessionQueue.closeAndPurge();
         for (EnqueuedMessage msg : inflightWindow.values()) {
             msg.release();
         }
