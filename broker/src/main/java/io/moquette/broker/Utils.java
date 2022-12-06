@@ -17,8 +17,11 @@
 package io.moquette.broker;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttMessage;
 import io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader;
+import io.netty.handler.codec.mqtt.MqttVersion;
+
 import java.util.Map;
 
 /**
@@ -44,6 +47,10 @@ public final class Utils {
         payload.readBytes(payloadContent);
         payload.readerIndex(mark);
         return payloadContent;
+    }
+
+    public static MqttVersion versionFromConnect(MqttConnectMessage msg) {
+        return MqttVersion.fromProtocolNameAndLevel(msg.variableHeader().name(), (byte) msg.variableHeader().version());
     }
 
     private Utils() {

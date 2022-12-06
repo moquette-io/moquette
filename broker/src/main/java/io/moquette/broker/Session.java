@@ -100,20 +100,30 @@ class Session {
     private final DelayQueue<InFlightPacket> inflightTimeouts = new DelayQueue<>();
     private final Map<Integer, MqttPublishMessage> qos2Receiving = new HashMap<>();
     private final AtomicInteger inflightSlots = new AtomicInteger(INFLIGHT_WINDOW_SIZE); // this should be configurable
-    private final boolean resendInflightOnTimeout = true;
+    private final boolean resendInflightOnTimeout;
 
     Session(String clientId, boolean clean, Will will, SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue) {
-        this(clientId, clean, sessionQueue);
+        this(clientId, clean, MqttVersion.MQTT_3_1, sessionQueue);
+        this.will = will;
+    }
+
+    Session(String clientId, boolean clean, MqttVersion protocolVersion, Will will, SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue) {
+        this(clientId, clean, protocolVersion, sessionQueue);
         this.will = will;
     }
 
     Session(String clientId, boolean clean, SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue) {
+        this(clientId, clean, MqttVersion.MQTT_3_1, sessionQueue);
+    }
+
+    Session(String clientId, boolean clean, MqttVersion protocolVersion, SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue) {
         if (sessionQueue == null) {
             throw new IllegalArgumentException("sessionQueue parameter can't be null");
         }
         this.clientId = clientId;
         this.clean = clean;
         this.sessionQueue = sessionQueue;
+        this.resendInflightOnTimeout = protocolVersion != MqttVersion.MQTT_5;
     }
 
     void update(boolean clean, Will will) {
