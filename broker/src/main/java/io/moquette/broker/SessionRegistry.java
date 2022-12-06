@@ -134,7 +134,7 @@ public class SessionRegistry {
             if (queueRepository.containsQueue(clientId)) {
                 final SessionMessageQueue<EnqueuedMessage> persistentQueue = queueRepository.getOrCreateQueue(clientId);
                 queues.remove(clientId);
-                Session rehydrated = new Session(clientId, false, persistentQueue);
+                Session rehydrated = new Session(clientId, false, MqttVersion.MQTT_3_1, persistentQueue);
                 pool.put(clientId, rehydrated);
             }
         }
