@@ -77,6 +77,7 @@ public class ServerIntegrationPahoCanPublishOnReadBlockedTopicTest {
         m_server = new Server();
         final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
         configProps.setProperty(BrokerConstants.REAUTHORIZE_SUBSCRIPTIONS_ON_CONNECT, "true");
+        configProps.setProperty(BrokerConstants.ENABLE_TELEMETRY_NAME, "false");
         m_config = new MemoryConfig(configProps);
         canRead = true;
 

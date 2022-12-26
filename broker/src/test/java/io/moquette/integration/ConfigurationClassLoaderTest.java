@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Properties;
 
+import static io.moquette.BrokerConstants.ENABLE_TELEMETRY_NAME;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ConfigurationClassLoaderTest implements IAuthenticator, IAuthorizatorPolicy {
@@ -63,6 +64,7 @@ public class ConfigurationClassLoaderTest implements IAuthenticator, IAuthorizat
     public void loadAuthenticator() throws Exception {
         Properties props = new Properties(IntegrationUtils.prepareTestProperties(dbPath));
         props.setProperty(BrokerConstants.AUTHENTICATOR_CLASS_NAME, getClass().getName());
+        props.setProperty(BrokerConstants.ENABLE_TELEMETRY_NAME, "false");
         startServer(props);
         assertTrue(true);
     }
@@ -71,6 +73,7 @@ public class ConfigurationClassLoaderTest implements IAuthenticator, IAuthorizat
     public void loadAuthorizator() throws Exception {
         Properties props = new Properties(IntegrationUtils.prepareTestProperties(dbPath));
         props.setProperty(BrokerConstants.AUTHORIZATOR_CLASS_NAME, getClass().getName());
+        props.setProperty(BrokerConstants.ENABLE_TELEMETRY_NAME, "false");
         startServer(props);
         assertTrue(true);
     }

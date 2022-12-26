@@ -114,6 +114,7 @@ public class ServerIntegrationSSLTest {
         sslProps.put(BrokerConstants.KEY_STORE_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
         sslProps.put(BrokerConstants.KEY_MANAGER_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
         sslProps.put(BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME, dbPath);
+        sslProps.put(BrokerConstants.ENABLE_TELEMETRY_NAME, "false");
         m_server.startServer(sslProps);
     }
 

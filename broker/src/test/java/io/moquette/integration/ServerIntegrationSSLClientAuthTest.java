@@ -183,6 +183,7 @@ public class ServerIntegrationSSLClientAuthTest {
         sslProps.put(BrokerConstants.KEY_MANAGER_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
         sslProps.put(BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME, dbPath);
         sslProps.put(BrokerConstants.NEED_CLIENT_AUTH, "true");
+        sslProps.put(BrokerConstants.ENABLE_TELEMETRY_NAME, "false");
         m_server.startServer(sslProps);
     }
 
