@@ -78,6 +78,8 @@ public final class BrokerConstants {
     public static final String METRICS_LIBRATO_TOKEN_PROPERTY_NAME = "metrics.librato.token";
     public static final String METRICS_LIBRATO_SOURCE_PROPERTY_NAME = "metrics.librato.source";
 
+    public static final String ENABLE_TELEMETRY_NAME = "telemetry_enabled";
+
     public static final String BUGSNAG_ENABLE_PROPERTY_NAME = "use_bugsnag";
     public static final String BUGSNAG_TOKEN_PROPERTY_NAME = "bugsnag.token";
 
