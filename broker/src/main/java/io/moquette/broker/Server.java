@@ -283,19 +283,19 @@ public class Server {
         final String maxHeap = maxMemory == Long.MAX_VALUE ? "undefined" : Long.toString(maxMemory);
 
         return String.format(
-            "{\"os\": %s, " +
-                "\"cpu_arch\": %s, " +
-                "\"jvm_version\": %s, " +
-                "\"jvm_vendor\": %s, " +
-                "\"broker_version\": %s, " +
+            "{\"os\": \"%s\", " +
+                "\"cpu_arch\": \"%s\", " +
+                "\"jvm_version\": \"%s\", " +
+                "\"jvm_vendor\": \"%s\", " +
+                "\"broker_version\": \"%s\", " +
                 "\"standalone\": %s," +
-                "\"max_heap\": %s" +
-                "\"uuid\": %s}",
+                "\"max_heap\": \"%s\", " +
+                "\"uuid\": \"%s\"}",
             os, cpuArch, jvmVersion, jvmVendor, MOQUETTE_VERSION, this.standalone, maxHeap, uuid);
     }
 
     private void sendTelemetryData(String telemetryDoc) throws IOException {
-        URL url = new URL("http://telemetry.moquette.io/api/v1/notify");
+        URL url = new URL("https://telemetry.moquette.io/api/v1/notify");
         HttpURLConnection con = (HttpURLConnection) url.openConnection();
         con.setRequestMethod("POST");
         con.setRequestProperty("Content-Type", "application/json");
