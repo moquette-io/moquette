@@ -1,4 +1,4 @@
-Version 0.16-SNAPSHOT:
+Version 0.16:
    [build] drop generation of broker-test, removed distribution and embedding_moquette modules from deploy phase (#616)
    [fix] introduces sessions event processors to segregate changes to a session in one single thread, simplifying concurrency and code (#631)
    [util] add collection of telemetry data (#700)
