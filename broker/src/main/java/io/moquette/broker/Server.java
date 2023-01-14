@@ -227,10 +227,15 @@ public class Server {
         LOG.info("Moquette integration has been started successfully in {} ms", startTime);
 
         if (config.boolProp(BrokerConstants.ENABLE_TELEMETRY_NAME, true)) {
-            collectAndSendTelemetryData(config);
+            collectAndSendTelemetryDataAsynch(config);
         }
 
         initialized = true;
+    }
+
+    private void collectAndSendTelemetryDataAsynch(IConfig config) {
+        final Thread telCollector = new Thread(() -> collectAndSendTelemetryData(config));
+        telCollector.start();
     }
 
     private void collectAndSendTelemetryData(IConfig config) {
@@ -275,6 +280,7 @@ public class Server {
      * @return a json string with the content of max mem, jvm version and similar telemetry data.
      * @param uuid*/
     private String collectTelemetryData(String uuid) {
+        final String remoteIp = retrievePublicIP();
         final String os = System.getProperty("os.name");
         final String cpuArch = System.getProperty("os.arch");
         final String jvmVersion = System.getProperty("java.specification.version");
@@ -290,8 +296,27 @@ public class Server {
                 "\"broker_version\": \"%s\", " +
                 "\"standalone\": %s," +
                 "\"max_heap\": \"%s\", " +
+                "\"remote_ip\": \"%s\", " +
                 "\"uuid\": \"%s\"}",
-            os, cpuArch, jvmVersion, jvmVendor, MOQUETTE_VERSION, this.standalone, maxHeap, uuid);
+            os, cpuArch, jvmVersion, jvmVendor, MOQUETTE_VERSION, this.standalone, maxHeap, remoteIp, uuid);
+    }
+
+    private String retrievePublicIP() {
+        try {
+            URL url = new URL("http://whatismyip.akamai.com");
+            HttpURLConnection con = (HttpURLConnection) url.openConnection();
+            final int status = con.getResponseCode();
+            if (status != HttpURLConnection.HTTP_OK) {
+                LOG.debug("What's my IP service replied with {}", status);
+                return "";
+            }
+
+            BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+            return in.readLine();
+        } catch (Exception e) {
+            LOG.debug("Can't connect to what's my IP service");
+            return "";
+        }
     }
 
     private void sendTelemetryData(String telemetryDoc) throws IOException {
