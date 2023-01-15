@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -149,6 +150,10 @@ public class QueuePool {
         queuePool.loadRecycledSegments(checkpointProps);
         LOG.debug("Recyclable segments are: {}", queuePool.recycledSegments);
         return queuePool;
+    }
+
+    public Set<String> queueNames() {
+        return queues.keySet().stream().map(qn -> qn.name).collect(Collectors.toSet());
     }
 
     private static Properties createOrLoadCheckpointFile(Path dataPath) throws QueueException {

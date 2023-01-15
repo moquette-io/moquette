@@ -28,12 +28,14 @@ import io.moquette.broker.security.IAuthenticator;
 import io.moquette.broker.security.IAuthorizatorPolicy;
 import io.moquette.broker.security.PermitAllAuthorizatorPolicy;
 import io.moquette.broker.security.ResourceAuthenticator;
+import io.moquette.broker.unsafequeues.QueueException;
 import io.moquette.interception.InterceptHandler;
 import io.moquette.persistence.H2Builder;
 import io.moquette.persistence.MemorySubscriptionsRepository;
 import io.moquette.interception.BrokerInterceptor;
 import io.moquette.broker.subscriptions.CTrieSubscriptionDirectory;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
+import io.moquette.persistence.SegmentQueueRepository;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -168,7 +170,7 @@ public class Server {
     }
 
     public void startServer(IConfig config, List<? extends InterceptHandler> handlers, ISslContextCreator sslCtxCreator,
-                            IAuthenticator authenticator, IAuthorizatorPolicy authorizatorPolicy) {
+                            IAuthenticator authenticator, IAuthorizatorPolicy authorizatorPolicy) throws IOException {
         final long start = System.currentTimeMillis();
         if (handlers == null) {
             handlers = Collections.emptyList();
@@ -196,10 +198,24 @@ public class Server {
         final IQueueRepository queueRepository;
         final IRetainedRepository retainedRepository;
         if (persistencePath != null && !persistencePath.isEmpty()) {
+            final String queueType = config.getProperty(BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, "h2");
+            if ("h2".equalsIgnoreCase(queueType)) {
+                LOG.trace("Configuring H2 queue store to {}", persistencePath);
+                h2Builder = new H2Builder(config, scheduler).initStore();
+                queueRepository = h2Builder.queueRepository();
+            } else if ("segmented".equalsIgnoreCase(queueType)) {
+                LOG.trace("Configuring segmented queue store to {}", persistencePath);
+                try {
+                    queueRepository = new SegmentQueueRepository(persistencePath);
+                } catch (QueueException e) {
+                    throw new IOException("Problem in configuring persistent queue on path " + persistencePath, e);
+                }
+            } else {
+                final String errMsg = String.format("Invalid property for %s found [%s] while only h2 or segmented are admitted", BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, queueType);
+                throw new RuntimeException(errMsg);
+            }
             LOG.trace("Configuring H2 subscriptions store to {}", persistencePath);
-            h2Builder = new H2Builder(config, scheduler).initStore();
             subscriptionsRepository = h2Builder.subscriptionsRepository();
-            queueRepository = h2Builder.queueRepository();
             retainedRepository = h2Builder.retainedRepository();
         } else {
             LOG.trace("Configuring in-memory subscriptions store");

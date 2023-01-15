@@ -1,6 +1,5 @@
 package io.moquette.broker;
 
-import java.util.Queue;
 import java.util.Set;
 
 public interface IQueueRepository {
