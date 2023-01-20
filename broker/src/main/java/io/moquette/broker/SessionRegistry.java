@@ -174,7 +174,6 @@ public class SessionRegistry {
             oldSession.closeImmediately();
         }
 
-
         if (newIsClean) {
             boolean result = oldSession.assignState(SessionStatus.DISCONNECTED, SessionStatus.DESTROYED);
             if (!result) {
@@ -289,5 +288,12 @@ public class SessionRegistry {
         final String clientID = s.getClientID();
         final Optional<InetSocketAddress> remoteAddressOpt = s.remoteAddress();
         return remoteAddressOpt.map(r -> new ClientDescriptor(clientID, r.getHostString(), r.getPort()));
+    }
+
+    /**
+     * Close all resources related to session management
+     * */
+    public void close() {
+        queueRepository.close();
     }
 }

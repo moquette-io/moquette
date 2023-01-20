@@ -164,6 +164,7 @@ public class QueuePool {
             try {
                 notExisted = checkpointPath.toFile().createNewFile();
             } catch (IOException e) {
+                LOG.error("IO Error creating the file {}", checkpointPath, e);
                 throw new QueueException("Reached an IO error during the bootstrapping of empty 'checkpoint.properties'", e);
             }
             if (!notExisted) {

@@ -6,11 +6,15 @@ import io.moquette.broker.SessionRegistry;
 import io.moquette.broker.unsafequeues.Queue;
 import io.moquette.broker.unsafequeues.QueueException;
 import io.moquette.broker.unsafequeues.QueuePool;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.file.Paths;
 import java.util.Set;
 
 public class SegmentQueueRepository implements IQueueRepository {
+
+    private static final Logger LOG = LoggerFactory.getLogger(SegmentQueueRepository.class);
 
     private final QueuePool queuePool;
 
@@ -37,5 +41,14 @@ public class SegmentQueueRepository implements IQueueRepository {
             throw new RuntimeException(e);
         }
         return new SegmentPersistentQueue(segmentedQueue);
+    }
+
+    @Override
+    public void close() {
+        try {
+            queuePool.close();
+        } catch (QueueException e) {
+            LOG.error("Error saving state of the queue pool", e);
+        }
     }
 }

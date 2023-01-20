@@ -1,7 +1,9 @@
 package io.moquette.broker;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 public class MemoryQueueRepository implements IQueueRepository {
 
@@ -26,6 +28,11 @@ public class MemoryQueueRepository implements IQueueRepository {
         SessionMessageQueue<SessionRegistry.EnqueuedMessage> queue = new InMemoryQueue(this, clientId);
         queues.put(clientId, queue);
         return queue;
+    }
+
+    @Override
+    public void close() {
+        queues.clear();
     }
 
     void dropQueue(String queueName) {

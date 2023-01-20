@@ -9,4 +9,6 @@ public interface IQueueRepository {
     boolean containsQueue(String clientId);
 
     SessionMessageQueue<SessionRegistry.EnqueuedMessage> getOrCreateQueue(String clientId);
+
+    void close();
 }

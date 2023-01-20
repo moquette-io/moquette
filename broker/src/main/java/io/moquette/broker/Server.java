@@ -183,8 +183,6 @@ public class Server {
         if (handlerProp != null) {
             config.setProperty(BrokerConstants.INTERCEPT_HANDLER_PROPERTY_NAME, handlerProp);
         }
-        final String persistencePath = config.getProperty(BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME);
-        LOG.debug("Configuring Using persistent store file, path: {}", persistencePath);
         initInterceptors(config, handlers);
         LOG.debug("Initialized MQTT protocol processor");
         if (sslCtxCreator == null) {
@@ -197,18 +195,22 @@ public class Server {
         final ISubscriptionsRepository subscriptionsRepository;
         final IQueueRepository queueRepository;
         final IRetainedRepository retainedRepository;
+        final String persistencePath = config.getProperty(BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME);
+        LOG.debug("Configuring Using persistent store file, path: {}", persistencePath);
         if (persistencePath != null && !persistencePath.isEmpty()) {
             final String queueType = config.getProperty(BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, "h2");
+            LOG.info("Configuring H2 subscription store to {}", persistencePath);
+            h2Builder = new H2Builder(config, scheduler).initStore();
             if ("h2".equalsIgnoreCase(queueType)) {
-                LOG.trace("Configuring H2 queue store to {}", persistencePath);
-                h2Builder = new H2Builder(config, scheduler).initStore();
+                LOG.info("Configuring H2 queue store to {}", persistencePath);
                 queueRepository = h2Builder.queueRepository();
             } else if ("segmented".equalsIgnoreCase(queueType)) {
-                LOG.trace("Configuring segmented queue store to {}", persistencePath);
+                final String segmentedPath = persistencePath.substring(0, persistencePath.lastIndexOf("/"));
+                LOG.info("Configuring segmented queue store to {}", segmentedPath);
                 try {
-                    queueRepository = new SegmentQueueRepository(persistencePath);
+                    queueRepository = new SegmentQueueRepository(segmentedPath);
                 } catch (QueueException e) {
-                    throw new IOException("Problem in configuring persistent queue on path " + persistencePath, e);
+                    throw new IOException("Problem in configuring persistent queue on path " + segmentedPath, e);
                 }
             } else {
                 final String errMsg = String.format("Invalid property for %s found [%s] while only h2 or segmented are admitted", BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, queueType);
@@ -521,6 +523,10 @@ public class Server {
 
     public void stopServer() {
         LOG.info("Unbinding integration from the configured ports");
+        if (acceptor == null) {
+            LOG.error("Closing a badly started server, exit immediately");
+            return;
+        }
         acceptor.close();
         LOG.trace("Stopping MQTT protocol processor");
         initialized = false;
@@ -528,6 +534,8 @@ public class Server {
         // calling shutdown() does not actually stop tasks that are not cancelled,
         // and SessionsRepository does not stop its tasks. Thus shutdownNow().
         scheduler.shutdownNow();
+
+        sessions.close();
 
         if (h2Builder != null) {
             LOG.trace("Shutting down H2 persistence {}");
