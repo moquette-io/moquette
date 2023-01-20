@@ -198,24 +198,9 @@ public class Server {
         final String persistencePath = config.getProperty(BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME);
         LOG.debug("Configuring Using persistent store file, path: {}", persistencePath);
         if (persistencePath != null && !persistencePath.isEmpty()) {
-            final String queueType = config.getProperty(BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, "h2");
             LOG.info("Configuring H2 subscription store to {}", persistencePath);
             h2Builder = new H2Builder(config, scheduler).initStore();
-            if ("h2".equalsIgnoreCase(queueType)) {
-                LOG.info("Configuring H2 queue store to {}", persistencePath);
-                queueRepository = h2Builder.queueRepository();
-            } else if ("segmented".equalsIgnoreCase(queueType)) {
-                final String segmentedPath = persistencePath.substring(0, persistencePath.lastIndexOf("/"));
-                LOG.info("Configuring segmented queue store to {}", segmentedPath);
-                try {
-                    queueRepository = new SegmentQueueRepository(segmentedPath);
-                } catch (QueueException e) {
-                    throw new IOException("Problem in configuring persistent queue on path " + segmentedPath, e);
-                }
-            } else {
-                final String errMsg = String.format("Invalid property for %s found [%s] while only h2 or segmented are admitted", BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, queueType);
-                throw new RuntimeException(errMsg);
-            }
+            queueRepository = initQueuesRepository(config, persistencePath, h2Builder);
             LOG.trace("Configuring H2 subscriptions store to {}", persistencePath);
             subscriptionsRepository = h2Builder.subscriptionsRepository();
             retainedRepository = h2Builder.retainedRepository();
@@ -249,6 +234,27 @@ public class Server {
         }
 
         initialized = true;
+    }
+
+    private static IQueueRepository initQueuesRepository(IConfig config, String persistencePath, H2Builder h2Builder) throws IOException {
+        final IQueueRepository queueRepository;
+        final String queueType = config.getProperty(BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, "h2");
+        if ("h2".equalsIgnoreCase(queueType)) {
+            LOG.info("Configuring H2 queue store to {}", persistencePath);
+            queueRepository = h2Builder.queueRepository();
+        } else if ("segmented".equalsIgnoreCase(queueType)) {
+            final String segmentedPath = persistencePath.substring(0, persistencePath.lastIndexOf("/"));
+            LOG.info("Configuring segmented queue store to {}", segmentedPath);
+            try {
+                queueRepository = new SegmentQueueRepository(segmentedPath);
+            } catch (QueueException e) {
+                throw new IOException("Problem in configuring persistent queue on path " + segmentedPath, e);
+            }
+        } else {
+            final String errMsg = String.format("Invalid property for %s found [%s] while only h2 or segmented are admitted", BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, queueType);
+            throw new RuntimeException(errMsg);
+        }
+        return queueRepository;
     }
 
     private void collectAndSendTelemetryDataAsynch(IConfig config) {
