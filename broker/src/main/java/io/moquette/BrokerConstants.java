@@ -22,8 +22,16 @@ public final class BrokerConstants {
 
     public static final String INTERCEPT_HANDLER_PROPERTY_NAME = "intercept.handler";
     public static final String BROKER_INTERCEPTOR_THREAD_POOL_SIZE = "intercept.thread_pool.size";
+    /**
+     * @deprecated use the DATA_PATH_PROPERTY_NAME to define the path where to store
+     * the broker files (es queues and subscriptions).
+     * Enable persistence with PERSISTENCE_ENABLED_PROPERTY_NAME
+     * */
+    @Deprecated
     public static final String PERSISTENT_STORE_PROPERTY_NAME = "persistent_store";
+    public static final String DATA_PATH_PROPERTY_NAME = "data_path";
     public static final String PERSISTENT_QUEUE_TYPE_PROPERTY_NAME = "persistent_queue_type"; // h2 or segmented, default h2
+    public static final String PERSISTENCE_ENABLED_PROPERTY_NAME = "persistence_enabled"; // true or false, default true
     public static final String AUTOSAVE_INTERVAL_PROPERTY_NAME = "autosave_interval";
     public static final String PASSWORD_FILE_PROPERTY_NAME = "password_file";
     public static final String PORT_PROPERTY_NAME = "port";

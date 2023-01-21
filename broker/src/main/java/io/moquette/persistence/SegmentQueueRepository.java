@@ -9,6 +9,7 @@ import io.moquette.broker.unsafequeues.QueuePool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Set;
 
@@ -20,6 +21,10 @@ public class SegmentQueueRepository implements IQueueRepository {
 
     public SegmentQueueRepository(String path) throws QueueException {
         queuePool = QueuePool.loadQueues(Paths.get(path));
+    }
+
+    public SegmentQueueRepository(Path path) throws QueueException {
+        queuePool = QueuePool.loadQueues(path);
     }
 
     @Override

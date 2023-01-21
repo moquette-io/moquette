@@ -16,7 +16,6 @@
 
 package io.moquette.integration;
 
-import io.moquette.BrokerConstants;
 import org.eclipse.paho.client.mqttv3.IMqttActionListener;
 import org.eclipse.paho.client.mqttv3.IMqttAsyncClient;
 import org.eclipse.paho.client.mqttv3.IMqttClient;
@@ -27,9 +26,11 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Properties;
 
+import static io.moquette.BrokerConstants.DATA_PATH_PROPERTY_NAME;
 import static io.moquette.BrokerConstants.DEFAULT_MOQUETTE_STORE_H2_DB_FILENAME;
 import static io.moquette.BrokerConstants.ENABLE_TELEMETRY_NAME;
-import static io.moquette.BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME;
+import static io.moquette.BrokerConstants.PERSISTENCE_ENABLED_PROPERTY_NAME;
+import static io.moquette.BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME;
 import static io.moquette.BrokerConstants.PORT_PROPERTY_NAME;
 
 /**
@@ -58,10 +59,11 @@ public final class IntegrationUtils {
 
     public static Properties prepareTestProperties(String dbPath) {
         Properties testProperties = new Properties();
-        testProperties.put(PERSISTENT_STORE_PROPERTY_NAME, dbPath);
+        testProperties.put(DATA_PATH_PROPERTY_NAME, dbPath);
+        testProperties.put(PERSISTENCE_ENABLED_PROPERTY_NAME, "true");
         testProperties.put(PORT_PROPERTY_NAME, "1883");
         testProperties.put(ENABLE_TELEMETRY_NAME, "false");
-        testProperties.put(BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, "segmented");
+        testProperties.put(PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, "segmented");
         return testProperties;
     }
 
