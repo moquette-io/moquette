@@ -20,11 +20,7 @@ import io.moquette.broker.SessionMessageQueue;
 import io.moquette.broker.SessionRegistry.EnqueuedMessage;
 import org.h2.mvstore.MVStore;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.stream.Collectors;
 
 public class H2QueueRepository implements IQueueRepository {
@@ -51,5 +47,10 @@ public class H2QueueRepository implements IQueueRepository {
     @Override
     public SessionMessageQueue<EnqueuedMessage> getOrCreateQueue(String clientId) {
         return new H2PersistentQueue(mvStore, clientId);
+    }
+
+    @Override
+    public void close() {
+        // No-op
     }
 }

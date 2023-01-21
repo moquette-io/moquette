@@ -1,6 +1,5 @@
 package io.moquette.broker;
 
-import java.util.Queue;
 import java.util.Set;
 
 public interface IQueueRepository {
@@ -10,4 +9,6 @@ public interface IQueueRepository {
     boolean containsQueue(String clientId);
 
     SessionMessageQueue<SessionRegistry.EnqueuedMessage> getOrCreateQueue(String clientId);
+
+    void close();
 }

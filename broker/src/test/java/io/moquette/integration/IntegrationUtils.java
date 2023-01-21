@@ -61,6 +61,7 @@ public final class IntegrationUtils {
         testProperties.put(PERSISTENT_STORE_PROPERTY_NAME, dbPath);
         testProperties.put(PORT_PROPERTY_NAME, "1883");
         testProperties.put(ENABLE_TELEMETRY_NAME, "false");
+        testProperties.put(BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, "segmented");
         return testProperties;
     }
 

@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -151,6 +152,10 @@ public class QueuePool {
         return queuePool;
     }
 
+    public Set<String> queueNames() {
+        return queues.keySet().stream().map(qn -> qn.name).collect(Collectors.toSet());
+    }
+
     private static Properties createOrLoadCheckpointFile(Path dataPath) throws QueueException {
         final Path checkpointPath = dataPath.resolve("checkpoint.properties");
         if (!Files.exists(checkpointPath)) {
@@ -159,6 +164,7 @@ public class QueuePool {
             try {
                 notExisted = checkpointPath.toFile().createNewFile();
             } catch (IOException e) {
+                LOG.error("IO Error creating the file {}", checkpointPath, e);
                 throw new QueueException("Reached an IO error during the bootstrapping of empty 'checkpoint.properties'", e);
             }
             if (!notExisted) {
