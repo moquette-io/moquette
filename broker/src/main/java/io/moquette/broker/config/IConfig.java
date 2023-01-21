@@ -31,7 +31,7 @@ public abstract class IConfig {
      * Same semantic of Properties
      *
      * @param name property name.
-     * @return property value.
+     * @return property value null if not found.
      * */
     public abstract String getProperty(String name);
 
@@ -39,7 +39,7 @@ public abstract class IConfig {
      * Same semantic of Properties
      *
      * @param name property name.
-     * @param defaultValue default value to return in case the property doesn't exists.
+     * @param defaultValue default value to return in case the property doesn't exist.
      * @return property value.
      * */
     public abstract String getProperty(String name, String defaultValue);
@@ -57,6 +57,9 @@ public abstract class IConfig {
         setProperty(BrokerConstants.AUTHORIZATOR_CLASS_NAME, "");
         setProperty(BrokerConstants.NETTY_MAX_BYTES_PROPERTY_NAME,
             String.valueOf(BrokerConstants.DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE));
+        setProperty(BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, "segmented");
+        setProperty(BrokerConstants.DATA_PATH_PROPERTY_NAME, "data/");
+        setProperty(BrokerConstants.PERSISTENCE_ENABLED_PROPERTY_NAME, Boolean.TRUE.toString());
     }
 
     public abstract IResourceLoader getResourceLoader();

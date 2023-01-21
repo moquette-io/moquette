@@ -53,7 +53,8 @@ public class ServerIntegrationWebSocketTest {
         m_server = new Server();
         final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
         configProps.put(BrokerConstants.WEB_SOCKET_PORT_PROPERTY_NAME, Integer.toString(BrokerConstants.WEBSOCKET_PORT));
-        configProps.put(BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME, dbPath);
+        configProps.put(BrokerConstants.DATA_PATH_PROPERTY_NAME, dbPath);
+        configProps.put(BrokerConstants.PERSISTENCE_ENABLED_PROPERTY_NAME, "true");
         m_config = new MemoryConfig(configProps);
         m_server.startServer(m_config);
     }
