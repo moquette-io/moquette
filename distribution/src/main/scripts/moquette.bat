@@ -1,6 +1,6 @@
 @ECHO OFF
 rem #
-rem # Copyright (c) 2012-2015 Andrea Selva
+rem # Copyright (c) 2012-2023 Andrea Selva
 rem #
 
 echo "                                                                         "
@@ -13,7 +13,7 @@ echo "  \_|  |_/\___/ \__, |\__,_|\___|\__|\__\___| \_|  |_/\_/\_\ \_/   \_/   "
 echo "                   | |                                                   "
 echo "                   |_|                                                   "
 echo "                                                                         "
-echo "                                               version: 0.13-SNAPSHOT    "
+echo "                                               version: 0.17-SNAPSHOT    "
 
 set "CURRENT_DIR=%cd%"
 if not "%MOQUETTE_HOME%" == "" goto gotHome
