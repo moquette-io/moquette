@@ -35,7 +35,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
@@ -110,19 +109,11 @@ class Session {
     private final AtomicInteger inflightSlots = new AtomicInteger(INFLIGHT_WINDOW_SIZE); // this should be configurable
     private final boolean resendInflightOnTimeout;
 
-    Session(String clientId, boolean clean, Will will, SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue) {
-        this(clientId, clean, MqttVersion.MQTT_3_1, sessionQueue);
-        this.will = will;
-    }
-
     Session(String clientId, boolean clean, MqttVersion protocolVersion, Will will, SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue) {
         this(clientId, clean, protocolVersion, sessionQueue);
         this.will = will;
     }
 
-    Session(String clientId, boolean clean, SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue) {
-        this(clientId, clean, MqttVersion.MQTT_3_1, sessionQueue);
-    }
     Session(String clientId, boolean clean, MqttVersion protocolVersion, SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue) {
         if (sessionQueue == null) {
             throw new IllegalArgumentException("sessionQueue parameter can't be null");
@@ -447,7 +438,7 @@ class Session {
 
     private void drainQueueToConnection() {
         // consume the queue
-        while (!sessionQueue.isEmpty() && inflighHasSlotsAndConnectionIsUp()) {
+        while (!sessionQueue.isEmpty() && inflightHasSlotsAndConnectionIsUp()) {
             final SessionRegistry.EnqueuedMessage msg = sessionQueue.dequeue();
             if (msg == null) {
                 // Our message was already fetched by another Thread.
