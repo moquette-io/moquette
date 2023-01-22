@@ -150,7 +150,10 @@ final class MQTTConnection {
         final String username = payload.userName();
         LOG.trace("Processing CONNECT message. CId: {} username: {}", clientId, username);
 
-        if (isNotProtocolVersion(msg, MqttVersion.MQTT_3_1) && isNotProtocolVersion(msg, MqttVersion.MQTT_3_1_1)) {
+        if (isNotProtocolVersion(msg, MqttVersion.MQTT_3_1) &&
+            isNotProtocolVersion(msg, MqttVersion.MQTT_3_1_1) &&
+            isNotProtocolVersion(msg, MqttVersion.MQTT_5)
+        ) {
             LOG.warn("MQTT protocol version is not valid. CId: {}", clientId);
             abortConnection(CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION);
             return PostOffice.RouteResult.failed(clientId);
@@ -237,11 +240,14 @@ final class MQTTConnection {
                         // OK continue with sending queued messages and normal flow
 
                         if (result.mode == SessionRegistry.CreationModeEnum.REOPEN_EXISTING) {
-                            result.session.sendQueuedMessagesWhileOffline();
+                            result.session.reconnectSession();
                         }
 
                         initializeKeepAliveTimeout(channel, msg, clientIdUsed);
-                        setupInflightResender(channel);
+                        if (isNotProtocolVersion(msg, MqttVersion.MQTT_5)) {
+                            // In MQTT5 MQTT-4.4.0-1 avoid retries messages on timer base.
+                            setupInflightResender(channel);
+                        }
 
                         postOffice.dispatchConnection(msg);
                         LOG.trace("dispatch connection: {}", msg);
