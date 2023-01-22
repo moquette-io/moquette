@@ -6,6 +6,7 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttVersion;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -27,7 +28,7 @@ public class SessionTest {
     public void setUp() {
         testChannel = new EmbeddedChannel();
         queuedMessages = new InMemoryQueue();
-        client = new Session(CLIENT_ID, true, null, queuedMessages);
+        client = new Session(CLIENT_ID, true, MqttVersion.MQTT_3_1, null, queuedMessages);
         createConnection(client);
     }
 

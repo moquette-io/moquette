@@ -23,6 +23,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -133,7 +134,7 @@ public class SessionRegistry {
             if (queueRepository.containsQueue(clientId)) {
                 final SessionMessageQueue<EnqueuedMessage> persistentQueue = queueRepository.getOrCreateQueue(clientId);
                 queues.remove(clientId);
-                Session rehydrated = new Session(clientId, false, persistentQueue);
+                Session rehydrated = new Session(clientId, false, MqttVersion.MQTT_3_1, persistentQueue);
                 pool.put(clientId, rehydrated);
             }
         }
@@ -234,11 +235,14 @@ public class SessionRegistry {
         } else {
             queue = new InMemoryQueue();
         }
+
+        final MqttVersion mqttVersion = Utils.versionFromConnect(msg);
+
         if (msg.variableHeader().isWillFlag()) {
             final Session.Will will = createWill(msg);
-            newSession = new Session(clientId, clean, will, queue);
+            newSession = new Session(clientId, clean, mqttVersion, will, queue);
         } else {
-            newSession = new Session(clientId, clean, queue);
+            newSession = new Session(clientId, clean, mqttVersion, queue);
         }
 
         newSession.markConnecting();
