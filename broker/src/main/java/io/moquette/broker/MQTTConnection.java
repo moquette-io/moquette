@@ -194,6 +194,7 @@ final class MQTTConnection {
             abortConnection(CONNECTION_REFUSED_SERVER_UNAVAILABLE);
             return;
         }
+        NettyUtils.clientID(channel, clientId);
 
         final boolean msgCleanSessionFlag = msg.variableHeader().isCleanSession();
         boolean isSessionAlreadyPresent = !msgCleanSessionFlag && result.alreadyStored;
@@ -212,7 +213,6 @@ final class MQTTConnection {
                         channel.writeAndFlush(disconnectMsg).addListener(CLOSE);
                         LOG.warn("CONNACK is sent but the session created can't transition in CONNECTED state");
                     } else {
-                        NettyUtils.clientID(channel, clientIdUsed);
                         connected = true;
                         // OK continue with sending queued messages and normal flow
 
