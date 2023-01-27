@@ -96,6 +96,7 @@ public final class BrokerConstants {
 
     public static final int FLIGHT_BEFORE_RESEND_MS = 5_000;
     public static final int INFLIGHT_WINDOW_SIZE = 10;
+    public static final int INFINITE_SESSION_EXPIRY = 0xFFFFFFFF;
 
     private BrokerConstants() {
     }
