@@ -55,7 +55,7 @@ class ConnectTest extends AbstractServerIntegrationTest {
             lowLevelClient.connectV5();
             fail("Connect on Disconnected TCP socket can't happen");
         } catch (RuntimeException rex) {
-            assertEquals("Cannot receive ConnAck in 200 ms", rex.getMessage());
+            assertEquals("Cannot receive ConnAck in 2 s", rex.getMessage());
         }
     }
 

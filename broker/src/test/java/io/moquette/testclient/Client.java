@@ -169,7 +169,7 @@ public class Client {
         }
 
         if (waitElapsed) {
-            throw new RuntimeException("Cannot receive ConnAck in 200 ms");
+            throw new RuntimeException("Cannot receive ConnAck in 2 s");
         }
 
         final MqttMessage connAckMessage = this.receivedMsg.get();
