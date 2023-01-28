@@ -1,13 +1,14 @@
 package io.moquette.broker;
 
-import java.util.Map;
-import java.util.Queue;
+import java.util.Set;
 
 public interface IQueueRepository {
 
-    Queue<SessionRegistry.EnqueuedMessage> createQueue(String cli, boolean clean);
+    Set<String> listQueueNames();
 
-    void removeQueue(String cli);
+    boolean containsQueue(String clientId);
 
-    Map<String, Queue<SessionRegistry.EnqueuedMessage>> listAllQueues();
+    SessionMessageQueue<SessionRegistry.EnqueuedMessage> getOrCreateQueue(String clientId);
+
+    void close();
 }

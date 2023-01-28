@@ -44,6 +44,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Properties;
 
@@ -73,10 +74,12 @@ public class ServerIntegrationPahoCanPublishOnReadBlockedTopicTest {
         Awaitility.setDefaultTimeout(Durations.ONE_SECOND);
     }
 
-    protected void startServer(String dbPath) {
+    protected void startServer(String dbPath) throws IOException {
         m_server = new Server();
         final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
         configProps.setProperty(BrokerConstants.REAUTHORIZE_SUBSCRIPTIONS_ON_CONNECT, "true");
+        configProps.setProperty(BrokerConstants.ENABLE_TELEMETRY_NAME, "false");
+        configProps.setProperty(BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, "segmented");
         m_config = new MemoryConfig(configProps);
         canRead = true;
 

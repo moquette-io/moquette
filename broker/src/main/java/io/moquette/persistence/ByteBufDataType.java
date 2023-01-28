@@ -21,35 +21,22 @@ import org.h2.mvstore.DataUtils;
 import org.h2.mvstore.WriteBuffer;
 
 import java.nio.ByteBuffer;
+import org.h2.mvstore.type.BasicDataType;
 
-public final class ByteBufDataType implements org.h2.mvstore.type.DataType {
+public final class ByteBufDataType extends BasicDataType<ByteBuf> {
 
     @Override
-    public int compare(Object a, Object b) {
-        return 0;
+    public int compare(ByteBuf a, ByteBuf b) {
+        throw DataUtils.newUnsupportedOperationException("Can not compare");
     }
 
     @Override
-    public int getMemory(Object obj) {
+    public int getMemory(ByteBuf obj) {
         if (!(obj instanceof ByteBuf)) {
             throw new IllegalArgumentException("Expected instance of ByteBuf but found " + obj.getClass());
         }
         final int payloadSize = ((ByteBuf) obj).readableBytes();
         return 4 + payloadSize;
-    }
-
-    @Override
-    public void read(ByteBuffer buff, Object[] obj, int len, boolean key) {
-        for (int i = 0; i < len; i++) {
-            obj[i] = read(buff);
-        }
-    }
-
-    @Override
-    public void write(WriteBuffer buff, Object[] obj, int len, boolean key) {
-        for (int i = 0; i < len; i++) {
-            write(buff, obj[i]);
-        }
     }
 
     @Override
@@ -61,12 +48,17 @@ public final class ByteBufDataType implements org.h2.mvstore.type.DataType {
     }
 
     @Override
-    public void write(WriteBuffer buff, Object obj) {
-        final ByteBuf casted = (ByteBuf) obj;
-        final int payloadSize = casted.readableBytes();
+    public void write(WriteBuffer buff, ByteBuf obj) {
+        final int payloadSize = obj.readableBytes();
         byte[] rawBytes = new byte[payloadSize];
-        casted.copy().readBytes(rawBytes).release();
+        obj.copy().readBytes(rawBytes).release();
         buff.putInt(payloadSize);
         buff.put(rawBytes);
     }
+
+    @Override
+    public ByteBuf[] createStorage(int i) {
+        return new ByteBuf[i];
+    }
+
 }

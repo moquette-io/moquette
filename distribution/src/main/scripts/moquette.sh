@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2012-2015 Andrea Selva
+# Copyright (c) 2012-2023 Andrea Selva
 #
 
 echo "                                                                         "
@@ -13,29 +13,39 @@ echo "  \_|  |_/\___/ \__, |\__,_|\___|\__|\__\___| \_|  |_/\_/\_\ \_/   \_/   "
 echo "                   | |                                                   "
 echo "                   |_|                                                   "
 echo "                                                                         "
-echo "                                               version: 0.16-SNAPSHOT    "
+echo "                                               version: 0.17-SNAPSHOT    "
 
 
-cd "$(dirname "$0")"
-
-# resolve links - $0 may be a softlink
-PRG="$0"
-
-while [ -h "$PRG" ]; do
-  ls=`ls -ld "$PRG"`
-  link=`expr "$ls" : '.*-> \(.*\)$'`
-  if expr "$link" : '/.*' > /dev/null; then
-    PRG="$link"
+unset CDPATH
+# This unwieldy bit of scripting is to try to catch instances where Moquette
+# was launched from a symlink, rather than a full path to the Moquette binary
+if [ -L "$0" ]; then
+  # Launched from a symlink
+  # --Test for the readlink binary
+  RL="$(command -v readlink)"
+  if [ $? -eq 0 ]; then
+    # readlink exists
+    SOURCEPATH="$($RL $0)"
   else
-    PRG=`dirname "$PRG"`/"$link"
+    # readlink not found, attempt to parse the output of stat
+    SOURCEPATH="$(stat -c %N $0 | awk '{print $3}' | sed -e 's/\‘//' -e 's/\’//')"
+    if [ $? -ne 0 ]; then
+      # Failed to execute or parse stat
+      echo "You may need to launch Moquette with a full path instead of a symlink."
+      exit 1
+    fi
   fi
-done
+else
+  # Not a symlink
+  SOURCEPATH="$0"
+fi
 
-# Get standard environment variables
-PRGDIR=`dirname "$PRG"`
+MOQUETTE_HOME="$(cd `dirname $SOURCEPATH`/..; pwd)"
+export MOQUETTE_HOME
+MOQUETTE_JARS=${MOQUETTE_HOME}/lib/*
 
 # Only set MOQUETTE_HOME if not already set
-[ -f "$MOQUETTE_HOME"/bin/moquette.sh ] || MOQUETTE_HOME=`cd "$PRGDIR/.." ; pwd`
+[ -f "$MOQUETTE_HOME"/bin/moquette.sh ] ; pwd`
 export MOQUETTE_HOME
 
 # Set JavaHome if it exists
@@ -94,5 +104,4 @@ JAVA_OPTS="$JAVA_OPTS -Xloggc:$MOQUETTE_HOME/gc.log"
 #JAVA_OPTS="$JAVA_OPTS -XX:NumberOfGCLogFiles=10"
 #JAVA_OPTS="$JAVA_OPTS -XX:GCLogFileSize=10M"
 
-echo '$JAVA -server $JAVA_OPTS $JAVA_OPTS_SCRIPT -Dlog4j.configuration="file:$LOG_FILE" -Dmoquette.path="$MOQUETTE_PATH" -cp "$MOQUETTE_HOME/lib/*" io.moquette.broker.Server'
-$JAVA -server $JAVA_OPTS $JAVA_OPTS_SCRIPT -Dlog4j.configuration="file:$LOG_FILE" -Dmoquette.path="$MOQUETTE_PATH" -cp "$MOQUETTE_HOME/lib/*" io.moquette.broker.Server
+$JAVA $JAVA_OPTS $JAVA_OPTS_SCRIPT -Dlog4j.configuration="file:$LOG_FILE" -Dmoquette.path="$MOQUETTE_HOME" -cp "$MOQUETTE_HOME/lib/*" io.moquette.broker.Server

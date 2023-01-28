@@ -3,27 +3,39 @@ package io.moquette.broker;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.Set;
 
 public class MemoryQueueRepository implements IQueueRepository {
 
-    private Map<String, Queue<SessionRegistry.EnqueuedMessage>> queues = new HashMap<>();
+    private Map<String, SessionMessageQueue<SessionRegistry.EnqueuedMessage>> queues = new HashMap<>();
 
     @Override
-    public Queue<SessionRegistry.EnqueuedMessage> createQueue(String cli, boolean clean) {
-        final ConcurrentLinkedQueue<SessionRegistry.EnqueuedMessage> queue = new ConcurrentLinkedQueue<>();
-        queues.put(cli, queue);
+    public Set<String> listQueueNames() {
+        return Collections.unmodifiableSet(queues.keySet());
+    }
+
+    @Override
+    public boolean containsQueue(String queueName) {
+        return queues.containsKey(queueName);
+    }
+
+    @Override
+    public SessionMessageQueue<SessionRegistry.EnqueuedMessage> getOrCreateQueue(String clientId) {
+        if (containsQueue(clientId)) {
+            return queues.get(clientId);
+        }
+
+        SessionMessageQueue<SessionRegistry.EnqueuedMessage> queue = new InMemoryQueue(this, clientId);
+        queues.put(clientId, queue);
         return queue;
     }
 
     @Override
-    public void removeQueue(String cli) {
-        queues.remove(cli);
+    public void close() {
+        queues.clear();
     }
 
-    @Override
-    public Map<String, Queue<SessionRegistry.EnqueuedMessage>> listAllQueues() {
-        return Collections.unmodifiableMap(queues);
+    void dropQueue(String queueName) {
+        queues.remove(queueName);
     }
 }

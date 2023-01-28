@@ -1,6 +1,12 @@
-Version 0.16-SNAPSHOT:
+Version 0.17-SNAPSHOT:
+   [break] deprecate `persistent_store` to separate the enablement of persistence with `persistence_enabled` and the path `data_path` (#706).
+   [enhancement] introduced new queue implementation based on segments in memory mapped files. The type of queue implementation
+   could be selected by setting `persistent_queue_type` (#691, #704).
+
+Version 0.16:
    [build] drop generation of broker-test, removed distribution and embedding_moquette modules from deploy phase (#616)
    [fix] introduces sessions event processors to segregate changes to a session in one single thread, simplifying concurrency and code (#631)
+   [util] add collection of telemetry data (#700)
 
 Version 0.15.1:
    [fix] avoid double subscription (#612)

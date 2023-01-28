@@ -15,20 +15,22 @@
  */
 package io.moquette.persistence;
 
+import io.moquette.broker.AbstractSessionMessageQueue;
+import io.moquette.broker.SessionMessageQueue;
 import io.moquette.broker.SessionRegistry;
 import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVStore;
 
-import java.util.AbstractQueue;
-import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicLong;
 
-class H2PersistentQueue extends AbstractQueue<SessionRegistry.EnqueuedMessage> {
+class H2PersistentQueue extends AbstractSessionMessageQueue<SessionRegistry.EnqueuedMessage> {
 
     private final MVMap<Long, SessionRegistry.EnqueuedMessage> queueMap;
     private final MVMap<String, Long> metadataMap;
     private final AtomicLong head;
     private final AtomicLong tail;
+    private final MVStore store;
+    private final String queueName;
 
     H2PersistentQueue(MVStore store, String queueName) {
         if (queueName == null || queueName.isEmpty()) {
@@ -38,7 +40,9 @@ class H2PersistentQueue extends AbstractQueue<SessionRegistry.EnqueuedMessage> {
             new MVMap.Builder<Long, SessionRegistry.EnqueuedMessage>()
                 .valueType(new EnqueuedMessageValueType());
 
-        this.queueMap = store.openMap("queue_" + queueName, messageTypeBuilder);
+        this.store = store;
+        this.queueName = queueName;
+        this.queueMap = this.store.openMap("queue_" + this.queueName, messageTypeBuilder);
         this.metadataMap = store.openMap("queue_" + queueName + "_meta");
 
         //setup head index
@@ -60,34 +64,17 @@ class H2PersistentQueue extends AbstractQueue<SessionRegistry.EnqueuedMessage> {
         this.tail = new AtomicLong(tailIdx);
     }
 
-    static void dropQueue(MVStore store, String queueName) {
-        store.removeMap(store.openMap("queue_" + queueName));
-        store.removeMap(store.openMap("queue_" + queueName + "_meta"));
-    }
-
     @Override
-    public Iterator<SessionRegistry.EnqueuedMessage> iterator() {
-        return null;
-    }
-
-    @Override
-    public int size() {
-        return this.head.intValue() - this.tail.intValue();
-    }
-
-    @Override
-    public boolean offer(SessionRegistry.EnqueuedMessage t) {
-        if (t == null) {
-            throw new NullPointerException("Inserted element can't be null");
-        }
+    public void enqueue(SessionRegistry.EnqueuedMessage t) {
+        checkEnqueuePreconditions(t);
         final long nextHead = head.getAndIncrement();
         this.queueMap.put(nextHead, t);
         this.metadataMap.put("head", nextHead + 1);
-        return true;
     }
 
     @Override
-    public SessionRegistry.EnqueuedMessage poll() {
+    public SessionRegistry.EnqueuedMessage dequeue() {
+        checkDequeuePreconditions();
         if (head.equals(tail)) {
             return null;
         }
@@ -99,11 +86,20 @@ class H2PersistentQueue extends AbstractQueue<SessionRegistry.EnqueuedMessage> {
     }
 
     @Override
-    public SessionRegistry.EnqueuedMessage peek() {
-        if (head.equals(tail)) {
-            return null;
-        }
-        return this.queueMap.get(tail.get());
+    public boolean isEmpty() {
+        checkIsEmptyPreconditions();
+        return (this.head.intValue() - this.tail.intValue()) == 0;
+    }
+
+    @Override
+    public void closeAndPurge() {
+        this.closed = true;
+        dropQueue(this.queueName);
+    }
+
+    private void dropQueue(String queueName) {
+        store.removeMap(store.openMap("queue_" + queueName));
+        store.removeMap(store.openMap("queue_" + queueName + "_meta"));
     }
 
 }

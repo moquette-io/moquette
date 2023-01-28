@@ -55,7 +55,10 @@ public class ServerIntegrationOpenSSLTest extends ServerIntegrationSSLTest {
         sslProps.put(BrokerConstants.JKS_PATH_PROPERTY_NAME, "src/test/resources/serverkeystore.jks");
         sslProps.put(BrokerConstants.KEY_STORE_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
         sslProps.put(BrokerConstants.KEY_MANAGER_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
-        sslProps.put(BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME, dbPath);
+        sslProps.put(BrokerConstants.DATA_PATH_PROPERTY_NAME, dbPath);
+        sslProps.put(BrokerConstants.PERSISTENCE_ENABLED_PROPERTY_NAME, "true");
+
+        sslProps.put(BrokerConstants.ENABLE_TELEMETRY_NAME, "false");
         m_server.startServer(sslProps);
     }
 }

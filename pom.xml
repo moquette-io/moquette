@@ -7,13 +7,16 @@
         <source.version>1.8</source.version>
         <target.version>1.8</target.version>
         <junit.version>5.7.0</junit.version>
+        <slf4j.version>1.7.36</slf4j.version>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
     </properties>
 
     <groupId>io.moquette</groupId>
     <artifactId>moquette-parent</artifactId>
 
     <packaging>pom</packaging>
-    <version>0.16-SNAPSHOT</version>
+    <version>0.17-SNAPSHOT</version>
     <name>Moquette MQTT</name>
     <description>Moquette lightweight MQTT Broker</description>
     <inceptionYear>2011</inceptionYear>
@@ -79,8 +82,8 @@
 
         <dependency>
             <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
-            <version>1.7.25</version>
+            <artifactId>slf4j-reload4j</artifactId>
+            <version>${slf4j.version}</version>
             <scope>test</scope>
         </dependency>
 
