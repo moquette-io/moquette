@@ -155,16 +155,18 @@ final class MQTTConnection {
         final boolean cleanSession = msg.variableHeader().isCleanSession();
         final boolean serverGeneratedClientId;
         if (clientId == null || clientId.length() == 0) {
-            if (!brokerConfig.isAllowZeroByteClientId()) {
-                LOG.info("Broker doesn't permit MQTT empty client ID. Username: {}", username);
-                abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
-                return PostOffice.RouteResult.failed(clientId);
-            }
+            if (isNotProtocolVersion(msg, MqttVersion.MQTT_5)) {
+                if (!brokerConfig.isAllowZeroByteClientId()) {
+                    LOG.info("Broker doesn't permit MQTT empty client ID. Username: {}", username);
+                    abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
+                    return PostOffice.RouteResult.failed(clientId);
+                }
 
-            if (!cleanSession) {
-                LOG.info("MQTT client ID cannot be empty for persistent session. Username: {}", username);
-                abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
-                return PostOffice.RouteResult.failed(clientId);
+                if (!cleanSession) {
+                    LOG.info("MQTT client ID cannot be empty for persistent session. Username: {}", username);
+                    abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
+                    return PostOffice.RouteResult.failed(clientId);
+                }
             }
 
             // Generating client id.
