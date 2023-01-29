@@ -135,8 +135,11 @@ public class Client {
     }
 
     public MqttConnAckMessage connectV5() {
-        MqttConnectMessage connectMessage = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_5)
-            .clientId(clientId)
+        final MqttMessageBuilders.ConnectBuilder builder = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_5);
+        if (clientId != null) {
+            builder.clientId(clientId);
+        }
+        MqttConnectMessage connectMessage = builder
             .keepAlive(2) // secs
             .willFlag(false)
             .willQoS(MqttQoS.AT_MOST_ONCE)
@@ -166,7 +169,7 @@ public class Client {
         }
 
         if (waitElapsed) {
-            throw new RuntimeException("Cannot receive ConnAck in 200 ms");
+            throw new RuntimeException("Cannot receive ConnAck in 2 s");
         }
 
         final MqttMessage connAckMessage = this.receivedMsg.get();
