@@ -30,16 +30,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
-import java.util.*;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static io.moquette.BrokerConstants.INFLIGHT_WINDOW_SIZE;
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 import static io.netty.channel.ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE;
-import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
+import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
+import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD;
+import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_REFUSED_IDENTIFIER_REJECTED;
+import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_REFUSED_SERVER_UNAVAILABLE;
+import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
-import static io.netty.handler.codec.mqtt.MqttQoS.*;
+import static io.netty.handler.codec.mqtt.MqttQoS.AT_LEAST_ONCE;
+import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 
 final class MQTTConnection {
 
@@ -159,22 +166,28 @@ final class MQTTConnection {
             return PostOffice.RouteResult.failed(clientId);
         }
         final boolean cleanSession = msg.variableHeader().isCleanSession();
+        final boolean serverGeneratedClientId;
         if (clientId == null || clientId.length() == 0) {
-            if (!brokerConfig.isAllowZeroByteClientId()) {
-                LOG.info("Broker doesn't permit MQTT empty client ID. Username: {}", username);
-                abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
-                return PostOffice.RouteResult.failed(clientId);
-            }
+            if (isNotProtocolVersion(msg, MqttVersion.MQTT_5)) {
+                if (!brokerConfig.isAllowZeroByteClientId()) {
+                    LOG.info("Broker doesn't permit MQTT empty client ID. Username: {}", username);
+                    abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
+                    return PostOffice.RouteResult.failed(clientId);
+                }
 
-            if (!cleanSession) {
-                LOG.info("MQTT client ID cannot be empty for persistent session. Username: {}", username);
-                abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
-                return PostOffice.RouteResult.failed(clientId);
+                if (!cleanSession) {
+                    LOG.info("MQTT client ID cannot be empty for persistent session. Username: {}", username);
+                    abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
+                    return PostOffice.RouteResult.failed(clientId);
+                }
             }
 
             // Generating client id.
             clientId = UUID.randomUUID().toString().replace("-", "");
+            serverGeneratedClientId = true;
             LOG.debug("Client has connected with integration generated id: {}, username: {}", clientId, username);
+        } else {
+            serverGeneratedClientId = false;
         }
 
         if (!login(msg, clientId)) {
@@ -186,7 +199,7 @@ final class MQTTConnection {
         final String sessionId = clientId;
         return postOffice.routeCommand(clientId, "CONN", () -> {
             checkMatchSessionLoop(sessionId);
-            executeConnect(msg, sessionId);
+            executeConnect(msg, sessionId, serverGeneratedClientId);
             return null;
         });
     }
@@ -205,7 +218,7 @@ final class MQTTConnection {
     /**
      * Invoked by the Session's event loop.
      * */
-    private void executeConnect(MqttConnectMessage msg, String clientId) {
+    private void executeConnect(MqttConnectMessage msg, String clientId, boolean serverGeneratedClientId) {
         final SessionRegistry.SessionCreationResult result;
         try {
             LOG.trace("Binding MQTTConnection to session");
@@ -220,11 +233,18 @@ final class MQTTConnection {
         NettyUtils.clientID(channel, clientId);
 
         final boolean msgCleanSessionFlag = msg.variableHeader().isCleanSession();
+        // [MQTT-3.2.2-2, MQTT-3.2.2-3, MQTT-3.2.2-6]
         boolean isSessionAlreadyPresent = !msgCleanSessionFlag && result.alreadyStored;
         final String clientIdUsed = clientId;
-        final MqttConnAckMessage ackMessage = MqttMessageBuilders.connAck()
+        final MqttMessageBuilders.ConnAckBuilder connAckBuilder = MqttMessageBuilders.connAck()
             .returnCode(CONNECTION_ACCEPTED)
-            .sessionPresent(isSessionAlreadyPresent).build();
+            .sessionPresent(isSessionAlreadyPresent);
+        if (isProtocolVersion(msg, MqttVersion.MQTT_5)) {
+            // set properties for MQTT 5
+            final MqttProperties ackProperties = prepareConnAckProperties(serverGeneratedClientId, clientId);
+            connAckBuilder.properties(ackProperties);
+        }
+        final MqttConnAckMessage ackMessage = connAckBuilder.build();
         channel.writeAndFlush(ackMessage).addListener(new ChannelFutureListener() {
             @Override
             public void operationComplete(ChannelFuture future) throws Exception {
@@ -267,6 +287,24 @@ final class MQTTConnection {
         });
     }
 
+    private MqttProperties prepareConnAckProperties(boolean serverGeneratedClientId, String clientId) {
+        final MqttMessageBuilders.ConnAckPropertiesBuilder builder = new MqttMessageBuilders.ConnAckPropertiesBuilder();
+        // default maximumQos is 2, [MQTT-3.2.2-10]
+        // unlimited maximumPacketSize inside however the protocol limit
+        if (serverGeneratedClientId) {
+            builder.assignedClientId(clientId);
+        }
+
+        return builder
+            .sessionExpiryInterval(BrokerConstants.INFINITE_SESSION_EXPIRY)
+            .receiveMaximum(INFLIGHT_WINDOW_SIZE)
+            .retainAvailable(true)
+            .wildcardSubscriptionAvailable(true)
+            .subscriptionIdentifiersAvailable(false)
+            .sharedSubscriptionAvailable(false)
+            .build();
+    }
+
     private void setupInflightResender(Channel channel) {
         channel.pipeline()
             .addFirst("inflightResender", new InflightResender(5_000, TimeUnit.MILLISECONDS));
@@ -292,7 +330,11 @@ final class MQTTConnection {
     }
 
     private boolean isNotProtocolVersion(MqttConnectMessage msg, MqttVersion version) {
-        return msg.variableHeader().version() != version.protocolLevel();
+        return !isProtocolVersion(msg, version);
+    }
+
+    private boolean isProtocolVersion(MqttConnectMessage msg, MqttVersion version) {
+        return msg.variableHeader().version() == version.protocolLevel();
     }
 
     private void abortConnection(MqttConnectReturnCode returnCode) {
