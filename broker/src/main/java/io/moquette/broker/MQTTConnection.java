@@ -30,7 +30,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
-import java.util.*;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -38,9 +39,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static io.moquette.BrokerConstants.INFLIGHT_WINDOW_SIZE;
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 import static io.netty.channel.ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE;
-import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
+import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
+import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD;
+import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_REFUSED_IDENTIFIER_REJECTED;
+import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_REFUSED_SERVER_UNAVAILABLE;
+import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
-import static io.netty.handler.codec.mqtt.MqttQoS.*;
+import static io.netty.handler.codec.mqtt.MqttQoS.AT_LEAST_ONCE;
+import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 
 final class MQTTConnection {
 
@@ -213,7 +219,7 @@ final class MQTTConnection {
         final MqttMessageBuilders.ConnAckBuilder connAckBuilder = MqttMessageBuilders.connAck()
             .returnCode(CONNECTION_ACCEPTED)
             .sessionPresent(isSessionAlreadyPresent);
-        if (msg.variableHeader().version() == 5) {
+        if (isProtocolVersion(msg, MqttVersion.MQTT_5)) {
             // set properties for MQTT 5
             final MqttProperties ackProperties = prepareConnAckProperties(serverGeneratedClientId, clientId);
             connAckBuilder.properties(ackProperties);
@@ -301,7 +307,11 @@ final class MQTTConnection {
     }
 
     private boolean isNotProtocolVersion(MqttConnectMessage msg, MqttVersion version) {
-        return msg.variableHeader().version() != version.protocolLevel();
+        return !isProtocolVersion(msg, version);
+    }
+
+    private boolean isProtocolVersion(MqttConnectMessage msg, MqttVersion version) {
+        return msg.variableHeader().version() == version.protocolLevel();
     }
 
     private void abortConnection(MqttConnectReturnCode returnCode) {
