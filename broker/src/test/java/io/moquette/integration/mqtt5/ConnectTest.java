@@ -5,77 +5,30 @@ import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import com.hivemq.client.mqtt.mqtt5.message.connect.connack.Mqtt5ConnAck;
 import com.hivemq.client.mqtt.mqtt5.message.connect.connack.Mqtt5ConnAckReasonCode;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5PublishResult;
-import io.moquette.broker.Server;
-import io.moquette.broker.config.IConfig;
-import io.moquette.broker.config.MemoryConfig;
-import io.moquette.integration.IntegrationUtils;
 import io.moquette.testclient.Client;
 import io.netty.handler.codec.mqtt.MqttConnAckMessage;
 import io.netty.handler.codec.mqtt.MqttConnectReturnCode;
-import io.netty.handler.codec.mqtt.MqttMessage;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import io.netty.handler.codec.mqtt.MqttQoS;
-import io.netty.handler.codec.mqtt.MqttSubAckMessage;
 import org.awaitility.Awaitility;
-import org.awaitility.Durations;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-import java.util.Optional;
-import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-public class ConnectTest {
+class ConnectTest extends AbstractServerIntegrationTest {
     private static final Logger LOG = LoggerFactory.getLogger(ConnectTest.class);
 
-    Server broker;
-    IConfig config;
-
-    @TempDir
-    Path tempFolder;
-    private String dbPath;
-    private Client lowLevelClient;
-
-    protected void startServer(String dbPath) throws IOException {
-        broker = new Server();
-        final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
-        config = new MemoryConfig(configProps);
-        broker.startServer(config);
-    }
-
-    @BeforeAll
-    public static void beforeTests() {
-        Awaitility.setDefaultTimeout(Durations.ONE_SECOND);
-    }
-
-    @BeforeEach
-    public void setUp() throws Exception {
-        dbPath = IntegrationUtils.tempH2Path(tempFolder);
-        startServer(dbPath);
-
-        lowLevelClient = new Client("localhost").clientId("subscriber");
-    }
-
-    @AfterEach
-    public void tearDown() throws Exception {
-        stopServer();
-    }
-
-    private void stopServer() {
-        broker.stopServer();
+    @Override
+    String clientName() {
+        return "subscriber";
     }
 
     @Test
@@ -102,7 +55,7 @@ public class ConnectTest {
             lowLevelClient.connectV5();
             fail("Connect on Disconnected TCP socket can't happen");
         } catch (RuntimeException rex) {
-            assertEquals("Cannot receive ConnAck in 200 ms", rex.getMessage());
+            assertEquals("Cannot receive ConnAck in 2 s", rex.getMessage());
         }
     }
 
