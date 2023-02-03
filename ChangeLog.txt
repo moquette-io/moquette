@@ -1,4 +1,5 @@
 Version 0.17-SNAPSHOT:
+   [feature] add `moquette.session_loop.debug` property to enable session loop checking assignments (#714).
    [break] deprecate `persistent_store` to separate the enablement of persistence with `persistence_enabled` and the path `data_path` (#706).
    [enhancement] introduced new queue implementation based on segments in memory mapped files. The type of queue implementation
    could be selected by setting `persistent_queue_type` (#691, #704).
