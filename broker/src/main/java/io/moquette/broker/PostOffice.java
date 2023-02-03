@@ -198,9 +198,13 @@ class PostOffice {
         this.sessionExecutors = new Thread[eventLoops];
         for (int i = 0; i < eventLoops; i++) {
             this.sessionExecutors[i] = new Thread(new SessionEventLoop(this.sessionQueues[i]));
-            this.sessionExecutors[i].setName("Session Executor " + i);
+            this.sessionExecutors[i].setName(sessionLoopName(i));
             this.sessionExecutors[i].start();
         }
+    }
+
+    private String sessionLoopName(int i) {
+        return "Session Executor " + i;
     }
 
     public void init(SessionRegistry sessionRegistry) {
@@ -624,12 +628,21 @@ class PostOffice {
         interceptor.notifyClientConnectionLost(clientId, userName);
     }
 
+    String sessionLoopThreadName(String clientId) {
+        final int targetQueueId = targetQueueOrdinal(clientId);
+        return sessionLoopName(targetQueueId);
+    }
+
+    private int targetQueueOrdinal(String clientId) {
+        return Math.abs(clientId.hashCode()) % this.eventLoops;
+    }
+
     /**
      * Route the command to the owning SessionEventLoop
      * */
     public RouteResult routeCommand(String clientId, String actionDescription, Callable<String> action) {
         SessionCommand cmd = new SessionCommand(clientId, action);
-        final int targetQueueId = Math.abs(cmd.getSessionId().hashCode()) % this.eventLoops;
+        final int targetQueueId = targetQueueOrdinal(cmd.getSessionId());
         LOG.debug("Routing cmd [{}] for session [{}] to event processor {}", actionDescription, cmd.getSessionId(), targetQueueId);
         final FutureTask<String> task = new FutureTask<>(() -> {
             cmd.execute();

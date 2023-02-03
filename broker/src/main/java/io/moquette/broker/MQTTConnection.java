@@ -44,6 +44,8 @@ final class MQTTConnection {
 
     private static final Logger LOG = LoggerFactory.getLogger(MQTTConnection.class);
 
+    static final boolean sessionLoopDebug = Boolean.parseBoolean(System.getProperty("moquette.session_loop.debug", "false"));
+
     final Channel channel;
     private final BrokerConfiguration brokerConfig;
     private final IAuthenticator authenticator;
@@ -108,15 +110,19 @@ final class MQTTConnection {
 
     private void processPubComp(MqttMessage msg) {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        this.postOffice.routeCommand(bindedSession.getClientID(), "PUBCOMP", () -> {
+        final String clientID = bindedSession.getClientID();
+        this.postOffice.routeCommand(clientID, "PUBCOMP", () -> {
+            checkMatchSessionLoop(clientID);
             bindedSession.processPubComp(messageID);
-            return bindedSession.getClientID();
+            return clientID;
         });
     }
 
     private void processPubRec(MqttMessage msg) {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        this.postOffice.routeCommand(bindedSession.getClientID(), "PUBREC", () -> {
+        final String clientID = bindedSession.getClientID();
+        this.postOffice.routeCommand(clientID, "PUBREC", () -> {
+            checkMatchSessionLoop(clientID);
             bindedSession.processPubRec(messageID);
             return null;
         });
@@ -131,6 +137,7 @@ final class MQTTConnection {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
         final String clientId = getClientId();
         this.postOffice.routeCommand(clientId, "PUB ACK", () -> {
+            checkMatchSessionLoop(clientId);
             bindedSession.pubAckReceived(messageID);
             return null;
         });
@@ -174,9 +181,21 @@ final class MQTTConnection {
 
         final String sessionId = clientId;
         return postOffice.routeCommand(clientId, "CONN", () -> {
+            checkMatchSessionLoop(sessionId);
             executeConnect(msg, sessionId);
             return null;
         });
+    }
+
+    private void checkMatchSessionLoop(String clientId) {
+        if (!sessionLoopDebug) {
+            return;
+        }
+        final String currentThreadName = Thread.currentThread().getName();
+        final String expectedThreadName = postOffice.sessionLoopThreadName(clientId);
+        if (!expectedThreadName.equals(currentThreadName)) {
+            throw new IllegalStateException("Expected to be executed on thread " + expectedThreadName + " but running on " + currentThreadName + ". This means a programming error");
+        }
     }
 
     /**
@@ -304,6 +323,7 @@ final class MQTTConnection {
         // this must not be done on the netty thread
         LOG.debug("Notifying connection lost event");
         postOffice.routeCommand(clientID, "CONN LOST", () -> {
+            checkMatchSessionLoop(clientID);
             if (isBoundToSession() || isSessionUnbound()) {
                 LOG.debug("Cleaning {}", clientID);
                 processConnectionLost(clientID);
@@ -314,6 +334,7 @@ final class MQTTConnection {
         });
     }
 
+    // Invoked when a TCP connection drops and not when a client send DISCONNECT and close.
     private void processConnectionLost(String clientID) {
         if (bindedSession.hasWill()) {
             postOffice.fireWill(bindedSession.getWill());
@@ -348,6 +369,7 @@ final class MQTTConnection {
         }
 
         return this.postOffice.routeCommand(clientID, "DISCONN", () -> {
+            checkMatchSessionLoop(clientID);
             if (!isBoundToSession()) {
                 LOG.debug("NOT processing disconnect {}, not bound.", clientID);
                 return null;
@@ -371,6 +393,7 @@ final class MQTTConnection {
         }
         final String username = NettyUtils.userName(channel);
         return postOffice.routeCommand(clientID, "SUB", () -> {
+            checkMatchSessionLoop(clientID);
             if (isBoundToSession())
                 postOffice.subscribeClientToTopics(msg, clientID, username, this);
             return null;
@@ -388,6 +411,7 @@ final class MQTTConnection {
         final int messageId = msg.variableHeader().messageId();
 
         postOffice.routeCommand(clientID, "UNSUB", () -> {
+            checkMatchSessionLoop(clientID);
             if (!isBoundToSession())
                 return null;
             LOG.trace("Processing UNSUBSCRIBE message. topics: {}", topics);
@@ -425,6 +449,7 @@ final class MQTTConnection {
         switch (qos) {
             case AT_MOST_ONCE:
                 return postOffice.routeCommand(clientId, "PUB QoS0", () -> {
+                    checkMatchSessionLoop(clientId);
                     if (!isBoundToSession())
                         return null;
                     postOffice.receivedPublishQos0(topic, username, clientId, msg);
@@ -432,6 +457,7 @@ final class MQTTConnection {
                 }).ifFailed(msg::release);
             case AT_LEAST_ONCE:
                 return postOffice.routeCommand(clientId, "PUB QoS1", () -> {
+                    checkMatchSessionLoop(clientId);
                     if (!isBoundToSession())
                         return null;
                     postOffice.receivedPublishQos1(this, topic, username, messageID, msg);
@@ -439,6 +465,7 @@ final class MQTTConnection {
                 }).ifFailed(msg::release);
             case EXACTLY_ONCE: {
                 final PostOffice.RouteResult firstStepResult = postOffice.routeCommand(clientId, "PUB QoS2", () -> {
+                    checkMatchSessionLoop(clientId);
                     if (!isBoundToSession())
                         return null;
                     bindedSession.receivedPublishQos2(messageID, msg);
@@ -470,7 +497,9 @@ final class MQTTConnection {
 
     private void processPubRel(MqttMessage msg) {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        postOffice.routeCommand(bindedSession.getClientID(), "PUBREL", () -> {
+        final String clientID = bindedSession.getClientID();
+        postOffice.routeCommand(clientID, "PUBREL", () -> {
+            checkMatchSessionLoop(clientID);
             executePubRel(messageID);
             return null;
         });
