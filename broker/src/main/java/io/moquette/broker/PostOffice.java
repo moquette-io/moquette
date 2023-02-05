@@ -507,9 +507,10 @@ class PostOffice {
     }
 
     private void publishToSession(ByteBuf payload, Topic topic, Collection<Subscription> subscriptions, MqttQoS publishingQos) {
+        ByteBuf duplicate = payload.duplicate();
         for (Subscription sub : subscriptions) {
             MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
-            publishToSession(payload, topic, sub, qos);
+            publishToSession(duplicate, topic, sub, qos);
         }
     }
 
