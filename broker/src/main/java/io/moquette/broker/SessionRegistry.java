@@ -188,7 +188,7 @@ public class SessionRegistry {
             if (!connecting) {
                 throw new SessionCorruptedException("old session moved in connected state by other thread");
             }
-            // case 3, reopening existing session without not clean session, so keep the existing subscriptions
+            // case 3, reopening existing session not clean session, so keep the existing subscriptions
             copySessionConfig(msg, oldSession);
             reactivateSubscriptions(oldSession, username);
 

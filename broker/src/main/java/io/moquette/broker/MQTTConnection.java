@@ -368,7 +368,6 @@ final class MQTTConnection {
                 LOG.debug("NOT processing disconnect {}, not bound.", clientID);
                 return null;
             }
-            //bindedSession.disconnect();
             sessionRegistry.connectionClosed(bindedSession);
             connected = false;
             channel.close().addListener(FIRE_EXCEPTION_ON_FAILURE);
