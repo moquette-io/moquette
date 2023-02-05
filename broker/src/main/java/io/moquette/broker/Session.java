@@ -28,7 +28,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
-import java.util.*;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
@@ -98,6 +106,8 @@ class Session {
     private final DelayQueue<InFlightPacket> inflightTimeouts = new DelayQueue<>();
     private final Map<Integer, MqttPublishMessage> qos2Receiving = new HashMap<>();
     private final AtomicInteger inflightSlots = new AtomicInteger(INFLIGHT_WINDOW_SIZE); // this should be configurable
+    private final Instant created;
+    private final int expiryInterval;
 
     Session(String clientId, boolean clean, Will will, SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue) {
         this(clientId, clean, sessionQueue);
@@ -111,6 +121,13 @@ class Session {
         this.clientId = clientId;
         this.clean = clean;
         this.sessionQueue = sessionQueue;
+        this.created = Instant.now();
+        // in MQTT3 cleanSession = true means  expiryInterval=0 else infinite
+        expiryInterval = clean ? 0 : 0xFFFFFFFF;
+    }
+
+    public boolean expireImmediately() {
+        return expiryInterval == 0;
     }
 
     void update(boolean clean, Will will) {

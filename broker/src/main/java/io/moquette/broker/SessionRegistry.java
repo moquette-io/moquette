@@ -175,15 +175,9 @@ public class SessionRegistry {
         }
 
         if (newIsClean) {
-            boolean result = oldSession.assignState(SessionStatus.DISCONNECTED, SessionStatus.DESTROYED);
-            if (!result) {
-                throw new SessionCorruptedException("old session has already changed state");
-            }
-
-            // case 2, reopening existing session but with cleanSession true
+            // case 2, reopening existing session but with a clean session
+            purgeSessionState(oldSession);
             // publish new session
-            unsubscribe(oldSession);
-            remove(clientId);
             final Session newSession = createNewSession(msg, clientId);
             pool.put(clientId, newSession);
 
@@ -194,7 +188,7 @@ public class SessionRegistry {
             if (!connecting) {
                 throw new SessionCorruptedException("old session moved in connected state by other thread");
             }
-            // case 3, reopening existing session without cleanSession, so keep the existing subscriptions
+            // case 3, reopening existing session not clean session, so keep the existing subscriptions
             copySessionConfig(msg, oldSession);
             reactivateSubscriptions(oldSession, username);
 
@@ -266,6 +260,28 @@ public class SessionRegistry {
 
     Session retrieve(String clientID) {
         return pool.get(clientID);
+    }
+
+    void connectionClosed(Session session) {
+        session.disconnect();
+        if (session.expireImmediately()) {
+            purgeSessionState(session);
+            return;
+        } else {
+            // TODO if binded session has expiry, disconnect it and schedule a task to do the cleanup after that
+
+        }
+    }
+
+    private void purgeSessionState(Session session) {
+        LOG.debug("Remove session state for client {}", session.getClientID());
+        boolean result = session.assignState(SessionStatus.DISCONNECTED, SessionStatus.DESTROYED);
+        if (!result) {
+            throw new SessionCorruptedException("Session has already changed state");
+        }
+
+        unsubscribe(session);
+        remove(session.getClientID());
     }
 
     void remove(String clientID) {
