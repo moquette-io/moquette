@@ -246,8 +246,7 @@ final class MQTTConnection {
                         LOG.trace("dispatch connection: {}", msg);
                     }
                 } else {
-                    bindedSession.disconnect();
-                    sessionRegistry.remove(bindedSession.getClientID());
+                    sessionRegistry.connectionClosed(bindedSession);
                     LOG.error("CONNACK send failed, cleanup session and close the connection", future.cause());
                     channel.close();
                 }
@@ -339,12 +338,7 @@ final class MQTTConnection {
         if (bindedSession.hasWill()) {
             postOffice.fireWill(bindedSession.getWill());
         }
-        if (bindedSession.isClean()) {
-            LOG.debug("Remove session for client {}", clientID);
-            sessionRegistry.remove(bindedSession.getClientID());
-        } else {
-            bindedSession.disconnect();
-        }
+        sessionRegistry.connectionClosed(bindedSession);
         connected = false;
         //dispatch connection lost to intercept.
         String userName = NettyUtils.userName(channel);
@@ -374,7 +368,8 @@ final class MQTTConnection {
                 LOG.debug("NOT processing disconnect {}, not bound.", clientID);
                 return null;
             }
-            bindedSession.disconnect();
+            //bindedSession.disconnect();
+            sessionRegistry.connectionClosed(bindedSession);
             connected = false;
             channel.close().addListener(FIRE_EXCEPTION_ON_FAILURE);
             String userName = NettyUtils.userName(channel);
