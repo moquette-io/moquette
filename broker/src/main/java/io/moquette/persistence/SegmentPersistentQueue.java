@@ -49,9 +49,7 @@ public class SegmentPersistentQueue extends AbstractSessionMessageQueue<SessionR
         private void writePayload(ByteBuffer target, ByteBuf source) {
             final int payloadSize = source.readableBytes();
             byte[] rawBytes = new byte[payloadSize];
-            final int pinPoint = source.readerIndex();
-            source.readBytes(rawBytes).release();
-            source.readerIndex(pinPoint);
+            source.duplicate().readBytes(rawBytes).release();
             target.putInt(payloadSize);
             target.put(rawBytes);
         }
