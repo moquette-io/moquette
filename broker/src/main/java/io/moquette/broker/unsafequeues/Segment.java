@@ -52,9 +52,9 @@ final class Segment {
     // fill the segment with value bytes
     void fillWith(byte value) {
         LOG.debug("Wipe segment {}", this);
-        final ByteBuffer buffer = (ByteBuffer) mappedBuffer.position(this.begin.offset());
-        for (int i = 0; i < Segment.SIZE; i++) {
-            buffer.put(i, value);
+        final int target = begin.offset()+Segment.SIZE;
+        for (int i = begin.offset(); i < target; i++) {
+            mappedBuffer.put(i, value);
         }
     }
 
