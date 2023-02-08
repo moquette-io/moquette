@@ -435,8 +435,7 @@ public class QueuePool {
 
         final SegmentRef pollSegment = segmentRefs.peekLast();
         if (pollSegment == null) {
-            LOG.error("Queue segments is empty for queue {}, segment references: {}", queueName, segmentRefs);
-            throw new IllegalStateException("Opening tail segment can't never go in empty queue, because it's checked upfront in Queue");
+            return null;
         }
 
         final Path pageFile = dataPath.resolve(String.format("%d.page", pollSegment.pageId));
