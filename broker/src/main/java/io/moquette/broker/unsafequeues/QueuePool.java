@@ -17,6 +17,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
@@ -426,15 +427,14 @@ public class QueuePool {
         }
     }
 
-    Segment openNextTailSegment(String name) throws QueueException {
+    Optional<Segment> openNextTailSegment(String name) throws QueueException {
         // definition from QueuePool.queueSegments
         final QueueName queueName = new QueueName(name);
         final LinkedList<SegmentRef> segmentRefs = queueSegments.get(queueName);
 
         final SegmentRef pollSegment = segmentRefs.peekLast();
         if (pollSegment == null) {
-            LOG.error("Queue segments is empty for queue {}, segment references: {}", queueName, segmentRefs);
-            throw new IllegalStateException("Opening tail segment can't never go in empty queue, because it's checked upfront in Queue");
+            return Optional.empty();
         }
 
         final Path pageFile = dataPath.resolve(String.format("%d.page", pollSegment.pageId));
@@ -451,7 +451,7 @@ public class QueuePool {
 
         final SegmentPointer begin = new SegmentPointer(pollSegment.pageId, pollSegment.offset);
         final SegmentPointer end = new SegmentPointer(pollSegment.pageId, pollSegment.offset + segmentSize - 1);
-        return new Segment(tailPage, begin, end);
+        return Optional.of(new Segment(tailPage, begin, end));
     }
 
     /**
