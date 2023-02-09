@@ -184,7 +184,8 @@ public class Queue {
             // tail must be moved to the next byte to read, so has to move to
             // header size + payload size + 1
             final int fullMessageSize = payloadLength + LENGTH_HEADER_SIZE;
-            if (tailSegment.hasSpace(existingTail, fullMessageSize + 1)) {
+            long remainingInSegment = tailSegment.bytesAfter(existingTail) + 1;
+            if (remainingInSegment >= fullMessageSize + 1) {
                 // currentSegments contains fully the payload
                 currentTailPtr = existingTail.moveForward(fullMessageSize);
                 // read data from currentTail + 4 bytes(the length)
@@ -194,6 +195,14 @@ public class Queue {
             } else {
                 // payload is split across currentSegment and next ones
                 VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
+
+                if (remainingInSegment - LENGTH_HEADER_SIZE == 0) {
+                    queuePool.consumedTailSegment(name);
+                    if (QueuePool.queueDebug) {
+                        tailSegment.fillWith((byte) 'D');
+                    }
+                    tailSegment = queuePool.openNextTailSegment(name);
+                }
 
                 LOG.debug("Loading payload size {}", payloadLength);
                 return Optional.of(loadPayloadFromSegments(payloadLength, tailSegment, dataStart));
@@ -240,7 +249,7 @@ public class Queue {
         }
 
         // read second part
-        final int remainingHeaderSize =  LENGTH_HEADER_SIZE - consumedHeaderSize;
+        final int remainingHeaderSize = LENGTH_HEADER_SIZE - consumedHeaderSize;
         Segment nextTailSegment = queuePool.openNextTailSegment(name);
         lengthBuffer.put(nextTailSegment.read(nextTailSegment.begin, remainingHeaderSize));
         final VirtualPointer dataStart = pointer.moveForward(LENGTH_HEADER_SIZE);
@@ -256,10 +265,11 @@ public class Queue {
 
         do {
             LOG.debug("Looping remaining {}", remaining);
-            int availableDataLength = Math.min(remaining, (int) segment.bytesAfter(scan) + 1);
+            final long bytesAfterScan = segment.bytesAfter(scan);
+            final int availableDataLength = Math.min(remaining, (int) bytesAfterScan + 1);
             final ByteBuffer buffer = segment.read(scan, availableDataLength);
             createdBuffers.add(buffer);
-            final boolean segmentCompletelyConsumed = (segment.bytesAfter(scan) + 1) == availableDataLength;
+            final boolean segmentCompletelyConsumed = (bytesAfterScan + 1) == availableDataLength;
             scan = scan.moveForward(availableDataLength);
             remaining -= buffer.remaining();
 
