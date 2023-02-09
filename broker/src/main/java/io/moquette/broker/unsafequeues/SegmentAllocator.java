@@ -18,4 +18,18 @@ interface SegmentAllocator {
     void close() throws QueueException;
 
     void dumpState(Properties checkpoint);
+
+    /**
+     * Get the size of a page that this allocator uses.
+     *
+     * @return the size of a page that this allocator uses.
+     */
+    int getPageSize();
+
+    /**
+     * Get the size of a segment that this allocator uses.
+     *
+     * @return the size of a segment that this allocator uses.
+     */
+    int getSegmentSize();
 }

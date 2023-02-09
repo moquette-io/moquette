@@ -18,6 +18,7 @@ package io.moquette.persistence;
 import io.moquette.broker.SessionMessageQueue;
 import io.moquette.broker.SessionRegistry;
 import io.moquette.broker.SessionRegistry.EnqueuedMessage;
+import io.moquette.broker.SessionRegistry.PublishedMessage;
 import io.moquette.broker.subscriptions.Topic;
 import io.moquette.broker.unsafequeues.QueueException;
 import io.netty.buffer.ByteBuf;
@@ -25,6 +26,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +44,8 @@ public class SegmentPersistentQueueTest {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPersistentQueueTest.class.getName());
 
+    private static final int PAGE_SIZE = 5000;
+    private static final int SEGMENT_SIZE = 1000;
     private static SegmentQueueRepository queueRepository;
     List<SessionMessageQueue<EnqueuedMessage>> queues = new ArrayList<>();
 
@@ -53,7 +57,8 @@ public class SegmentPersistentQueueTest {
 
     @BeforeAll
     public static void beforeAll() throws IOException, QueueException {
-        queueRepository = new SegmentQueueRepository(tempQueueFolder.toFile().getAbsolutePath());
+        System.setProperty("moquette.queue.debug", "false");
+        queueRepository = new SegmentQueueRepository(tempQueueFolder.toFile().getAbsolutePath(), PAGE_SIZE, SEGMENT_SIZE);
     }
 
     @AfterEach
@@ -76,15 +81,15 @@ public class SegmentPersistentQueueTest {
         return queue;
     }
 
-    private static void createAndAddToQueue(SessionMessageQueue<EnqueuedMessage> queue, String message) {
-        final SessionRegistry.PublishedMessage msg1 = createMessage(message);
+    private static void createAndAddToQueue(SessionMessageQueue<EnqueuedMessage> queue, String topic, int totalSize) {
+        final PublishedMessage msg1 = createMessage(topic, totalSize);
         msg1.retain();
         queue.enqueue(msg1);
         msg1.release();
     }
 
-    private void createAndAddToQueues(String message) {
-        final SessionRegistry.PublishedMessage msg1 = createMessage(message);
+    private void createAndAddToQueues(String topic, int totalSize) {
+        final PublishedMessage msg1 = createMessage(topic, totalSize);
         for (SessionMessageQueue<EnqueuedMessage> queue : queues) {
             msg1.retain();
             queue.enqueue(msg1);
@@ -106,7 +111,7 @@ public class SegmentPersistentQueueTest {
 
     private void dequeueFromAll(String expected) {
         for (SessionMessageQueue<EnqueuedMessage> queue : queues) {
-            final SessionRegistry.PublishedMessage mesg = (SessionRegistry.PublishedMessage) queue.dequeue();
+            final SessionRegistry.PublishedMessage mesg = (PublishedMessage) queue.dequeue();
             assertEquals(expected, mesg.getTopic().toString());
         }
     }
@@ -117,18 +122,18 @@ public class SegmentPersistentQueueTest {
         SessionMessageQueue<EnqueuedMessage> queue = queueRepository.getOrCreateQueue("testAdd");
         queues.add(queue);
         assertTrue(queue.isEmpty(), "Queue must start empty.");
-        createAndAddToQueue(queue, "Hello");
+        createAndAddToQueue(queue, "Hello", 100);
         assertFalse(queue.isEmpty(), "Queue must not be empty after adding.");
-        createAndAddToQueue(queue, "world");
+        createAndAddToQueue(queue, "world", 100);
         assertFalse(queue.isEmpty(), "Queue must not be empty after adding.");
 
-        assertEquals("Hello", ((SessionRegistry.PublishedMessage) queue.dequeue()).getTopic().toString());
-        assertEquals("world", ((SessionRegistry.PublishedMessage) queue.dequeue()).getTopic().toString());
+        assertEquals("Hello", ((PublishedMessage) queue.dequeue()).getTopic().toString());
+        assertEquals("world", ((PublishedMessage) queue.dequeue()).getTopic().toString());
         assertAllEmpty("After dequeueing all, queue must be empty");
 
-        createAndAddToQueue(queue, "Hello");
+        createAndAddToQueue(queue, "Hello", 100);
         assertFalse(queue.isEmpty(), "Queue must not be empty after adding.");
-        assertEquals("Hello", ((SessionRegistry.PublishedMessage) queue.dequeue()).getTopic().toString());
+        assertEquals("Hello", ((PublishedMessage) queue.dequeue()).getTopic().toString());
         assertAllEmpty("After dequeueing all, queue must be empty");
     }
 
@@ -150,16 +155,16 @@ public class SegmentPersistentQueueTest {
         }
         assertAllEmpty("Queue must start empty.");
 
-        createAndAddToQueues("Hello");
+        createAndAddToQueues("Hello", 100);
         assertAllNonEmpty("Queue must not be empty after adding.");
 
-        createAndAddToQueues("world");
+        createAndAddToQueues("world", 100);
         assertAllNonEmpty("Queue must not be empty after adding.");
 
         dequeueFromAll("Hello");
         assertAllNonEmpty("After dequeueing one, queue must not be empty");
 
-        createAndAddToQueues("crazy");
+        createAndAddToQueues("crazy", 100);
         assertAllNonEmpty("Queue must not be empty after adding.");
 
         dequeueFromAll("world");
@@ -168,10 +173,39 @@ public class SegmentPersistentQueueTest {
         dequeueFromAll("crazy");
         assertAllEmpty("After dequeueing all, queue must be empty");
     }
+    private static String body;
 
-    private static SessionRegistry.PublishedMessage createMessage(String name) {
-        final ByteBuf payload = Unpooled.wrappedBuffer(name.getBytes(StandardCharsets.UTF_8));
-        return new SessionRegistry.PublishedMessage(Topic.asTopic(name), MqttQoS.AT_LEAST_ONCE, payload, false);
+    private static String getBody(int bodySize) {
+        if (body == null || body.length() != bodySize) {
+            char a = 'A';
+            char z = 'Z';
+            char curChar = a;
+            StringBuilder bodyString = new StringBuilder();
+            for (int i = 0; i < 104 + 81; i++) {
+                bodyString.append(curChar);
+                if (curChar == z) {
+                    curChar = a;
+                } else {
+                    curChar++;
+                }
+            }
+            body = bodyString.toString();
+        }
+        return body;
+    }
+
+    private static void checkMessage(PublishedMessage message, String expTopic) {
+        assertEquals(expTopic, message.getTopic().toString());
+        final String receivedBody = message.getPayload().toString(UTF_8);
+        final String expectedBody = getBody(receivedBody.length());
+        assertEquals(expectedBody, receivedBody);
+    }
+
+    private static PublishedMessage createMessage(String topic, int totalMessageSize) {
+        // 4 totalSize + 1 msgType + 1 qos + 4 topicSize + 4 bodySize = 14
+        int bodySize = totalMessageSize - 14 - topic.getBytes(UTF_8).length;
+        final ByteBuf payload = Unpooled.wrappedBuffer(getBody(bodySize).getBytes(StandardCharsets.UTF_8));
+        return new PublishedMessage(Topic.asTopic(topic), MqttQoS.AT_LEAST_ONCE, payload, false);
     }
 
     @Test
@@ -179,26 +213,36 @@ public class SegmentPersistentQueueTest {
         LOGGER.info("testPerformance");
         SessionMessageQueue<EnqueuedMessage> queue = queueRepository.getOrCreateQueue("testPerformance");
         queues.add(queue);
-        final int numIterations = 1_000_000;
-        final int perIteration = 10;
-        int count = 0;
+        final String topic = "Hello";
+        final int numIterations = 10_000;
+        final int perIteration = 3;
+        // With a total (in-queue) message size of 201, and a segment size of 1000
+        // we can be sure we hit all corner cases.
+        final int totalMessageSize = 201;
+        int countPush = 0;
+        int countPull = 0;
         int j = 0;
         final String message = "Queue should have contained " + perIteration + " items";
         try {
             for (int i = 0; i < numIterations; i++) {
                 for (j = 0; j < perIteration; j++) {
-                    createAndAddToQueue(queue, "Hello");
-                    count++;
+                    countPush++;
+                    LOGGER.debug("push {}, {}", countPush, j);
+                    createAndAddToQueue(queue, topic, totalMessageSize);
                 }
                 j = 0;
                 while (!queue.isEmpty()) {
-                    assertEquals("Hello", ((SessionRegistry.PublishedMessage) queue.dequeue()).getTopic().toString());
+                    countPull++;
                     j++;
+                    LOGGER.debug("pull {}, {}", countPull, j);
+                    final PublishedMessage msg = (PublishedMessage) queue.dequeue();
+                    checkMessage(msg, topic);
                 }
                 assertEquals(perIteration, j, message);
             }
         } catch (Exception ex) {
-            Assertions.fail("Failed on count " + count + ", j " + j, ex);
+            LOGGER.error("", ex);
+            Assertions.fail("Failed on push count " + countPush + ", pull count " + countPull + ", j " + j, ex);
         }
         assertTrue(queue.isEmpty(), "should be empty");
     }
@@ -208,15 +252,15 @@ public class SegmentPersistentQueueTest {
         LOGGER.info("testReloadFromPersistedState");
         SessionMessageQueue<EnqueuedMessage> queue = queueRepository.getOrCreateQueue("testReloadFromPersistedState");
         queues.add(queue);
-        createAndAddToQueue(queue, "Hello");
-        createAndAddToQueue(queue, "crazy");
-        createAndAddToQueue(queue, "world");
-        assertEquals("Hello", ((SessionRegistry.PublishedMessage) queue.dequeue()).getTopic().toString());
+        createAndAddToQueue(queue, "Hello", 100);
+        createAndAddToQueue(queue, "crazy", 100);
+        createAndAddToQueue(queue, "world", 100);
+        assertEquals("Hello", ((PublishedMessage) queue.dequeue()).getTopic().toString());
 
         queue = queueRepository.getOrCreateQueue("testReloadFromPersistedState");
 
-        assertEquals("crazy", ((SessionRegistry.PublishedMessage) queue.dequeue()).getTopic().toString());
-        assertEquals("world", ((SessionRegistry.PublishedMessage) queue.dequeue()).getTopic().toString());
+        assertEquals("crazy", ((PublishedMessage) queue.dequeue()).getTopic().toString());
+        assertEquals("world", ((PublishedMessage) queue.dequeue()).getTopic().toString());
         assertTrue(queue.isEmpty(), "should be empty");
     }
 }

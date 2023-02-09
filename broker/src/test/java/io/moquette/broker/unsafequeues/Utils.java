@@ -22,10 +22,10 @@ class Utils {
         return fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, size);
     }
 
-    static MappedByteBuffer openPageFile(Path pageFile) throws IOException {
+    static MappedByteBuffer openPageFile(Path pageFile, int pageSize) throws IOException {
         final OpenOption[] openOptions = {StandardOpenOption.READ, StandardOpenOption.TRUNCATE_EXISTING};
         FileChannel fileChannel = FileChannel.open(pageFile, openOptions);
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, PagedFilesAllocator.PAGE_SIZE);
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, pageSize);
     }
 
     static String bufferToString(ByteBuffer buffer) {
