@@ -236,7 +236,11 @@ final class MQTTConnection {
                         // OK continue with sending queued messages and normal flow
 
                         if (result.mode == SessionRegistry.CreationModeEnum.REOPEN_EXISTING) {
-                            result.session.sendQueuedMessagesWhileOffline();
+                            final Session session = result.session;
+                            postOffice.routeCommand(session.getClientID(), "sendOfflineMessages", () -> {
+                                session.sendQueuedMessagesWhileOffline();
+                                return null;
+                            });
                         }
 
                         initializeKeepAliveTimeout(channel, msg, clientIdUsed);
@@ -543,7 +547,7 @@ final class MQTTConnection {
     public void writabilityChanged() {
         if (channel.isWritable()) {
             LOG.debug("Channel is again writable");
-            bindedSession.writabilityChanged();
+            queueDrainQueueCommand();
         }
     }
 
@@ -628,8 +632,15 @@ final class MQTTConnection {
         LOG.debug("readCompleted client CId: {}", getClientId());
         if (getClientId() != null) {
             // TODO drain all messages in target's session in-flight message queue
-            bindedSession.flushAllQueuedMessages();
+            queueDrainQueueCommand();
         }
+    }
+
+    private void queueDrainQueueCommand() {
+        postOffice.routeCommand(getClientId(), "flushQueues", () -> {
+            bindedSession.flushAllQueuedMessages();
+            return null;
+        });
     }
 
     public void flush() {
