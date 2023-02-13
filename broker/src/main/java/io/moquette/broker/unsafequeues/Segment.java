@@ -44,9 +44,12 @@ final class Segment {
     }
 
     void write(SegmentPointer offset, ByteBuffer content) {
-        final ByteBuffer buffer = (ByteBuffer) mappedBuffer.position(offset.offset());
         checkContentStartWith(content);
-        buffer.put(content);
+        final int startPos = offset.offset();
+        final int endPos = startPos + content.remaining();
+        for (int i = startPos; i < endPos; i++) {
+            mappedBuffer.put(i, content.get());
+        }
     }
 
     // fill the segment with value bytes
@@ -66,9 +69,11 @@ final class Segment {
     }
 
     void write(VirtualPointer offset, ByteBuffer content) {
-        final int pageOffset = rebasedOffset(offset);
-        final ByteBuffer buffer = (ByteBuffer) mappedBuffer.position(pageOffset);
-        buffer.put(content);
+        final int startPos = rebasedOffset(offset);
+        final int endPos = startPos + content.remaining();
+        for (int i = startPos; i < endPos; i++) {
+            mappedBuffer.put(i, content.get());
+        }
     }
 
     /**
