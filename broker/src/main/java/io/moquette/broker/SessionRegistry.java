@@ -264,7 +264,7 @@ public class SessionRegistry {
 
     void connectionClosed(Session session) {
         session.disconnect();
-        if (session.expireImmediately()) {
+        if (session.expireImmediately()&& !session.hasState(SessionStatus.DESTROYED)) {
             purgeSessionState(session);
             return;
         } else {

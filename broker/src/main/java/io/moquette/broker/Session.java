@@ -187,6 +187,10 @@ class Session {
         return status.compareAndSet(expected, newState);
     }
 
+    boolean hasState(SessionStatus expectedStatus) {
+        return status.get() == expectedStatus;
+    }
+
     public void closeImmediately() {
         mqttConnection.dropConnection();
         mqttConnection = null;
