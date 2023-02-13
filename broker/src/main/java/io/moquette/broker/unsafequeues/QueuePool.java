@@ -33,7 +33,7 @@ public class QueuePool {
 
     static final boolean queueDebug = Boolean.parseBoolean(System.getProperty("moquette.queue.debug", "false"));
 
-    private static SegmentAllocationCallback callback;
+    private final SegmentAllocationCallback callback;
 
     // visible for testing
     static class SegmentRef implements Comparable<SegmentRef> {
@@ -104,6 +104,7 @@ public class QueuePool {
         this.allocator = allocator;
         this.dataPath = dataPath;
         this.segmentSize = segmentSize;
+        this.callback = new SegmentAllocationCallback(this);
     }
 
     private static class SegmentAllocationCallback implements PagedFilesAllocator.AllocationListener {
@@ -142,7 +143,6 @@ public class QueuePool {
         final PagedFilesAllocator allocator = new PagedFilesAllocator(dataPath, pageSize, segmentSize, lastPage, lastSegment);
 
         final QueuePool queuePool = new QueuePool(allocator, dataPath, segmentSize);
-        callback = new SegmentAllocationCallback(queuePool);
         queuePool.loadQueueDefinitions(checkpointProps);
         LOG.debug("Loaded queues definitions: {}", queuePool.queueSegments);
 
