@@ -23,10 +23,12 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Optional;
@@ -34,6 +36,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
+
+import static io.moquette.broker.Session.INFINITE_EXPIRY;
 
 public class SessionRegistry {
 
@@ -114,13 +118,16 @@ public class SessionRegistry {
 
     private final ConcurrentMap<String, Session> pool = new ConcurrentHashMap<>();
     private final ISubscriptionsDirectory subscriptionsDirectory;
+    private final ISessionsRepository sessionsRepository;
     private final IQueueRepository queueRepository;
     private final Authorizator authorizator;
 
     SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory,
+                    ISessionsRepository sessionsRepository,
                     IQueueRepository queueRepository,
                     Authorizator authorizator) {
         this.subscriptionsDirectory = subscriptionsDirectory;
+        this.sessionsRepository = sessionsRepository;
         this.queueRepository = queueRepository;
         this.authorizator = authorizator;
         recreateSessionPool();
@@ -128,13 +135,13 @@ public class SessionRegistry {
 
     private void recreateSessionPool() {
         final Set<String> queues = queueRepository.listQueueNames();
-        for (String clientId : subscriptionsDirectory.listAllSessionIds()) {
+        for (ISessionsRepository.SessionData session : sessionsRepository.list()) {
             // if the subscriptions are present is obviously false
-            if (queueRepository.containsQueue(clientId)) {
-                final SessionMessageQueue<EnqueuedMessage> persistentQueue = queueRepository.getOrCreateQueue(clientId);
-                queues.remove(clientId);
-                Session rehydrated = new Session(clientId, false, persistentQueue);
-                pool.put(clientId, rehydrated);
+            if (queueRepository.containsQueue(session.clientId())) {
+                final SessionMessageQueue<EnqueuedMessage> persistentQueue = queueRepository.getOrCreateQueue(session.clientId());
+                queues.remove(session.clientId());
+                Session rehydrated = new Session(session.clientId(), false, persistentQueue);
+                pool.put(session.clientId(), rehydrated);
             }
         }
         if (!queues.isEmpty()) {
@@ -236,6 +243,7 @@ public class SessionRegistry {
         }
 
         newSession.markConnecting();
+        sessionsRepository.saveSession(new ISessionsRepository.SessionData(clientId, Instant.now(), MqttVersion.MQTT_3_1_1, INFINITE_EXPIRY));
         return newSession;
     }
 

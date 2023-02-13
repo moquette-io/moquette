@@ -31,6 +31,7 @@ import io.moquette.broker.security.ResourceAuthenticator;
 import io.moquette.broker.unsafequeues.QueueException;
 import io.moquette.interception.InterceptHandler;
 import io.moquette.persistence.H2Builder;
+import io.moquette.persistence.MemorySessionsRepository;
 import io.moquette.persistence.MemorySubscriptionsRepository;
 import io.moquette.interception.BrokerInterceptor;
 import io.moquette.broker.subscriptions.CTrieSubscriptionDirectory;
@@ -192,6 +193,7 @@ public class Server {
         authenticator = initializeAuthenticator(authenticator, config);
         authorizatorPolicy = initializeAuthorizatorPolicy(authorizatorPolicy, config);
 
+        final ISessionsRepository sessionsRepository;
         final ISubscriptionsRepository subscriptionsRepository;
         final IQueueRepository queueRepository;
         final IRetainedRepository retainedRepository;
@@ -225,17 +227,19 @@ public class Server {
             LOG.trace("Configuring H2 subscriptions repository");
             subscriptionsRepository = h2Builder.subscriptionsRepository();
             retainedRepository = h2Builder.retainedRepository();
+            sessionsRepository = h2Builder.sessionsRepository();
         } else {
             LOG.trace("Configuring in-memory subscriptions store");
             subscriptionsRepository = new MemorySubscriptionsRepository();
             queueRepository = new MemoryQueueRepository();
             retainedRepository = new MemoryRetainedRepository();
+            sessionsRepository = new MemorySessionsRepository();
         }
 
         ISubscriptionsDirectory subscriptions = new CTrieSubscriptionDirectory();
         subscriptions.init(subscriptionsRepository);
         final Authorizator authorizator = new Authorizator(authorizatorPolicy);
-        sessions = new SessionRegistry(subscriptions, queueRepository, authorizator);
+        sessions = new SessionRegistry(subscriptions, sessionsRepository, queueRepository, authorizator);
         final int sessionQueueSize = config.intProp(BrokerConstants.SESSION_QUEUE_SIZE, 1024);
         dispatcher = new PostOffice(subscriptions, retainedRepository, sessions, interceptor, authorizator,
                                     sessionQueueSize);

@@ -38,6 +38,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static io.moquette.broker.MQTTConnectionPublishTest.inMemorySessionsRepository;
 import static io.moquette.broker.PostOfficePublishTest.PUBLISHER_ID;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
 import static java.util.Collections.*;
@@ -87,7 +88,7 @@ public class PostOfficeUnsubscribeTest {
 
         final PermitAllAuthorizatorPolicy authorizatorPolicy = new PermitAllAuthorizatorPolicy();
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
-        sessionRegistry = new SessionRegistry(subscriptions, queueRepository, permitAll);
+        sessionRegistry = new SessionRegistry(subscriptions, inMemorySessionsRepository(), queueRepository, permitAll);
         sut = new PostOffice(subscriptions, new MemoryRetainedRepository(), sessionRegistry,
                              ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, 1024);
     }

@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.ExecutionException;
 
+import static io.moquette.broker.MQTTConnectionPublishTest.inMemorySessionsRepository;
 import static io.moquette.broker.NettyChannelAssertions.assertEqualsConnAck;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
 import static java.util.Collections.singleton;
@@ -70,7 +71,7 @@ public class MQTTConnectionConnectTest {
 
         final PermitAllAuthorizatorPolicy authorizatorPolicy = new PermitAllAuthorizatorPolicy();
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
-        sessionRegistry = new SessionRegistry(subscriptions, queueRepository, permitAll);
+        sessionRegistry = new SessionRegistry(subscriptions, inMemorySessionsRepository(), queueRepository, permitAll);
         postOffice = new PostOffice(subscriptions, new MemoryRetainedRepository(), sessionRegistry,
                                     ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, 1024);
 

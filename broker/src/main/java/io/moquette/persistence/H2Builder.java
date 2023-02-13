@@ -2,6 +2,7 @@ package io.moquette.persistence;
 
 import io.moquette.broker.IQueueRepository;
 import io.moquette.broker.IRetainedRepository;
+import io.moquette.broker.ISessionsRepository;
 import io.moquette.broker.ISubscriptionsRepository;
 import org.h2.mvstore.MVStore;
 import org.slf4j.Logger;
@@ -71,5 +72,9 @@ public class H2Builder {
 
     public IRetainedRepository retainedRepository() {
         return new H2RetainedRepository(mvStore);
+    }
+
+    public ISessionsRepository sessionsRepository() {
+        return new H2SessionsRepository(mvStore);
     }
 }

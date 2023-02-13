@@ -46,6 +46,7 @@ import java.util.concurrent.atomic.AtomicReference;
 class Session {
 
     private static final Logger LOG = LoggerFactory.getLogger(Session.class);
+    static final int INFINITE_EXPIRY = 0xFFFFFFFF;
 
     static class InFlightPacket implements Delayed {
 
@@ -123,7 +124,7 @@ class Session {
         this.sessionQueue = sessionQueue;
         this.created = Instant.now();
         // in MQTT3 cleanSession = true means  expiryInterval=0 else infinite
-        expiryInterval = clean ? 0 : 0xFFFFFFFF;
+        expiryInterval = clean ? 0 : INFINITE_EXPIRY;
     }
 
     public boolean expireImmediately() {
