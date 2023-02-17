@@ -19,12 +19,12 @@ public class SegmentQueueRepository implements IQueueRepository {
 
     private final QueuePool queuePool;
 
-    public SegmentQueueRepository(String path) throws QueueException {
-        queuePool = QueuePool.loadQueues(Paths.get(path));
+    public SegmentQueueRepository(String path, int pageSize, int segmentSize) throws QueueException {
+        queuePool = QueuePool.loadQueues(Paths.get(path), pageSize, segmentSize);
     }
 
-    public SegmentQueueRepository(Path path) throws QueueException {
-        queuePool = QueuePool.loadQueues(path);
+    public SegmentQueueRepository(Path path, int pageSize, int segmentSize) throws QueueException {
+        queuePool = QueuePool.loadQueues(path, pageSize, segmentSize);
     }
 
     @Override

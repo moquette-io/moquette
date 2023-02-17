@@ -19,17 +19,20 @@ class PagedFilesAllocator implements SegmentAllocator {
         void segmentedCreated(String name, Segment segment);
     }
 
-    public static final int MB = 1024 * 1024;
-    public static final int PAGE_SIZE = 64 * MB;
     private final Path pagesFolder;
+    private final int pageSize;
     private final int segmentSize;
     private int lastSegmentAllocated;
     private int lastPage;
     private MappedByteBuffer currentPage;
     private FileChannel currentPageFile;
 
-    PagedFilesAllocator(Path pagesFolder, int segmentSize, int lastPage, int lastSegmentAllocated) throws QueueException {
+    PagedFilesAllocator(Path pagesFolder, int pageSize, int segmentSize, int lastPage, int lastSegmentAllocated) throws QueueException {
+        if (pageSize % segmentSize != 0) {
+            throw new IllegalArgumentException("The pageSize must be an exact multiple of the segmentSize");
+        }
         this.pagesFolder = pagesFolder;
+        this.pageSize = pageSize;
         this.segmentSize = segmentSize;
         this.lastPage = lastPage;
         this.lastSegmentAllocated = lastSegmentAllocated;
@@ -50,10 +53,10 @@ class PagedFilesAllocator implements SegmentAllocator {
 
         try (FileChannel fileChannel = FileChannel.open(pageFile, StandardOpenOption.READ, StandardOpenOption.WRITE)) {
             this.currentPageFile = fileChannel;
-            final MappedByteBuffer mappedPage = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, PAGE_SIZE);
+            final MappedByteBuffer mappedPage = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, pageSize);
             // DBG
             if (createNew && QueuePool.queueDebug) {
-                for (int i = 0; i < PAGE_SIZE; i++){
+                for (int i = 0; i < pageSize; i++) {
                     mappedPage.put(i, (byte) 'C');
                 }
             }
@@ -67,7 +70,7 @@ class PagedFilesAllocator implements SegmentAllocator {
     @Override
     public Segment nextFreeSegment() throws QueueException {
         if (currentPageIsExhausted()) {
-            lastPage ++;
+            lastPage++;
             currentPage = openRWPageFile(pagesFolder, lastPage);
             lastSegmentAllocated = 0;
         }
@@ -104,7 +107,17 @@ class PagedFilesAllocator implements SegmentAllocator {
         checkpoint.setProperty("segments.last_segment", String.valueOf(this.lastSegmentAllocated));
     }
 
+    @Override
+    public int getPageSize() {
+        return pageSize;
+    }
+
+    @Override
+    public int getSegmentSize() {
+        return segmentSize;
+    }
+
     private boolean currentPageIsExhausted() {
-        return lastSegmentAllocated * segmentSize == PAGE_SIZE;
+        return lastSegmentAllocated * segmentSize == pageSize;
     }
 }

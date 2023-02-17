@@ -32,6 +32,10 @@ public final class BrokerConstants {
     public static final String DATA_PATH_PROPERTY_NAME = "data_path";
     public static final String PERSISTENT_QUEUE_TYPE_PROPERTY_NAME = "persistent_queue_type"; // h2 or segmented, default h2
     public static final String PERSISTENCE_ENABLED_PROPERTY_NAME = "persistence_enabled"; // true or false, default true
+    public static final String SEGMENTED_QUEUE_PAGE_SIZE = "queue_page_size";
+    public static final int DEFAULT_SEGMENTED_QUEUE_PAGE_SIZE = 64 * 1024 * 1024;
+    public static final String SEGMENTED_QUEUE_SEGMENT_SIZE = "queue_segment_size";
+    public static final int DEFAULT_SEGMENTED_QUEUE_SEGMENT_SIZE = 4 * 1024 * 1024;
     public static final String AUTOSAVE_INTERVAL_PROPERTY_NAME = "autosave_interval";
     public static final String PASSWORD_FILE_PROPERTY_NAME = "password_file";
     public static final String PORT_PROPERTY_NAME = "port";

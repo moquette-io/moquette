@@ -7,6 +7,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.moquette.BrokerConstants;
+import io.moquette.broker.unsafequeues.Queue;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
@@ -34,12 +36,15 @@ class QueuePoolTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(QueuePoolTest.class);
 
+    private static final int PAGE_SIZE = BrokerConstants.DEFAULT_SEGMENTED_QUEUE_PAGE_SIZE;
+    private static final int SEGMENT_SIZE = BrokerConstants.DEFAULT_SEGMENTED_QUEUE_SEGMENT_SIZE;
+
     @TempDir
     Path tempQueueFolder;
 
     @Test
     public void checkpointFileContainsCorrectReferences() throws QueueException, IOException {
-        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder, PAGE_SIZE, SEGMENT_SIZE);
         final Queue queue = queuePool.getOrCreate("test");
         queue.enqueue((ByteBuffer)ByteBuffer.wrap("AAAA".getBytes(StandardCharsets.UTF_8)));
         queue.force();
@@ -69,14 +74,14 @@ class QueuePoolTest {
 
     @Test
     public void reloadQueuePoolAndCheckRestartFromWhereItLeft() throws QueueException, IOException {
-        QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder, PAGE_SIZE, SEGMENT_SIZE);
         Queue queue = queuePool.getOrCreate("test");
         queue.enqueue(ByteBuffer.wrap("AAAA".getBytes(StandardCharsets.UTF_8)));
         queue.force();
         queuePool.close();
 
         // reload
-        queuePool = QueuePool.loadQueues(tempQueueFolder);
+        queuePool = QueuePool.loadQueues(tempQueueFolder, PAGE_SIZE, SEGMENT_SIZE);
         queue = queuePool.getOrCreate("test");
         queue.enqueue(ByteBuffer.wrap("BBBB".getBytes(StandardCharsets.UTF_8)));
         queue.force();
@@ -105,8 +110,8 @@ class QueuePoolTest {
 
     @Test
     public void checkRecreateHolesAtTheStartOfThePage() throws QueueException {
-        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
-        final QueuePool.SegmentRef middleSegment = new QueuePool.SegmentRef(0, Segment.SIZE);
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder, PAGE_SIZE, SEGMENT_SIZE);
+        final QueuePool.SegmentRef middleSegment = new QueuePool.SegmentRef(0, SEGMENT_SIZE);
 
         // Exercise
         final List<QueuePool.SegmentRef> holes = queuePool.recreateSegmentHoles(asTreeSet(middleSegment));
@@ -120,9 +125,9 @@ class QueuePoolTest {
 
     @Test
     public void checkRecreateHolesAtTheStartOfThePageWith2OccupiedContiguousSegments() throws QueueException {
-        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
-        final QueuePool.SegmentRef firstSegment = new QueuePool.SegmentRef(0, Segment.SIZE);
-        final QueuePool.SegmentRef secondSegment = new QueuePool.SegmentRef(0, 2 * Segment.SIZE);
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder, PAGE_SIZE, SEGMENT_SIZE);
+        final QueuePool.SegmentRef firstSegment = new QueuePool.SegmentRef(0, SEGMENT_SIZE);
+        final QueuePool.SegmentRef secondSegment = new QueuePool.SegmentRef(0, 2 * SEGMENT_SIZE);
 
         // Exercise
         final List<QueuePool.SegmentRef> holes = queuePool.recreateSegmentHoles(asTreeSet(firstSegment, secondSegment));
@@ -136,19 +141,19 @@ class QueuePoolTest {
 
     @Test
     public void checkRecreateHolesBeforeSecondPage() throws QueueException {
-        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
-        final QueuePool.SegmentRef middleSegment = new QueuePool.SegmentRef(1, Segment.SIZE);
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder, PAGE_SIZE, SEGMENT_SIZE);
+        final QueuePool.SegmentRef middleSegment = new QueuePool.SegmentRef(1, SEGMENT_SIZE);
 
         // Exercise
         final List<QueuePool.SegmentRef> holes = queuePool.recreateSegmentHoles(asTreeSet(middleSegment));
 
         // Verify
-        final int expectedHolesCount = (int) (PagedFilesAllocator.PAGE_SIZE / Segment.SIZE) + 1;
+        final int expectedHolesCount = (int) (PAGE_SIZE / SEGMENT_SIZE) + 1;
         assertEquals(expectedHolesCount, holes.size(), "The previous empty page is full of holes");
         for (int i = 0; i < expectedHolesCount - 1; i++) {
             final QueuePool.SegmentRef hole = holes.get(i);
             assertEquals(0, hole.pageId);
-            assertEquals(i * Segment.SIZE, hole.offset);
+            assertEquals(i * SEGMENT_SIZE, hole.offset);
         }
         QueuePool.SegmentRef singleHole = holes.get(expectedHolesCount - 1);
         assertEquals(1, singleHole.pageId);
@@ -157,9 +162,9 @@ class QueuePoolTest {
 
     @Test
     public void checkRecreateHolesBetweenUsedSegmentsOnSamePage() throws QueueException {
-        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder, PAGE_SIZE, SEGMENT_SIZE);
         final QueuePool.SegmentRef initialSegment = new QueuePool.SegmentRef(0, 0);
-        final QueuePool.SegmentRef middleSegment = new QueuePool.SegmentRef(0, 3 * Segment.SIZE);
+        final QueuePool.SegmentRef middleSegment = new QueuePool.SegmentRef(0, 3 * SEGMENT_SIZE);
 
         // Exercise
         final List<QueuePool.SegmentRef> holes = queuePool.recreateSegmentHoles(asTreeSet(initialSegment, middleSegment));
@@ -169,23 +174,23 @@ class QueuePoolTest {
 
         // first hole
         assertEquals(0, holes.get(0).pageId);
-        assertEquals(Segment.SIZE, holes.get(0).offset);
+        assertEquals(SEGMENT_SIZE, holes.get(0).offset);
         // second hole
         assertEquals(0, holes.get(1).pageId);
-        assertEquals(2 * Segment.SIZE, holes.get(1).offset);
+        assertEquals(2 * SEGMENT_SIZE, holes.get(1).offset);
     }
 
     @Test
     public void checkRecreateHolesSpanningMultiplePages() throws QueueException {
-        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder, PAGE_SIZE, SEGMENT_SIZE);
         final QueuePool.SegmentRef initialSegment = new QueuePool.SegmentRef(0, 0);
-        final QueuePool.SegmentRef middleSegment = new QueuePool.SegmentRef(2, 3 * Segment.SIZE);
+        final QueuePool.SegmentRef middleSegment = new QueuePool.SegmentRef(2, 3 * SEGMENT_SIZE);
 
         // Exercise
         final List<QueuePool.SegmentRef> holes = queuePool.recreateSegmentHoles(asTreeSet(initialSegment, middleSegment));
 
         // Verify
-        final int holesInEmptyPage = (PagedFilesAllocator.PAGE_SIZE / Segment.SIZE);
+        final int holesInEmptyPage = (PAGE_SIZE / SEGMENT_SIZE);
         final int holesInFirstPage = holesInEmptyPage - 1;
         final int holesInLastPage = 3;
         final int expectedHolesCount = holesInFirstPage + holesInEmptyPage + holesInLastPage;
@@ -193,12 +198,12 @@ class QueuePoolTest {
 
         // first page hole
         int i = 0;
-        int expectedOffset = Segment.SIZE;
+        int expectedOffset = SEGMENT_SIZE;
         for (; i < holesInFirstPage; i++) {
             final QueuePool.SegmentRef hole = holes.get(i);
             assertEquals(0, hole.pageId);
             assertEquals(expectedOffset, hole.offset);
-            expectedOffset += Segment.SIZE;
+            expectedOffset += SEGMENT_SIZE;
         }
 
         // central empty pages
@@ -207,7 +212,7 @@ class QueuePoolTest {
             final QueuePool.SegmentRef hole = holes.get(i);
             assertEquals(1, hole.pageId);
             assertEquals(expectedOffset, hole.offset);
-            expectedOffset += Segment.SIZE;
+            expectedOffset += SEGMENT_SIZE;
         }
 
         // tail page hole
@@ -216,21 +221,21 @@ class QueuePoolTest {
             final QueuePool.SegmentRef hole = holes.get(i);
             assertEquals(2, hole.pageId);
             assertEquals(expectedOffset, hole.offset);
-            expectedOffset += Segment.SIZE;
+            expectedOffset += SEGMENT_SIZE;
         }
     }
 
     @Test
     public void checkRecreateHolesWhenSegmentAreAdjacentAndSpanningMultiplePages() throws QueueException {
-        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
-        final QueuePool.SegmentRef initialSegment = new QueuePool.SegmentRef(0, PagedFilesAllocator.PAGE_SIZE - Segment.SIZE);
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder, PAGE_SIZE, SEGMENT_SIZE);
+        final QueuePool.SegmentRef initialSegment = new QueuePool.SegmentRef(0, PAGE_SIZE - SEGMENT_SIZE);
         final QueuePool.SegmentRef adjacentSegment = new QueuePool.SegmentRef(1, 0);
 
         // Exercise
         final List<QueuePool.SegmentRef> holes = queuePool.recreateSegmentHoles(asTreeSet(initialSegment, adjacentSegment));
 
         // Verify
-        assertEquals((PagedFilesAllocator.PAGE_SIZE - Segment.SIZE) / Segment.SIZE, holes.size());
+        assertEquals((PAGE_SIZE - SEGMENT_SIZE) / SEGMENT_SIZE, holes.size());
     }
 
     @Test
@@ -242,13 +247,13 @@ class QueuePoolTest {
     @Test
     @Disabled
     public void verifySingleReaderSingleWriterOnSingleQueuePool_with_random_size_packet() throws QueueException, ExecutionException, InterruptedException, TimeoutException, NoSuchAlgorithmException {
-        final int payloadSize = SecureRandom.getInstanceStrong().nextInt(Segment.SIZE / 2 - LENGTH_HEADER_SIZE);
+        final int payloadSize = SecureRandom.getInstanceStrong().nextInt(SEGMENT_SIZE / 2 - LENGTH_HEADER_SIZE);
         templateSingleReaderSingleWriterOnSingleQueuePool(payloadSize);
 
     }
 
     private void templateSingleReaderSingleWriterOnSingleQueuePool(int payloadSize) throws QueueException, InterruptedException, ExecutionException, TimeoutException {
-        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder);
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder, PAGE_SIZE, SEGMENT_SIZE);
         Queue queue = queuePool.getOrCreate("single_writer_single_reader");
         ExecutorService pool = Executors.newCachedThreadPool();
         int messagesToSend = 1000;
@@ -309,7 +314,7 @@ class QueuePoolTest {
     public void testMultipleWritersSingleReader() throws QueueException, NoSuchAlgorithmException, ExecutionException, InterruptedException, TimeoutException {
         final int payloadSize = 152433/*SecureRandom.getInstanceStrong().nextInt(Segment.SIZE / 2 - LENGTH_HEADER_SIZE)*/;
         LOG.info("Payload size: " + payloadSize);
-        final QueuePool queuePool = QueuePool.loadQueues(/*tempQueueFolder*/Paths.get("/tmp/test_dir/"));
+        final QueuePool queuePool = QueuePool.loadQueues(/*tempQueueFolder*/Paths.get("/tmp/test_dir/"), PAGE_SIZE, SEGMENT_SIZE);
         Queue queue = queuePool.getOrCreate("multiple_writers_single_reader");
         ExecutorService pool = Executors.newCachedThreadPool();
         int messagesToSend = 1000;
