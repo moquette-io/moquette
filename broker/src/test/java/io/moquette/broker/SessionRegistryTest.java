@@ -40,7 +40,7 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutionException;
 
-import static io.moquette.broker.MQTTConnectionPublishTest.inMemorySessionsRepository;
+import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
 import static io.moquette.broker.NettyChannelAssertions.assertEqualsConnAck;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
 import static java.util.Collections.singleton;
@@ -86,7 +86,7 @@ public class SessionRegistryTest {
 
         final PermitAllAuthorizatorPolicy authorizatorPolicy = new PermitAllAuthorizatorPolicy();
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
-        sut = new SessionRegistry(subscriptions, inMemorySessionsRepository(), queueRepository, permitAll);
+        sut = new SessionRegistry(subscriptions, memorySessionsRepository(), queueRepository, permitAll);
         final PostOffice postOffice = new PostOffice(subscriptions,
             new MemoryRetainedRepository(), sut, ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, 1024);
         return new MQTTConnection(channel, config, mockAuthenticator, sut, postOffice);

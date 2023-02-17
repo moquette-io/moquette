@@ -32,7 +32,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
-import static io.moquette.broker.MQTTConnectionPublishTest.inMemorySessionsRepository;
+import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
 import static io.moquette.broker.PostOfficeUnsubscribeTest.CONFIG;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -90,7 +90,7 @@ public class PostOfficeInternalPublishTest {
 
         final PermitAllAuthorizatorPolicy authorizatorPolicy = new PermitAllAuthorizatorPolicy();
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
-        sessionRegistry = new SessionRegistry(subscriptions, inMemorySessionsRepository(), queueRepository, permitAll);
+        sessionRegistry = new SessionRegistry(subscriptions, memorySessionsRepository(), queueRepository, permitAll);
         sut = new PostOffice(subscriptions, retainedRepository, sessionRegistry,
                              ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, 1024);
     }
