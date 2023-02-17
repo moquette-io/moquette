@@ -89,12 +89,12 @@ public class SegmentPersistentQueueTest {
     }
 
     private void createAndAddToQueues(String topic, int totalSize) {
-        final PublishedMessage msg1 = createMessage(topic, totalSize);
+        final PublishedMessage msg = createMessage(topic, totalSize);
         for (SessionMessageQueue<EnqueuedMessage> queue : queues) {
-            msg1.retain();
-            queue.enqueue(msg1);
+            msg.retain();
+            queue.enqueue(msg);
         }
-        msg1.release();
+        msg.release();
     }
 
     private void assertAllEmpty(String message) {
