@@ -14,6 +14,8 @@ import java.util.Collection;
 
 class H2SessionsRepository implements ISessionsRepository {
 
+    private static final byte SESSION_DATA_SERDES_V1 = 1;
+
     private final MVMap<String, SessionData> sessionMap;
 
     public H2SessionsRepository(MVStore mvStore) {
@@ -48,6 +50,7 @@ class H2SessionsRepository implements ISessionsRepository {
 
         @Override
         public void write(WriteBuffer buff, SessionData obj) {
+            buff.put(SESSION_DATA_SERDES_V1);
             stringDataType.write(buff, obj.clientId());
             buff.putLong(obj.created().toEpochMilli());
             buff.put(obj.protocolVersion().protocolLevel());
@@ -56,17 +59,13 @@ class H2SessionsRepository implements ISessionsRepository {
 
         @Override
         public SessionData read(ByteBuffer buff) {
+            final byte serDesVersion = buff.get();
+            if (serDesVersion != SESSION_DATA_SERDES_V1) {
+                throw new IllegalArgumentException("Unrecognized serialization version " + serDesVersion);
+            }
             final String clientId = stringDataType.read(buff);
             final long created = buff.getLong();
-            final byte rawVersion = buff.get();
-            final MqttVersion version;
-            switch (rawVersion) {
-                case 3: version = MqttVersion.MQTT_3_1; break;
-                case 4: version = MqttVersion.MQTT_3_1_1; break;
-                case 5: version = MqttVersion.MQTT_5; break;
-                default:
-                    throw new IllegalArgumentException("Unrecognized MQTT version value " + rawVersion);
-            }
+            final MqttVersion version = readMQTTVersion(buff.get());
             final long expiryInterval = buff.getLong();
 
             return new SessionData(clientId, Instant.ofEpochMilli(created), version, expiryInterval);
@@ -76,5 +75,17 @@ class H2SessionsRepository implements ISessionsRepository {
         public SessionData[] createStorage(int i) {
             return new SessionData[i];
         }
+    }
+
+    private MqttVersion readMQTTVersion(byte rawVersion) {
+        final MqttVersion version;
+        switch (rawVersion) {
+            case 3: version = MqttVersion.MQTT_3_1; break;
+            case 4: version = MqttVersion.MQTT_3_1_1; break;
+            case 5: version = MqttVersion.MQTT_5; break;
+            default:
+                throw new IllegalArgumentException("Unrecognized MQTT version value " + rawVersion);
+        }
+        return version;
     }
 }
