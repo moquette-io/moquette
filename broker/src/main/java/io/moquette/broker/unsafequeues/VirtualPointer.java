@@ -16,8 +16,8 @@ public class VirtualPointer implements Comparable<VirtualPointer> {
         return Long.compare(logicalOffset, other.logicalOffset);
     }
 
-    public long segmentOffset() {
-        return logicalOffset % Segment.SIZE;
+    public long segmentOffset(int segmentSize) {
+        return logicalOffset % segmentSize;
     }
 
     public long logicalOffset() {

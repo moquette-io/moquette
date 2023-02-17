@@ -10,8 +10,7 @@ import java.nio.MappedByteBuffer;
 final class Segment {
     private static final Logger LOG = LoggerFactory.getLogger(Segment.class);
 
-    final static int SIZE = 4 * 1024 * 1024;
-
+    final int segmentSize;
     final SegmentPointer begin;
     final SegmentPointer end;
 
@@ -19,6 +18,7 @@ final class Segment {
 
     Segment(MappedByteBuffer page, SegmentPointer begin, SegmentPointer end) {
         assert begin.samePage(end);
+        this.segmentSize = end.offset() - begin.offset() + 1;
         this.begin = begin;
         this.end = end;
         this.mappedBuffer = page;
@@ -53,7 +53,7 @@ final class Segment {
     void fillWith(byte value) {
         LOG.debug("Wipe segment {}", this);
         final ByteBuffer buffer = (ByteBuffer) mappedBuffer.position(this.begin.offset());
-        for (int i = 0; i < Segment.SIZE; i++) {
+        for (int i = 0; i < size(); i++) {
             buffer.put(i, value);
         }
     }
@@ -95,7 +95,8 @@ final class Segment {
     }
 
     /*private*/ int rebasedOffset(VirtualPointer virtualPtr) {
-        return this.begin.plus((int) virtualPtr.segmentOffset()).offset();
+        final int pointerOffset = (int) virtualPtr.segmentOffset(segmentSize);
+        return this.begin.plus(pointerOffset).offset();
     }
 
     public ByteBuffer read(VirtualPointer start, int length) {

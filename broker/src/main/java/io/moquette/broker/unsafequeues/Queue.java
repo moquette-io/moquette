@@ -26,6 +26,7 @@ public class Queue {
     private Segment tailSegment;
 
     private final QueuePool queuePool;
+    private final SegmentAllocator allocator;
     private final PagedFilesAllocator.AllocationListener allocationListener;
 //    private final ReentrantLock lock = new ReentrantLock();
 
@@ -37,6 +38,7 @@ public class Queue {
         this.currentHeadPtr = currentHeadPtr;
         this.currentTailPtr = currentTailPtr;
         this.tailSegment = tailSegment;
+        this.allocator = allocator;
         this.allocationListener = allocationListener;
         this.queuePool = queuePool;
     }
@@ -91,7 +93,7 @@ public class Queue {
             //notify segment creation for queue in queue pool
             allocationListener.segmentedCreated(name, newSegment);
 
-            int copySize = (int) Math.min(rawData.remaining(), Segment.SIZE);
+            int copySize = (int) Math.min(rawData.remaining(), allocator.getSegmentSize());
             ByteBuffer slice = rawData.slice();
             slice.limit(copySize);
 
@@ -279,7 +281,7 @@ public class Queue {
     }
 
     private int segmentCountFromSize(int remaining) {
-        return (int) Math.ceil((double) remaining / Segment.SIZE);
+        return (int) Math.ceil((double) remaining / allocator.getSegmentSize());
     }
 
     private boolean isTailFirstUsage(VirtualPointer tail) {

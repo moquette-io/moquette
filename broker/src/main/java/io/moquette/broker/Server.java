@@ -265,8 +265,10 @@ public class Server {
             queueRepository = h2Builder.queueRepository();
         } else if ("segmented".equalsIgnoreCase(queueType)) {
             LOG.info("Configuring segmented queue store to {}", dataPath);
+            final int pageSize = config.intProp(BrokerConstants.SEGMENTED_QUEUE_PAGE_SIZE, BrokerConstants.DEFAULT_SEGMENTED_QUEUE_PAGE_SIZE);
+            final int segmentSize = config.intProp(BrokerConstants.SEGMENTED_QUEUE_SEGMENT_SIZE, BrokerConstants.DEFAULT_SEGMENTED_QUEUE_SEGMENT_SIZE);
             try {
-                queueRepository = new SegmentQueueRepository(dataPath);
+                queueRepository = new SegmentQueueRepository(dataPath, pageSize, segmentSize);
             } catch (QueueException e) {
                 throw new IOException("Problem in configuring persistent queue on path " + dataPath, e);
             }
