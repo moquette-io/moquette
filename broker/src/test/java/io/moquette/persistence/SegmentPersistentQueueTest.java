@@ -181,7 +181,7 @@ public class SegmentPersistentQueueTest {
             char z = 'Z';
             char curChar = a;
             StringBuilder bodyString = new StringBuilder();
-            for (int i = 0; i < 104 + 81; i++) {
+            for (int i = 0; i < bodySize; i++) {
                 bodyString.append(curChar);
                 if (curChar == z) {
                     curChar = a;

@@ -187,8 +187,8 @@ public class Queue {
             // header size + payload size + 1
             final int fullMessageSize = payloadLength + LENGTH_HEADER_SIZE;
             long remainingInSegment = tailSegment.bytesAfter(existingTail) + 1;
-            if (remainingInSegment >= fullMessageSize + 1) {
-                // currentSegments contains fully the payload
+            if (remainingInSegment > fullMessageSize) {
+                // tail segment fully contains the payload with space left over
                 currentTailPtr = existingTail.moveForward(fullMessageSize);
                 // read data from currentTail + 4 bytes(the length)
                 final VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
