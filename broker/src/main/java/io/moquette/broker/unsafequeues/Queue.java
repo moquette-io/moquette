@@ -168,6 +168,9 @@ public class Queue {
             // head and tail pointer are the same, the queue is empty
             return Optional.empty();
         }
+        if (tailSegment == null) {
+            tailSegment = queuePool.openNextTailSegment(name).get();
+        }
 
         LOG.debug("currentTail is {}", currentTailPtr);
         if (containsHeader(tailSegment, currentTailPtr)) {
@@ -183,8 +186,9 @@ public class Queue {
             // tail must be moved to the next byte to read, so has to move to
             // header size + payload size + 1
             final int fullMessageSize = payloadLength + LENGTH_HEADER_SIZE;
-            if (tailSegment.hasSpace(existingTail, fullMessageSize + 1)) {
-                // currentSegments contains fully the payload
+            long remainingInSegment = tailSegment.bytesAfter(existingTail) + 1;
+            if (remainingInSegment > fullMessageSize) {
+                // tail segment fully contains the payload with space left over
                 currentTailPtr = existingTail.moveForward(fullMessageSize);
                 // read data from currentTail + 4 bytes(the length)
                 final VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
@@ -193,6 +197,14 @@ public class Queue {
             } else {
                 // payload is split across currentSegment and next ones
                 VirtualPointer dataStart = existingTail.moveForward(LENGTH_HEADER_SIZE);
+
+                if (remainingInSegment - LENGTH_HEADER_SIZE == 0) {
+                    queuePool.consumedTailSegment(name);
+                    if (QueuePool.queueDebug) {
+                        tailSegment.fillWith((byte) 'D');
+                    }
+                    tailSegment = queuePool.openNextTailSegment(name).get();
+                }
 
                 LOG.debug("Loading payload size {}", payloadLength);
                 return Optional.of(loadPayloadFromSegments(payloadLength, tailSegment, dataStart));
@@ -239,8 +251,8 @@ public class Queue {
         }
 
         // read second part
-        final int remainingHeaderSize =  LENGTH_HEADER_SIZE - consumedHeaderSize;
-        Segment nextTailSegment = queuePool.openNextTailSegment(name);
+        final int remainingHeaderSize = LENGTH_HEADER_SIZE - consumedHeaderSize;
+        Segment nextTailSegment = queuePool.openNextTailSegment(name).get();
         lengthBuffer.put(nextTailSegment.read(nextTailSegment.begin, remainingHeaderSize));
         final VirtualPointer dataStart = pointer.moveForward(LENGTH_HEADER_SIZE);
         int payloadLength = ((ByteBuffer) lengthBuffer.flip()).getInt();
@@ -255,20 +267,19 @@ public class Queue {
 
         do {
             LOG.debug("Looping remaining {}", remaining);
-            int availableDataLength = Math.min(remaining, (int) segment.bytesAfter(scan) + 1);
+            final int availableDataLength = Math.min(remaining, (int) segment.bytesAfter(scan) + 1);
             final ByteBuffer buffer = segment.read(scan, availableDataLength);
             createdBuffers.add(buffer);
             final boolean segmentCompletelyConsumed = (segment.bytesAfter(scan) + 1) == availableDataLength;
             scan = scan.moveForward(availableDataLength);
-            final boolean consumedQueue = scan.isGreaterThan(currentHead());
             remaining -= buffer.remaining();
 
-            if (remaining > 0 || (segmentCompletelyConsumed && !consumedQueue)) {
+            if (remaining > 0 || segmentCompletelyConsumed) {
                 queuePool.consumedTailSegment(name);
                 if (QueuePool.queueDebug) {
                     segment.fillWith((byte) 'D');
                 }
-                segment = queuePool.openNextTailSegment(name);
+                segment = queuePool.openNextTailSegment(name).orElse(null);
             }
         } while (remaining > 0);
 
