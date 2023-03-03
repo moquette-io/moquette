@@ -178,7 +178,7 @@ class PostOffice {
     private SessionRegistry sessionRegistry;
     private BrokerInterceptor interceptor;
 
-    private final Thread[] sessionExecutors;
+    private final SessionEventLoop[] sessionExecutors;
     private final BlockingQueue<FutureTask<String>>[] sessionQueues;
     private final int eventLoops = Runtime.getRuntime().availableProcessors();
     private final FailedPublishCollection failedPublishes = new FailedPublishCollection();
@@ -195,9 +195,9 @@ class PostOffice {
         for (int i = 0; i < eventLoops; i++) {
             this.sessionQueues[i] = new ArrayBlockingQueue<>(sessionQueueSize);
         }
-        this.sessionExecutors = new Thread[eventLoops];
+        this.sessionExecutors = new SessionEventLoop[eventLoops];
         for (int i = 0; i < eventLoops; i++) {
-            this.sessionExecutors[i] = new Thread(new SessionEventLoop(this.sessionQueues[i]));
+            this.sessionExecutors[i] = new SessionEventLoop(this.sessionQueues[i]);
             this.sessionExecutors[i].setName(sessionLoopName(i));
             this.sessionExecutors[i].start();
         }
@@ -663,15 +663,19 @@ class PostOffice {
     }
 
     public void terminate() {
-        for (Thread processor : sessionExecutors) {
+        for (SessionEventLoop processor : sessionExecutors) {
             processor.interrupt();
         }
-        for (Thread processor : sessionExecutors) {
+        for (SessionEventLoop processor : sessionExecutors) {
             try {
                 processor.join(5_000);
             } catch (InterruptedException ex) {
                 LOG.info("Interrupted while joining session event loop {}", processor.getName(), ex);
             }
+        }
+
+        for (SessionEventLoop processor : sessionExecutors) {
+            processor.failIfError();
         }
     }
 

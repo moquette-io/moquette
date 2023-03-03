@@ -6,12 +6,14 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.FutureTask;
 
-final class SessionEventLoop implements Runnable {
+final class SessionEventLoop extends Thread {
 
     private static final Logger LOG = LoggerFactory.getLogger(SessionEventLoop.class);
 
     private final BlockingQueue<FutureTask<String>> sessionQueue;
     private final boolean flushOnExit;
+
+    private RuntimeException interruptingError = null;
 
     public SessionEventLoop(BlockingQueue<FutureTask<String>> sessionQueue) {
         this(sessionQueue, true);
@@ -35,6 +37,9 @@ final class SessionEventLoop implements Runnable {
             } catch (InterruptedException e) {
                 LOG.info("SessionEventLoop {} interrupted", Thread.currentThread().getName());
                 Thread.currentThread().interrupt();
+            } catch (RuntimeException th) {
+                interruptingError = th;
+                Thread.currentThread().interrupt();
             }
         }
         LOG.info("SessionEventLoop {} exit", Thread.currentThread().getName());
@@ -48,8 +53,15 @@ final class SessionEventLoop implements Runnable {
                 // we ran it, but we have to grab the exception if raised
                 task.get();
             } catch (Throwable th) {
-                LOG.info("SessionEventLoop {} reached exception in processing command", Thread.currentThread().getName(), th);
+                LOG.warn("SessionEventLoop {} reached exception in processing command", Thread.currentThread().getName(), th);
+                throw new RuntimeException(th);
             }
+        }
+    }
+
+    public void failIfError() {
+        if (interruptingError != null) {
+            throw interruptingError;
         }
     }
 }
