@@ -15,6 +15,7 @@ import java.util.Collection;
 class H2SessionsRepository implements ISessionsRepository {
 
     private static final byte SESSION_DATA_SERDES_V1 = 1;
+    private static final long UNDEFINED_INSTANT = -1;
 
     private final MVMap<String, SessionData> sessionMap;
 
@@ -45,16 +46,16 @@ class H2SessionsRepository implements ISessionsRepository {
 
         @Override
         public int getMemory(SessionData obj) {
-            return stringDataType.getMemory(obj.clientId()) + 8 + 1 + 8;
+            return stringDataType.getMemory(obj.clientId()) + 8 + 1 + 4;
         }
 
         @Override
         public void write(WriteBuffer buff, SessionData obj) {
             buff.put(SESSION_DATA_SERDES_V1);
             stringDataType.write(buff, obj.clientId());
-            buff.putLong(obj.created().toEpochMilli());
+            buff.putLong(obj.expiryInstant().orElse(UNDEFINED_INSTANT));
             buff.put(obj.protocolVersion().protocolLevel());
-            buff.putLong(obj.expiryInterval());
+            buff.putInt(obj.expiryInterval());
         }
 
         @Override
@@ -64,11 +65,15 @@ class H2SessionsRepository implements ISessionsRepository {
                 throw new IllegalArgumentException("Unrecognized serialization version " + serDesVersion);
             }
             final String clientId = stringDataType.read(buff);
-            final long created = buff.getLong();
+            final long expiresAt = buff.getLong();
             final MqttVersion version = readMQTTVersion(buff.get());
-            final long expiryInterval = buff.getLong();
+            final int expiryInterval = buff.getInt();
 
-            return new SessionData(clientId, Instant.ofEpochMilli(created), version, expiryInterval);
+            if (expiresAt == UNDEFINED_INSTANT) {
+                return new SessionData(clientId, version, expiryInterval);
+            } else {
+                return new SessionData(clientId, Instant.ofEpochMilli(expiresAt), version, expiryInterval);
+            }
         }
 
         @Override

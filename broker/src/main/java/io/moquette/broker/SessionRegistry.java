@@ -243,7 +243,7 @@ public class SessionRegistry {
         }
 
         newSession.markConnecting();
-        sessionsRepository.saveSession(new ISessionsRepository.SessionData(clientId, Instant.now(), MqttVersion.MQTT_3_1_1, INFINITE_EXPIRY));
+        sessionsRepository.saveSession(new ISessionsRepository.SessionData(clientId, MqttVersion.MQTT_3_1_1, INFINITE_EXPIRY));
         return newSession;
     }
 

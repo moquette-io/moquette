@@ -5,6 +5,7 @@ import io.netty.handler.codec.mqtt.MqttVersion;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Used to store data about persisted sessions like MQTT version, session's properties.
@@ -14,15 +15,28 @@ public interface ISessionsRepository {
     // Data class
     final class SessionData {
         private final String clientId;
-        private final Instant created;
+        private Instant expireAt = null;
         final MqttVersion version;
-        final long expiryInterval;
+        private final int expiryInterval;
 
-        public SessionData(String clientId, Instant created, MqttVersion version, long expiryInterval) {
+        /**
+         * Construct a new SessionData without expiration set yet.
+         * */
+        public SessionData(String clientId, MqttVersion version, int expiryInterval) {
             this.clientId = clientId;
-            this.created = created;
             this.version = version;
             this.expiryInterval = expiryInterval;
+        }
+
+        /**
+         * Construct SessionData with an expiration instant, created by loading from the storage.
+         * */
+        public SessionData(String clientId, Instant expireAt, MqttVersion version, int expiryInterval) {
+            this.expiryInterval = expiryInterval;
+            Objects.requireNonNull(expireAt, "An expiration time is requested");
+            this.clientId = clientId;
+            this.expireAt = expireAt;
+            this.version = version;
         }
 
         public String clientId() {
@@ -33,11 +47,16 @@ public interface ISessionsRepository {
             return version;
         }
 
-        public Instant created() {
-            return created;
+        public Optional<Instant> expireAt() {
+            return Optional.ofNullable(expireAt);
         }
 
-        public long expiryInterval() {
+        public Optional<Long> expiryInstant() {
+            return expireAt()
+                .map(Instant::toEpochMilli);
+        }
+
+        public int expiryInterval() {
             return expiryInterval;
         }
 
@@ -58,7 +77,7 @@ public interface ISessionsRepository {
         public String toString() {
             return "SessionData{" +
                 "clientId='" + clientId + '\'' +
-                ", created=" + created +
+                ", expireAt=" + expireAt +
                 ", version=" + version +
                 ", expiryInterval=" + expiryInterval +
                 '}';

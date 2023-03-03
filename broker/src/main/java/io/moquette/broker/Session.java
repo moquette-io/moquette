@@ -51,7 +51,7 @@ class Session {
     private static final Logger LOG = LoggerFactory.getLogger(Session.class);
     // By specification session expiry value of 0xFFFFFFFF (UINT_MAX) (seconds) means
     // session that doesn't expire, it's ~136 years, we can set a cap at 100 year
-    static final int INFINITE_EXPIRY = (int) Duration.of(100, ChronoUnit.YEARS).toMillis() / 1000;
+    static final int INFINITE_EXPIRY = (int) Duration.ofDays(80 * 365).toMillis() / 1000;
 
     static class InFlightPacket implements Delayed {
 
