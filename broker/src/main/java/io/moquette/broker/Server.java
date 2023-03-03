@@ -300,7 +300,7 @@ public class Server {
     }
 
     private String checkOrCreateUUID(IConfig config) {
-        final String storagePath = config.getProperty(BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME, "");
+        final String storagePath = config.getProperty(BrokerConstants.DATA_PATH_PROPERTY_NAME, "");
         final Path uuidFilePath = Paths.get(storagePath, ".moquette_uuid");
         if (Files.exists(uuidFilePath)) {
             try {
