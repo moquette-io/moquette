@@ -28,7 +28,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
-import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Optional;
@@ -140,7 +139,7 @@ public class SessionRegistry {
             if (queueRepository.containsQueue(session.clientId())) {
                 final SessionMessageQueue<EnqueuedMessage> persistentQueue = queueRepository.getOrCreateQueue(session.clientId());
                 queues.remove(session.clientId());
-                Session rehydrated = new Session(session.clientId(), false, persistentQueue);
+                Session rehydrated = new Session(session, false, persistentQueue);
                 pool.put(session.clientId(), rehydrated);
             }
         }
@@ -235,15 +234,19 @@ public class SessionRegistry {
         } else {
             queue = new InMemoryQueue();
         }
+        // in MQTT3 cleanSession = true means  expiryInterval=0 else infinite
+        final int expiryInterval = clean ? 0 : INFINITE_EXPIRY;
+        final ISessionsRepository.SessionData sessionData = new ISessionsRepository.SessionData(clientId,
+            MqttVersion.MQTT_3_1_1, expiryInterval);
         if (msg.variableHeader().isWillFlag()) {
             final Session.Will will = createWill(msg);
-            newSession = new Session(clientId, clean, will, queue);
+            newSession = new Session(sessionData, clean, will, queue);
         } else {
-            newSession = new Session(clientId, clean, queue);
+            newSession = new Session(sessionData, clean, queue);
         }
 
         newSession.markConnecting();
-        sessionsRepository.saveSession(new ISessionsRepository.SessionData(clientId, MqttVersion.MQTT_3_1_1, INFINITE_EXPIRY));
+        sessionsRepository.saveSession(sessionData);
         return newSession;
     }
 
