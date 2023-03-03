@@ -28,7 +28,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -46,7 +49,9 @@ import java.util.concurrent.atomic.AtomicReference;
 class Session {
 
     private static final Logger LOG = LoggerFactory.getLogger(Session.class);
-    static final int INFINITE_EXPIRY = 0xFFFFFFFF;
+    // By specification session expiry value of 0xFFFFFFFF (UINT_MAX) (seconds) means
+    // session that doesn't expire, it's ~136 years, we can set a cap at 100 year
+    static final int INFINITE_EXPIRY = (int) Duration.of(100, ChronoUnit.YEARS).toMillis() / 1000;
 
     static class InFlightPacket implements Delayed {
 
