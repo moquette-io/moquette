@@ -93,10 +93,10 @@ public final class BrokerConstants {
     public static final String IMMEDIATE_BUFFER_FLUSH_PROPERTY_NAME = "immediate_buffer_flush";
     /**
      * 0/immediate means immediate flush, like immediate_buffer_flush = true
-     * -1/no flush means no flush, let Netty flush when write buffers are full, like immediate_buffer_flush = false
+     * -1/full means no explicit flush, let Netty flush when write buffers are full, like immediate_buffer_flush = false
      * a number of milliseconds to between flushes
      * */
-    public static final String BUFFER_FLUSH_MS_PROPERTY_NAME = "buffer_flush_ms";
+    public static final String BUFFER_FLUSH_MS_PROPERTY_NAME = "buffer_flush_millis";
     public static final int NO_BUFFER_FLUSH = -1;
     public static final int IMMEDIATE_BUFFER_FLUSH = 0;
 
