@@ -338,8 +338,11 @@ final class MQTTConnection {
         if (bindedSession.hasWill()) {
             postOffice.fireWill(bindedSession.getWill());
         }
-        sessionRegistry.connectionClosed(bindedSession);
-        connected = false;
+        if (bindedSession.connected()) {
+            LOG.debug("Closing session on connectionLost {}", clientID);
+            sessionRegistry.connectionClosed(bindedSession);
+            connected = false;
+        }
         //dispatch connection lost to intercept.
         String userName = NettyUtils.userName(channel);
         postOffice.dispatchConnectionLost(clientID,userName);
@@ -368,6 +371,7 @@ final class MQTTConnection {
                 LOG.debug("NOT processing disconnect {}, not bound.", clientID);
                 return null;
             }
+            LOG.debug("Closing session on disconnect {}", clientID);
             sessionRegistry.connectionClosed(bindedSession);
             connected = false;
             channel.close().addListener(FIRE_EXCEPTION_ON_FAILURE);

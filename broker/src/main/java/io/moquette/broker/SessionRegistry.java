@@ -277,7 +277,7 @@ public class SessionRegistry {
         LOG.debug("Remove session state for client {}", session.getClientID());
         boolean result = session.assignState(SessionStatus.DISCONNECTED, SessionStatus.DESTROYED);
         if (!result) {
-            throw new SessionCorruptedException("Session has already changed state");
+            throw new SessionCorruptedException("Session has already changed state: " + session);
         }
 
         unsubscribe(session);

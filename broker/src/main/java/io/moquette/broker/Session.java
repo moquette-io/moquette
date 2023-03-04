@@ -427,7 +427,7 @@ class Session {
 
     private void drainQueueToConnection() {
         // consume the queue
-        while (!sessionQueue.isEmpty() && inflighHasSlotsAndConnectionIsUp()) {
+        while (connected() && !sessionQueue.isEmpty() && inflighHasSlotsAndConnectionIsUp()) {
             final SessionRegistry.EnqueuedMessage msg = sessionQueue.dequeue();
             if (msg == null) {
                 // Our message was already fetched by another Thread.
