@@ -21,6 +21,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Properties;
 
+import static io.moquette.BrokerConstants.IMMEDIATE_BUFFER_FLUSH;
+import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class BrokerConfigurationTest {
@@ -32,7 +34,7 @@ public class BrokerConfigurationTest {
         assertTrue(brokerConfiguration.isAllowAnonymous());
         assertFalse(brokerConfiguration.isAllowZeroByteClientId());
         assertFalse(brokerConfiguration.isReauthorizeSubscriptionsOnConnect());
-        assertFalse(brokerConfiguration.isImmediateBufferFlush());
+        assertEquals(NO_BUFFER_FLUSH, brokerConfiguration.getBufferFlushMillis(), "No immediate flush by default");
     }
 
     @Test
@@ -44,7 +46,7 @@ public class BrokerConfigurationTest {
         assertFalse(brokerConfiguration.isAllowAnonymous());
         assertFalse(brokerConfiguration.isAllowZeroByteClientId());
         assertFalse(brokerConfiguration.isReauthorizeSubscriptionsOnConnect());
-        assertFalse(brokerConfiguration.isImmediateBufferFlush());
+        assertEquals(NO_BUFFER_FLUSH, brokerConfiguration.getBufferFlushMillis(), "No immediate flush by default");
     }
 
     @Test
@@ -56,7 +58,7 @@ public class BrokerConfigurationTest {
         assertTrue(brokerConfiguration.isAllowAnonymous());
         assertTrue(brokerConfiguration.isAllowZeroByteClientId());
         assertFalse(brokerConfiguration.isReauthorizeSubscriptionsOnConnect());
-        assertFalse(brokerConfiguration.isImmediateBufferFlush());
+        assertEquals(NO_BUFFER_FLUSH, brokerConfiguration.getBufferFlushMillis(), "No immediate flush by default");
     }
 
     @Test
@@ -68,7 +70,7 @@ public class BrokerConfigurationTest {
         assertTrue(brokerConfiguration.isAllowAnonymous());
         assertFalse(brokerConfiguration.isAllowZeroByteClientId());
         assertTrue(brokerConfiguration.isReauthorizeSubscriptionsOnConnect());
-        assertFalse(brokerConfiguration.isImmediateBufferFlush());
+        assertEquals(NO_BUFFER_FLUSH, brokerConfiguration.getBufferFlushMillis(), "No immediate flush by default");
     }
 
     @Test
@@ -80,6 +82,6 @@ public class BrokerConfigurationTest {
         assertTrue(brokerConfiguration.isAllowAnonymous());
         assertFalse(brokerConfiguration.isAllowZeroByteClientId());
         assertFalse(brokerConfiguration.isReauthorizeSubscriptionsOnConnect());
-        assertTrue(brokerConfiguration.isImmediateBufferFlush());
+        assertEquals(IMMEDIATE_BUFFER_FLUSH, brokerConfiguration.getBufferFlushMillis(), "No immediate flush by default");
     }
 }

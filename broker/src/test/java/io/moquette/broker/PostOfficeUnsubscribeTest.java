@@ -38,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
+import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static io.moquette.broker.PostOfficePublishTest.PUBLISHER_ID;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
 import static java.util.Collections.*;
@@ -59,7 +60,7 @@ public class PostOfficeUnsubscribeTest {
     private MqttConnectMessage connectMessage;
     private IAuthenticator mockAuthenticator;
     private SessionRegistry sessionRegistry;
-    public static final BrokerConfiguration CONFIG = new BrokerConfiguration(true, true, false, false);
+    public static final BrokerConfiguration CONFIG = new BrokerConfiguration(true, true, false, NO_BUFFER_FLUSH);
     private MemoryQueueRepository queueRepository;
 
     @BeforeEach

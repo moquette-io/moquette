@@ -86,7 +86,20 @@ public final class BrokerConstants {
     public static final String NETTY_EPOLL_PROPERTY_NAME = "netty.epoll";
     public static final String NETTY_MAX_BYTES_PROPERTY_NAME = "netty.mqtt.message_size";
     public static final int DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE = 8092;
+    /**
+     * @deprecated use the BUFFER_FLUSH_MS_PROPERTY_NAME
+     * */
+    @Deprecated
     public static final String IMMEDIATE_BUFFER_FLUSH_PROPERTY_NAME = "immediate_buffer_flush";
+    /**
+     * 0/immediate means immediate flush, like immediate_buffer_flush = true
+     * -1/no flush means no flush, let Netty flush when write buffers are full, like immediate_buffer_flush = false
+     * a number of milliseconds to between flushes
+     * */
+    public static final String BUFFER_FLUSH_MS_PROPERTY_NAME = "buffer_flush_ms";
+    public static final int NO_BUFFER_FLUSH = -1;
+    public static final int IMMEDIATE_BUFFER_FLUSH = 0;
+
     public static final String METRICS_ENABLE_PROPERTY_NAME = "use_metrics";
     public static final String METRICS_LIBRATO_EMAIL_PROPERTY_NAME = "metrics.librato.email";
     public static final String METRICS_LIBRATO_TOKEN_PROPERTY_NAME = "metrics.librato.token";

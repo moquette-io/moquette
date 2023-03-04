@@ -15,6 +15,7 @@
  */
 package io.moquette.broker;
 
+import io.moquette.BrokerConstants;
 import io.moquette.broker.subscriptions.Topic;
 import io.moquette.broker.security.IAuthenticator;
 import io.netty.buffer.ByteBuf;
@@ -535,7 +536,7 @@ final class MQTTConnection {
             }
 
             ChannelFuture channelFuture;
-            if (brokerConfig.isImmediateBufferFlush()) {
+            if (brokerConfig.getBufferFlushMillis() == BrokerConstants.IMMEDIATE_BUFFER_FLUSH) {
                 channelFuture = channel.writeAndFlush(retainedDup);
             } else {
                 channelFuture = channel.write(retainedDup);

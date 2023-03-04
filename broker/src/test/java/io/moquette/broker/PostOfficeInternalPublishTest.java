@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
+import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static io.moquette.broker.PostOfficeUnsubscribeTest.CONFIG;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -55,7 +56,7 @@ public class PostOfficeInternalPublishTest {
     private SessionRegistry sessionRegistry;
     private MockAuthenticator mockAuthenticator;
     private static final BrokerConfiguration ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID =
-        new BrokerConfiguration(true, true, false, false);
+        new BrokerConfiguration(true, true, false, NO_BUFFER_FLUSH);
     private MemoryRetainedRepository retainedRepository;
     private MemoryQueueRepository queueRepository;
 

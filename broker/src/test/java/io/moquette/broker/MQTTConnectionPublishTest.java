@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.ExecutionException;
 
+import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
@@ -56,7 +57,7 @@ public class MQTTConnectionPublishTest {
     public void setUp() {
         connMsg = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_3_1).cleanSession(true);
 
-        BrokerConfiguration config = new BrokerConfiguration(true, true, false, false);
+        BrokerConfiguration config = new BrokerConfiguration(true, true, false, NO_BUFFER_FLUSH);
 
         createMQTTConnection(config);
     }
