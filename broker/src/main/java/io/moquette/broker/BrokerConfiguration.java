@@ -37,7 +37,7 @@ class BrokerConfiguration {
         if (bufferFlushMillisProp != null && !bufferFlushMillisProp.isEmpty()) {
             switch (bufferFlushMillisProp.toLowerCase(Locale.ROOT)) {
                 case "immediate":
-                    bufferFlushMillis = BrokerConstants.IMMEDIATE_BUFFER_FLUSH;
+                    bufferFlushMillis = BrokerConstants. IMMEDIATE_BUFFER_FLUSH;
                     break;
                 case "full":
                     bufferFlushMillis = BrokerConstants.NO_BUFFER_FLUSH;
@@ -55,7 +55,7 @@ class BrokerConfiguration {
                     }
             }
         } else {
-            if (props.boolProp(BrokerConstants.IMMEDIATE_BUFFER_FLUSH_PROPERTY_NAME, false)) {
+            if (props.boolProp(BrokerConstants.IMMEDIATE_BUFFER_FLUSH_PROPERTY_NAME, true)) {
                 bufferFlushMillis = BrokerConstants.IMMEDIATE_BUFFER_FLUSH;
             } else {
                 bufferFlushMillis = BrokerConstants.NO_BUFFER_FLUSH;
