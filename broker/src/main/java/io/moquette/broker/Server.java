@@ -249,7 +249,7 @@ public class Server {
 
         final NewNettyMQTTHandler mqttHandler = new NewNettyMQTTHandler(connectionFactory);
         acceptor = new NewNettyAcceptor();
-        acceptor.initialize(mqttHandler, config, sslCtxCreator);
+        acceptor.initialize(mqttHandler, config, sslCtxCreator, brokerConfig);
 
         final long startTime = System.currentTimeMillis() - start;
         LOG.info("Moquette integration has been started successfully in {} ms", startTime);

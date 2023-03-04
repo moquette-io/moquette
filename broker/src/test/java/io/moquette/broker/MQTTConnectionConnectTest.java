@@ -32,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import java.util.concurrent.ExecutionException;
 
 import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
+import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static io.moquette.broker.NettyChannelAssertions.assertEqualsConnAck;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
 import static java.util.Collections.singleton;
@@ -53,7 +54,7 @@ public class MQTTConnectionConnectTest {
     private EmbeddedChannel channel;
     private SessionRegistry sessionRegistry;
     private MqttMessageBuilders.ConnectBuilder connMsg;
-    private static final BrokerConfiguration CONFIG = new BrokerConfiguration(true, true, false, false);
+    private static final BrokerConfiguration CONFIG = new BrokerConfiguration(true, true, false, NO_BUFFER_FLUSH);
     private IAuthenticator mockAuthenticator;
     private PostOffice postOffice;
     private MemoryQueueRepository queueRepository;
@@ -209,7 +210,7 @@ public class MQTTConnectionConnectTest {
     @Test
     public void prohibitAnonymousClient() {
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).build();
-        BrokerConfiguration config = new BrokerConfiguration(false, true, false, false);
+        BrokerConfiguration config = new BrokerConfiguration(false, true, false, NO_BUFFER_FLUSH);
 
         sut = createMQTTConnection(config);
         channel = (EmbeddedChannel) sut.channel;
@@ -227,7 +228,7 @@ public class MQTTConnectionConnectTest {
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID)
             .username(TEST_USER + "_fake")
             .build();
-        BrokerConfiguration config = new BrokerConfiguration(false, true, false, false);
+        BrokerConfiguration config = new BrokerConfiguration(false, true, false, NO_BUFFER_FLUSH);
 
         createMQTTConnection(config);
 
@@ -241,7 +242,7 @@ public class MQTTConnectionConnectTest {
 
     @Test
     public void testZeroByteClientIdNotAllowed() {
-        BrokerConfiguration config = new BrokerConfiguration(false, false, false, false);
+        BrokerConfiguration config = new BrokerConfiguration(false, false, false, NO_BUFFER_FLUSH);
 
         sut = createMQTTConnection(config);
         channel = (EmbeddedChannel) sut.channel;
@@ -292,7 +293,7 @@ public class MQTTConnectionConnectTest {
         EmbeddedChannel evilChannel = new EmbeddedChannel();
 
         // Exercise
-        BrokerConfiguration config = new BrokerConfiguration(true, true, false, false);
+        BrokerConfiguration config = new BrokerConfiguration(true, true, false, NO_BUFFER_FLUSH);
         final MQTTConnection evilConnection = createMQTTConnection(config, evilChannel, postOffice);
         evilConnection.processConnect(evilClientConnMsg);
 

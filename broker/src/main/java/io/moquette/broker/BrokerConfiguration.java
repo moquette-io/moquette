@@ -18,26 +18,57 @@ package io.moquette.broker;
 import io.moquette.BrokerConstants;
 import io.moquette.broker.config.IConfig;
 
+import java.util.Locale;
+
 class BrokerConfiguration {
 
     private final boolean allowAnonymous;
     private final boolean allowZeroByteClientId;
     private final boolean reauthorizeSubscriptionsOnConnect;
-    private final boolean immediateBufferFlush;
+    private final int bufferFlushMillis;
 
     BrokerConfiguration(IConfig props) {
         allowAnonymous = props.boolProp(BrokerConstants.ALLOW_ANONYMOUS_PROPERTY_NAME, true);
         allowZeroByteClientId = props.boolProp(BrokerConstants.ALLOW_ZERO_BYTE_CLIENT_ID_PROPERTY_NAME, false);
         reauthorizeSubscriptionsOnConnect = props.boolProp(BrokerConstants.REAUTHORIZE_SUBSCRIPTIONS_ON_CONNECT, false);
-        immediateBufferFlush = props.boolProp(BrokerConstants.IMMEDIATE_BUFFER_FLUSH_PROPERTY_NAME, false);
+
+        // BUFFER_FLUSH_MS_PROPERTY_NAME has precedence over the deprecated IMMEDIATE_BUFFER_FLUSH_PROPERTY_NAME
+        final String bufferFlushMillisProp = props.getProperty(BrokerConstants.BUFFER_FLUSH_MS_PROPERTY_NAME);
+        if (bufferFlushMillisProp != null && !bufferFlushMillisProp.isEmpty()) {
+            switch (bufferFlushMillisProp.toLowerCase(Locale.ROOT)) {
+                case "immediate":
+                    bufferFlushMillis = BrokerConstants. IMMEDIATE_BUFFER_FLUSH;
+                    break;
+                case "full":
+                    bufferFlushMillis = BrokerConstants.NO_BUFFER_FLUSH;
+                    break;
+                default:
+                    final String errorMsg = String.format("Can't state value of %s property. Has to be 'immediate', " +
+                        "'full' or a number >= -1, found %s", BrokerConstants.BUFFER_FLUSH_MS_PROPERTY_NAME, bufferFlushMillisProp);
+                    try {
+                        bufferFlushMillis = Integer.parseInt(bufferFlushMillisProp);
+                        if (bufferFlushMillis < -1) {
+                            throw new IllegalArgumentException(errorMsg);
+                        }
+                    } catch (NumberFormatException ex) {
+                        throw new IllegalArgumentException(errorMsg);
+                    }
+            }
+        } else {
+            if (props.boolProp(BrokerConstants.IMMEDIATE_BUFFER_FLUSH_PROPERTY_NAME, true)) {
+                bufferFlushMillis = BrokerConstants.IMMEDIATE_BUFFER_FLUSH;
+            } else {
+                bufferFlushMillis = BrokerConstants.NO_BUFFER_FLUSH;
+            }
+        }
     }
 
     public BrokerConfiguration(boolean allowAnonymous, boolean allowZeroByteClientId,
-                               boolean reauthorizeSubscriptionsOnConnect, boolean immediateBufferFlush) {
+                               boolean reauthorizeSubscriptionsOnConnect, int bufferFlushMillis) {
         this.allowAnonymous = allowAnonymous;
         this.allowZeroByteClientId = allowZeroByteClientId;
         this.reauthorizeSubscriptionsOnConnect = reauthorizeSubscriptionsOnConnect;
-        this.immediateBufferFlush = immediateBufferFlush;
+        this.bufferFlushMillis = bufferFlushMillis;
     }
 
     public boolean isAllowAnonymous() {
@@ -52,7 +83,7 @@ class BrokerConfiguration {
         return reauthorizeSubscriptionsOnConnect;
     }
 
-    public boolean isImmediateBufferFlush() {
-        return immediateBufferFlush;
+    public int getBufferFlushMillis() {
+        return bufferFlushMillis;
     }
 }
