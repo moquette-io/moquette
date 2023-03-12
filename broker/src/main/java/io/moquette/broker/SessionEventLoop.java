@@ -13,8 +13,6 @@ final class SessionEventLoop extends Thread {
     private final BlockingQueue<FutureTask<String>> sessionQueue;
     private final boolean flushOnExit;
 
-    private RuntimeException interruptingError = null;
-
     public SessionEventLoop(BlockingQueue<FutureTask<String>> sessionQueue) {
         this(sessionQueue, true);
     }
@@ -37,9 +35,6 @@ final class SessionEventLoop extends Thread {
             } catch (InterruptedException e) {
                 LOG.info("SessionEventLoop {} interrupted", Thread.currentThread().getName());
                 Thread.currentThread().interrupt();
-            } catch (RuntimeException th) {
-                interruptingError = th;
-                Thread.currentThread().interrupt();
             }
         }
         LOG.info("SessionEventLoop {} exit", Thread.currentThread().getName());
@@ -56,12 +51,6 @@ final class SessionEventLoop extends Thread {
                 LOG.warn("SessionEventLoop {} reached exception in processing command", Thread.currentThread().getName(), th);
                 throw new RuntimeException(th);
             }
-        }
-    }
-
-    public void failIfError() {
-        if (interruptingError != null) {
-            throw interruptingError;
         }
     }
 }

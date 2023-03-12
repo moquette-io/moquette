@@ -26,13 +26,7 @@ import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -182,6 +176,7 @@ class PostOffice {
     private final BlockingQueue<FutureTask<String>>[] sessionQueues;
     private final int eventLoops = Runtime.getRuntime().availableProcessors();
     private final FailedPublishCollection failedPublishes = new FailedPublishCollection();
+    private final ConcurrentMap<String, Throwable> loopThrownExceptions = new ConcurrentHashMap<>();
 
     PostOffice(ISubscriptionsDirectory subscriptions, IRetainedRepository retainedRepository,
                SessionRegistry sessionRegistry, BrokerInterceptor interceptor, Authorizator authorizator, int sessionQueueSize) {
@@ -197,9 +192,15 @@ class PostOffice {
         }
         this.sessionExecutors = new SessionEventLoop[eventLoops];
         for (int i = 0; i < eventLoops; i++) {
-            this.sessionExecutors[i] = new SessionEventLoop(this.sessionQueues[i]);
-            this.sessionExecutors[i].setName(sessionLoopName(i));
-            this.sessionExecutors[i].start();
+            SessionEventLoop newLoop = new SessionEventLoop(this.sessionQueues[i]);
+            newLoop.setName(sessionLoopName(i));
+            newLoop.setUncaughtExceptionHandler((loopThread, ex) -> {
+                // executed in session loop thread
+                // collect the exception thrown to later re-throw
+                loopThrownExceptions.put(loopThread.getName(), ex);
+            });
+            newLoop.start();
+            this.sessionExecutors[i] = newLoop;
         }
     }
 
@@ -674,8 +675,10 @@ class PostOffice {
             }
         }
 
-        for (SessionEventLoop processor : sessionExecutors) {
-            processor.failIfError();
+        for (Map.Entry<String, Throwable> loopThrownExceptionEntry : loopThrownExceptions.entrySet()) {
+            String threadName = loopThrownExceptionEntry.getKey();
+            Throwable threadError = loopThrownExceptionEntry.getValue();
+            LOG.error("Session event loop {} terminated with error", threadName, threadError);
         }
     }
 
