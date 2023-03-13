@@ -25,7 +25,7 @@ import io.moquette.interception.messages.InterceptSubscribeMessage;
 import io.moquette.interception.messages.InterceptUnsubscribeMessage;
 
 /**
- * Basic abstract class usefull to avoid empty methods creation in subclasses.
+ * Basic abstract class useful to avoid empty methods creation in subclasses.
  */
 public abstract class AbstractInterceptHandler implements InterceptHandler {
 

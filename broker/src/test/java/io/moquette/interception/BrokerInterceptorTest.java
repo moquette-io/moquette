@@ -89,6 +89,11 @@ public class BrokerInterceptorTest {
         public void onMessageAcknowledged(InterceptAcknowledgedMessage msg) {
             n.set(90);
         }
+
+        @Override
+        public void onSessionLoopError(Throwable error) {
+            throw new RuntimeException(error);
+        }
     }
 
     private static final BrokerInterceptor interceptor = new BrokerInterceptor(

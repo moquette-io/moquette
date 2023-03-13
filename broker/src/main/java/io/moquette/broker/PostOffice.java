@@ -19,6 +19,7 @@ import io.moquette.interception.BrokerInterceptor;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
 import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.Topic;
+import io.moquette.interception.messages.InterceptExceptionMessage;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.*;
@@ -198,6 +199,9 @@ class PostOffice {
                 // executed in session loop thread
                 // collect the exception thrown to later re-throw
                 loopThrownExceptions.put(loopThread.getName(), ex);
+
+                // This is done in asynch from another thread in BrokerInterceptor
+                interceptor.notifyLoopException(new InterceptExceptionMessage(ex));
             });
             newLoop.start();
             this.sessionExecutors[i] = newLoop;

@@ -22,6 +22,7 @@ import io.netty.handler.codec.mqtt.MqttMessage;
 
 /**
  * This interface is used to inject code for intercepting broker events.
+ * This is part of the API that integrator of Moquette has to implement.
  * <p>
  * The events can act only as observers.
  * <p>
@@ -33,7 +34,7 @@ public interface InterceptHandler {
 
     Class<?>[] ALL_MESSAGE_TYPES = {InterceptConnectMessage.class, InterceptDisconnectMessage.class,
             InterceptConnectionLostMessage.class, InterceptPublishMessage.class, InterceptSubscribeMessage.class,
-            InterceptUnsubscribeMessage.class, InterceptAcknowledgedMessage.class};
+            InterceptUnsubscribeMessage.class, InterceptAcknowledgedMessage.class, InterceptExceptionMessage.class};
 
     /**
      * @return the identifier of this intercept handler.
@@ -65,4 +66,6 @@ public interface InterceptHandler {
     void onUnsubscribe(InterceptUnsubscribeMessage msg);
 
     void onMessageAcknowledged(InterceptAcknowledgedMessage msg);
+
+    void onSessionLoopError(Throwable error);
 }
