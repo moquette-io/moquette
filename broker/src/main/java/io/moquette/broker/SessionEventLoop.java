@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.FutureTask;
 
-final class SessionEventLoop implements Runnable {
+final class SessionEventLoop extends Thread {
 
     private static final Logger LOG = LoggerFactory.getLogger(SessionEventLoop.class);
 
@@ -48,7 +48,8 @@ final class SessionEventLoop implements Runnable {
                 // we ran it, but we have to grab the exception if raised
                 task.get();
             } catch (Throwable th) {
-                LOG.info("SessionEventLoop {} reached exception in processing command", Thread.currentThread().getName(), th);
+                LOG.warn("SessionEventLoop {} reached exception in processing command", Thread.currentThread().getName(), th);
+                throw new RuntimeException(th);
             }
         }
     }

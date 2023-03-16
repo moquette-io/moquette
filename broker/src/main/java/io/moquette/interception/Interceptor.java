@@ -18,6 +18,7 @@ package io.moquette.interception;
 
 import io.moquette.interception.messages.InterceptAcknowledgedMessage;
 import io.moquette.broker.subscriptions.Subscription;
+import io.moquette.interception.messages.InterceptExceptionMessage;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 
@@ -46,6 +47,8 @@ public interface Interceptor {
     void notifyTopicUnsubscribed(String topic, String clientID, String username);
 
     void notifyMessageAcknowledged(InterceptAcknowledgedMessage msg);
+
+    void notifyLoopException(InterceptExceptionMessage th);
 
     void addInterceptHandler(InterceptHandler interceptHandler);
 

@@ -167,6 +167,13 @@ public final class BrokerInterceptor implements Interceptor {
     }
 
     @Override
+    public void notifyLoopException(InterceptExceptionMessage msg) {
+        for (final InterceptHandler handler : this.handlers.get(InterceptExceptionMessage.class)) {
+            handler.onSessionLoopError(msg.getError());
+        }
+    }
+
+    @Override
     public void addInterceptHandler(InterceptHandler interceptHandler) {
         Class<?>[] interceptedMessageTypes = getInterceptedMessageTypes(interceptHandler);
         LOG.info("Adding MQTT message interceptor. InterceptorId={}, handledMessageTypes={}",
