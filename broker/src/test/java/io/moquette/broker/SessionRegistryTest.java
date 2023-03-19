@@ -33,12 +33,15 @@ import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttVersion;
 import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVStore;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
@@ -65,12 +68,20 @@ public class SessionRegistryTest {
     private static final BrokerConfiguration ALLOW_ANONYMOUS_AND_ZEROBYTE_CLIENT_ID =
         new BrokerConfiguration(true, true, false, NO_BUFFER_FLUSH);
     private MemoryQueueRepository queueRepository;
+    private ScheduledExecutorService scheduler;
 
     @BeforeEach
     public void setUp() {
         connMsg = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_3_1).cleanSession(true);
 
+        scheduler = Executors.newScheduledThreadPool(1);
+
         createMQTTConnection(ALLOW_ANONYMOUS_AND_ZEROBYTE_CLIENT_ID);
+    }
+
+    @AfterEach
+    public void tearDown() {
+        scheduler.shutdown();
     }
 
     private void createMQTTConnection(BrokerConfiguration config) {
@@ -89,8 +100,8 @@ public class SessionRegistryTest {
 
         final PermitAllAuthorizatorPolicy authorizatorPolicy = new PermitAllAuthorizatorPolicy();
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
-        sut = new SessionRegistry(subscriptions, memorySessionsRepository(), queueRepository, permitAll);
         final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024);
+        sut = new SessionRegistry(subscriptions, memorySessionsRepository(), queueRepository, permitAll, scheduler);
         final PostOffice postOffice = new PostOffice(subscriptions,
             new MemoryRetainedRepository(), sut, ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup);
         return new MQTTConnection(channel, config, mockAuthenticator, sut, postOffice);

@@ -34,6 +34,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
@@ -122,15 +123,18 @@ public class SessionRegistry {
     private final ISessionsRepository sessionsRepository;
     private final IQueueRepository queueRepository;
     private final Authorizator authorizator;
+    private final ScheduledExecutorService scheduler;
 
     SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory,
                     ISessionsRepository sessionsRepository,
                     IQueueRepository queueRepository,
-                    Authorizator authorizator) {
+                    Authorizator authorizator,
+                    ScheduledExecutorService scheduler) {
         this.subscriptionsDirectory = subscriptionsDirectory;
         this.sessionsRepository = sessionsRepository;
         this.queueRepository = queueRepository;
         this.authorizator = authorizator;
+        this.scheduler = scheduler;
         recreateSessionPool();
     }
 

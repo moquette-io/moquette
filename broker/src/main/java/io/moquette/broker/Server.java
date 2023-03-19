@@ -239,7 +239,7 @@ public class Server {
         ISubscriptionsDirectory subscriptions = new CTrieSubscriptionDirectory();
         subscriptions.init(subscriptionsRepository);
         final Authorizator authorizator = new Authorizator(authorizatorPolicy);
-        sessions = new SessionRegistry(subscriptions, sessionsRepository, queueRepository, authorizator);
+        sessions = new SessionRegistry(subscriptions, sessionsRepository, queueRepository, authorizator, scheduler);
         final int sessionQueueSize = config.intProp(BrokerConstants.SESSION_QUEUE_SIZE, 1024);
         final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(interceptor, sessionQueueSize);
         dispatcher = new PostOffice(subscriptions, retainedRepository, sessions, interceptor, authorizator,
