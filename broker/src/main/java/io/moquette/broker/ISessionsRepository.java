@@ -6,6 +6,8 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.Delayed;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Used to store data about persisted sessions like MQTT version, session's properties.
@@ -13,11 +15,16 @@ import java.util.Optional;
 public interface ISessionsRepository {
 
     // Data class
-    final class SessionData {
+    final class SessionData implements Delayed {
         private final String clientId;
         private Instant expireAt = null;
         final MqttVersion version;
         private final int expiryInterval;
+
+        static SessionData calculateExpiration(SessionData session) {
+            final Instant expireAt = Instant.now().plusSeconds(session.expiryInterval);
+            return new SessionData(session.clientId, expireAt, session.version, session.expiryInterval);
+        }
 
         /**
          * Construct a new SessionData without expiration set yet.
@@ -81,6 +88,16 @@ public interface ISessionsRepository {
                 ", version=" + version +
                 ", expiryInterval=" + expiryInterval +
                 '}';
+        }
+
+        @Override
+        public long getDelay(TimeUnit unit) {
+            return unit.convert(expireAt.toEpochMilli() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+        }
+
+        @Override
+        public int compareTo(Delayed o) {
+            return Long.compare(getDelay(TimeUnit.MILLISECONDS), o.getDelay(TimeUnit.MILLISECONDS));
         }
     }
 

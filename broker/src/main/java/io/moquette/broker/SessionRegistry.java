@@ -28,18 +28,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.DelayQueue;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
 
 public class SessionRegistry {
+
+    private final ScheduledFuture<?> scheduledExpiredSessions;
 
     public abstract static class EnqueuedMessage {
 
@@ -123,7 +131,7 @@ public class SessionRegistry {
     private final ISessionsRepository sessionsRepository;
     private final IQueueRepository queueRepository;
     private final Authorizator authorizator;
-    private final ScheduledExecutorService scheduler;
+    private final DelayQueue<ISessionsRepository.SessionData> removableSessions = new DelayQueue<>();
 
     SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory,
                     ISessionsRepository sessionsRepository,
@@ -134,8 +142,26 @@ public class SessionRegistry {
         this.sessionsRepository = sessionsRepository;
         this.queueRepository = queueRepository;
         this.authorizator = authorizator;
-        this.scheduler = scheduler;
+        this.scheduledExpiredSessions = scheduler.scheduleWithFixedDelay(this::checkExpiredSessions, 1, 1, TimeUnit.SECONDS);
         recreateSessionPool();
+    }
+
+    private void checkExpiredSessions() {
+        List<ISessionsRepository.SessionData> expiredSessions = new ArrayList<>();
+        int drainedSessions = removableSessions.drainTo(expiredSessions);
+        LOG.debug("Retrieved {} expired sessions", drainedSessions);
+        for (ISessionsRepository.SessionData expiredSession : expiredSessions) {
+            final String expiredAt = expiredSession.expireAt().map(Instant::toString).orElse("UNDEFINED");
+            LOG.debug("Removing session {}, expired on {}", expiredSession.clientId(), expiredAt);
+            remove(expiredSession.clientId());
+        }
+    }
+
+    private void trackForRemovalOnExpiration(ISessionsRepository.SessionData session) {
+        if (!session.expireAt().isPresent()) {
+            throw new RuntimeException("Can't track for expiration a session without expiry instant, client_id: " + session.clientId());
+        }
+        removableSessions.add(session);
     }
 
     private void recreateSessionPool() {
@@ -147,6 +173,7 @@ public class SessionRegistry {
                 queues.remove(session.clientId());
                 Session rehydrated = new Session(session, false, persistentQueue);
                 pool.put(session.clientId(), rehydrated);
+                trackForRemovalOnExpiration(session);
             }
         }
         if (!queues.isEmpty()) {
@@ -283,10 +310,9 @@ public class SessionRegistry {
         session.disconnect();
         if (session.expireImmediately()) {
             purgeSessionState(session);
-            return;
         } else {
-            // TODO if binded session has expiry, disconnect it and schedule a task to do the cleanup after that
-
+            //bound session has expiry, disconnect it and add to the queue for removal
+            trackForRemovalOnExpiration(ISessionsRepository.SessionData.calculateExpiration(session.getSessionData()));
         }
     }
 
@@ -304,6 +330,8 @@ public class SessionRegistry {
     void remove(String clientID) {
         final Session old = pool.remove(clientID);
         if (old != null) {
+            // remove from expired tracker if present
+            removableSessions.remove(old.getSessionData());
             old.cleanUp();
         }
     }
@@ -355,6 +383,23 @@ public class SessionRegistry {
      * Close all resources related to session management
      */
     public void close() {
+        if (scheduledExpiredSessions.cancel(false)) {
+            LOG.info("Successfully cancelled expired sessions task");
+        } else {
+            LOG.warn("Can't cancel the execution of expired sessions task, was already cancelled? {}, was done? {}",
+                scheduledExpiredSessions.isCancelled(), scheduledExpiredSessions.isDone());
+        }
+        // Update all not clean session with the proper expiry date
+        updateNotCleanSessionsWithPropertExpire();
         queueRepository.close();
+    }
+
+    private void updateNotCleanSessionsWithPropertExpire() {
+        pool.values().stream()
+            .filter(s -> !s.isClean()) // not clean session
+            .map(Session::getSessionData)
+            .filter(s -> !s.expireAt().isPresent()) // without expire set
+            .map(ISessionsRepository.SessionData::calculateExpiration) // new SessionData with expireAt valued
+            .forEach(sessionsRepository::saveSession); // update the storage
     }
 }

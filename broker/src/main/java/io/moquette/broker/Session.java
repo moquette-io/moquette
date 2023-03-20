@@ -502,6 +502,10 @@ class Session {
         }
     }
 
+    ISessionsRepository.SessionData getSessionData() {
+        return this.data;
+    }
+
     @Override
     public String toString() {
         return "Session{" +
