@@ -44,10 +44,6 @@ MOQUETTE_HOME="$(cd `dirname $SOURCEPATH`/..; pwd)"
 export MOQUETTE_HOME
 MOQUETTE_JARS=${MOQUETTE_HOME}/lib/*
 
-# Only set MOQUETTE_HOME if not already set
-[ -f "$MOQUETTE_HOME"/bin/moquette.sh ] ; pwd`
-export MOQUETTE_HOME
-
 # Set JavaHome if it exists
 if [ -f "${JAVA_HOME}/bin/java" ]; then 
    JAVA=${JAVA_HOME}/bin/java
