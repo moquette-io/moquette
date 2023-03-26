@@ -2,6 +2,7 @@ package io.moquette.broker;
 
 import io.netty.handler.codec.mqtt.MqttVersion;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Objects;
@@ -20,29 +21,36 @@ public interface ISessionsRepository {
         private Instant expireAt = null;
         final MqttVersion version;
         private final int expiryInterval;
+        private final Clock clock;
 
+        /**
+         * Create a new SessionData setting the expiration instant computed by
+         * the actual instant and the expiry interval defined for the session.
+         * */
         static SessionData calculateExpiration(SessionData session) {
             final Instant expireAt = Instant.now().plusSeconds(session.expiryInterval);
-            return new SessionData(session.clientId, expireAt, session.version, session.expiryInterval);
+            return new SessionData(session.clientId, expireAt, session.version, session.expiryInterval, session.clock);
         }
 
         /**
          * Construct a new SessionData without expiration set yet.
          * */
-        public SessionData(String clientId, MqttVersion version, int expiryInterval) {
+        public SessionData(String clientId, MqttVersion version, int expiryInterval, Clock clock) {
             this.clientId = clientId;
-            this.version = version;
+            this.clock = clock;
             this.expiryInterval = expiryInterval;
+            this.version = version;
         }
 
         /**
          * Construct SessionData with an expiration instant, created by loading from the storage.
          * */
-        public SessionData(String clientId, Instant expireAt, MqttVersion version, int expiryInterval) {
-            this.expiryInterval = expiryInterval;
+        public SessionData(String clientId, Instant expireAt, MqttVersion version, int expiryInterval, Clock clock) {
             Objects.requireNonNull(expireAt, "An expiration time is requested");
+            this.clock = clock;
             this.clientId = clientId;
             this.expireAt = expireAt;
+            this.expiryInterval = expiryInterval;
             this.version = version;
         }
 
@@ -92,7 +100,7 @@ public interface ISessionsRepository {
 
         @Override
         public long getDelay(TimeUnit unit) {
-            return unit.convert(expireAt.toEpochMilli() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+            return unit.convert(expireAt.toEpochMilli() - clock.millis(), TimeUnit.MILLISECONDS);
         }
 
         @Override
@@ -110,4 +118,6 @@ public interface ISessionsRepository {
      * Save data composing a session, es MQTT version, creation date and properties but not queues or subscriptions.
      * */
     void saveSession(SessionData session);
+
+    void delete(SessionData session);
 }

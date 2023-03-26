@@ -55,6 +55,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.ParseException;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -210,6 +211,8 @@ public class Server {
             config.setProperty(BrokerConstants.DATA_PATH_PROPERTY_NAME, dataPath);
         }
 
+        final Clock clock = Clock.systemDefaultZone();
+
         if (Boolean.parseBoolean(config.getProperty(BrokerConstants.PERSISTENCE_ENABLED_PROPERTY_NAME))) {
             final Path dataPath = Paths.get(config.getProperty(BrokerConstants.DATA_PATH_PROPERTY_NAME));
             if (!dataPath.toFile().exists()) {
@@ -222,7 +225,7 @@ public class Server {
 
             LOG.debug("Configuring persistent subscriptions store and queues, path: {}", dataPath);
             final int autosaveInterval = Integer.parseInt(config.getProperty(BrokerConstants.AUTOSAVE_INTERVAL_PROPERTY_NAME, "30"));
-            h2Builder = new H2Builder(scheduler, dataPath, autosaveInterval).initStore();
+            h2Builder = new H2Builder(scheduler, dataPath, autosaveInterval, clock).initStore();
             queueRepository = initQueuesRepository(config, dataPath, h2Builder);
             LOG.trace("Configuring H2 subscriptions repository");
             subscriptionsRepository = h2Builder.subscriptionsRepository();
@@ -239,7 +242,7 @@ public class Server {
         ISubscriptionsDirectory subscriptions = new CTrieSubscriptionDirectory();
         subscriptions.init(subscriptionsRepository);
         final Authorizator authorizator = new Authorizator(authorizatorPolicy);
-        sessions = new SessionRegistry(subscriptions, sessionsRepository, queueRepository, authorizator, scheduler);
+        sessions = new SessionRegistry(subscriptions, sessionsRepository, queueRepository, authorizator, scheduler, clock);
         final int sessionQueueSize = config.intProp(BrokerConstants.SESSION_QUEUE_SIZE, 1024);
         final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(interceptor, sessionQueueSize);
         dispatcher = new PostOffice(subscriptions, retainedRepository, sessions, interceptor, authorizator,

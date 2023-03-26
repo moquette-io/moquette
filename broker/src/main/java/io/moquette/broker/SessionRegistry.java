@@ -28,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -132,17 +133,29 @@ public class SessionRegistry {
     private final IQueueRepository queueRepository;
     private final Authorizator authorizator;
     private final DelayQueue<ISessionsRepository.SessionData> removableSessions = new DelayQueue<>();
+    private final Clock clock;
 
+    // Used in testing
     SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory,
                     ISessionsRepository sessionsRepository,
                     IQueueRepository queueRepository,
                     Authorizator authorizator,
                     ScheduledExecutorService scheduler) {
+        this(subscriptionsDirectory, sessionsRepository, queueRepository, authorizator, scheduler, Clock.systemDefaultZone());
+    }
+
+    SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory,
+                    ISessionsRepository sessionsRepository,
+                    IQueueRepository queueRepository,
+                    Authorizator authorizator,
+                    ScheduledExecutorService scheduler,
+                    Clock clock) {
         this.subscriptionsDirectory = subscriptionsDirectory;
         this.sessionsRepository = sessionsRepository;
         this.queueRepository = queueRepository;
         this.authorizator = authorizator;
         this.scheduledExpiredSessions = scheduler.scheduleWithFixedDelay(this::checkExpiredSessions, 1, 1, TimeUnit.SECONDS);
+        this.clock = clock;
         recreateSessionPool();
     }
 
@@ -154,6 +167,7 @@ public class SessionRegistry {
             final String expiredAt = expiredSession.expireAt().map(Instant::toString).orElse("UNDEFINED");
             LOG.debug("Removing session {}, expired on {}", expiredSession.clientId(), expiredAt);
             remove(expiredSession.clientId());
+            sessionsRepository.delete(expiredSession);
         }
     }
 
@@ -269,8 +283,9 @@ public class SessionRegistry {
         }
         // in MQTT3 cleanSession = true means  expiryInterval=0 else infinite
         final int expiryInterval = clean ? 0 : INFINITE_EXPIRY;
+
         final ISessionsRepository.SessionData sessionData = new ISessionsRepository.SessionData(clientId,
-            MqttVersion.MQTT_3_1_1, expiryInterval);
+            MqttVersion.MQTT_3_1_1, expiryInterval, clock);
         if (msg.variableHeader().isWillFlag()) {
             final Session.Will will = createWill(msg);
             newSession = new Session(sessionData, clean, will, queue);
@@ -390,11 +405,11 @@ public class SessionRegistry {
                 scheduledExpiredSessions.isCancelled(), scheduledExpiredSessions.isDone());
         }
         // Update all not clean session with the proper expiry date
-        updateNotCleanSessionsWithPropertExpire();
+        updateNotCleanSessionsWithProperExpire();
         queueRepository.close();
     }
 
-    private void updateNotCleanSessionsWithPropertExpire() {
+    private void updateNotCleanSessionsWithProperExpire() {
         pool.values().stream()
             .filter(s -> !s.isClean()) // not clean session
             .map(Session::getSessionData)

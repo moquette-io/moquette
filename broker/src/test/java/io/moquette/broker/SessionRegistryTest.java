@@ -31,17 +31,28 @@ import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttVersion;
+import org.awaitility.Awaitility;
 import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVStore;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.Collection;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
@@ -57,6 +68,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class SessionRegistryTest {
 
     public static final boolean ANY_BOOLEAN = false;
+    private static final Logger LOG = LoggerFactory.getLogger(SessionRegistryTest.class);
     static final String FAKE_CLIENT_ID = "FAKE_123";
     static final String TEST_USER = "fakeuser";
     static final String TEST_PWD = "fakepwd";
@@ -69,6 +81,9 @@ public class SessionRegistryTest {
         new BrokerConfiguration(true, true, false, NO_BUFFER_FLUSH);
     private MemoryQueueRepository queueRepository;
     private ScheduledExecutorService scheduler;
+    private final Clock pointInTimeFixedClock = Clock.fixed(Instant.parse("2023-03-26T18:09:30.00Z"), ZoneId.of("Europe/Rome"));
+    private ForwardableClock slidingClock = new ForwardableClock(pointInTimeFixedClock);
+    private ISessionsRepository sessionRepository;
 
     @BeforeEach
     public void setUp() {
@@ -101,7 +116,8 @@ public class SessionRegistryTest {
         final PermitAllAuthorizatorPolicy authorizatorPolicy = new PermitAllAuthorizatorPolicy();
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
         final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024);
-        sut = new SessionRegistry(subscriptions, memorySessionsRepository(), queueRepository, permitAll, scheduler);
+        sessionRepository = memorySessionsRepository();
+        sut = new SessionRegistry(subscriptions, sessionRepository, queueRepository, permitAll, scheduler, slidingClock);
         final PostOffice postOffice = new PostOffice(subscriptions,
             new MemoryRetainedRepository(), sut, ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup);
         return new MQTTConnection(channel, config, mockAuthenticator, sut, postOffice);
@@ -109,7 +125,7 @@ public class SessionRegistryTest {
 
     @Test
     public void testConnAckContainsSessionPresentFlag() {
-        System.out.println("testConnAckContainsSessionPresentFlag invoked");
+        LOG.info("testConnAckContainsSessionPresentFlag invoked");
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID)
                                         .protocolVersion(MqttVersion.MQTT_3_1_1)
                                         .build();
@@ -134,6 +150,7 @@ public class SessionRegistryTest {
 
     @Test
     public void connectWithCleanSessionUpdateClientSession() throws ExecutionException, InterruptedException {
+        LOG.info("connectWithCleanSessionUpdateClientSession");
         // first connect with clean session true
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).cleanSession(true).build();
         connection.processConnect(msg).completableFuture().get();
@@ -201,6 +218,7 @@ public class SessionRegistryTest {
 
     @Test
     public void testSerializabilityOfPublishedMessage() {
+        LOG.info("testSerializabilityOfPublishedMessage");
         MVStore mvStore = new MVStore.Builder()
             .fileName(BrokerConstants.DEFAULT_PERSISTENT_PATH)
             .autoCommitDisabled()
@@ -237,5 +255,33 @@ public class SessionRegistryTest {
             }
             assertFalse(dbFile.exists());
         }
+    }
+
+    @Test
+    public void givenSessionWithExpireTimeWhenAfterExpirationIsPassedThenSessionIsRemoved() {
+        LOG.info("givenSessionWithExpireTimeWhenAfterExpirationIsPassedThenSessionIsRemoved");
+
+        // insert a not clean session that should expire in INFINITE_EXPIRY (~100 years)
+        final String clientId = "client_to_be_removed";
+        final SessionRegistry.SessionCreationResult res = sut.createOrReopenSession(connMsg.cleanSession(false).build(), clientId, "User");
+        assertEquals(SessionRegistry.CreationModeEnum.CREATED_CLEAN_NEW, res.mode, "Not clean session must be created");
+
+        // remove it, so that it's tracked in the inner delay queue
+        sut.connectionClosed(res.session);
+        assertEquals(1, sessionRepository.list().size(), "Not clean session must be persisted");
+
+        // move time forward
+        Duration moreThenSessionExpiration = Duration.ofSeconds(Session.INFINITE_EXPIRY).plusSeconds(10);
+        slidingClock.forward(moreThenSessionExpiration);
+
+        // check the session has been removed
+        Awaitility
+            .await()
+            .atMost(3, TimeUnit.SECONDS)
+            .until(sessionsList(), Matchers.empty());
+    }
+
+    private Callable<Collection<ISessionsRepository.SessionData>> sessionsList() {
+        return () -> sessionRepository.list();
     }
 }

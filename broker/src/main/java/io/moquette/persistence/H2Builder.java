@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Clock;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -22,12 +23,14 @@ public class H2Builder {
     private final String storePath;
     private final int autosaveInterval; // in seconds
     private final ScheduledExecutorService scheduler;
+    private final Clock clock;
     private MVStore mvStore;
 
-    public H2Builder(ScheduledExecutorService scheduler, Path storePath, int autosaveInterval) {
+    public H2Builder(ScheduledExecutorService scheduler, Path storePath, int autosaveInterval, Clock clock) {
         this.storePath = storePath.resolve("moquette_store.h2").toAbsolutePath().toString();
         this.autosaveInterval = autosaveInterval;
         this.scheduler = scheduler;
+        this.clock = clock;
     }
 
     @SuppressWarnings("FutureReturnValueIgnored")
@@ -75,6 +78,6 @@ public class H2Builder {
     }
 
     public ISessionsRepository sessionsRepository() {
-        return new H2SessionsRepository(mvStore);
+        return new H2SessionsRepository(mvStore, clock);
     }
 }

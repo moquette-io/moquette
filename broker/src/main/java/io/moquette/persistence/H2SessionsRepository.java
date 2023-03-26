@@ -9,6 +9,7 @@ import org.h2.mvstore.type.BasicDataType;
 import org.h2.mvstore.type.StringDataType;
 
 import java.nio.ByteBuffer;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
 
@@ -18,8 +19,10 @@ class H2SessionsRepository implements ISessionsRepository {
     private static final long UNDEFINED_INSTANT = -1;
 
     private final MVMap<String, SessionData> sessionMap;
+    private final Clock clock;
 
-    public H2SessionsRepository(MVStore mvStore) {
+    public H2SessionsRepository(MVStore mvStore, Clock clock) {
+        this.clock = clock;
         final MVMap.Builder<String, ISessionsRepository.SessionData> sessionTypeBuilder =
             new MVMap.Builder<String, ISessionsRepository.SessionData>()
                 .valueType(new SessionDataValueType());
@@ -35,6 +38,11 @@ class H2SessionsRepository implements ISessionsRepository {
     @Override
     public void saveSession(SessionData session) {
         sessionMap.put(session.clientId(), session);
+    }
+
+    @Override
+    public void delete(SessionData session) {
+        sessionMap.remove(session.clientId());
     }
 
     /**
@@ -70,9 +78,9 @@ class H2SessionsRepository implements ISessionsRepository {
             final int expiryInterval = buff.getInt();
 
             if (expiresAt == UNDEFINED_INSTANT) {
-                return new SessionData(clientId, version, expiryInterval);
+                return new SessionData(clientId, version, expiryInterval, clock);
             } else {
-                return new SessionData(clientId, Instant.ofEpochMilli(expiresAt), version, expiryInterval);
+                return new SessionData(clientId, Instant.ofEpochMilli(expiresAt), version, expiryInterval, clock);
             }
         }
 

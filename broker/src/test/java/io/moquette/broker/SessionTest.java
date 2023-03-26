@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 
 import static io.moquette.BrokerConstants.FLIGHT_BEFORE_RESEND_MS;
 import io.moquette.broker.subscriptions.Subscription;
+
+import java.time.Clock;
 import java.util.Arrays;
 import org.assertj.core.api.Assertions;
 
@@ -33,7 +35,8 @@ public class SessionTest {
     public void setUp() {
         testChannel = new EmbeddedChannel();
         queuedMessages = new InMemoryQueue();
-        final ISessionsRepository.SessionData data = new ISessionsRepository.SessionData(CLIENT_ID, MqttVersion.MQTT_3_1_1, INFINITE_EXPIRY);
+        final Clock clock = Clock.systemDefaultZone();
+        final ISessionsRepository.SessionData data = new ISessionsRepository.SessionData(CLIENT_ID, MqttVersion.MQTT_3_1_1, INFINITE_EXPIRY, clock);
         client = new Session(data, true, null, queuedMessages);
         createConnection(client);
     }
