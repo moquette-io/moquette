@@ -65,6 +65,7 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
+import static io.moquette.broker.Session.INFINITE_EXPIRY;
 import static io.moquette.logging.LoggingUtils.getInterceptorIds;
 
 public class Server {
@@ -242,7 +243,15 @@ public class Server {
         ISubscriptionsDirectory subscriptions = new CTrieSubscriptionDirectory();
         subscriptions.init(subscriptionsRepository);
         final Authorizator authorizator = new Authorizator(authorizatorPolicy);
-        sessions = new SessionRegistry(subscriptions, sessionsRepository, queueRepository, authorizator, scheduler, clock);
+
+        final int globalSessionExpiry;
+        if (config.getProperty(BrokerConstants.PERSISTENT_CLEAN_EXPIRATION_PROPERTY_NAME) != null) {
+            globalSessionExpiry = (int) config.durationProp(BrokerConstants.PERSISTENT_CLEAN_EXPIRATION_PROPERTY_NAME).toMillis() / 1000;
+        } else {
+            globalSessionExpiry = INFINITE_EXPIRY;
+        }
+
+        sessions = new SessionRegistry(subscriptions, sessionsRepository, queueRepository, authorizator, scheduler, clock, globalSessionExpiry);
         final int sessionQueueSize = config.intProp(BrokerConstants.SESSION_QUEUE_SIZE, 1024);
         final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(interceptor, sessionQueueSize);
         dispatcher = new PostOffice(subscriptions, retainedRepository, sessions, interceptor, authorizator,

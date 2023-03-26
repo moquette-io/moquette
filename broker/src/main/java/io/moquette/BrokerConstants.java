@@ -112,6 +112,8 @@ public final class BrokerConstants {
 
     public static final String STORAGE_CLASS_NAME = "storage_class";
 
+    public static final String PERSISTENT_CLEAN_EXPIRATION_PROPERTY_NAME = "persistent_client_expiration";
+
     public static final int FLIGHT_BEFORE_RESEND_MS = 5_000;
     public static final int INFLIGHT_WINDOW_SIZE = 10;
 

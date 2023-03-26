@@ -49,6 +49,7 @@ import static io.moquette.broker.Session.INFINITE_EXPIRY;
 public class SessionRegistry {
 
     private final ScheduledFuture<?> scheduledExpiredSessions;
+    private int globalExpirySeconds;
 
     public abstract static class EnqueuedMessage {
 
@@ -141,7 +142,7 @@ public class SessionRegistry {
                     IQueueRepository queueRepository,
                     Authorizator authorizator,
                     ScheduledExecutorService scheduler) {
-        this(subscriptionsDirectory, sessionsRepository, queueRepository, authorizator, scheduler, Clock.systemDefaultZone());
+        this(subscriptionsDirectory, sessionsRepository, queueRepository, authorizator, scheduler, Clock.systemDefaultZone(), INFINITE_EXPIRY);
     }
 
     SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory,
@@ -149,13 +150,14 @@ public class SessionRegistry {
                     IQueueRepository queueRepository,
                     Authorizator authorizator,
                     ScheduledExecutorService scheduler,
-                    Clock clock) {
+                    Clock clock, int globalExpirySeconds) {
         this.subscriptionsDirectory = subscriptionsDirectory;
         this.sessionsRepository = sessionsRepository;
         this.queueRepository = queueRepository;
         this.authorizator = authorizator;
         this.scheduledExpiredSessions = scheduler.scheduleWithFixedDelay(this::checkExpiredSessions, 1, 1, TimeUnit.SECONDS);
         this.clock = clock;
+        this.globalExpirySeconds = globalExpirySeconds;
         recreateSessionPool();
     }
 
@@ -281,8 +283,8 @@ public class SessionRegistry {
         } else {
             queue = new InMemoryQueue();
         }
-        // in MQTT3 cleanSession = true means  expiryInterval=0 else infinite
-        final int expiryInterval = clean ? 0 : INFINITE_EXPIRY;
+        // in MQTT3 cleanSession = true means expiryInterval=0 else infinite
+        final int expiryInterval = clean ? 0 : globalExpirySeconds;
 
         final ISessionsRepository.SessionData sessionData = new ISessionsRepository.SessionData(clientId,
             MqttVersion.MQTT_3_1_1, expiryInterval, clock);

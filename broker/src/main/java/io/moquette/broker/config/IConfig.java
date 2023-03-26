@@ -18,6 +18,10 @@ package io.moquette.broker.config;
 
 import io.moquette.BrokerConstants;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
+
 /**
  * Base interface for all configuration implementations (filesystem, memory or classpath)
  */
@@ -78,5 +82,32 @@ public abstract class IConfig {
             return defaultValue;
         }
         return Boolean.parseBoolean(propertyValue);
+    }
+
+    public Duration durationProp(String propertyName) {
+        String propertyValue = getProperty(propertyName);
+        final char timeSpecifier = propertyValue.charAt(propertyValue.length() - 1);
+        final TemporalUnit periodType;
+        switch (timeSpecifier) {
+            case 'h':
+                periodType = ChronoUnit.HOURS;
+                break;
+            case 'd':
+                periodType = ChronoUnit.DAYS;
+                break;
+            case 'w':
+                periodType = ChronoUnit.WEEKS;
+                break;
+            case 'm':
+                periodType = ChronoUnit.MONTHS;
+                break;
+            case 'y':
+                periodType = ChronoUnit.YEARS;
+                break;
+            default:
+                throw new IllegalStateException("Can' parse duration property " + propertyName + " with value: " + propertyValue + ", admitted only h, d, w, m, y");
+
+        }
+        return Duration.of(Integer.parseInt(propertyValue.substring(0, propertyValue.length() - 1)), periodType);
     }
 }
