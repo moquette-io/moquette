@@ -51,6 +51,11 @@ public final class EmbeddedLauncher {
             final String decodedPayload = msg.getPayload().toString(UTF_8);
             System.out.println("Received on topic: " + msg.getTopicName() + " content: " + decodedPayload);
         }
+        
+        @Override
+        public void onSessionLoopError(Throwable error) {
+            System.out.println("Session event loop reported error: " + error);
+        }
     }
 
     public static void main(String[] args) throws InterruptedException, IOException {
