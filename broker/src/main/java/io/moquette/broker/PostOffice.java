@@ -172,12 +172,7 @@ class PostOffice {
     private final IRetainedRepository retainedRepository;
     private SessionRegistry sessionRegistry;
     private BrokerInterceptor interceptor;
-
-//    private final SessionEventLoop[] sessionExecutors;
-//    private final BlockingQueue<FutureTask<String>>[] sessionQueues;
-//    private final int eventLoops = Runtime.getRuntime().availableProcessors();
     private final FailedPublishCollection failedPublishes = new FailedPublishCollection();
-//    private final ConcurrentMap<String, Throwable> loopThrownExceptions = new ConcurrentHashMap<>();
     private final SessionEventLoopGroup sessionLoops;
 
     PostOffice(ISubscriptionsDirectory subscriptions, IRetainedRepository retainedRepository,
@@ -187,33 +182,8 @@ class PostOffice {
         this.retainedRepository = retainedRepository;
         this.sessionRegistry = sessionRegistry;
         this.interceptor = interceptor;
-
-//        this.sessionQueues = new BlockingQueue[eventLoops];
-//        for (int i = 0; i < eventLoops; i++) {
-//            this.sessionQueues[i] = new ArrayBlockingQueue<>(sessionQueueSize);
-//        }
-//        this.sessionExecutors = new SessionEventLoop[eventLoops];
-//        for (int i = 0; i < eventLoops; i++) {
-//            SessionEventLoop newLoop = new SessionEventLoop(this.sessionQueues[i]);
-//            newLoop.setName(sessionLoopName(i));
-//            newLoop.setUncaughtExceptionHandler((loopThread, ex) -> {
-//                // executed in session loop thread
-//                // collect the exception thrown to later re-throw
-//                loopThrownExceptions.put(loopThread.getName(), ex);
-//
-//                // This is done in asynch from another thread in BrokerInterceptor
-//                interceptor.notifyLoopException(new InterceptExceptionMessage(ex));
-//            });
-//            newLoop.start();
-//            this.sessionExecutors[i] = newLoop;
-//        }
-
         this.sessionLoops = new SessionEventLoopGroup(interceptor, sessionQueueSize);
     }
-
-//    private String sessionLoopName(int i) {
-//        return "Session Executor " + i;
-//    }
 
     public void init(SessionRegistry sessionRegistry) {
         this.sessionRegistry = sessionRegistry;
@@ -642,10 +612,6 @@ class PostOffice {
     String sessionLoopThreadName(String clientId) {
         return sessionLoops.sessionLoopThreadName(clientId);
     }
-
-//    private int targetQueueOrdinal(String clientId) {
-//        return Math.abs(clientId.hashCode()) % this.eventLoops;
-//    }
 
     static class SessionEventLoopGroup {
         private static final Logger LOG = LoggerFactory.getLogger(SessionEventLoopGroup.class);
