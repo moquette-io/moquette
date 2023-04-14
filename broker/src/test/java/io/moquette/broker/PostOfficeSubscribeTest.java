@@ -98,8 +98,9 @@ public class PostOfficeSubscribeTest {
         final PermitAllAuthorizatorPolicy authorizatorPolicy = new PermitAllAuthorizatorPolicy();
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
         sessionRegistry = new SessionRegistry(subscriptions, memorySessionsRepository(), queueRepository, permitAll);
+        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024);
         sut = new PostOffice(subscriptions, new MemoryRetainedRepository(), sessionRegistry,
-                             ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, 1024);
+                             ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup);
     }
 
     private MQTTConnection createMQTTConnection(BrokerConfiguration config, Channel channel) {
@@ -171,8 +172,9 @@ public class PostOfficeSubscribeTest {
         when(prohibitReadOnNewsTopic.canRead(eq(new Topic(NEWS_TOPIC)), eq(FAKE_USER_NAME), eq(FAKE_CLIENT_ID)))
             .thenReturn(false);
 
+        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024);
         sut = new PostOffice(subscriptions, new MemoryRetainedRepository(), sessionRegistry,
-                             ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, new Authorizator(prohibitReadOnNewsTopic), 1024);
+                             ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, new Authorizator(prohibitReadOnNewsTopic), loopsGroup);
 
         connection.processConnect(connectMessage).completableFuture().get();
         ConnectionTestUtils.assertConnectAccepted(channel);

@@ -241,8 +241,9 @@ public class Server {
         final Authorizator authorizator = new Authorizator(authorizatorPolicy);
         sessions = new SessionRegistry(subscriptions, sessionsRepository, queueRepository, authorizator);
         final int sessionQueueSize = config.intProp(BrokerConstants.SESSION_QUEUE_SIZE, 1024);
+        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(interceptor, sessionQueueSize);
         dispatcher = new PostOffice(subscriptions, retainedRepository, sessions, interceptor, authorizator,
-                                    sessionQueueSize);
+            loopsGroup);
         final BrokerConfiguration brokerConfig = new BrokerConfiguration(config);
         MQTTConnectionFactory connectionFactory = new MQTTConnectionFactory(brokerConfig, authenticator, sessions,
                                                                             dispatcher);
