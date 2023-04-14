@@ -251,9 +251,10 @@ public class Server {
             globalSessionExpiry = INFINITE_EXPIRY;
         }
 
-        sessions = new SessionRegistry(subscriptions, sessionsRepository, queueRepository, authorizator, scheduler, clock, globalSessionExpiry);
         final int sessionQueueSize = config.intProp(BrokerConstants.SESSION_QUEUE_SIZE, 1024);
         final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(interceptor, sessionQueueSize);
+        sessions = new SessionRegistry(subscriptions, sessionsRepository, queueRepository, authorizator, scheduler,
+            clock, globalSessionExpiry, loopsGroup);
         dispatcher = new PostOffice(subscriptions, retainedRepository, sessions, interceptor, authorizator,
             loopsGroup);
         final BrokerConfiguration brokerConfig = new BrokerConfiguration(config);

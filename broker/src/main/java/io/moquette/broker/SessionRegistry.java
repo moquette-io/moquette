@@ -50,6 +50,7 @@ public class SessionRegistry {
 
     private final ScheduledFuture<?> scheduledExpiredSessions;
     private int globalExpirySeconds;
+    private final SessionEventLoopGroup loopsGroup;
 
     public abstract static class EnqueuedMessage {
 
@@ -141,8 +142,9 @@ public class SessionRegistry {
                     ISessionsRepository sessionsRepository,
                     IQueueRepository queueRepository,
                     Authorizator authorizator,
-                    ScheduledExecutorService scheduler) {
-        this(subscriptionsDirectory, sessionsRepository, queueRepository, authorizator, scheduler, Clock.systemDefaultZone(), INFINITE_EXPIRY);
+                    ScheduledExecutorService scheduler,
+                    SessionEventLoopGroup loopsGroup) {
+        this(subscriptionsDirectory, sessionsRepository, queueRepository, authorizator, scheduler, Clock.systemDefaultZone(), INFINITE_EXPIRY, loopsGroup);
     }
 
     SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory,
@@ -150,7 +152,8 @@ public class SessionRegistry {
                     IQueueRepository queueRepository,
                     Authorizator authorizator,
                     ScheduledExecutorService scheduler,
-                    Clock clock, int globalExpirySeconds) {
+                    Clock clock, int globalExpirySeconds,
+                    SessionEventLoopGroup loopsGroup) {
         this.subscriptionsDirectory = subscriptionsDirectory;
         this.sessionsRepository = sessionsRepository;
         this.queueRepository = queueRepository;
@@ -158,6 +161,7 @@ public class SessionRegistry {
         this.scheduledExpiredSessions = scheduler.scheduleWithFixedDelay(this::checkExpiredSessions, 1, 1, TimeUnit.SECONDS);
         this.clock = clock;
         this.globalExpirySeconds = globalExpirySeconds;
+        this.loopsGroup = loopsGroup;
         recreateSessionPool();
     }
 
@@ -349,7 +353,10 @@ public class SessionRegistry {
         if (old != null) {
             // remove from expired tracker if present
             removableSessions.remove(old.getSessionData());
-            old.cleanUp();
+            loopsGroup.routeCommand(clientID, "Clean up removed session", () -> {
+                old.cleanUp();
+                return null;
+            });
         }
     }
 
