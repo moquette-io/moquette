@@ -73,8 +73,9 @@ public class MQTTConnectionConnectTest {
         final PermitAllAuthorizatorPolicy authorizatorPolicy = new PermitAllAuthorizatorPolicy();
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
         sessionRegistry = new SessionRegistry(subscriptions, memorySessionsRepository(), queueRepository, permitAll);
+        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024);
         postOffice = new PostOffice(subscriptions, new MemoryRetainedRepository(), sessionRegistry,
-                                    ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, 1024);
+                                    ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup);
 
         sut = createMQTTConnection(CONFIG);
         channel = (EmbeddedChannel) sut.channel;
