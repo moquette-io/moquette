@@ -173,11 +173,12 @@ class PostOffice {
     private SessionRegistry sessionRegistry;
     private BrokerInterceptor interceptor;
 
-    private final SessionEventLoop[] sessionExecutors;
-    private final BlockingQueue<FutureTask<String>>[] sessionQueues;
-    private final int eventLoops = Runtime.getRuntime().availableProcessors();
+//    private final SessionEventLoop[] sessionExecutors;
+//    private final BlockingQueue<FutureTask<String>>[] sessionQueues;
+//    private final int eventLoops = Runtime.getRuntime().availableProcessors();
     private final FailedPublishCollection failedPublishes = new FailedPublishCollection();
-    private final ConcurrentMap<String, Throwable> loopThrownExceptions = new ConcurrentHashMap<>();
+//    private final ConcurrentMap<String, Throwable> loopThrownExceptions = new ConcurrentHashMap<>();
+    private final SessionEventLoopGroup sessionLoops;
 
     PostOffice(ISubscriptionsDirectory subscriptions, IRetainedRepository retainedRepository,
                SessionRegistry sessionRegistry, BrokerInterceptor interceptor, Authorizator authorizator, int sessionQueueSize) {
@@ -187,30 +188,32 @@ class PostOffice {
         this.sessionRegistry = sessionRegistry;
         this.interceptor = interceptor;
 
-        this.sessionQueues = new BlockingQueue[eventLoops];
-        for (int i = 0; i < eventLoops; i++) {
-            this.sessionQueues[i] = new ArrayBlockingQueue<>(sessionQueueSize);
-        }
-        this.sessionExecutors = new SessionEventLoop[eventLoops];
-        for (int i = 0; i < eventLoops; i++) {
-            SessionEventLoop newLoop = new SessionEventLoop(this.sessionQueues[i]);
-            newLoop.setName(sessionLoopName(i));
-            newLoop.setUncaughtExceptionHandler((loopThread, ex) -> {
-                // executed in session loop thread
-                // collect the exception thrown to later re-throw
-                loopThrownExceptions.put(loopThread.getName(), ex);
+//        this.sessionQueues = new BlockingQueue[eventLoops];
+//        for (int i = 0; i < eventLoops; i++) {
+//            this.sessionQueues[i] = new ArrayBlockingQueue<>(sessionQueueSize);
+//        }
+//        this.sessionExecutors = new SessionEventLoop[eventLoops];
+//        for (int i = 0; i < eventLoops; i++) {
+//            SessionEventLoop newLoop = new SessionEventLoop(this.sessionQueues[i]);
+//            newLoop.setName(sessionLoopName(i));
+//            newLoop.setUncaughtExceptionHandler((loopThread, ex) -> {
+//                // executed in session loop thread
+//                // collect the exception thrown to later re-throw
+//                loopThrownExceptions.put(loopThread.getName(), ex);
+//
+//                // This is done in asynch from another thread in BrokerInterceptor
+//                interceptor.notifyLoopException(new InterceptExceptionMessage(ex));
+//            });
+//            newLoop.start();
+//            this.sessionExecutors[i] = newLoop;
+//        }
 
-                // This is done in asynch from another thread in BrokerInterceptor
-                interceptor.notifyLoopException(new InterceptExceptionMessage(ex));
-            });
-            newLoop.start();
-            this.sessionExecutors[i] = newLoop;
-        }
+        this.sessionLoops = new SessionEventLoopGroup(interceptor, sessionQueueSize);
     }
 
-    private String sessionLoopName(int i) {
-        return "Session Executor " + i;
-    }
+//    private String sessionLoopName(int i) {
+//        return "Session Executor " + i;
+//    }
 
     public void init(SessionRegistry sessionRegistry) {
         this.sessionRegistry = sessionRegistry;
@@ -411,10 +414,12 @@ class PostOffice {
     private class BatchingPublishesCollector {
         final List<Subscription>[] subscriptions;
         private final int eventLoops;
+        private final SessionEventLoopGroup loopGroup;
 
-        BatchingPublishesCollector(int eventLoops) {
+        BatchingPublishesCollector(SessionEventLoopGroup loopGroup) {
+            eventLoops = loopGroup.getEventLoopCount();
+            this.loopGroup = loopGroup;
             subscriptions = new List[eventLoops];
-            this.eventLoops = eventLoops;
         }
 
         public void add(Subscription sub) {
@@ -426,7 +431,7 @@ class PostOffice {
         }
 
         private int subscriberEventLoop(String clientId) {
-            return Math.abs(clientId.hashCode()) % this.eventLoops;
+            return loopGroup.targetQueueOrdinal(clientId);
         }
 
         List<RouteResult> routeBatchedPublishes(Consumer<List<Subscription>> action) {
@@ -478,7 +483,7 @@ class PostOffice {
             return new RoutingResults(Collections.emptyList(), Collections.emptyList(), CompletableFuture.completedFuture(null));
         }
 
-        final BatchingPublishesCollector collector = new BatchingPublishesCollector(eventLoops);
+        final BatchingPublishesCollector collector = new BatchingPublishesCollector(sessionLoops);
 
         for (final Subscription sub : topicMatchingSubscriptions) {
             if (filterTargetClients == NO_FILTER || filterTargetClients.contains(sub.getClientId())) {
@@ -635,55 +640,113 @@ class PostOffice {
     }
 
     String sessionLoopThreadName(String clientId) {
-        final int targetQueueId = targetQueueOrdinal(clientId);
-        return sessionLoopName(targetQueueId);
+        return sessionLoops.sessionLoopThreadName(clientId);
     }
 
-    private int targetQueueOrdinal(String clientId) {
-        return Math.abs(clientId.hashCode()) % this.eventLoops;
+//    private int targetQueueOrdinal(String clientId) {
+//        return Math.abs(clientId.hashCode()) % this.eventLoops;
+//    }
+
+    static class SessionEventLoopGroup {
+        private static final Logger LOG = LoggerFactory.getLogger(SessionEventLoopGroup.class);
+
+        private final SessionEventLoop[] sessionExecutors;
+        private final BlockingQueue<FutureTask<String>>[] sessionQueues;
+        private final int eventLoops = Runtime.getRuntime().availableProcessors();
+        private final ConcurrentMap<String, Throwable> loopThrownExceptions = new ConcurrentHashMap<>();
+
+        SessionEventLoopGroup(BrokerInterceptor interceptor, int sessionQueueSize) {
+            this.sessionQueues = new BlockingQueue[eventLoops];
+            for (int i = 0; i < eventLoops; i++) {
+                this.sessionQueues[i] = new ArrayBlockingQueue<>(sessionQueueSize);
+            }
+            this.sessionExecutors = new SessionEventLoop[eventLoops];
+            for (int i = 0; i < eventLoops; i++) {
+                SessionEventLoop newLoop = new SessionEventLoop(this.sessionQueues[i]);
+                newLoop.setName(sessionLoopName(i));
+                newLoop.setUncaughtExceptionHandler((loopThread, ex) -> {
+                    // executed in session loop thread
+                    // collect the exception thrown to later re-throw
+                    loopThrownExceptions.put(loopThread.getName(), ex);
+
+                    // This is done in asynch from another thread in BrokerInterceptor
+                    interceptor.notifyLoopException(new InterceptExceptionMessage(ex));
+                });
+                newLoop.start();
+                this.sessionExecutors[i] = newLoop;
+            }
+        }
+
+        int targetQueueOrdinal(String clientId) {
+            return Math.abs(clientId.hashCode()) % this.eventLoops;
+        }
+
+        private String sessionLoopName(int i) {
+            return "Session Executor " + i;
+        }
+
+        String sessionLoopThreadName(String clientId) {
+            final int targetQueueId = targetQueueOrdinal(clientId);
+            return sessionLoopName(targetQueueId);
+        }
+
+        /**
+         * Route the command to the owning SessionEventLoop
+         * */
+        public RouteResult routeCommand(String clientId, String actionDescription, Callable<String> action) {
+            SessionCommand cmd = new SessionCommand(clientId, action);
+            final int targetQueueId = targetQueueOrdinal(cmd.getSessionId());
+            LOG.debug("Routing cmd [{}] for session [{}] to event processor {}", actionDescription, cmd.getSessionId(), targetQueueId);
+            final FutureTask<String> task = new FutureTask<>(() -> {
+                cmd.execute();
+                cmd.complete();
+                return cmd.getSessionId();
+            });
+            if (Thread.currentThread() == sessionExecutors[targetQueueId]) {
+                SessionEventLoop.executeTask(task);
+                return RouteResult.success(clientId, cmd.completableFuture());
+            }
+            if (this.sessionQueues[targetQueueId].offer(task)) {
+                return RouteResult.success(clientId, cmd.completableFuture());
+            } else {
+                LOG.warn("Session command queue {} is full executing action {}", targetQueueId, actionDescription);
+                return RouteResult.failed(clientId);
+            }
+        }
+
+        public void terminate() {
+            for (SessionEventLoop processor : sessionExecutors) {
+                processor.interrupt();
+            }
+            for (SessionEventLoop processor : sessionExecutors) {
+                try {
+                    processor.join(5_000);
+                } catch (InterruptedException ex) {
+                    LOG.info("Interrupted while joining session event loop {}", processor.getName(), ex);
+                }
+            }
+
+            for (Map.Entry<String, Throwable> loopThrownExceptionEntry : loopThrownExceptions.entrySet()) {
+                String threadName = loopThrownExceptionEntry.getKey();
+                Throwable threadError = loopThrownExceptionEntry.getValue();
+                LOG.error("Session event loop {} terminated with error", threadName, threadError);
+            }
+        }
+
+        public int getEventLoopCount() {
+            return eventLoops;
+        }
     }
 
     /**
      * Route the command to the owning SessionEventLoop
      * */
     public RouteResult routeCommand(String clientId, String actionDescription, Callable<String> action) {
-        SessionCommand cmd = new SessionCommand(clientId, action);
-        final int targetQueueId = targetQueueOrdinal(cmd.getSessionId());
-        LOG.debug("Routing cmd [{}] for session [{}] to event processor {}", actionDescription, cmd.getSessionId(), targetQueueId);
-        final FutureTask<String> task = new FutureTask<>(() -> {
-            cmd.execute();
-            cmd.complete();
-            return cmd.getSessionId();
-        });
-        if (Thread.currentThread() == sessionExecutors[targetQueueId]) {
-            SessionEventLoop.executeTask(task);
-            return RouteResult.success(clientId, cmd.completableFuture());
-        }
-        if (this.sessionQueues[targetQueueId].offer(task)) {
-            return RouteResult.success(clientId, cmd.completableFuture());
-        } else {
-            LOG.warn("Session command queue {} is full executing action {}", targetQueueId, actionDescription);
-            return RouteResult.failed(clientId);
-        }
+        return sessionLoops.routeCommand(clientId, actionDescription, action);
     }
 
     public void terminate() {
-        for (SessionEventLoop processor : sessionExecutors) {
-            processor.interrupt();
-        }
-        for (SessionEventLoop processor : sessionExecutors) {
-            try {
-                processor.join(5_000);
-            } catch (InterruptedException ex) {
-                LOG.info("Interrupted while joining session event loop {}", processor.getName(), ex);
-            }
-        }
-
-        for (Map.Entry<String, Throwable> loopThrownExceptionEntry : loopThrownExceptions.entrySet()) {
-            String threadName = loopThrownExceptionEntry.getKey();
-            Throwable threadError = loopThrownExceptionEntry.getValue();
-            LOG.error("Session event loop {} terminated with error", threadName, threadError);
-        }
+        sessionLoops.terminate();
     }
 
     /**
