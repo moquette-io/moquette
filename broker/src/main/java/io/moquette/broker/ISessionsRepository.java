@@ -21,14 +21,14 @@ public interface ISessionsRepository {
         private Instant expireAt = null;
         final MqttVersion version;
         private final int expiryInterval;
-        private final Clock clock;
+        private transient final Clock clock;
 
         /**
          * Create a new SessionData setting the expiration instant computed by
          * the actual instant and the expiry interval defined for the session.
          * */
         static SessionData calculateExpiration(SessionData session) {
-            final Instant expireAt = Instant.now().plusSeconds(session.expiryInterval);
+            final Instant expireAt = session.clock.instant().plusSeconds(session.expiryInterval);
             return new SessionData(session.clientId, expireAt, session.version, session.expiryInterval, session.clock);
         }
 
