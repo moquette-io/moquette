@@ -168,7 +168,7 @@ public class SessionRegistry {
     private void checkExpiredSessions() {
         List<ISessionsRepository.SessionData> expiredSessions = new ArrayList<>();
         int drainedSessions = removableSessions.drainTo(expiredSessions);
-        LOG.debug("Retrieved {} expired sessions", drainedSessions);
+        LOG.debug("Retrieved {} expired sessions or {}", drainedSessions, removableSessions.size());
         for (ISessionsRepository.SessionData expiredSession : expiredSessions) {
             final String expiredAt = expiredSession.expireAt().map(Instant::toString).orElse("UNDEFINED");
             LOG.debug("Removing session {}, expired on {}", expiredSession.clientId(), expiredAt);
@@ -181,6 +181,7 @@ public class SessionRegistry {
         if (!session.expireAt().isPresent()) {
             throw new RuntimeException("Can't track for expiration a session without expiry instant, client_id: " + session.clientId());
         }
+        LOG.debug("start tracking the session {} for removal", session.clientId());
         removableSessions.add(session);
     }
 

@@ -57,7 +57,6 @@ import java.util.concurrent.TimeUnit;
 import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static io.moquette.broker.NettyChannelAssertions.assertEqualsConnAck;
-import static io.moquette.broker.Session.INFINITE_EXPIRY;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
@@ -73,6 +72,7 @@ public class SessionRegistryTest {
     static final String FAKE_CLIENT_ID = "FAKE_123";
     static final String TEST_USER = "fakeuser";
     static final String TEST_PWD = "fakepwd";
+    public static final int GLOBAL_SESSION_EXPIRY_SECONDS = 100 * 24 * 60 * 60; // 100 days
 
     private MQTTConnection connection;
     private EmbeddedChannel channel;
@@ -118,7 +118,7 @@ public class SessionRegistryTest {
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
         final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024);
         sessionRepository = memorySessionsRepository();
-        sut = new SessionRegistry(subscriptions, sessionRepository, queueRepository, permitAll, scheduler, slidingClock, INFINITE_EXPIRY, loopsGroup);
+        sut = new SessionRegistry(subscriptions, sessionRepository, queueRepository, permitAll, scheduler, slidingClock, GLOBAL_SESSION_EXPIRY_SECONDS, loopsGroup);
         final PostOffice postOffice = new PostOffice(subscriptions,
             new MemoryRetainedRepository(), sut, ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup);
         return new MQTTConnection(channel, config, mockAuthenticator, sut, postOffice);
@@ -262,7 +262,7 @@ public class SessionRegistryTest {
     public void givenSessionWithExpireTimeWhenAfterExpirationIsPassedThenSessionIsRemoved() {
         LOG.info("givenSessionWithExpireTimeWhenAfterExpirationIsPassedThenSessionIsRemoved");
 
-        // insert a not clean session that should expire in INFINITE_EXPIRY (~100 years)
+        // insert a not clean session that should expire in GLOBAL_SESSION_EXPIRY_SECONDS (100 days)
         final String clientId = "client_to_be_removed";
         final SessionRegistry.SessionCreationResult res = sut.createOrReopenSession(connMsg.cleanSession(false).build(), clientId, "User");
         assertEquals(SessionRegistry.CreationModeEnum.CREATED_CLEAN_NEW, res.mode, "Not clean session must be created");
@@ -272,7 +272,7 @@ public class SessionRegistryTest {
         assertEquals(1, sessionRepository.list().size(), "Not clean session must be persisted");
 
         // move time forward
-        Duration moreThenSessionExpiration = Duration.ofSeconds(Session.INFINITE_EXPIRY).plusSeconds(10);
+        Duration moreThenSessionExpiration = Duration.ofSeconds(GLOBAL_SESSION_EXPIRY_SECONDS).plusSeconds(10);
         slidingClock.forward(moreThenSessionExpiration);
 
         // check the session has been removed
