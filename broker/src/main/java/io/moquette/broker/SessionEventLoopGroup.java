@@ -61,6 +61,10 @@ class SessionEventLoopGroup {
      */
     public PostOffice.RouteResult routeCommand(String clientId, String actionDescription, Callable<String> action) {
         SessionCommand cmd = new SessionCommand(clientId, action);
+
+        if (clientId == null)
+            return PostOffice.RouteResult.failed(null, "Seems awaiting new route feature completion, skipping.");
+
         final int targetQueueId = targetQueueOrdinal(cmd.getSessionId());
         LOG.debug("Routing cmd [{}] for session [{}] to event processor {}", actionDescription, cmd.getSessionId(), targetQueueId);
         final FutureTask<String> task = new FutureTask<>(() -> {

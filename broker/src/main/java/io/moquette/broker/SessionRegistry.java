@@ -46,13 +46,15 @@ public class SessionRegistry {
          * Releases any held resources. Must be called when the EnqueuedMessage is no
          * longer needed.
          */
-        public void release() {}
+        public void release() {
+        }
 
         /**
          * Retains any held resources. Must be called when the EnqueuedMessage is added
          * to a store.
          */
-        public void retain() {}
+        public void retain() {
+        }
     }
 
     public static class PublishedMessage extends EnqueuedMessage {
@@ -210,7 +212,7 @@ public class SessionRegistry {
         //verify if subscription still satisfy read ACL permissions
         for (Subscription existingSub : session.getSubscriptions()) {
             final boolean topicReadable = authorizator.canRead(existingSub.getTopicFilter(), username,
-                                                               session.getClientID());
+                session.getClientID());
             if (!topicReadable) {
                 subscriptionsDirectory.removeSubscription(existingSub.getTopicFilter(), session.getClientID());
             }
@@ -311,6 +313,27 @@ public class SessionRegistry {
             .collect(Collectors.toList());
     }
 
+    boolean dropConnection(final String clientID) {
+        LOG.debug("Disconnecting client: {}", clientID);
+        if (clientID == null) return false;
+
+        final Session client = pool.get(clientID);
+
+        if (client != null) {
+
+            client.closeImmediately();
+            client.cleanUp();
+            purgeSessionState(client);
+            pool.remove(clientID);
+
+            LOG.debug("Client {} successfully disconnected from broker", clientID);
+            return true;
+        }
+
+        LOG.debug("Client {} not found, nothing disconnected", clientID);
+        return false;
+    }
+
     private Optional<ClientDescriptor> createClientDescriptor(Session s) {
         final String clientID = s.getClientID();
         final Optional<InetSocketAddress> remoteAddressOpt = s.remoteAddress();
@@ -319,7 +342,7 @@ public class SessionRegistry {
 
     /**
      * Close all resources related to session management
-     * */
+     */
     public void close() {
         queueRepository.close();
     }
