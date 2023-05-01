@@ -30,6 +30,8 @@ import org.slf4j.LoggerFactory;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -309,6 +311,22 @@ public class SessionRegistry {
             .filter(Optional::isPresent)
             .map(Optional::get)
             .collect(Collectors.toList());
+    }
+
+    List<ClientDescriptor> kickClient(String clientId) {
+        return pool.values().stream()
+            .filter(Session::connected)
+            .filter(session -> Objects.equals(clientId, session.getClientID()))
+            .map(this::disconnectSession)
+            .filter(Optional::isPresent)
+            .map(Optional::get)
+            .collect(Collectors.toList());
+    }
+
+    private Optional<ClientDescriptor> disconnectSession(Session s) {
+        Optional<ClientDescriptor> descriptor = createClientDescriptor(s);
+        s.closeImmediately();
+        return descriptor;
     }
 
     private Optional<ClientDescriptor> createClientDescriptor(Session s) {

@@ -638,4 +638,15 @@ public class Server {
     public Collection<ClientDescriptor> listConnectedClients() {
         return sessions.listConnectedClients();
     }
+
+
+
+    /**
+     * Attempts to disconnect a client given its client id.
+     * Iterates over the session pool. returning client descriptors of any matched (now disconnected)
+     * clients.
+     * */
+    public List<ClientDescriptor> kickClientId(String clientId) {
+        return sessions.kickClient(clientId);
+    }
 }
