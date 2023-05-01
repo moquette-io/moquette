@@ -66,6 +66,7 @@ public class PostOfficePublishTest {
     public static final String FAKE_USER_NAME = "UnAuthUser";
     private MqttConnectMessage connectMessage;
     private SessionRegistry sessionRegistry;
+    private MockConnectionFilter connectionFilter = new MockConnectionFilter();
     private MockAuthenticator mockAuthenticator;
     static final BrokerConfiguration ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID =
         new BrokerConfiguration(true, true, false, NO_BUFFER_FLUSH);
@@ -93,7 +94,7 @@ public class PostOfficePublishTest {
     }
 
     private MQTTConnection createMQTTConnection(BrokerConfiguration config, Channel channel) {
-        return new MQTTConnection(channel, config, mockAuthenticator, sessionRegistry, sut);
+        return new MQTTConnection(channel, config, mockAuthenticator, connectionFilter, sessionRegistry, sut);
     }
 
     private void initPostOfficeAndSubsystems() {

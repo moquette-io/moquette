@@ -26,6 +26,7 @@ import io.moquette.broker.security.AcceptAllAuthenticator;
 import io.moquette.broker.security.DenyAllAuthorizatorPolicy;
 import io.moquette.broker.security.IAuthenticator;
 import io.moquette.broker.security.IAuthorizatorPolicy;
+import io.moquette.broker.security.IConnectionFilter;
 import io.moquette.broker.security.PermitAllAuthorizatorPolicy;
 import io.moquette.broker.security.ResourceAuthenticator;
 import io.moquette.broker.unsafequeues.QueueException;
@@ -167,11 +168,11 @@ public class Server {
      */
     public void startServer(IConfig config, List<? extends InterceptHandler> handlers) throws IOException {
         LOG.debug("Starting moquette integration using IConfig instance and intercept handlers");
-        startServer(config, handlers, null, null, null);
+        startServer(config, handlers, null, null, null, null);
     }
 
     public void startServer(IConfig config, List<? extends InterceptHandler> handlers, ISslContextCreator sslCtxCreator,
-                            IAuthenticator authenticator, IAuthorizatorPolicy authorizatorPolicy) throws IOException {
+                            IConnectionFilter connectionFilter, IAuthenticator authenticator, IAuthorizatorPolicy authorizatorPolicy) throws IOException {
         final long start = System.currentTimeMillis();
         if (handlers == null) {
             handlers = Collections.emptyList();
@@ -190,6 +191,7 @@ public class Server {
             LOG.info("Using default SSL context creator");
             sslCtxCreator = new DefaultMoquetteSslContextCreator(config);
         }
+        connectionFilter = initializeConnectionFilter(connectionFilter, config);
         authenticator = initializeAuthenticator(authenticator, config);
         authorizatorPolicy = initializeAuthorizatorPolicy(authorizatorPolicy, config);
 
@@ -245,7 +247,7 @@ public class Server {
         dispatcher = new PostOffice(subscriptions, retainedRepository, sessions, interceptor, authorizator,
             loopsGroup);
         final BrokerConfiguration brokerConfig = new BrokerConfiguration(config);
-        MQTTConnectionFactory connectionFactory = new MQTTConnectionFactory(brokerConfig, authenticator, sessions,
+        MQTTConnectionFactory connectionFactory = new MQTTConnectionFactory(brokerConfig, authenticator, connectionFilter, sessions,
                                                                             dispatcher);
 
         final NewNettyMQTTHandler mqttHandler = new NewNettyMQTTHandler(connectionFactory);
@@ -261,6 +263,7 @@ public class Server {
 
         initialized = true;
     }
+
 
     private static IQueueRepository initQueuesRepository(IConfig config, Path dataPath, H2Builder h2Builder) throws IOException {
         final IQueueRepository queueRepository;
@@ -457,6 +460,16 @@ public class Server {
             LOG.info("Authorizator policy {} instance will be used", authorizatorPolicy.getClass().getName());
         }
         return authorizatorPolicy;
+    }
+
+    private IConnectionFilter initializeConnectionFilter(IConnectionFilter connectionFilter, IConfig props) {
+        LOG.debug("Configuring MQTT Connection Filter");
+        String connectionFilterClassName = props.getProperty(BrokerConstants.CONNECTION_FILTER_CLASS_NAME, "");
+
+        if (connectionFilter == null && !connectionFilterClassName.isEmpty()) {
+            connectionFilter = loadClass(connectionFilterClassName, IConnectionFilter.class, IConfig.class, props);
+        }
+        return connectionFilter;
     }
 
     private IAuthenticator initializeAuthenticator(IAuthenticator authenticator, IConfig props) {

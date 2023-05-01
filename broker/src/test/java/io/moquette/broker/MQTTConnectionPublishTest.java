@@ -15,6 +15,7 @@
  */
 package io.moquette.broker;
 
+import io.moquette.broker.security.IConnectionFilter;
 import io.moquette.broker.security.PermitAllAuthorizatorPolicy;
 import io.moquette.broker.subscriptions.CTrieSubscriptionDirectory;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
@@ -71,6 +72,7 @@ public class MQTTConnectionPublishTest {
     private MQTTConnection createMQTTConnection(BrokerConfiguration config, Channel channel) {
         IAuthenticator mockAuthenticator = new MockAuthenticator(singleton(FAKE_CLIENT_ID),
                                                                  singletonMap(TEST_USER, TEST_PWD));
+        IConnectionFilter connectionFilter = new MockConnectionFilter();
 
         ISubscriptionsDirectory subscriptions = new CTrieSubscriptionDirectory();
         ISubscriptionsRepository subscriptionsRepository = new MemorySubscriptionsRepository();
@@ -83,7 +85,7 @@ public class MQTTConnectionPublishTest {
         final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024);
         final PostOffice postOffice = new PostOffice(subscriptions,
             new MemoryRetainedRepository(), sessionRegistry, ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup);
-        return new MQTTConnection(channel, config, mockAuthenticator, sessionRegistry, postOffice);
+        return new MQTTConnection(channel, config, mockAuthenticator, connectionFilter, sessionRegistry, postOffice);
     }
 
 //    @NotNull

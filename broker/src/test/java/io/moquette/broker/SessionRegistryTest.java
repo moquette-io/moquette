@@ -79,6 +79,7 @@ public class SessionRegistryTest {
     private MQTTConnection createMQTTConnection(BrokerConfiguration config, Channel channel) {
         IAuthenticator mockAuthenticator = new MockAuthenticator(singleton(FAKE_CLIENT_ID),
                                                                  singletonMap(TEST_USER, TEST_PWD));
+        MockConnectionFilter connectionFilter = new MockConnectionFilter();
 
         ISubscriptionsDirectory subscriptions = new CTrieSubscriptionDirectory();
         ISubscriptionsRepository subscriptionsRepository = new MemorySubscriptionsRepository();
@@ -91,7 +92,7 @@ public class SessionRegistryTest {
         final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024);
         final PostOffice postOffice = new PostOffice(subscriptions,
             new MemoryRetainedRepository(), sut, ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup);
-        return new MQTTConnection(channel, config, mockAuthenticator, sut, postOffice);
+        return new MQTTConnection(channel, config, mockAuthenticator, connectionFilter, sut, postOffice);
     }
 
     @Test

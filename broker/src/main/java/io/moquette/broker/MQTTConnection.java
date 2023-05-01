@@ -16,6 +16,7 @@
 package io.moquette.broker;
 
 import io.moquette.BrokerConstants;
+import io.moquette.broker.security.IConnectionFilter;
 import io.moquette.broker.subscriptions.Topic;
 import io.moquette.broker.security.IAuthenticator;
 import io.netty.buffer.ByteBuf;
@@ -50,6 +51,7 @@ final class MQTTConnection {
     final Channel channel;
     private final BrokerConfiguration brokerConfig;
     private final IAuthenticator authenticator;
+    private final IConnectionFilter connectionFilter;
     private final SessionRegistry sessionRegistry;
     private final PostOffice postOffice;
     private volatile boolean connected;
@@ -57,10 +59,11 @@ final class MQTTConnection {
     private Session bindedSession;
 
     MQTTConnection(Channel channel, BrokerConfiguration brokerConfig, IAuthenticator authenticator,
-                   SessionRegistry sessionRegistry, PostOffice postOffice) {
+                   IConnectionFilter connectionFilter, SessionRegistry sessionRegistry, PostOffice postOffice) {
         this.channel = channel;
         this.brokerConfig = brokerConfig;
         this.authenticator = authenticator;
+        this.connectionFilter = connectionFilter;
         this.sessionRegistry = sessionRegistry;
         this.postOffice = postOffice;
         this.connected = false;
@@ -180,12 +183,22 @@ final class MQTTConnection {
             return PostOffice.RouteResult.failed(clientId);
         }
 
+        if (!connectionAllowed(clientId)) {
+            abortConnection(CONNECTION_REFUSED_BANNED);
+            channel.close().addListener(CLOSE_ON_FAILURE);
+            return PostOffice.RouteResult.failed(clientId);
+        }
+
         final String sessionId = clientId;
         return postOffice.routeCommand(clientId, "CONN", () -> {
             checkMatchSessionLoop(sessionId);
             executeConnect(msg, sessionId);
             return null;
         });
+    }
+
+    private boolean connectionAllowed(String clientId) {
+        return connectionFilter == null || connectionFilter.allowConnection(clientDescriptor(clientId));
     }
 
     private void checkMatchSessionLoop(String clientId) {
@@ -632,8 +645,19 @@ final class MQTTConnection {
         return "MQTTConnection{channel=" + channel + ", connected=" + connected + '}';
     }
 
+    // TODO : Unsafe cast, this is something else during testing (EmbeddedSocketAddress)
     InetSocketAddress remoteAddress() {
         return (InetSocketAddress) channel.remoteAddress();
+    }
+
+    ClientDescriptor clientDescriptor(String clientId) {
+        if (channel.remoteAddress() instanceof InetSocketAddress) {
+            return new ClientDescriptor(
+                clientId,
+                ((InetSocketAddress) channel.remoteAddress()).getHostString(),
+                ((InetSocketAddress) channel.remoteAddress()).getPort());
+        }
+        return new ClientDescriptor(clientId, "unknown", -1);
     }
 
     public void readCompleted() {
