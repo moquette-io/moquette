@@ -15,6 +15,7 @@
  */
 package io.moquette.testembedded;
 
+import io.moquette.broker.ClientDescriptor;
 import io.moquette.broker.Server;
 import io.moquette.interception.AbstractInterceptHandler;
 import io.moquette.interception.InterceptHandler;
@@ -29,6 +30,7 @@ import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import io.netty.handler.codec.mqtt.MqttQoS;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -39,7 +41,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * */
 public final class EmbeddedLauncher {
 
-    static class PublisherListener extends AbstractInterceptHandler {
+    private class PublisherListener extends AbstractInterceptHandler {
 
         @Override
         public String getID() {
@@ -50,6 +52,17 @@ public final class EmbeddedLauncher {
         public void onPublish(InterceptPublishMessage msg) {
             final String decodedPayload = msg.getPayload().toString(UTF_8);
             System.out.println("Received on topic: " + msg.getTopicName() + " content: " + decodedPayload);
+            if ("/command".equals(msg.getTopicName())) {
+                switch (decodedPayload) {
+                    case "exit":
+                        System.out.println("EXITING broker by /command exit");
+                        shutdown();
+                        return;
+                    case "list_clients":
+                        listClients();
+                        return;
+                }
+            }
         }
         
         @Override
@@ -59,22 +72,33 @@ public final class EmbeddedLauncher {
     }
 
     public static void main(String[] args) throws InterruptedException, IOException {
+        final EmbeddedLauncher launcher = new EmbeddedLauncher();
+        launcher.start();
+    }
+
+    private Server mqttBroker;
+
+    private EmbeddedLauncher() {
+    }
+
+    private void start() throws IOException, InterruptedException {
         IResourceLoader classpathLoader = new ClasspathResourceLoader();
         final IConfig classPathConfig = new ResourceLoaderConfig(classpathLoader);
 
-        final Server mqttBroker = new Server();
+        mqttBroker = new Server();
         List<? extends InterceptHandler> userHandlers = Collections.singletonList(new PublisherListener());
         mqttBroker.startServer(classPathConfig, userHandlers);
 
         System.out.println("Broker started press [CTRL+C] to stop");
-        //Bind  a shutdown hook
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("Stopping broker");
-            mqttBroker.stopServer();
-            System.out.println("Broker stopped");
-        }));
+
+        //Bind a shutdown hook
+        Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
 
         Thread.sleep(20000);
+        internalPublish("Hello World!!");
+    }
+
+    private void internalPublish(String messageText) {
         System.out.println("Before self publish");
         MqttPublishMessage message = MqttMessageBuilders.publish()
             .topicName("/exit")
@@ -82,13 +106,29 @@ public final class EmbeddedLauncher {
 //        qos(MqttQoS.AT_MOST_ONCE);
 //        qQos(MqttQoS.AT_LEAST_ONCE);
             .qos(MqttQoS.EXACTLY_ONCE)
-            .payload(Unpooled.copiedBuffer("Hello World!!".getBytes(UTF_8)))
+            .payload(Unpooled.copiedBuffer(messageText.getBytes(UTF_8)))
             .build();
 
         mqttBroker.internalPublish(message, "INTRLPUB");
         System.out.println("After self publish");
     }
 
-    private EmbeddedLauncher() {
+    private void shutdown() {
+        listClients();
+
+        System.out.println("Stopping broker");
+        mqttBroker.stopServer();
+        System.out.println("Broker stopped");
     }
+
+    private void listClients() {
+        final Collection<ClientDescriptor> connectedClients = mqttBroker.listConnectedClients();
+        if (connectedClients.isEmpty()) {
+            System.out.println("No connected clients");
+        }
+        for (ClientDescriptor client : connectedClients) {
+            System.out.println(client);
+        }
+    }
+
 }
