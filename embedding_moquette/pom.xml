@@ -9,7 +9,7 @@
     </parent>
 
     <artifactId>embedded_test</artifactId>
-    <packaging>pom</packaging>
+    <packaging>jar</packaging>
     <name>Moquette - Embedded test</name>
 
     <dependencies>
