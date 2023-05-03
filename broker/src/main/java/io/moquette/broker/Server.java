@@ -634,12 +634,8 @@ public class Server {
 
     /**
      * Return a list of descriptors of connected clients.
-     * Returns null if the broker is not started.
      * */
     public Collection<ClientDescriptor> listConnectedClients() {
-        if (sessions == null) {
-            return null;
-        }
         return sessions.listConnectedClients();
     }
 
