@@ -637,8 +637,9 @@ public class Server {
      * Returns null if the broker is not started.
      * */
     public Collection<ClientDescriptor> listConnectedClients() {
-        if (sessions == null) {
-            return null;
+        if (!initialized) {
+            LOG.error("Moquette is not started, MQTT clients listing unavailable");
+            throw new IllegalStateException("Can't get clients list from a integration that is not yet started");
         }
         return sessions.listConnectedClients();
     }
