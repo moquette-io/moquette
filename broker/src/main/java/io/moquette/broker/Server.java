@@ -636,6 +636,10 @@ public class Server {
      * Return a list of descriptors of connected clients.
      * */
     public Collection<ClientDescriptor> listConnectedClients() {
+        if (!initialized) {
+            LOG.error("Moquette is not started, MQTT clients listing unavailable");
+            throw new IllegalStateException("Can't get clients list from a Server that is not yet started");
+        }
         return sessions.listConnectedClients();
     }
 
