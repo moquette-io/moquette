@@ -198,7 +198,7 @@ public class SessionRegistry {
             }
         }
         if (!queues.isEmpty()) {
-            LOG.error("Recreating sessions left {} unused queues. This is probably bug. Session IDs: {}", queues.size(), Arrays.toString(queues.toArray()));
+            LOG.error("Recreating sessions left {} unused queues. This is probably a bug. Session IDs: {}", queues.size(), Arrays.toString(queues.toArray()));
         }
     }
 
@@ -334,7 +334,7 @@ public class SessionRegistry {
             purgeSessionState(session);
         } else {
             //bound session has expiry, disconnect it and add to the queue for removal
-            trackForRemovalOnExpiration(ISessionsRepository.SessionData.calculateExpiration(session.getSessionData()));
+            trackForRemovalOnExpiration(session.getSessionData().withExpirationComputed());
         }
     }
 
@@ -424,7 +424,7 @@ public class SessionRegistry {
             .filter(s -> !s.isClean()) // not clean session
             .map(Session::getSessionData)
             .filter(s -> !s.expireAt().isPresent()) // without expire set
-            .map(ISessionsRepository.SessionData::calculateExpiration) // new SessionData with expireAt valued
+            .map(ISessionsRepository.SessionData::withExpirationComputed) // new SessionData with expireAt valued
             .forEach(sessionsRepository::saveSession); // update the storage
     }
 }

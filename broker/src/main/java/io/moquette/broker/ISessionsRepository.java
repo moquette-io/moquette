@@ -24,15 +24,6 @@ public interface ISessionsRepository {
         private transient final Clock clock;
 
         /**
-         * Create a new SessionData setting the expiration instant computed by
-         * the actual instant and the expiry interval defined for the session.
-         * */
-        static SessionData calculateExpiration(SessionData session) {
-            final Instant expireAt = session.clock.instant().plusSeconds(session.expiryInterval);
-            return new SessionData(session.clientId, expireAt, session.version, session.expiryInterval, session.clock);
-        }
-
-        /**
          * Construct a new SessionData without expiration set yet.
          *
          * @expiryInterval seconds after which the persistent session could be dropped.
@@ -77,6 +68,11 @@ public interface ISessionsRepository {
 
         public int expiryInterval() {
             return expiryInterval;
+        }
+
+        public SessionData withExpirationComputed() {
+            final Instant expiresAt = clock.instant().plusSeconds(expiryInterval);
+            return new SessionData(clientId, expiresAt, version, expiryInterval, clock);
         }
 
         @Override
