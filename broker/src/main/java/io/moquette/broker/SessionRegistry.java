@@ -313,7 +313,7 @@ public class SessionRegistry {
             .collect(Collectors.toList());
     }
 
-    boolean dropConnection(final String clientId) {
+    boolean dropConnection(final String clientId, boolean cleanSession) {
         LOG.debug("Disconnecting client: {}", clientId);
         if (clientId == null) {
             return false;
@@ -325,8 +325,10 @@ public class SessionRegistry {
             return false;
         }
 
-       client.closeImmediately();
-       purgeSessionState(client);
+        client.closeImmediately();
+        if (cleanSession) {
+            purgeSessionState(client);
+        }
 
        LOG.debug("Client {} successfully disconnected from broker", clientId);
        return true;
