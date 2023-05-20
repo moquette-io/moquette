@@ -185,6 +185,10 @@ public class SessionRegistry {
         removableSessions.add(session);
     }
 
+    private void untrackFromRemovalOnExpiration(ISessionsRepository.SessionData session) {
+
+    }
+
     private void recreateSessionPool() {
         final Set<String> queues = queueRepository.listQueueNames();
         for (ISessionsRepository.SessionData session : sessionsRepository.list()) {
@@ -255,6 +259,8 @@ public class SessionRegistry {
             LOG.trace("case 3, oldSession with same CId {} disconnected", clientId);
             creationResult = new SessionCreationResult(oldSession, CreationModeEnum.REOPEN_EXISTING, true);
         }
+
+        untrackFromRemovalOnExpiration(creationResult.session.getSessionData());
 
         // case not covered new session is clean true/false and old session not in CONNECTED/DISCONNECTED
         return creationResult;

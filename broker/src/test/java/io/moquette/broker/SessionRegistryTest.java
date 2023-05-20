@@ -282,6 +282,35 @@ public class SessionRegistryTest {
             .until(sessionsList(), Matchers.empty());
     }
 
+    @Test
+    public void givenSessionThatExpiresWhenReopenIsNotAnymoreTrackedForExpiration() {
+        LOG.info("givenSessionThatExpiresWhenReopenIsNotAnymoreTrackedForExpiration");
+        final String clientId = "client_to_be_removed";
+        SessionRegistry.SessionCreationResult res = sut.createOrReopenSession(connMsg.cleanSession(false).build(), clientId, "User");
+        assertEquals(SessionRegistry.CreationModeEnum.CREATED_CLEAN_NEW, res.mode, "Non clean session must be created");
+        res.session.completeConnection();
+
+        // remove it, so that it's tracked in the inner delay queue
+        sut.connectionClosed(res.session);
+        assertEquals(1, sessionRepository.list().size(), "Non clean session must be persisted");
+
+        // Exercise
+        // reopen the session
+        res = sut.createOrReopenSession(connMsg.cleanSession(false).build(), clientId, "User");
+        assertEquals(SessionRegistry.CreationModeEnum.REOPEN_EXISTING, res.mode, "Non clean session must be re-opened");
+
+        // move time forward
+        Duration moreThenSessionExpiration = Duration.ofSeconds(GLOBAL_SESSION_EXPIRY_SECONDS).plusSeconds(10);
+        slidingClock.forward(moreThenSessionExpiration);
+
+        // Verify that the session reopened is still listed
+        final Collection<ISessionsRepository.SessionData> activeSessions = sessionRepository.list();
+        System.out.println(activeSessions);
+        assertEquals(1, activeSessions.size(), "There must be active one session");
+        final ISessionsRepository.SessionData element = activeSessions.iterator().next();
+        assertFalse(element.expireAt().isPresent(), "Shouldn't have an expiration configured");
+    }
+
     private Callable<Collection<ISessionsRepository.SessionData>> sessionsList() {
         return () -> sessionRepository.list();
     }
