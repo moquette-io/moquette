@@ -313,25 +313,23 @@ public class SessionRegistry {
             .collect(Collectors.toList());
     }
 
-    boolean dropConnection(final String clientID) {
-        LOG.debug("Disconnecting client: {}", clientID);
-        if (clientID == null) return false;
-
-        final Session client = pool.get(clientID);
-
-        if (client != null) {
-
-            client.closeImmediately();
-            client.cleanUp();
-            purgeSessionState(client);
-            pool.remove(clientID);
-
-            LOG.debug("Client {} successfully disconnected from broker", clientID);
-            return true;
+    boolean dropConnection(final String clientId) {
+        LOG.debug("Disconnecting client: {}", clientId);
+        if (clientId == null) {
+            return false;
         }
 
-        LOG.debug("Client {} not found, nothing disconnected", clientID);
-        return false;
+        final Session client = pool.get(clientId);
+        if (client == null) {
+            LOG.debug("Client {} not found, nothing disconnected", clientId);
+            return false;
+        }
+
+       client.closeImmediately();
+       purgeSessionState(client);
+
+       LOG.debug("Client {} successfully disconnected from broker", clientId);
+       return true;
     }
 
     private Optional<ClientDescriptor> createClientDescriptor(Session s) {
