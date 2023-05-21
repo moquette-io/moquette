@@ -313,7 +313,7 @@ public class SessionRegistry {
             .collect(Collectors.toList());
     }
 
-    boolean dropConnection(final String clientId, boolean cleanSession) {
+    boolean dropConnection(final String clientId, boolean clearSession) {
         LOG.debug("Disconnecting client: {}", clientId);
         if (clientId == null) {
             return false;
@@ -326,7 +326,7 @@ public class SessionRegistry {
         }
 
         client.closeImmediately();
-        if (cleanSession) {
+        if (clearSession) {
             purgeSessionState(client);
         }
 

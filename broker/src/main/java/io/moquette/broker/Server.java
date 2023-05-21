@@ -643,7 +643,7 @@ public class Server {
         return sessions.listConnectedClients();
     }
 
-    public boolean disconnectClient(final String clientID, boolean cleanSession) {
-        return sessions.dropConnection(clientID, cleanSession);
+    public boolean disconnectClient(final String clientID, boolean clearSession) {
+        return sessions.dropConnection(clientID, clearSession);
     }
 }
