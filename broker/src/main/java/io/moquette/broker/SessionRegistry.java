@@ -320,7 +320,7 @@ public class SessionRegistry {
     * @param clientId the name of the client to drop the session.
     * @param removeSessionState boolean flag to request the removal of session state from broker.
     */ 
-    boolean dropAndPurge(final String clientId, boolean removeSessionState) {
+    boolean dropSession(final String clientId, boolean removeSessionState) {
         LOG.debug("Disconnecting client: {}", clientId);
         if (clientId == null) {
             return false;

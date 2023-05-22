@@ -647,15 +647,15 @@ public class Server {
      * @param clientId the name of the client to drop session.
      */
     public boolean disconnectClient(final String clientId) {
-        return sessions.dropSession(clientId);
+        return sessions.dropSession(clientId, false);
     }
-    
+
     /**
      * Force the disconnection of a client, closing the related session and removing any session state from
      * the broker, such as subscriptions and queue.
      * @param clientId the name of the client to drop session.
      */
     public boolean disconnectAndPurgeClientState(final String clientId) {
-        return sessions.dropAndPurgeSession(clientId);
+        return sessions.dropSession(clientId, true);
     }
 }
