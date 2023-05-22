@@ -313,7 +313,14 @@ public class SessionRegistry {
             .collect(Collectors.toList());
     }
 
-    boolean dropConnection(final String clientId, boolean clearSession) {
+   /**
+    * Close the connection bound to the session for the clintId. If removeSessionState is provided
+    * remove any session state like queues and subscription from broker memory.
+    *
+    * @param clientId the name of the client to drop the session.
+    * @param removeSessionState boolean flag to request the removal of session state from broker.
+    */ 
+    boolean dropAndPurge(final String clientId, boolean removeSessionState) {
         LOG.debug("Disconnecting client: {}", clientId);
         if (clientId == null) {
             return false;
@@ -326,7 +333,7 @@ public class SessionRegistry {
         }
 
         client.closeImmediately();
-        if (clearSession) {
+        if (removeSessionState) {
             purgeSessionState(client);
         }
 
