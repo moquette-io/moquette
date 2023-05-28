@@ -72,7 +72,7 @@ class CNode implements Comparable<CNode> {
     }
 
     public void add(INode newINode) {
-        int idx = Collections.binarySearch(children, token, (Object node, Object token1) -> ((INode) node).mainNode().token.compareTo((Token) token1));
+        int idx = Collections.binarySearch(children, newINode.mainNode().token, (Object node, Object token1) -> ((INode) node).mainNode().token.compareTo((Token) token1));
         if (idx < 0) {
             children.add(-1 - idx, newINode);
         } else {
