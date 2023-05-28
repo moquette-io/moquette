@@ -78,11 +78,24 @@ public class CTrie {
         }
         Topic remainingTopic = (ROOT.equals(cnode.getToken())) ? topic : topic.exceptHeadToken();
         Set<Subscription> subscriptions = new HashSet<>();
+
+        // We should only consider the maximum three children children of
+        // type #, + or exact match
+        INode subInode = cnode.childOf(Token.MULTI);
+        if (subInode != null) {
+            subscriptions.addAll(recursiveMatch(remainingTopic, subInode));
+        }
+        subInode = cnode.childOf(Token.SINGLE);
+        if (subInode != null) {
+            subscriptions.addAll(recursiveMatch(remainingTopic, subInode));
+        }
         if (remainingTopic.isEmpty()) {
             subscriptions.addAll(cnode.subscriptions);
-        }
-        for (INode subInode : cnode.allChildren()) {
-            subscriptions.addAll(recursiveMatch(remainingTopic, subInode));
+        } else {
+            subInode = cnode.childOf(remainingTopic.headToken());
+            if (subInode != null) {
+                subscriptions.addAll(recursiveMatch(remainingTopic, subInode));
+            }
         }
         return subscriptions;
     }
