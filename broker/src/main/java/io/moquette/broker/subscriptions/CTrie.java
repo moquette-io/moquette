@@ -129,13 +129,22 @@ public class CTrie {
     }
 
     private Action insertSubscription(INode inode, CNode cnode, Subscription newSubscription) {
-        final CNode updatedCnode = cnode.copy().addSubscription(newSubscription);
+        final CNode updatedCnode;
+        if (cnode instanceof TNode)
+            updatedCnode = new CNode(cnode.getToken());
+        else
+            updatedCnode = cnode.copy();
+        updatedCnode.addSubscription(newSubscription);
         return inode.compareAndSet(cnode, updatedCnode) ? Action.OK : Action.REPEAT;
     }
 
     private Action createNodeAndInsertSubscription(Topic topic, INode inode, CNode cnode, Subscription newSubscription) {
         final INode newInode = createPathRec(topic, newSubscription);
-        final CNode updatedCnode = cnode.copy();
+        final CNode updatedCnode;
+        if (cnode instanceof TNode)
+            updatedCnode = new CNode(cnode.getToken());
+        else
+            updatedCnode = cnode.copy();
         updatedCnode.add(newInode);
 
         return inode.compareAndSet(cnode, updatedCnode) ? Action.OK : Action.REPEAT;

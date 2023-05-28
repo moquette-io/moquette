@@ -22,11 +22,6 @@ class TNode extends CNode {
     }
 
     @Override
-    public Token getToken() {
-        throw new IllegalStateException("Can't be invoked on TNode");
-    }
-
-    @Override
     INode childOf(Token token) {
         throw new IllegalStateException("Can't be invoked on TNode");
     }
