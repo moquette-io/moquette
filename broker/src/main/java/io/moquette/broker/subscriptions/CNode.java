@@ -40,22 +40,15 @@ class CNode implements Comparable<CNode> {
         return token;
     }
 
-    boolean anyChildrenMatch(Token token) {
-        int idx = Collections.binarySearch(children, token, (Object node, Object token1) -> ((INode) node).mainNode().token.compareTo((Token) token1));
-        return idx >= 0;
-    }
-
     List<INode> allChildren() {
         return new ArrayList<>(this.children);
     }
 
     INode childOf(Token token) {
         int idx = Collections.binarySearch(children, token, (Object node, Object token1) -> ((INode) node).mainNode().token.compareTo((Token) token1));
-        INode child = children.get(idx);
-        if (child != null) {
-            return child;
-        }
-        throw new IllegalArgumentException("Asked for a token that doesn't exists in any child [" + token + "]");
+        if (idx < 0)
+            return null;
+        return children.get(idx);
     }
 
     private boolean equalsToken(Token token) {

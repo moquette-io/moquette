@@ -61,8 +61,4 @@ class TNode extends CNode {
         throw new IllegalStateException("Can't be invoked on TNode");
     }
 
-    @Override
-    boolean anyChildrenMatch(Token token) {
-        return false;
-    }
 }
