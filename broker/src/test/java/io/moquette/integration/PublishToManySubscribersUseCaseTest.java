@@ -162,7 +162,7 @@ public class PublishToManySubscribersUseCaseTest extends AbstractIntegration {
     }
 
     private void segmentedParallelSubscriptions(BiConsumer<IMqttAsyncClient, IMqttActionListener> biConsumer) throws InterruptedException {
-        int openSlotCount = COMMAND_QUEUE_SIZE;
+        int openSlotCount = COMMAND_QUEUE_SIZE / 2;
         Semaphore openSlots = new Semaphore(openSlotCount);
         IMqttActionListener completionCallback = createMqttCallback(openSlots);
         for (IMqttAsyncClient subscriber : this.subscribers) {
