@@ -278,7 +278,6 @@ final class MQTTConnection {
                         if (result.mode == SessionRegistry.CreationModeEnum.REOPEN_EXISTING) {
                             final Session session = result.session;
                             postOffice.routeCommand(session.getClientID(), "sendOfflineMessages", () -> {
-                                session.sendQueuedMessagesWhileOffline();
                                 session.reconnectSession();
                                 return null;
                             });
