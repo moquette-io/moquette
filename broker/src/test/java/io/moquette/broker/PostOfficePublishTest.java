@@ -34,9 +34,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.charset.Charset;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 
 import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
@@ -71,6 +69,7 @@ public class PostOfficePublishTest {
         new BrokerConfiguration(true, true, false, NO_BUFFER_FLUSH);
     private MemoryRetainedRepository retainedRepository;
     private MemoryQueueRepository queueRepository;
+    private ScheduledExecutorService scheduler;
 
     @BeforeEach
     public void setUp() {
@@ -85,6 +84,7 @@ public class PostOfficePublishTest {
 
     @AfterEach
     public void tearDown() {
+        scheduler.shutdown();
         sut.terminate();
     }
 
@@ -97,6 +97,7 @@ public class PostOfficePublishTest {
     }
 
     private void initPostOfficeAndSubsystems() {
+        scheduler = Executors.newScheduledThreadPool(1);
         subscriptions = new CTrieSubscriptionDirectory();
         ISubscriptionsRepository subscriptionsRepository = new MemorySubscriptionsRepository();
         subscriptions.init(subscriptionsRepository);
@@ -105,8 +106,8 @@ public class PostOfficePublishTest {
 
         final PermitAllAuthorizatorPolicy authorizatorPolicy = new PermitAllAuthorizatorPolicy();
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
-        sessionRegistry = new SessionRegistry(subscriptions, memorySessionsRepository(), queueRepository, permitAll);
         final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024);
+        sessionRegistry = new SessionRegistry(subscriptions, memorySessionsRepository(), queueRepository, permitAll, scheduler, loopsGroup);
         sut = new PostOffice(subscriptions, retainedRepository, sessionRegistry,
                              ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup);
     }

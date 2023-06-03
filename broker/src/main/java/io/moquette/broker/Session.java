@@ -33,7 +33,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -51,9 +50,9 @@ import java.util.concurrent.atomic.AtomicReference;
 class Session {
 
     private static final Logger LOG = LoggerFactory.getLogger(Session.class);
-    // By specification session expiry value of 0xFFFFFFFF (UINT_MAX) (seconds) means
-    // session that doesn't expire, it's ~136 years, we can set a cap at 100 year
-    static final int INFINITE_EXPIRY = (int) Duration.ofDays(80 * 365).toMillis() / 1000;
+    // By specification session expiry value of 0xEFFFFFFF (UINT_MAX) (seconds) means
+    // session that doesn't expire, it's ~68 years.
+    static final int INFINITE_EXPIRY = Integer.MAX_VALUE;
 
     static class InFlightPacket implements Delayed {
 
@@ -500,6 +499,10 @@ class Session {
         for (MqttPublishMessage msg : qos2Receiving.values()) {
             msg.release();
         }
+    }
+
+    ISessionsRepository.SessionData getSessionData() {
+        return this.data;
     }
 
     @Override
