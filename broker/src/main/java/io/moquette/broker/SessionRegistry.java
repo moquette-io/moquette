@@ -46,13 +46,15 @@ public class SessionRegistry {
          * Releases any held resources. Must be called when the EnqueuedMessage is no
          * longer needed.
          */
-        public void release() {}
+        public void release() {
+        }
 
         /**
          * Retains any held resources. Must be called when the EnqueuedMessage is added
          * to a store.
          */
-        public void retain() {}
+        public void retain() {
+        }
     }
 
     public static class PublishedMessage extends EnqueuedMessage {
@@ -210,7 +212,7 @@ public class SessionRegistry {
         //verify if subscription still satisfy read ACL permissions
         for (Subscription existingSub : session.getSubscriptions()) {
             final boolean topicReadable = authorizator.canRead(existingSub.getTopicFilter(), username,
-                                                               session.getClientID());
+                session.getClientID());
             if (!topicReadable) {
                 subscriptionsDirectory.removeSubscription(existingSub.getTopicFilter(), session.getClientID());
             }
@@ -311,6 +313,34 @@ public class SessionRegistry {
             .collect(Collectors.toList());
     }
 
+   /**
+    * Close the connection bound to the session for the clintId. If removeSessionState is provided
+    * remove any session state like queues and subscription from broker memory.
+    *
+    * @param clientId the name of the client to drop the session.
+    * @param removeSessionState boolean flag to request the removal of session state from broker.
+    */ 
+    boolean dropSession(final String clientId, boolean removeSessionState) {
+        LOG.debug("Disconnecting client: {}", clientId);
+        if (clientId == null) {
+            return false;
+        }
+
+        final Session client = pool.get(clientId);
+        if (client == null) {
+            LOG.debug("Client {} not found, nothing disconnected", clientId);
+            return false;
+        }
+
+        client.closeImmediately();
+        if (removeSessionState) {
+            purgeSessionState(client);
+        }
+
+       LOG.debug("Client {} successfully disconnected from broker", clientId);
+       return true;
+    }
+
     private Optional<ClientDescriptor> createClientDescriptor(Session s) {
         final String clientID = s.getClientID();
         final Optional<InetSocketAddress> remoteAddressOpt = s.remoteAddress();
@@ -319,7 +349,7 @@ public class SessionRegistry {
 
     /**
      * Close all resources related to session management
-     * */
+     */
     public void close() {
         queueRepository.close();
     }
