@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -51,6 +52,7 @@ public class SessionRegistry {
     private final ScheduledFuture<?> scheduledExpiredSessions;
     private int globalExpirySeconds;
     private final SessionEventLoopGroup loopsGroup;
+    static final Duration EXPIRED_SESSION_CLEANER_TASK_INTERVAL = Duration.ofSeconds(1);
 
     public abstract static class EnqueuedMessage {
 
@@ -158,7 +160,9 @@ public class SessionRegistry {
         this.sessionsRepository = sessionsRepository;
         this.queueRepository = queueRepository;
         this.authorizator = authorizator;
-        this.scheduledExpiredSessions = scheduler.scheduleWithFixedDelay(this::checkExpiredSessions, 1, 1, TimeUnit.SECONDS);
+        this.scheduledExpiredSessions = scheduler.scheduleWithFixedDelay(this::checkExpiredSessions,
+            EXPIRED_SESSION_CLEANER_TASK_INTERVAL.getSeconds(), EXPIRED_SESSION_CLEANER_TASK_INTERVAL.getSeconds(),
+            TimeUnit.SECONDS);
         this.clock = clock;
         this.globalExpirySeconds = globalExpirySeconds;
         this.loopsGroup = loopsGroup;
@@ -186,7 +190,6 @@ public class SessionRegistry {
     }
 
     private void untrackFromRemovalOnExpiration(ISessionsRepository.SessionData session) {
-
     }
 
     private void recreateSessionPool() {

@@ -278,12 +278,12 @@ public class SessionRegistryTest {
         // check the session has been removed
         Awaitility
             .await()
-            .atMost(3, TimeUnit.SECONDS)
+            .atMost(3 * SessionRegistry.EXPIRED_SESSION_CLEANER_TASK_INTERVAL.toMillis(), TimeUnit.MILLISECONDS)
             .until(sessionsList(), Matchers.empty());
     }
 
     @Test
-    public void givenSessionThatExpiresWhenReopenIsNotAnymoreTrackedForExpiration() {
+    public void givenSessionThatExpiresWhenReopenIsNotAnymoreTrackedForExpiration() throws InterruptedException {
         LOG.info("givenSessionThatExpiresWhenReopenIsNotAnymoreTrackedForExpiration");
         final String clientId = "client_to_be_removed";
         SessionRegistry.SessionCreationResult res = sut.createOrReopenSession(connMsg.cleanSession(false).build(), clientId, "User");
@@ -305,10 +305,16 @@ public class SessionRegistryTest {
 
         // Verify that the session reopened is still listed
         final Collection<ISessionsRepository.SessionData> activeSessions = sessionRepository.list();
-        System.out.println(activeSessions);
         assertEquals(1, activeSessions.size(), "There must be active one session");
         final ISessionsRepository.SessionData element = activeSessions.iterator().next();
         assertFalse(element.expireAt().isPresent(), "Shouldn't have an expiration configured");
+
+        // wait the session expiry thread kicks in for at least one execution
+        Thread.sleep(3 * SessionRegistry.EXPIRED_SESSION_CLEANER_TASK_INTERVAL.toMillis());
+        Awaitility
+            .await()
+            .atMost(2 * SessionRegistry.EXPIRED_SESSION_CLEANER_TASK_INTERVAL.toMillis(), TimeUnit.MILLISECONDS)
+            .until(sessionsList(), Matchers.not(Matchers.empty()));
     }
 
     private Callable<Collection<ISessionsRepository.SessionData>> sessionsList() {
