@@ -89,6 +89,12 @@ public abstract class IConfig {
         final char timeSpecifier = propertyValue.charAt(propertyValue.length() - 1);
         final TemporalUnit periodType;
         switch (timeSpecifier) {
+            case 's':
+                periodType = ChronoUnit.SECONDS;
+                break;
+            case 'm':
+                periodType = ChronoUnit.MINUTES;
+                break;
             case 'h':
                 periodType = ChronoUnit.HOURS;
                 break;
@@ -98,7 +104,7 @@ public abstract class IConfig {
             case 'w':
                 periodType = ChronoUnit.WEEKS;
                 break;
-            case 'm':
+            case 'M':
                 periodType = ChronoUnit.MONTHS;
                 break;
             case 'y':
