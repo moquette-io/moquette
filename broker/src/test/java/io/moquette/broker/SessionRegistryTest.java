@@ -48,10 +48,12 @@ import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class SessionRegistryTest {
 
+    public static final boolean ANY_BOOLEAN = false;
     static final String FAKE_CLIENT_ID = "FAKE_123";
     static final String TEST_USER = "fakeuser";
     static final String TEST_PWD = "fakepwd";
@@ -143,6 +145,47 @@ public class SessionRegistryTest {
         // Verify client session is clean false
         Session session = sut.retrieve(FAKE_CLIENT_ID);
         assertFalse(session.isClean());
+    }
+
+    @Test
+    public void testDropSessionWithNullClientId() {
+        assertFalse(sut.dropSession(null, ANY_BOOLEAN), "Can't be successful when null clientId is passed");
+    }
+
+    @Test
+    public void testDropSessionWithNotExistingClientId() {
+        assertFalse(sut.dropSession(FAKE_CLIENT_ID, ANY_BOOLEAN), "Can't be successful when non existing clientId is passed");
+    }
+
+    @Test
+    public void testDropSessionToForceClosingConnectedSessionWithoutCleaning() throws ExecutionException, InterruptedException {
+        MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID)
+            .protocolVersion(MqttVersion.MQTT_3_1_1)
+            .build();
+        connection.processConnect(msg).completableFuture().get();
+        assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
+
+        // Exercise
+        assertTrue(sut.dropSession(FAKE_CLIENT_ID, false), "Operation must have successfully terminated");
+
+        // Verify
+        final Session stillStoredSession = sut.retrieve(FAKE_CLIENT_ID);
+        assertTrue(stillStoredSession.disconnected(), "session is still present and disconnected");
+    }
+
+    @Test
+    public void testDropSessionToForceClosingConnectedSessionWithCleaning() throws ExecutionException, InterruptedException {
+        MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID)
+            .protocolVersion(MqttVersion.MQTT_3_1_1)
+            .build();
+        connection.processConnect(msg).completableFuture().get();
+        assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
+
+        // Exercise
+        assertTrue(sut.dropSession(FAKE_CLIENT_ID, true), "Operation must have successfully terminated");
+
+        // Verify
+        assertNull(sut.retrieve(FAKE_CLIENT_ID), "Session state can't be present");
     }
 
     @Test
