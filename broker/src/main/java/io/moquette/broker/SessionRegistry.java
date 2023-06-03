@@ -190,6 +190,7 @@ public class SessionRegistry {
     }
 
     private void untrackFromRemovalOnExpiration(ISessionsRepository.SessionData session) {
+        removableSessions.remove(session);
     }
 
     private void recreateSessionPool() {
