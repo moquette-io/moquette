@@ -19,4 +19,9 @@ public class MemorySessionsRepository implements ISessionsRepository {
     public void saveSession(SessionData session) {
         sessions.put(session.clientId(), session);
     }
+
+    @Override
+    public void delete(SessionData session) {
+        sessions.remove(session.clientId());
+    }
 }
