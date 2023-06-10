@@ -117,7 +117,6 @@ class Session {
     private final Map<Integer, MqttPublishMessage> qos2Receiving = new HashMap<>();
     private final AtomicInteger inflightSlots = new AtomicInteger(INFLIGHT_WINDOW_SIZE); // this should be configurable
     private final ISessionsRepository.SessionData data;
-    private final boolean resendInflightOnTimeout;
 
     Session(ISessionsRepository.SessionData data, boolean clean, Will will, SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue) {
         this(data, clean, sessionQueue);
