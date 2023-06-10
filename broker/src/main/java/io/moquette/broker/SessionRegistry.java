@@ -298,9 +298,15 @@ public class SessionRegistry {
         } else {
             queue = new InMemoryQueue();
         }
-        // in MQTT3 cleanSession = true means expiryInterval=0 else infinite
-        final int expiryInterval = clean ? 0 : globalExpirySeconds;
+        final int expiryInterval;
         final MqttVersion mqttVersion = Utils.versionFromConnect(msg);
+        if (mqttVersion != MqttVersion.MQTT_5) {
+            // in MQTT3 cleanSession = true means expiryInterval=0 else infinite
+            expiryInterval = clean ? 0 : globalExpirySeconds;
+        } else {
+            // TODO retrieve from argument to add
+            expiryInterval = 12345;
+        }
         final ISessionsRepository.SessionData sessionData = new ISessionsRepository.SessionData(clientId,
             mqttVersion, expiryInterval, clock);
         if (msg.variableHeader().isWillFlag()) {
