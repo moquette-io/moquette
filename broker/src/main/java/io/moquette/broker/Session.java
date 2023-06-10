@@ -130,8 +130,6 @@ class Session {
         this.data = data;
         this.clean = clean;
         this.sessionQueue = sessionQueue;
-        // in MQTT3 cleanSession = true means  expiryInterval=0 else infinite
-//        expiryInterval = clean ? 0 : 0xFFFFFFFF;
         this.resendInflightOnTimeout = data.protocolVersion() != MqttVersion.MQTT_5;
     }
 
