@@ -45,10 +45,16 @@ class CNode implements Comparable<CNode> {
     }
 
     INode childOf(Token token) {
-        int idx = Collections.binarySearch(children, token, (Object node, Object token1) -> ((INode) node).mainNode().token.compareTo((Token) token1));
-        if (idx < 0)
+        int idx = findIndexForToken(token);
+        if (idx < 0) {
             return null;
+        }
         return children.get(idx);
+    }
+
+    private int findIndexForToken(Token token) {
+        final INode tempTokenNode = new INode(new CNode(token));
+        return Collections.binarySearch(children, tempTokenNode, (INode node, INode tokenHolder) -> node.mainNode().token.compareTo(tokenHolder.mainNode().token));
     }
 
     private boolean equalsToken(Token token) {
@@ -65,7 +71,7 @@ class CNode implements Comparable<CNode> {
     }
 
     public void add(INode newINode) {
-        int idx = Collections.binarySearch(children, newINode.mainNode().token, (Object node, Object token1) -> ((INode) node).mainNode().token.compareTo((Token) token1));
+        int idx = findIndexForToken(newINode.mainNode().token);
         if (idx < 0) {
             children.add(-1 - idx, newINode);
         } else {
@@ -74,7 +80,7 @@ class CNode implements Comparable<CNode> {
     }
 
     public void remove(INode node) {
-        int idx = Collections.binarySearch(children, node.mainNode().token, (Object node1, Object token1) -> ((INode) node1).mainNode().token.compareTo((Token) token1));
+        int idx = findIndexForToken(node.mainNode().token);
         this.children.remove(idx);
     }
 
