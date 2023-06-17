@@ -307,7 +307,7 @@ public class SessionRegistry {
         } else {
             final MqttProperties.MqttProperty<Integer> expiryIntervalProperty =
                 (MqttProperties.MqttProperty<Integer>) msg.variableHeader().properties()
-                .getProperty(MqttProperties.MqttPropertyType.SESSION_EXPIRY_INTERVAL.value()).value();
+                .getProperty(MqttProperties.MqttPropertyType.SESSION_EXPIRY_INTERVAL.value());
             expiryInterval = expiryIntervalProperty.value();
         }
         final ISessionsRepository.SessionData sessionData = new ISessionsRepository.SessionData(clientId,
