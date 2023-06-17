@@ -1,4 +1,5 @@
 Version 0.17-SNAPSHOT:
+   [dependency] updated Netty to 4.1.93 and tcnative to 2.0.61 (#755)
    [feature] add saved session expiry configurable through the `persistent_client_expiration` setting (#739).
    [feature] implemented methods to forcibly disconnects a clients from a Server instance (#744).
    [refactory] moved code to handle session event loops from PostOffice into separate SessionEventLoopGroup (#742).
