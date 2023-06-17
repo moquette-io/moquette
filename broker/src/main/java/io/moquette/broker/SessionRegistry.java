@@ -308,7 +308,12 @@ public class SessionRegistry {
             final MqttProperties.MqttProperty<Integer> expiryIntervalProperty =
                 (MqttProperties.MqttProperty<Integer>) msg.variableHeader().properties()
                 .getProperty(MqttProperties.MqttPropertyType.SESSION_EXPIRY_INTERVAL.value());
-            expiryInterval = expiryIntervalProperty.value();
+            if (expiryIntervalProperty != null) {
+                expiryInterval = expiryIntervalProperty.value();
+            } else {
+                // the connect doesn't provide any expiry, fallback to global expiry
+                expiryInterval = clean ? 0 : globalExpirySeconds;
+            }
         }
         final ISessionsRepository.SessionData sessionData = new ISessionsRepository.SessionData(clientId,
             mqttVersion, expiryInterval, clock);
