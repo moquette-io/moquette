@@ -15,6 +15,8 @@
  */
 package io.moquette.broker.subscriptions;
 
+import java.util.Optional;
+
 class TNode extends CNode {
 
     public TNode(Token token) {
@@ -22,7 +24,7 @@ class TNode extends CNode {
     }
 
     @Override
-    INode childOf(Token token) {
+    Optional<INode> childOf(Token token) {
         throw new IllegalStateException("Can't be invoked on TNode");
     }
 

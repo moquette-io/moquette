@@ -44,12 +44,12 @@ class CNode implements Comparable<CNode> {
         return new ArrayList<>(this.children);
     }
 
-    INode childOf(Token token) {
+    Optional<INode> childOf(Token token) {
         int idx = findIndexForToken(token);
         if (idx < 0) {
-            return null;
+            return Optional.empty();
         }
-        return children.get(idx);
+        return Optional.of(children.get(idx));
     }
 
     private int findIndexForToken(Token token) {

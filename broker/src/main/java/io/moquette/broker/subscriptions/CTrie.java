@@ -32,12 +32,12 @@ public class CTrie {
         INode inode = this.root;
         Token token = topic.headToken();
         while (!topic.isEmpty()) {
-            INode child = inode.mainNode().childOf(token);
-            if (child == null) {
+            Optional<INode> child = inode.mainNode().childOf(token);
+            if (child.isEmpty()) {
                 break;
             }
             topic = topic.exceptHeadToken();
-            inode = inode.mainNode().childOf(token);
+            inode = child.get();
             token = topic.headToken();
         }
         if (inode == null || !topic.isEmpty()) {
@@ -85,20 +85,20 @@ public class CTrie {
 
         // We should only consider the maximum three children children of
         // type #, + or exact match
-        INode subInode = cnode.childOf(Token.MULTI);
-        if (subInode != null) {
-            subscriptions.addAll(recursiveMatch(remainingTopic, subInode));
+        Optional<INode> subInode = cnode.childOf(Token.MULTI);
+        if (subInode.isPresent()) {
+            subscriptions.addAll(recursiveMatch(remainingTopic, subInode.get()));
         }
         subInode = cnode.childOf(Token.SINGLE);
-        if (subInode != null) {
-            subscriptions.addAll(recursiveMatch(remainingTopic, subInode));
+        if (subInode.isPresent()) {
+            subscriptions.addAll(recursiveMatch(remainingTopic, subInode.get()));
         }
         if (remainingTopic.isEmpty()) {
             subscriptions.addAll(cnode.subscriptions);
         } else {
             subInode = cnode.childOf(remainingTopic.headToken());
-            if (subInode != null) {
-                subscriptions.addAll(recursiveMatch(remainingTopic, subInode));
+            if (subInode.isPresent()) {
+                subscriptions.addAll(recursiveMatch(remainingTopic, subInode.get()));
             }
         }
         return subscriptions;
@@ -115,10 +115,10 @@ public class CTrie {
         final Token token = topic.headToken();
         final CNode cnode = inode.mainNode();
         if (!topic.isEmpty()) {
-            INode nextInode = cnode.childOf(token);
-            if (nextInode != null) {
+            Optional<INode> nextInode = cnode.childOf(token);
+            if (nextInode.isPresent()) {
                 Topic remainingTopic = topic.exceptHeadToken();
-                return insert(remainingTopic, nextInode, newSubscription);
+                return insert(remainingTopic, nextInode.get(), newSubscription);
             }
         }
         if (topic.isEmpty()) {
@@ -130,10 +130,11 @@ public class CTrie {
 
     private Action insertSubscription(INode inode, CNode cnode, Subscription newSubscription) {
         final CNode updatedCnode;
-        if (cnode instanceof TNode)
+        if (cnode instanceof TNode) {
             updatedCnode = new CNode(cnode.getToken());
-        else
+        } else {
             updatedCnode = cnode.copy();
+        }
         updatedCnode.addSubscription(newSubscription);
         return inode.compareAndSet(cnode, updatedCnode) ? Action.OK : Action.REPEAT;
     }
@@ -141,10 +142,11 @@ public class CTrie {
     private Action createNodeAndInsertSubscription(Topic topic, INode inode, CNode cnode, Subscription newSubscription) {
         final INode newInode = createPathRec(topic, newSubscription);
         final CNode updatedCnode;
-        if (cnode instanceof TNode)
+        if (cnode instanceof TNode) {
             updatedCnode = new CNode(cnode.getToken());
-        else
+        } else {
             updatedCnode = cnode.copy();
+        }
         updatedCnode.add(newInode);
 
         return inode.compareAndSet(cnode, updatedCnode) ? Action.OK : Action.REPEAT;
@@ -180,10 +182,10 @@ public class CTrie {
         Token token = topic.headToken();
         final CNode cnode = inode.mainNode();
         if (!topic.isEmpty()) {
-            INode nextInode = cnode.childOf(token);
-            if (nextInode != null) {
+            Optional<INode> nextInode = cnode.childOf(token);
+            if (nextInode.isPresent()) {
                 Topic remainingTopic = topic.exceptHeadToken();
-                return remove(clientId, remainingTopic, nextInode, inode);
+                return remove(clientId, remainingTopic, nextInode.get(), inode);
             }
         }
         if (cnode instanceof TNode) {
