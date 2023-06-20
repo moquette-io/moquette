@@ -19,7 +19,7 @@ package io.moquette.broker.subscriptions;
 /**
  * Internal use only class.
  */
-public class Token {
+public class Token implements Comparable<Token> {
 
     static final Token EMPTY = new Token("");
     static final Token MULTI = new Token("#");
@@ -71,5 +71,19 @@ public class Token {
     @Override
     public String toString() {
         return name;
+    }
+
+    @Override
+    public int compareTo(Token other) {
+        if (name == null) {
+            if (other.name == null) {
+                return 0;
+            }
+            return 1;
+        }
+        if (other.name == null) {
+            return -1;
+        }
+        return name.compareTo(other.name);
     }
 }

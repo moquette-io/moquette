@@ -15,20 +15,16 @@
  */
 package io.moquette.broker.subscriptions;
 
+import java.util.Optional;
+
 class TNode extends CNode {
 
-    @Override
-    public Token getToken() {
-        throw new IllegalStateException("Can't be invoked on TNode");
+    public TNode(Token token) {
+        super(token);
     }
 
     @Override
-    public void setToken(Token token) {
-        throw new IllegalStateException("Can't be invoked on TNode");
-    }
-
-    @Override
-    INode childOf(Token token) {
+    Optional<INode> childOf(Token token) {
         throw new IllegalStateException("Can't be invoked on TNode");
     }
 
@@ -62,8 +58,4 @@ class TNode extends CNode {
         throw new IllegalStateException("Can't be invoked on TNode");
     }
 
-    @Override
-    boolean anyChildrenMatch(Token token) {
-        return false;
-    }
 }

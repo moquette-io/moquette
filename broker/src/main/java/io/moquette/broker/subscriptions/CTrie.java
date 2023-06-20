@@ -24,17 +24,20 @@ public class CTrie {
     INode root;
 
     CTrie() {
-        final CNode mainNode = new CNode();
-        mainNode.setToken(ROOT);
+        final CNode mainNode = new CNode(ROOT);
         this.root = new INode(mainNode);
     }
 
     Optional<CNode> lookup(Topic topic) {
         INode inode = this.root;
         Token token = topic.headToken();
-        while (!topic.isEmpty() && (inode.mainNode().anyChildrenMatch(token))) {
+        while (!topic.isEmpty()) {
+            Optional<INode> child = inode.mainNode().childOf(token);
+            if (child.isEmpty()) {
+                break;
+            }
             topic = topic.exceptHeadToken();
-            inode = inode.mainNode().childOf(token);
+            inode = child.get();
             token = topic.headToken();
         }
         if (inode == null || !topic.isEmpty()) {
@@ -79,11 +82,24 @@ public class CTrie {
         }
         Topic remainingTopic = (ROOT.equals(cnode.getToken())) ? topic : topic.exceptHeadToken();
         Set<Subscription> subscriptions = new HashSet<>();
+
+        // We should only consider the maximum three children children of
+        // type #, + or exact match
+        Optional<INode> subInode = cnode.childOf(Token.MULTI);
+        if (subInode.isPresent()) {
+            subscriptions.addAll(recursiveMatch(remainingTopic, subInode.get()));
+        }
+        subInode = cnode.childOf(Token.SINGLE);
+        if (subInode.isPresent()) {
+            subscriptions.addAll(recursiveMatch(remainingTopic, subInode.get()));
+        }
         if (remainingTopic.isEmpty()) {
             subscriptions.addAll(cnode.subscriptions);
-        }
-        for (INode subInode : cnode.allChildren()) {
-            subscriptions.addAll(recursiveMatch(remainingTopic, subInode));
+        } else {
+            subInode = cnode.childOf(remainingTopic.headToken());
+            if (subInode.isPresent()) {
+                subscriptions.addAll(recursiveMatch(remainingTopic, subInode.get()));
+            }
         }
         return subscriptions;
     }
@@ -96,34 +112,41 @@ public class CTrie {
     }
 
     private Action insert(Topic topic, final INode inode, Subscription newSubscription) {
-        Token token = topic.headToken();
-        if (!topic.isEmpty() && inode.mainNode().anyChildrenMatch(token)) {
-            Topic remainingTopic = topic.exceptHeadToken();
-            INode nextInode = inode.mainNode().childOf(token);
-            return insert(remainingTopic, nextInode, newSubscription);
-        } else {
-            if (topic.isEmpty()) {
-                return insertSubscription(inode, newSubscription);
-            } else {
-                return createNodeAndInsertSubscription(topic, inode, newSubscription);
+        final Token token = topic.headToken();
+        final CNode cnode = inode.mainNode();
+        if (!topic.isEmpty()) {
+            Optional<INode> nextInode = cnode.childOf(token);
+            if (nextInode.isPresent()) {
+                Topic remainingTopic = topic.exceptHeadToken();
+                return insert(remainingTopic, nextInode.get(), newSubscription);
             }
         }
-    }
-
-    private Action insertSubscription(INode inode, Subscription newSubscription) {
-        CNode cnode = inode.mainNode();
-        CNode updatedCnode = cnode.copy().addSubscription(newSubscription);
-        if (inode.compareAndSet(cnode, updatedCnode)) {
-            return Action.OK;
+        if (topic.isEmpty()) {
+            return insertSubscription(inode, cnode, newSubscription);
         } else {
-            return Action.REPEAT;
+            return createNodeAndInsertSubscription(topic, inode, cnode, newSubscription);
         }
     }
 
-    private Action createNodeAndInsertSubscription(Topic topic, INode inode, Subscription newSubscription) {
-        INode newInode = createPathRec(topic, newSubscription);
-        CNode cnode = inode.mainNode();
-        CNode updatedCnode = cnode.copy();
+    private Action insertSubscription(INode inode, CNode cnode, Subscription newSubscription) {
+        final CNode updatedCnode;
+        if (cnode instanceof TNode) {
+            updatedCnode = new CNode(cnode.getToken());
+        } else {
+            updatedCnode = cnode.copy();
+        }
+        updatedCnode.addSubscription(newSubscription);
+        return inode.compareAndSet(cnode, updatedCnode) ? Action.OK : Action.REPEAT;
+    }
+
+    private Action createNodeAndInsertSubscription(Topic topic, INode inode, CNode cnode, Subscription newSubscription) {
+        final INode newInode = createPathRec(topic, newSubscription);
+        final CNode updatedCnode;
+        if (cnode instanceof TNode) {
+            updatedCnode = new CNode(cnode.getToken());
+        } else {
+            updatedCnode = cnode.copy();
+        }
         updatedCnode.add(newInode);
 
         return inode.compareAndSet(cnode, updatedCnode) ? Action.OK : Action.REPEAT;
@@ -133,8 +156,7 @@ public class CTrie {
         Topic remainingTopic = topic.exceptHeadToken();
         if (!remainingTopic.isEmpty()) {
             INode inode = createPathRec(remainingTopic, newSubscription);
-            CNode cnode = new CNode();
-            cnode.setToken(topic.headToken());
+            CNode cnode = new CNode(topic.headToken());
             cnode.add(inode);
             return new INode(cnode);
         } else {
@@ -143,8 +165,7 @@ public class CTrie {
     }
 
     private INode createLeafNodes(Token token, Subscription newSubscription) {
-        CNode newLeafCnode = new CNode();
-        newLeafCnode.setToken(token);
+        CNode newLeafCnode = new CNode(token);
         newLeafCnode.addSubscription(newSubscription);
 
         return new INode(newLeafCnode);
@@ -159,33 +180,34 @@ public class CTrie {
 
     private Action remove(String clientId, Topic topic, INode inode, INode iParent) {
         Token token = topic.headToken();
-        if (!topic.isEmpty() && (inode.mainNode().anyChildrenMatch(token))) {
-            Topic remainingTopic = topic.exceptHeadToken();
-            INode nextInode = inode.mainNode().childOf(token);
-            return remove(clientId, remainingTopic, nextInode, inode);
+        final CNode cnode = inode.mainNode();
+        if (!topic.isEmpty()) {
+            Optional<INode> nextInode = cnode.childOf(token);
+            if (nextInode.isPresent()) {
+                Topic remainingTopic = topic.exceptHeadToken();
+                return remove(clientId, remainingTopic, nextInode.get(), inode);
+            }
+        }
+        if (cnode instanceof TNode) {
+            // this inode is a tomb, has no clients and should be cleaned up
+            // Because we implemented cleanTomb below, this should be rare, but possible
+            // Consider calling cleanTomb here too
+            return Action.OK;
+        }
+        if (cnode.containsOnly(clientId) && topic.isEmpty() && cnode.allChildren().isEmpty()) {
+            // last client to leave this node, AND there are no downstream children, remove via TNode tomb
+            if (inode == this.root) {
+                return inode.compareAndSet(cnode, inode.mainNode().copy()) ? Action.OK : Action.REPEAT;
+            }
+            TNode tnode = new TNode(cnode.getToken());
+            return inode.compareAndSet(cnode, tnode) ? cleanTomb(inode, iParent) : Action.REPEAT;
+        } else if (cnode.contains(clientId) && topic.isEmpty()) {
+            CNode updatedCnode = cnode.copy();
+            updatedCnode.removeSubscriptionsFor(clientId);
+            return inode.compareAndSet(cnode, updatedCnode) ? Action.OK : Action.REPEAT;
         } else {
-            final CNode cnode = inode.mainNode();
-            if (cnode instanceof TNode) {
-                // this inode is a tomb, has no clients and should be cleaned up
-                // Because we implemented cleanTomb below, this should be rare, but possible
-                // Consider calling cleanTomb here too
-                return Action.OK;
-            }
-            if (cnode.containsOnly(clientId) && topic.isEmpty() && cnode.allChildren().isEmpty()) {
-                // last client to leave this node, AND there are no downstream children, remove via TNode tomb
-                if (inode == this.root) {
-                    return inode.compareAndSet(cnode, inode.mainNode().copy()) ? Action.OK : Action.REPEAT;
-                }
-                TNode tnode = new TNode();
-                return inode.compareAndSet(cnode, tnode) ? cleanTomb(inode, iParent) : Action.REPEAT;
-            } else if (cnode.contains(clientId) && topic.isEmpty()) {
-                CNode updatedCnode = cnode.copy();
-                updatedCnode.removeSubscriptionsFor(clientId);
-                return inode.compareAndSet(cnode, updatedCnode) ? Action.OK : Action.REPEAT;
-            } else {
-                //someone else already removed
-                return Action.OK;
-            }
+            //someone else already removed
+            return Action.OK;
         }
     }
 
