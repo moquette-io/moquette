@@ -21,18 +21,18 @@ class CNode implements Comparable<CNode> {
 
     private final Token token;
     private final List<INode> children;
-    Set<Subscription> subscriptions;
+    List<Subscription> subscriptions;
 
     CNode(Token token) {
         this.children = new ArrayList<>();
-        this.subscriptions = new HashSet<>();
+        this.subscriptions = new ArrayList<>();
         this.token = token;
     }
 
     //Copy constructor
-    private CNode(Token token, List<INode> children, Set<Subscription> subscriptions) {
+    private CNode(Token token, List<INode> children, List<Subscription> subscriptions) {
         this.token = token; // keep reference, root comparison in directory logic relies on it for now.
-        this.subscriptions = new HashSet<>(subscriptions);
+        this.subscriptions = new ArrayList<>(subscriptions);
         this.children = new ArrayList<>(children);
     }
 
@@ -86,16 +86,15 @@ class CNode implements Comparable<CNode> {
 
     CNode addSubscription(Subscription newSubscription) {
         // if already contains one with same topic and same client, keep that with higher QoS
-        if (subscriptions.contains(newSubscription)) {
-            final Subscription existing = subscriptions.stream()
-                .filter(s -> s.equals(newSubscription))
-                .findFirst().get();
+        int idx = Collections.binarySearch(subscriptions, newSubscription);
+        if (idx >= 0) {
+            // Subscription already exists
+            final Subscription existing = subscriptions.get(idx);
             if (existing.getRequestedQos().value() < newSubscription.getRequestedQos().value()) {
-                subscriptions.remove(existing);
-                subscriptions.add(new Subscription(newSubscription));
+                subscriptions.set(idx, newSubscription);
             }
         } else {
-            this.subscriptions.add(new Subscription(newSubscription));
+            this.subscriptions.add(-1 - idx, new Subscription(newSubscription));
         }
         return this;
     }

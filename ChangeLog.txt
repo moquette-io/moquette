@@ -1,4 +1,5 @@
 Version 0.17-SNAPSHOT:
+   [fix] resolved issue #633 of bad perfomance when adding many subscriptions to few topics, resolved in #758.
    [fix] resolved issue #629 that originated from subscription trees wide and flat, resolved in #630
    [dependency] updated Netty to 4.1.93 and tcnative to 2.0.61 (#755)
    [feature] add saved session expiry configurable through the `persistent_client_expiration` setting (#739).

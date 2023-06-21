@@ -1,7 +1,9 @@
 package io.moquette.broker.subscriptions;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -64,24 +66,24 @@ public class CTrie {
         return NavigationAction.GODEEP;
     }
 
-    public Set<Subscription> recursiveMatch(Topic topic) {
+    public List<Subscription> recursiveMatch(Topic topic) {
         return recursiveMatch(topic, this.root);
     }
 
-    private Set<Subscription> recursiveMatch(Topic topic, INode inode) {
+    private List<Subscription> recursiveMatch(Topic topic, INode inode) {
         CNode cnode = inode.mainNode();
         if (cnode instanceof TNode) {
-            return Collections.emptySet();
+            return Collections.emptyList();
         }
         NavigationAction action = evaluate(topic, cnode);
         if (action == NavigationAction.MATCH) {
             return cnode.subscriptions;
         }
         if (action == NavigationAction.STOP) {
-            return Collections.emptySet();
+            return Collections.emptyList();
         }
         Topic remainingTopic = (ROOT.equals(cnode.getToken())) ? topic : topic.exceptHeadToken();
-        Set<Subscription> subscriptions = new HashSet<>();
+        List<Subscription> subscriptions = new ArrayList<>();
 
         // We should only consider the maximum three children children of
         // type #, + or exact match

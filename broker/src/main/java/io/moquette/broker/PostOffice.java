@@ -455,7 +455,7 @@ class PostOffice {
 
     private RoutingResults publish2Subscribers(ByteBuf payload, Topic topic, MqttQoS publishingQos,
                                                Set<String> filterTargetClients) {
-        Set<Subscription> topicMatchingSubscriptions = subscriptions.matchQosSharpening(topic);
+        List<Subscription> topicMatchingSubscriptions = subscriptions.matchQosSharpening(topic);
         if (topicMatchingSubscriptions.isEmpty()) {
             // no matching subscriptions, clean exit
             LOG.trace("No matching subscriptions for topic: {}", topic);
