@@ -16,24 +16,27 @@
 package io.moquette.broker;
 
 import io.moquette.broker.security.IAuthenticator;
+import io.moquette.broker.security.IConnectionFilter;
 import io.netty.channel.Channel;
 
 class MQTTConnectionFactory {
 
     private final BrokerConfiguration brokerConfig;
     private final IAuthenticator authenticator;
+    private final IConnectionFilter connectionFilter;
     private final SessionRegistry sessionRegistry;
     private final PostOffice postOffice;
 
     MQTTConnectionFactory(BrokerConfiguration brokerConfig, IAuthenticator authenticator,
-                          SessionRegistry sessionRegistry, PostOffice postOffice) {
+                          IConnectionFilter connectionFilter, SessionRegistry sessionRegistry, PostOffice postOffice) {
         this.brokerConfig = brokerConfig;
         this.authenticator = authenticator;
+        this.connectionFilter = connectionFilter;
         this.sessionRegistry = sessionRegistry;
         this.postOffice = postOffice;
     }
 
     MQTTConnection create(Channel channel) {
-        return new MQTTConnection(channel, brokerConfig, authenticator, sessionRegistry, postOffice);
+        return new MQTTConnection(channel, brokerConfig, authenticator, connectionFilter, sessionRegistry, postOffice);
     }
 }

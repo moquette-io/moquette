@@ -96,7 +96,7 @@ public class ServerIntegrationPahoCanPublishOnReadBlockedTopicTest {
             }
         };
 
-        m_server.startServer(m_config, EMPTY_OBSERVERS, null, new AcceptAllAuthenticator(), switchingAuthorizator);
+        m_server.startServer(m_config, EMPTY_OBSERVERS, null, null, new AcceptAllAuthenticator(), switchingAuthorizator);
     }
 
     @BeforeEach

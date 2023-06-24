@@ -66,6 +66,7 @@ public class PostOfficeSubscribeTest {
     private ISubscriptionsDirectory subscriptions;
     public static final String FAKE_USER_NAME = "UnAuthUser";
     private MqttConnectMessage connectMessage;
+    private MockConnectionFilter connectionFilter = new MockConnectionFilter();
     private IAuthenticator mockAuthenticator;
     private SessionRegistry sessionRegistry;
     public static final BrokerConfiguration CONFIG = new BrokerConfiguration(true, true, false, NO_BUFFER_FLUSH);
@@ -110,7 +111,7 @@ public class PostOfficeSubscribeTest {
     }
 
     private MQTTConnection createMQTTConnection(BrokerConfiguration config, Channel channel) {
-        return new MQTTConnection(channel, config, mockAuthenticator, sessionRegistry, sut);
+        return new MQTTConnection(channel, config, mockAuthenticator, connectionFilter, sessionRegistry, sut);
     }
 
     protected void connect() {

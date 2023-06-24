@@ -66,6 +66,8 @@ public final class BrokerConstants {
     public static final String REAUTHORIZE_SUBSCRIPTIONS_ON_CONNECT = "reauthorize_subscriptions_on_connect";
     public static final String ALLOW_ZERO_BYTE_CLIENT_ID_PROPERTY_NAME = "allow_zero_byte_client_id";
     public static final String ACL_FILE_PROPERTY_NAME = "acl_file";
+
+    public static final String CONNECTION_FILTER_CLASS_NAME = "connection_filter_class";
     public static final String AUTHORIZATOR_CLASS_NAME = "authorizator_class";
     public static final String AUTHENTICATOR_CLASS_NAME = "authenticator_class";
     public static final String DB_AUTHENTICATOR_DRIVER = "authenticator.db.driver";

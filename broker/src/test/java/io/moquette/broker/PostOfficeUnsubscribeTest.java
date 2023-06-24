@@ -57,6 +57,7 @@ public class PostOfficeUnsubscribeTest {
     private PostOffice sut;
     private ISubscriptionsDirectory subscriptions;
     private MqttConnectMessage connectMessage;
+    private MockConnectionFilter connectionFilter = new MockConnectionFilter();
     private IAuthenticator mockAuthenticator;
     private SessionRegistry sessionRegistry;
     public static final BrokerConfiguration CONFIG = new BrokerConfiguration(true, true, false, NO_BUFFER_FLUSH);
@@ -101,7 +102,7 @@ public class PostOfficeUnsubscribeTest {
     }
 
     private MQTTConnection createMQTTConnection(BrokerConfiguration config, Channel channel) {
-        return new MQTTConnection(channel, config, mockAuthenticator, sessionRegistry, sut);
+        return new MQTTConnection(channel, config, mockAuthenticator, connectionFilter, sessionRegistry, sut);
     }
 
     protected static void connect(MQTTConnection connection, String clientId) {

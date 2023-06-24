@@ -58,6 +58,7 @@ public class MQTTConnectionConnectTest {
     private SessionRegistry sessionRegistry;
     private MqttMessageBuilders.ConnectBuilder connMsg;
     private static final BrokerConfiguration CONFIG = new BrokerConfiguration(true, true, false, NO_BUFFER_FLUSH);
+    private MockConnectionFilter connectionFilter = new MockConnectionFilter();
     private IAuthenticator mockAuthenticator;
     private PostOffice postOffice;
     private MemoryQueueRepository queueRepository;
@@ -102,7 +103,7 @@ public class MQTTConnectionConnectTest {
     }
 
     private MQTTConnection createMQTTConnection(BrokerConfiguration config, Channel channel, PostOffice postOffice) {
-        return new MQTTConnection(channel, config, mockAuthenticator, sessionRegistry, postOffice);
+        return new MQTTConnection(channel, config, mockAuthenticator, connectionFilter, sessionRegistry, postOffice);
     }
 
     @Test
@@ -202,6 +203,23 @@ public class MQTTConnectionConnectTest {
         // Verify
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
         assertTrue(channel.isOpen(), "Connection is accepted and therefore must remain open");
+    }
+
+
+    @Test
+    public void validAuthenticationBannedClient() throws ExecutionException, InterruptedException {
+        MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID)
+            .username(TEST_USER).password(TEST_PWD).build();
+
+        connectionFilter.banClientId(FAKE_CLIENT_ID);
+
+        // Exercise
+        PostOffice.RouteResult result = sut.processConnect(msg);
+        assertFalse(result.isSuccess());
+
+        // Verify
+        assertEqualsConnAck(CONNECTION_REFUSED_BANNED, channel.readOutbound());
+        assertFalse(channel.isOpen(), "Connection is refused/baned and therefore must not remain open");
     }
 
     @Test

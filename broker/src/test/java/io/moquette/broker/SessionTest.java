@@ -21,7 +21,6 @@ import static io.moquette.broker.Session.INFINITE_EXPIRY;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
-import static org.junit.jupiter.api.Assertions.*;
 
 public class SessionTest {
 
@@ -125,7 +124,7 @@ public class SessionTest {
 
     private void createConnection(Session client) {
         BrokerConfiguration brokerConfiguration = new BrokerConfiguration(true, false, false, NO_BUFFER_FLUSH);
-        MQTTConnection mqttConnection = new MQTTConnection(testChannel, brokerConfiguration, null, null, null);
+        MQTTConnection mqttConnection = new MQTTConnection(testChannel, brokerConfiguration, null, null, null, null);
         client.markConnecting();
         client.bind(mqttConnection);
         client.completeConnection();
