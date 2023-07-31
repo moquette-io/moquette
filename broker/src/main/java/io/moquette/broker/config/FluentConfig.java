@@ -81,8 +81,8 @@ public class FluentConfig {
 
     private void initializeDefaultValues() {
         // preload with default values
-        configAccumulator.put(HOST_PROPERTY_NAME, Integer.toString(BrokerConstants.PORT));
-        configAccumulator.put(PORT_PROPERTY_NAME, BrokerConstants.HOST);
+        configAccumulator.put(PORT_PROPERTY_NAME, Integer.toString(BrokerConstants.PORT));
+        configAccumulator.put(HOST_PROPERTY_NAME, BrokerConstants.HOST);
         configAccumulator.put(PASSWORD_FILE_PROPERTY_NAME, "");
         configAccumulator.put(ALLOW_ANONYMOUS_PROPERTY_NAME, Boolean.TRUE.toString());
         configAccumulator.put(AUTHENTICATOR_CLASS_NAME, "");
@@ -95,13 +95,13 @@ public class FluentConfig {
     }
 
     public FluentConfig host(String host) {
-        configAccumulator.put(PORT_PROPERTY_NAME, host);
+        configAccumulator.put(HOST_PROPERTY_NAME, host);
         return this;
     }
 
     public FluentConfig port(int port) {
         validatePort(port);
-        configAccumulator.put(HOST_PROPERTY_NAME, Integer.toString(port));
+        configAccumulator.put(PORT_PROPERTY_NAME, Integer.toString(port));
         return this;
     }
 
