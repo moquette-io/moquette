@@ -300,9 +300,9 @@ public class SessionRegistry {
         }
         // in MQTT3 cleanSession = true means expiryInterval=0 else infinite
         final int expiryInterval = clean ? 0 : globalExpirySeconds;
-
+        final MqttVersion mqttVersion = Utils.versionFromConnect(msg);
         final ISessionsRepository.SessionData sessionData = new ISessionsRepository.SessionData(clientId,
-            MqttVersion.MQTT_3_1_1, expiryInterval, clock);
+            mqttVersion, expiryInterval, clock);
         if (msg.variableHeader().isWillFlag()) {
             final Session.Will will = createWill(msg);
             newSession = new Session(sessionData, clean, will, queue);

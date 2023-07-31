@@ -27,8 +27,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
+import java.util.Optional;
+import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 import static io.netty.channel.ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE;
@@ -51,7 +55,8 @@ public class Client {
     private boolean m_connectionLost;
     private ICallback callback;
     private String clientId;
-    private MqttMessage receivedMsg;
+    private AtomicReference<MqttMessage> receivedMsg = new AtomicReference<>();
+    private final Queue<MqttMessage> receivedMessages = new LinkedBlockingQueue<>();
 
     public Client(String host) {
         this(host, BrokerConstants.PORT);
@@ -118,15 +123,6 @@ public class Client {
                 mqttConnectVariableHeader,
                 mqttConnectPayload);
 
-        /*
-         * ConnectMessage connectMessage = new ConnectMessage();
-         * connectMessage.setProtocolVersion((byte) 3); connectMessage.setClientID(this.clientId);
-         * connectMessage.setKeepAlive(2); //secs connectMessage.setWillFlag(true);
-         * connectMessage.setWillMessage(willTestamentMsg.getBytes());
-         * connectMessage.setWillTopic(willTestamentTopic);
-         * connectMessage.setWillQos(MqttQoS.AT_MOST_ONCE.byteValue());
-         */
-
         doConnect(connectMessage);
     }
 
@@ -138,24 +134,93 @@ public class Client {
         doConnect(connectMessage);
     }
 
-    private void doConnect(MqttConnectMessage connectMessage) {
+    public MqttConnAckMessage connectV5() {
+        final MqttMessageBuilders.ConnectBuilder builder = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_5);
+        if (clientId != null) {
+            builder.clientId(clientId);
+        }
+        MqttConnectMessage connectMessage = builder
+            .keepAlive(2) // secs
+            .willFlag(false)
+            .willQoS(MqttQoS.AT_MOST_ONCE)
+            .build();
+
+        return doConnect(connectMessage);
+    }
+
+    private MqttConnAckMessage doConnect(MqttConnectMessage connectMessage) {
         final CountDownLatch latch = new CountDownLatch(1);
         this.setCallback(msg -> {
-            receivedMsg = msg;
+            receivedMsg.getAndSet(msg);
+            LOG.info("Connect callback invocation, received message {}", msg.fixedHeader().messageType());
             latch.countDown();
+
+            // clear the callback
+            setCallback(null);
         });
 
         this.sendMessage(connectMessage);
 
+        boolean waitElapsed;
         try {
-            latch.await(200, TimeUnit.MILLISECONDS);
+            waitElapsed = !latch.await(2_000, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
-            throw new RuntimeException("Cannot receive message in 200 ms", e);
+            throw new RuntimeException("Interrupted while waiting", e);
         }
-        if (!(this.receivedMsg instanceof MqttConnAckMessage)) {
-            MqttMessageType messageType = this.receivedMsg.fixedHeader().messageType();
+
+        if (waitElapsed) {
+            throw new RuntimeException("Cannot receive ConnAck in 2 s");
+        }
+
+        final MqttMessage connAckMessage = this.receivedMsg.get();
+        if (!(connAckMessage instanceof MqttConnAckMessage)) {
+            MqttMessageType messageType = connAckMessage.fixedHeader().messageType();
             throw new RuntimeException("Expected a CONN_ACK message but received " + messageType);
         }
+        return (MqttConnAckMessage) connAckMessage;
+    }
+
+    public MqttSubAckMessage subscribe(String topic, MqttQoS qos) {
+        final MqttSubscribeMessage subscribeMessage = MqttMessageBuilders.subscribe()
+            .messageId(1)
+            .addSubscription(qos, topic)
+            .build();
+
+        final CountDownLatch subscribeAckLatch = new CountDownLatch(1);
+        this.setCallback(msg -> {
+            receivedMsg.getAndSet(msg);
+            LOG.debug("Subscribe callback invocation, received message {}", msg.fixedHeader().messageType());
+            subscribeAckLatch.countDown();
+
+            // clear the callback
+            setCallback(null);
+        });
+
+        LOG.debug("Sending SUBSCRIBE message");
+        sendMessage(subscribeMessage);
+        LOG.debug("Sent SUBSCRIBE message");
+
+        boolean waitElapsed;
+        try {
+            waitElapsed = !subscribeAckLatch.await(200, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            throw new RuntimeException("Interrupted while waiting", e);
+        }
+
+        if (waitElapsed) {
+            throw new RuntimeException("Cannot receive SubscribeAck in 200 ms");
+        }
+        final MqttMessage subAckMessage = this.receivedMsg.get();
+        if (!(subAckMessage instanceof MqttSubAckMessage)) {
+            MqttMessageType messageType = subAckMessage.fixedHeader().messageType();
+            throw new RuntimeException("Expected a SUB_ACK message but received " + messageType);
+        }
+        return (MqttSubAckMessage) subAckMessage;
+    }
+
+    public void disconnect() {
+        final MqttMessage disconnectMessage = MqttMessageBuilders.disconnect().build();
+        sendMessage(disconnectMessage);
     }
 
     public void setCallback(ICallback callback) {
@@ -167,14 +232,20 @@ public class Client {
     }
 
     public MqttMessage lastReceivedMessage() {
-        return this.receivedMsg;
+        return this.receivedMsg.get();
     }
 
     void messageReceived(MqttMessage msg) {
         LOG.info("Received message {}", msg);
         if (this.callback != null) {
             this.callback.call(msg);
+        } else {
+            receivedMessages.add(msg);
         }
+    }
+
+    public boolean hasReceivedMessages() {
+        return !receivedMessages.isEmpty();
     }
 
     void setConnectionLost(boolean status) {
@@ -183,6 +254,13 @@ public class Client {
 
     public boolean isConnectionLost() {
         return m_connectionLost;
+    }
+
+    public Optional<MqttMessage> nextQueuedMessage() {
+        if (receivedMessages.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(receivedMessages.poll());
     }
 
     @SuppressWarnings("FutureReturnValueIgnored")
