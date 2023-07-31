@@ -9,7 +9,29 @@ import java.util.Locale;
 import java.util.Properties;
 import java.util.function.Consumer;
 
-import static io.moquette.BrokerConstants.*;
+import static io.moquette.broker.config.IConfig.ACL_FILE_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.ALLOW_ANONYMOUS_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.AUTHENTICATOR_CLASS_NAME;
+import static io.moquette.broker.config.IConfig.AUTHORIZATOR_CLASS_NAME;
+import static io.moquette.broker.config.IConfig.BUFFER_FLUSH_MS_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.DATA_PATH_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE;
+import static io.moquette.broker.config.IConfig.ENABLE_TELEMETRY_NAME;
+import static io.moquette.broker.config.IConfig.HOST_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.JKS_PATH_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.KEY_MANAGER_PASSWORD_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.KEY_STORE_PASSWORD_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.KEY_STORE_TYPE;
+import static io.moquette.broker.config.IConfig.NETTY_MAX_BYTES_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.PASSWORD_FILE_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.PERSISTENCE_ENABLED_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.PORT_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.SESSION_QUEUE_SIZE;
+import static io.moquette.broker.config.IConfig.SSL_PORT_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.SSL_PROVIDER;
+import static io.moquette.broker.config.IConfig.WEB_SOCKET_PORT_PROPERTY_NAME;
 
 /**
  *  DSL to create Moquette config.
@@ -61,15 +83,14 @@ public class FluentConfig {
         // preload with default values
         configAccumulator.put(PORT_PROPERTY_NAME, Integer.toString(BrokerConstants.PORT));
         configAccumulator.put(HOST_PROPERTY_NAME, BrokerConstants.HOST);
-        configAccumulator.put(BrokerConstants.PASSWORD_FILE_PROPERTY_NAME, "");
-        configAccumulator.put(BrokerConstants.ALLOW_ANONYMOUS_PROPERTY_NAME, Boolean.TRUE.toString());
-        configAccumulator.put(BrokerConstants.AUTHENTICATOR_CLASS_NAME, "");
-        configAccumulator.put(BrokerConstants.AUTHORIZATOR_CLASS_NAME, "");
-        configAccumulator.put(BrokerConstants.NETTY_MAX_BYTES_PROPERTY_NAME,
-            String.valueOf(BrokerConstants.DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE));
-        configAccumulator.put(BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, PersistentQueueType.SEGMENTED.name().toLowerCase(Locale.ROOT));
-        configAccumulator.put(BrokerConstants.DATA_PATH_PROPERTY_NAME, "data/");
-        configAccumulator.put(BrokerConstants.PERSISTENCE_ENABLED_PROPERTY_NAME, Boolean.TRUE.toString());
+        configAccumulator.put(PASSWORD_FILE_PROPERTY_NAME, "");
+        configAccumulator.put(ALLOW_ANONYMOUS_PROPERTY_NAME, Boolean.TRUE.toString());
+        configAccumulator.put(AUTHENTICATOR_CLASS_NAME, "");
+        configAccumulator.put(AUTHORIZATOR_CLASS_NAME, "");
+        configAccumulator.put(NETTY_MAX_BYTES_PROPERTY_NAME, String.valueOf(DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE));
+        configAccumulator.put(PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, PersistentQueueType.SEGMENTED.name().toLowerCase(Locale.ROOT));
+        configAccumulator.put(DATA_PATH_PROPERTY_NAME, "data/");
+        configAccumulator.put(PERSISTENCE_ENABLED_PROPERTY_NAME, Boolean.TRUE.toString());
         configAccumulator.put(BUFFER_FLUSH_MS_PROPERTY_NAME, BufferFlushKind.IMMEDIATE.name().toLowerCase(Locale.ROOT));
     }
 
