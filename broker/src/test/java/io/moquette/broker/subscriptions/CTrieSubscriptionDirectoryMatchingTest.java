@@ -27,6 +27,7 @@ import java.util.Set;
 
 import static io.moquette.broker.subscriptions.CTrieTest.clientSubOnTopic;
 import static io.moquette.broker.subscriptions.Topic.asTopic;
+import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -203,7 +204,7 @@ public class CTrieSubscriptionDirectoryMatchingTest {
         sut.add(specificSub);
 
         //Exercise
-        final Set<Subscription> matchingForSpecific = sut.matchQosSharpening(asTopic("a/b"));
+        final List<Subscription> matchingForSpecific = sut.matchQosSharpening(asTopic("a/b"));
 
         // Verify
         assertThat(matchingForSpecific.size()).isEqualTo(1);
@@ -234,7 +235,7 @@ public class CTrieSubscriptionDirectoryMatchingTest {
         sut.removeSubscription(asTopic("/topic"), slashSub.clientId);
 
         // Verify
-        final Set<Subscription> matchingSubscriptions = sut.matchWithoutQosSharpening(asTopic("/topic"));
+        final List<Subscription> matchingSubscriptions = sut.matchWithoutQosSharpening(asTopic("/topic"));
         assertThat(matchingSubscriptions).isEmpty();
     }
 
@@ -252,7 +253,7 @@ public class CTrieSubscriptionDirectoryMatchingTest {
         this.sut.add(client1SubQoS2);
 
         // Verify
-        Set<Subscription> subscriptions = this.sut.matchQosSharpening(asTopic("client/test/b"));
+        List<Subscription> subscriptions = this.sut.matchQosSharpening(asTopic("client/test/b"));
         assertThat(subscriptions).contains(client1SubQoS2);
         assertThat(subscriptions).contains(client2Sub);
 

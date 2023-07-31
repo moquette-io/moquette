@@ -76,13 +76,13 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
      * @return the list of matching subscriptions, or empty if not matching.
      */
     @Override
-    public Set<Subscription> matchWithoutQosSharpening(Topic topic) {
+    public List<Subscription> matchWithoutQosSharpening(Topic topic) {
         return ctrie.recursiveMatch(topic);
     }
 
     @Override
-    public Set<Subscription> matchQosSharpening(Topic topic) {
-        final Set<Subscription> subscriptions = matchWithoutQosSharpening(topic);
+    public List<Subscription> matchQosSharpening(Topic topic) {
+        final List<Subscription> subscriptions = matchWithoutQosSharpening(topic);
 
         Map<String, Subscription> subsGroupedByClient = new HashMap<>();
         for (Subscription sub : subscriptions) {
@@ -92,7 +92,7 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
                 subsGroupedByClient.put(sub.clientId, sub);
             }
         }
-        return new HashSet<>(subsGroupedByClient.values());
+        return new ArrayList<>(subsGroupedByClient.values());
     }
 
     @Override

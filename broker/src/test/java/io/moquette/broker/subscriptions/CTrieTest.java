@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static io.moquette.broker.subscriptions.Topic.asTopic;
+import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -94,7 +95,7 @@ public class CTrieTest {
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/temp"));
         assertTrue(matchedNode.isPresent(), "Node on path /temp must be present");
-        final Set<Subscription> subscriptions = matchedNode.get().subscriptions;
+        final List<Subscription> subscriptions = matchedNode.get().subscriptions;
         assertTrue(subscriptions.contains(newSubscription));
     }
 
@@ -109,7 +110,7 @@ public class CTrieTest {
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/italy/happiness"));
         assertTrue(matchedNode.isPresent(), "Node on path /italy/happiness must be present");
-        final Set<Subscription> subscriptions = matchedNode.get().subscriptions;
+        final List<Subscription> subscriptions = matchedNode.get().subscriptions;
         assertTrue(subscriptions.contains(happinessSensor));
     }
 
@@ -176,7 +177,7 @@ public class CTrieTest {
         sut.removeFromTree(asTopic("/temp/1"), "TempSensor1");
 
         sut.removeFromTree(asTopic("/temp/1"), "TempSensor1");
-        final Set<Subscription> matchingSubs = sut.recursiveMatch(asTopic("/temp/2"));
+        final List<Subscription> matchingSubs = sut.recursiveMatch(asTopic("/temp/2"));
 
         //Verify
         final Subscription expectedMatchingsub = new Subscription("TempSensor1", asTopic("/temp/2"), MqttQoS.AT_MOST_ONCE);
@@ -191,8 +192,8 @@ public class CTrieTest {
         //Exercise
         sut.removeFromTree(asTopic("/temp"), "TempSensor1");
 
-        final Set<Subscription> matchingSubs1 = sut.recursiveMatch(asTopic("/temp/1"));
-        final Set<Subscription> matchingSubs2 = sut.recursiveMatch(asTopic("/temp/2"));
+        final List<Subscription> matchingSubs1 = sut.recursiveMatch(asTopic("/temp/1"));
+        final List<Subscription> matchingSubs2 = sut.recursiveMatch(asTopic("/temp/2"));
 
         //Verify
         // not clear to me, but I believe /temp unsubscribe should not unsub you from downstream /temp/1 or /temp/2
@@ -218,7 +219,7 @@ public class CTrieTest {
         sut.addToTree(clientSubOnTopic("TempSensor1", "/temp"));
 
         //Exercise
-        final Set<Subscription> matchingSubs = sut.recursiveMatch(asTopic("/temp"));
+        final List<Subscription> matchingSubs = sut.recursiveMatch(asTopic("/temp"));
 
         //Verify
         final Subscription expectedMatchingsub = new Subscription("TempSensor1", asTopic("/temp"), MqttQoS.AT_MOST_ONCE);
@@ -231,8 +232,8 @@ public class CTrieTest {
         sut.addToTree(clientSubOnTopic("TempSensor1", "temp/1"));
 
         //Exercise
-        final Set<Subscription> matchingSubs1 = sut.recursiveMatch(asTopic("temp"));
-        final Set<Subscription> matchingSubs2 = sut.recursiveMatch(asTopic("temp/1"));
+        final List<Subscription> matchingSubs1 = sut.recursiveMatch(asTopic("temp"));
+        final List<Subscription> matchingSubs2 = sut.recursiveMatch(asTopic("temp/1"));
 
         //Verify
         final Subscription expectedMatchingsub1 = new Subscription("TempSensor1", asTopic("temp"), MqttQoS.AT_MOST_ONCE);
@@ -244,8 +245,8 @@ public class CTrieTest {
         sut.removeFromTree(asTopic("temp"), "TempSensor1");
 
         //Exercise
-        final Set<Subscription> matchingSubs3 = sut.recursiveMatch(asTopic("temp"));
-        final Set<Subscription> matchingSubs4 = sut.recursiveMatch(asTopic("temp/1"));
+        final List<Subscription> matchingSubs3 = sut.recursiveMatch(asTopic("temp"));
+        final List<Subscription> matchingSubs4 = sut.recursiveMatch(asTopic("temp/1"));
 
         assertThat(matchingSubs3).doesNotContain(expectedMatchingsub1);
         assertThat(matchingSubs4).contains(expectedMatchingsub2);
@@ -257,8 +258,8 @@ public class CTrieTest {
         sut.addToTree(clientSubOnTopic("TempSensor2", "temp/1"));
 
         //Exercise
-        final Set<Subscription> matchingSubs1 = sut.recursiveMatch(asTopic("temp"));
-        final Set<Subscription> matchingSubs2 = sut.recursiveMatch(asTopic("temp/1"));
+        final List<Subscription> matchingSubs1 = sut.recursiveMatch(asTopic("temp"));
+        final List<Subscription> matchingSubs2 = sut.recursiveMatch(asTopic("temp/1"));
 
         //Verify
         final Subscription expectedMatchingsub1 = new Subscription("TempSensor1", asTopic("temp"), MqttQoS.AT_MOST_ONCE);
@@ -270,8 +271,8 @@ public class CTrieTest {
         sut.removeFromTree(asTopic("temp"), "TempSensor1");
 
         //Exercise
-        final Set<Subscription> matchingSubs3 = sut.recursiveMatch(asTopic("temp"));
-        final Set<Subscription> matchingSubs4 = sut.recursiveMatch(asTopic("temp/1"));
+        final List<Subscription> matchingSubs3 = sut.recursiveMatch(asTopic("temp"));
+        final List<Subscription> matchingSubs4 = sut.recursiveMatch(asTopic("temp/1"));
 
         assertThat(matchingSubs3).doesNotContain(expectedMatchingsub1);
         assertThat(matchingSubs4).contains(expectedMatchingsub2);
@@ -283,8 +284,8 @@ public class CTrieTest {
         sut.addToTree(clientSubOnTopic("TempSensor2", "temp/1"));
 
         //Exercise
-        final Set<Subscription> matchingSubs1 = sut.recursiveMatch(asTopic("temp"));
-        final Set<Subscription> matchingSubs2 = sut.recursiveMatch(asTopic("temp/1"));
+        final List<Subscription> matchingSubs1 = sut.recursiveMatch(asTopic("temp"));
+        final List<Subscription> matchingSubs2 = sut.recursiveMatch(asTopic("temp/1"));
 
         //Verify
         final Subscription expectedMatchingsub1 = new Subscription("TempSensor1", asTopic("temp"), MqttQoS.AT_MOST_ONCE);
@@ -296,8 +297,8 @@ public class CTrieTest {
         sut.removeFromTree(asTopic("temp/1"), "TempSensor2");
 
         //Exercise
-        final Set<Subscription> matchingSubs3 = sut.recursiveMatch(asTopic("temp"));
-        final Set<Subscription> matchingSubs4 = sut.recursiveMatch(asTopic("temp/1"));
+        final List<Subscription> matchingSubs3 = sut.recursiveMatch(asTopic("temp"));
+        final List<Subscription> matchingSubs4 = sut.recursiveMatch(asTopic("temp/1"));
 
         assertThat(matchingSubs3).contains(expectedMatchingsub1);
         assertThat(matchingSubs4).doesNotContain(expectedMatchingsub2);

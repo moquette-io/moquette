@@ -26,9 +26,9 @@ public interface ISubscriptionsDirectory {
 
     Set<String> listAllSessionIds();
 
-    Set<Subscription> matchWithoutQosSharpening(Topic topic);
+    List<Subscription> matchWithoutQosSharpening(Topic topic);
 
-    Set<Subscription> matchQosSharpening(Topic topic);
+    List<Subscription> matchQosSharpening(Topic topic);
 
     void add(Subscription newSubscription);
 

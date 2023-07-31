@@ -42,6 +42,7 @@ import static io.netty.handler.codec.mqtt.MqttQoS.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
+import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class PostOfficeInternalPublishTest {
@@ -337,7 +338,7 @@ public class PostOfficeInternalPublishTest {
         final String clientId = connection.getClientId();
         Subscription expectedSubscription = new Subscription(clientId, new Topic(topic), desiredQos);
 
-        final Set<Subscription> matchedSubscriptions = subscriptions.matchWithoutQosSharpening(new Topic(topic));
+        final List<Subscription> matchedSubscriptions = subscriptions.matchWithoutQosSharpening(new Topic(topic));
         assertEquals(1, matchedSubscriptions.size());
         final Subscription onlyMatchedSubscription = matchedSubscriptions.iterator().next();
         assertEquals(expectedSubscription, onlyMatchedSubscription);

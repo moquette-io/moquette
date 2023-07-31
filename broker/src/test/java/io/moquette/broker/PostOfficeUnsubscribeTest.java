@@ -41,6 +41,7 @@ import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static io.moquette.broker.PostOfficePublishTest.PUBLISHER_ID;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
 import static java.util.Collections.*;
+import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
@@ -123,7 +124,7 @@ public class PostOfficeUnsubscribeTest {
         final String clientId = connection.getClientId();
         Subscription expectedSubscription = new Subscription(clientId, new Topic(topic), desiredQos);
 
-        final Set<Subscription> matchedSubscriptions = subscriptions.matchQosSharpening(new Topic(topic));
+        final List<Subscription> matchedSubscriptions = subscriptions.matchQosSharpening(new Topic(topic));
         assertEquals(1, matchedSubscriptions.size());
         //assertTrue(matchedSubscriptions.size() >=1);
         final Subscription onlyMatchedSubscription = matchedSubscriptions.iterator().next();

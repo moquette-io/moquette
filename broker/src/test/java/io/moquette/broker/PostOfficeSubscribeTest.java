@@ -144,7 +144,7 @@ public class PostOfficeSubscribeTest {
         final String clientId = NettyUtils.clientID(channel);
         Subscription expectedSubscription = new Subscription(clientId, new Topic(topic), desiredQos);
 
-        final Set<Subscription> matchedSubscriptions = subscriptions.matchWithoutQosSharpening(new Topic(topic));
+        final List<Subscription> matchedSubscriptions = subscriptions.matchWithoutQosSharpening(new Topic(topic));
         assertEquals(1, matchedSubscriptions.size());
         final Subscription onlyMatchedSubscription = matchedSubscriptions.iterator().next();
         assertEquals(expectedSubscription, onlyMatchedSubscription);
@@ -164,7 +164,7 @@ public class PostOfficeSubscribeTest {
         final String clientId = connection.getClientId();
         Subscription expectedSubscription = new Subscription(clientId, new Topic(topic), desiredQos);
 
-        final Set<Subscription> matchedSubscriptions = subscriptions.matchWithoutQosSharpening(new Topic(topic));
+        final List<Subscription> matchedSubscriptions = subscriptions.matchWithoutQosSharpening(new Topic(topic));
         assertEquals(1, matchedSubscriptions.size());
         final Subscription onlyMatchedSubscription = matchedSubscriptions.iterator().next();
         assertEquals(expectedSubscription, onlyMatchedSubscription);

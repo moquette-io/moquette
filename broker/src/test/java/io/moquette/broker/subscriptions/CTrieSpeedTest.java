@@ -16,8 +16,10 @@
 package io.moquette.broker.subscriptions;
 
 import static io.moquette.broker.subscriptions.Topic.asTopic;
+import io.netty.handler.codec.mqtt.MqttQoS;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
@@ -33,6 +35,13 @@ public class CTrieSpeedTest {
 
     static Subscription clientSubOnTopic(String clientID, String topicName) {
         return new Subscription(clientID, asTopic(topicName), null);
+    }
+
+    @Test
+    @Timeout(value = MAX_DURATION_S)
+    public void testManyClientsFewTopics() {
+        List<Subscription> subscriptionList = prepareSubscriptionsManyClientsFewTopic();
+        createSubscriptions(subscriptionList);
     }
 
     @Test
@@ -71,6 +80,15 @@ public class CTrieSpeedTest {
         long end = System.currentTimeMillis();
         long duration = end - start;
         LOGGER.info("Added " + count + " subscriptions in " + duration + " ms (" + Math.round(1000.0 * count / duration) + "/s)");
+    }
+
+    public List<Subscription> prepareSubscriptionsManyClientsFewTopic() {
+        List<Subscription> subscriptionList = new ArrayList<>(TOTAL_SUBSCRIPTIONS);
+        for (int i = 0; i < TOTAL_SUBSCRIPTIONS; i++) {
+            Topic topic = asTopic("topic/test/" + new Random().nextInt(1 + i % 10) + "/test");
+            subscriptionList.add(new Subscription("TestClient-" + i, topic, MqttQoS.AT_LEAST_ONCE));
+        }
+        return subscriptionList;
     }
 
     public List<Subscription> prepareSubscriptionsFlat() {
