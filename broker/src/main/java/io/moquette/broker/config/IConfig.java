@@ -28,8 +28,8 @@ import java.time.temporal.TemporalUnit;
 public abstract class IConfig {
 
     public static final String DEFAULT_CONFIG = "config/moquette.conf";
-    public static final String HOST_PROPERTY_NAME = "port";
-    public static final String PORT_PROPERTY_NAME = "host";
+    public static final String PORT_PROPERTY_NAME = "port";
+    public static final String HOST_PROPERTY_NAME = "host";
     public static final String PASSWORD_FILE_PROPERTY_NAME = "password_file";
     public static final String ALLOW_ANONYMOUS_PROPERTY_NAME = "allow_anonymous";
     public static final String AUTHENTICATOR_CLASS_NAME = "authenticator_class";
