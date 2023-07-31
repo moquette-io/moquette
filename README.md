@@ -46,13 +46,13 @@ Include dependency in your project:
 <dependency>
       <groupId>io.moquette</groupId>
       <artifactId>moquette-broker</artifactId>
-      <version>0.15</version>
+      <version>0.17</version>
 </dependency>
 ```
 
 ## Build from sources
 
 After a git clone of the repository, cd into the cloned sources and: `./gradlew package`, at the end the distribution 
-package is present at `distribution/target/distribution-0.17-SNAPSHOT-bundle.tar.gz`
+package is present at `distribution/target/distribution-0.17-bundle.tar.gz`
 
 In distribution/target directory will be produced the selfcontained file for the broker with all dependencies and a running script. 
