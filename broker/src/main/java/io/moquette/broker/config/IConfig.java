@@ -28,6 +28,42 @@ import java.time.temporal.TemporalUnit;
 public abstract class IConfig {
 
     public static final String DEFAULT_CONFIG = "config/moquette.conf";
+    public static final String PORT_PROPERTY_NAME = "port";
+    public static final String HOST_PROPERTY_NAME = "host";
+    public static final String PASSWORD_FILE_PROPERTY_NAME = "password_file";
+    public static final String ALLOW_ANONYMOUS_PROPERTY_NAME = "allow_anonymous";
+    public static final String AUTHENTICATOR_CLASS_NAME = "authenticator_class";
+    public static final String AUTHORIZATOR_CLASS_NAME = "authorizator_class";
+    public static final String PERSISTENT_QUEUE_TYPE_PROPERTY_NAME = "persistent_queue_type"; // h2 or segmented, default h2
+    public static final String DATA_PATH_PROPERTY_NAME = "data_path";
+    public static final String PERSISTENCE_ENABLED_PROPERTY_NAME = "persistence_enabled"; // true or false, default true
+    /**
+     * 0/immediate means immediate flush, like immediate_buffer_flush = true
+     * -1/full means no explicit flush, let Netty flush when write buffers are full, like immediate_buffer_flush = false
+     * a number of milliseconds to between flushes
+     * */
+    public static final String BUFFER_FLUSH_MS_PROPERTY_NAME = "buffer_flush_millis";
+    public static final String WEB_SOCKET_PORT_PROPERTY_NAME = "websocket_port";
+    public static final String WSS_PORT_PROPERTY_NAME = "secure_websocket_port";
+    public static final String WEB_SOCKET_PATH_PROPERTY_NAME = "websocket_path";
+    public static final String ACL_FILE_PROPERTY_NAME = "acl_file";
+    public static final String PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME = "persistent_client_expiration";
+    public static final String SESSION_QUEUE_SIZE = "session_queue_size";
+    public static final String ENABLE_TELEMETRY_NAME = "telemetry_enabled";
+    /**
+     * Defines the SSL implementation to use, default to "JDK".
+     * @see io.netty.handler.ssl.SslProvider#name()
+     */
+    public static final String SSL_PROVIDER = "ssl_provider";
+    public static final String SSL_PORT_PROPERTY_NAME = "ssl_port";
+    public static final String JKS_PATH_PROPERTY_NAME = "jks_path";
+
+    /** @see java.security.KeyStore#getInstance(String) for allowed types, default to "jks" */
+    public static final String KEY_STORE_TYPE = "key_store_type";
+    public static final String KEY_STORE_PASSWORD_PROPERTY_NAME = "key_store_password";
+    public static final String KEY_MANAGER_PASSWORD_PROPERTY_NAME = "key_manager_password";
+    public static final String NETTY_MAX_BYTES_PROPERTY_NAME = "netty.mqtt.message_size";
+    public static final int DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE = 8092;
 
     public abstract void setProperty(String name, String value);
 

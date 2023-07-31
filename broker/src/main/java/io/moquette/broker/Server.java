@@ -16,11 +16,7 @@
 package io.moquette.broker;
 
 import io.moquette.BrokerConstants;
-import io.moquette.broker.config.FileResourceLoader;
-import io.moquette.broker.config.IConfig;
-import io.moquette.broker.config.IResourceLoader;
-import io.moquette.broker.config.MemoryConfig;
-import io.moquette.broker.config.ResourceLoaderConfig;
+import io.moquette.broker.config.*;
 import io.moquette.broker.security.ACLFileParser;
 import io.moquette.broker.security.AcceptAllAuthenticator;
 import io.moquette.broker.security.DenyAllAuthorizatorPolicy;
@@ -245,8 +241,8 @@ public class Server {
         final Authorizator authorizator = new Authorizator(authorizatorPolicy);
 
         final int globalSessionExpiry;
-        if (config.getProperty(BrokerConstants.PERSISTENT_CLEAN_EXPIRATION_PROPERTY_NAME) != null) {
-            globalSessionExpiry = (int) config.durationProp(BrokerConstants.PERSISTENT_CLEAN_EXPIRATION_PROPERTY_NAME).toMillis() / 1000;
+        if (config.getProperty(BrokerConstants.PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME) != null) {
+            globalSessionExpiry = (int) config.durationProp(BrokerConstants.PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME).toMillis() / 1000;
         } else {
             globalSessionExpiry = INFINITE_EXPIRY;
         }
@@ -670,5 +666,9 @@ public class Server {
      */
     public boolean disconnectAndPurgeClientState(final String clientId) {
         return sessions.dropSession(clientId, true);
+    }
+
+    public FluentConfig withConfig() {
+        return new FluentConfig(this);
     }
 }
