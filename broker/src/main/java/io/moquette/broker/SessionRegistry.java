@@ -22,6 +22,7 @@ import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
+import io.netty.handler.codec.mqtt.MqttProperties;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttVersion;
 import org.slf4j.Logger;
@@ -298,9 +299,22 @@ public class SessionRegistry {
         } else {
             queue = new InMemoryQueue();
         }
-        // in MQTT3 cleanSession = true means expiryInterval=0 else infinite
-        final int expiryInterval = clean ? 0 : globalExpirySeconds;
+        final int expiryInterval;
         final MqttVersion mqttVersion = Utils.versionFromConnect(msg);
+        if (mqttVersion != MqttVersion.MQTT_5) {
+            // in MQTT3 cleanSession = true means expiryInterval=0 else infinite
+            expiryInterval = clean ? 0 : globalExpirySeconds;
+        } else {
+            final MqttProperties.MqttProperty<Integer> expiryIntervalProperty =
+                (MqttProperties.MqttProperty<Integer>) msg.variableHeader().properties()
+                    .getProperty(MqttProperties.MqttPropertyType.SESSION_EXPIRY_INTERVAL.value());
+            if (expiryIntervalProperty != null) {
+                expiryInterval = expiryIntervalProperty.value();
+            } else {
+                // the connect doesn't provide any expiry, fallback to global expiry
+                expiryInterval = clean ? 0 : globalExpirySeconds;
+            }
+        }
         final ISessionsRepository.SessionData sessionData = new ISessionsRepository.SessionData(clientId,
             mqttVersion, expiryInterval, clock);
         if (msg.variableHeader().isWillFlag()) {

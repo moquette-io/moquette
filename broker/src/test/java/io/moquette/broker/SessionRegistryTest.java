@@ -76,15 +76,15 @@ public class SessionRegistryTest {
 
     private MQTTConnection connection;
     private EmbeddedChannel channel;
-    private SessionRegistry sut;
-    private MqttMessageBuilders.ConnectBuilder connMsg;
+    protected SessionRegistry sut;
+    protected MqttMessageBuilders.ConnectBuilder connMsg;
     private static final BrokerConfiguration ALLOW_ANONYMOUS_AND_ZEROBYTE_CLIENT_ID =
         new BrokerConfiguration(true, true, false, NO_BUFFER_FLUSH);
     private MemoryQueueRepository queueRepository;
     private ScheduledExecutorService scheduler;
     private final Clock pointInTimeFixedClock = Clock.fixed(Instant.parse("2023-03-26T18:09:30.00Z"), ZoneId.of("Europe/Rome"));
-    private ForwardableClock slidingClock = new ForwardableClock(pointInTimeFixedClock);
-    private ISessionsRepository sessionRepository;
+    protected ForwardableClock slidingClock = new ForwardableClock(pointInTimeFixedClock);
+    protected ISessionsRepository sessionRepository;
 
     @BeforeEach
     public void setUp() {
@@ -317,7 +317,7 @@ public class SessionRegistryTest {
             .until(sessionsList(), Matchers.not(Matchers.empty()));
     }
 
-    private Callable<Collection<ISessionsRepository.SessionData>> sessionsList() {
+    protected Callable<Collection<ISessionsRepository.SessionData>> sessionsList() {
         return () -> sessionRepository.list();
     }
 }
