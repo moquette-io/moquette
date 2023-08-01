@@ -345,7 +345,7 @@ public class Server {
      * @return a json string with the content of max mem, jvm version and similar telemetry data.
      * @param uuid*/
     private String collectTelemetryData(String uuid) {
-        final String remoteIp = retrievePublicIP();
+        final String remoteIp = "uncollected";
         final String os = System.getProperty("os.name");
         final String cpuArch = System.getProperty("os.arch");
         final String jvmVersion = System.getProperty("java.specification.version");
