@@ -85,21 +85,20 @@ public abstract class IConfig {
     public abstract String getProperty(String name, String defaultValue);
 
     void assignDefaults() {
-        setProperty(BrokerConstants.PORT_PROPERTY_NAME, Integer.toString(BrokerConstants.PORT));
-        setProperty(BrokerConstants.HOST_PROPERTY_NAME, BrokerConstants.HOST);
+        setProperty(PORT_PROPERTY_NAME, Integer.toString(BrokerConstants.PORT));
+        setProperty(HOST_PROPERTY_NAME, BrokerConstants.HOST);
         // setProperty(BrokerConstants.WEB_SOCKET_PORT_PROPERTY_NAME,
         // Integer.toString(BrokerConstants.WEBSOCKET_PORT));
-        setProperty(BrokerConstants.PASSWORD_FILE_PROPERTY_NAME, "");
+        setProperty(PASSWORD_FILE_PROPERTY_NAME, "");
         // setProperty(BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME,
         // BrokerConstants.DEFAULT_PERSISTENT_PATH);
-        setProperty(BrokerConstants.ALLOW_ANONYMOUS_PROPERTY_NAME, Boolean.TRUE.toString());
-        setProperty(BrokerConstants.AUTHENTICATOR_CLASS_NAME, "");
-        setProperty(BrokerConstants.AUTHORIZATOR_CLASS_NAME, "");
-        setProperty(BrokerConstants.NETTY_MAX_BYTES_PROPERTY_NAME,
-            String.valueOf(BrokerConstants.DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE));
-        setProperty(BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, "segmented");
-        setProperty(BrokerConstants.DATA_PATH_PROPERTY_NAME, "data/");
-        setProperty(BrokerConstants.PERSISTENCE_ENABLED_PROPERTY_NAME, Boolean.TRUE.toString());
+        setProperty(ALLOW_ANONYMOUS_PROPERTY_NAME, Boolean.TRUE.toString());
+        setProperty(AUTHENTICATOR_CLASS_NAME, "");
+        setProperty(AUTHORIZATOR_CLASS_NAME, "");
+        setProperty(NETTY_MAX_BYTES_PROPERTY_NAME, String.valueOf(DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE));
+        setProperty(PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, "segmented");
+        setProperty(DATA_PATH_PROPERTY_NAME, "data/");
+        setProperty(PERSISTENCE_ENABLED_PROPERTY_NAME, Boolean.TRUE.toString());
     }
 
     public abstract IResourceLoader getResourceLoader();

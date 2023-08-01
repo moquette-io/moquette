@@ -53,7 +53,7 @@ public class PublishToManySubscribersUseCaseTest extends AbstractIntegration {
     protected void startServer(String dbPath) throws IOException {
         broker = new Server();
         final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
-        configProps.put(BrokerConstants.SESSION_QUEUE_SIZE, Integer.toString(COMMAND_QUEUE_SIZE));
+        configProps.put(IConfig.SESSION_QUEUE_SIZE, Integer.toString(COMMAND_QUEUE_SIZE));
         IConfig brokerConfig = new MemoryConfig(configProps);
         broker.startServer(brokerConfig);
     }

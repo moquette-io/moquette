@@ -26,12 +26,12 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Properties;
 
-import static io.moquette.BrokerConstants.DATA_PATH_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.DATA_PATH_PROPERTY_NAME;
 import static io.moquette.BrokerConstants.DEFAULT_MOQUETTE_STORE_H2_DB_FILENAME;
-import static io.moquette.BrokerConstants.ENABLE_TELEMETRY_NAME;
-import static io.moquette.BrokerConstants.PERSISTENCE_ENABLED_PROPERTY_NAME;
-import static io.moquette.BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME;
-import static io.moquette.BrokerConstants.PORT_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.ENABLE_TELEMETRY_NAME;
+import static io.moquette.broker.config.IConfig.PERSISTENCE_ENABLED_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.PORT_PROPERTY_NAME;
 
 /**
  * Used to carry integration configurations.

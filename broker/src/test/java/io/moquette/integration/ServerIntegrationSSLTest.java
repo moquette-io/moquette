@@ -36,7 +36,7 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
-import io.moquette.BrokerConstants;
+import io.moquette.broker.config.IConfig;
 import org.eclipse.paho.client.mqttv3.IMqttClient;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttClientPersistence;
@@ -109,13 +109,13 @@ public class ServerIntegrationSSLTest {
         m_server = new Server();
 
         Properties sslProps = new Properties();
-        sslProps.put(BrokerConstants.SSL_PORT_PROPERTY_NAME, "8883");
-        sslProps.put(BrokerConstants.JKS_PATH_PROPERTY_NAME, "src/test/resources/serverkeystore.jks");
-        sslProps.put(BrokerConstants.KEY_STORE_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
-        sslProps.put(BrokerConstants.KEY_MANAGER_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
-        sslProps.put(BrokerConstants.DATA_PATH_PROPERTY_NAME, dbPath);
-        sslProps.put(BrokerConstants.PERSISTENCE_ENABLED_PROPERTY_NAME, "true");
-        sslProps.put(BrokerConstants.ENABLE_TELEMETRY_NAME, "false");
+        sslProps.put(IConfig.SSL_PORT_PROPERTY_NAME, "8883");
+        sslProps.put(IConfig.JKS_PATH_PROPERTY_NAME, "src/test/resources/serverkeystore.jks");
+        sslProps.put(IConfig.KEY_STORE_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
+        sslProps.put(IConfig.KEY_MANAGER_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
+        sslProps.put(IConfig.DATA_PATH_PROPERTY_NAME, dbPath);
+        sslProps.put(IConfig.PERSISTENCE_ENABLED_PROPERTY_NAME, "true");
+        sslProps.put(IConfig.ENABLE_TELEMETRY_NAME, "false");
         m_server.startServer(sslProps);
     }
 
