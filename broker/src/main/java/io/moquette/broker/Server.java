@@ -16,7 +16,12 @@
 package io.moquette.broker;
 
 import io.moquette.BrokerConstants;
-import io.moquette.broker.config.*;
+import io.moquette.broker.config.FileResourceLoader;
+import io.moquette.broker.config.FluentConfig;
+import io.moquette.broker.config.IConfig;
+import io.moquette.broker.config.IResourceLoader;
+import io.moquette.broker.config.MemoryConfig;
+import io.moquette.broker.config.ResourceLoaderConfig;
 import io.moquette.broker.security.ACLFileParser;
 import io.moquette.broker.security.AcceptAllAuthenticator;
 import io.moquette.broker.security.DenyAllAuthorizatorPolicy;
@@ -198,20 +203,20 @@ public class Server {
 
         if (config.getProperty(BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME) != null) {
             LOG.warn("Using a deprecated setting {} please update to {}",
-                BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME, BrokerConstants.DATA_PATH_PROPERTY_NAME);
-            LOG.warn("Forcing {} to true", BrokerConstants.PERSISTENCE_ENABLED_PROPERTY_NAME);
-            config.setProperty(BrokerConstants.PERSISTENCE_ENABLED_PROPERTY_NAME, Boolean.TRUE.toString());
+                BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME, IConfig.DATA_PATH_PROPERTY_NAME);
+            LOG.warn("Forcing {} to true", IConfig.PERSISTENCE_ENABLED_PROPERTY_NAME);
+            config.setProperty(IConfig.PERSISTENCE_ENABLED_PROPERTY_NAME, Boolean.TRUE.toString());
 
             final String persistencePath = config.getProperty(BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME);
             final String dataPath = persistencePath.substring(0, persistencePath.lastIndexOf("/"));
-            LOG.warn("Forcing {} to {}", BrokerConstants.DATA_PATH_PROPERTY_NAME, dataPath);
-            config.setProperty(BrokerConstants.DATA_PATH_PROPERTY_NAME, dataPath);
+            LOG.warn("Forcing {} to {}", IConfig.DATA_PATH_PROPERTY_NAME, dataPath);
+            config.setProperty(IConfig.DATA_PATH_PROPERTY_NAME, dataPath);
         }
 
         final Clock clock = Clock.systemDefaultZone();
 
-        if (Boolean.parseBoolean(config.getProperty(BrokerConstants.PERSISTENCE_ENABLED_PROPERTY_NAME))) {
-            final Path dataPath = Paths.get(config.getProperty(BrokerConstants.DATA_PATH_PROPERTY_NAME));
+        if (Boolean.parseBoolean(config.getProperty(IConfig.PERSISTENCE_ENABLED_PROPERTY_NAME))) {
+            final Path dataPath = Paths.get(config.getProperty(IConfig.DATA_PATH_PROPERTY_NAME));
             if (!dataPath.toFile().exists()) {
                 if (dataPath.toFile().mkdirs()) {
                     LOG.debug("Created data_path {} folder", dataPath);
@@ -241,13 +246,13 @@ public class Server {
         final Authorizator authorizator = new Authorizator(authorizatorPolicy);
 
         final int globalSessionExpiry;
-        if (config.getProperty(BrokerConstants.PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME) != null) {
-            globalSessionExpiry = (int) config.durationProp(BrokerConstants.PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME).toMillis() / 1000;
+        if (config.getProperty(IConfig.PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME) != null) {
+            globalSessionExpiry = (int) config.durationProp(IConfig.PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME).toMillis() / 1000;
         } else {
             globalSessionExpiry = INFINITE_EXPIRY;
         }
 
-        final int sessionQueueSize = config.intProp(BrokerConstants.SESSION_QUEUE_SIZE, 1024);
+        final int sessionQueueSize = config.intProp(IConfig.SESSION_QUEUE_SIZE, 1024);
         final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(interceptor, sessionQueueSize);
         sessions = new SessionRegistry(subscriptions, sessionsRepository, queueRepository, authorizator, scheduler,
             clock, globalSessionExpiry, loopsGroup);
@@ -264,7 +269,7 @@ public class Server {
         final long startTime = System.currentTimeMillis() - start;
         LOG.info("Moquette integration has been started successfully in {} ms", startTime);
 
-        if (config.boolProp(BrokerConstants.ENABLE_TELEMETRY_NAME, true)) {
+        if (config.boolProp(IConfig.ENABLE_TELEMETRY_NAME, true)) {
             collectAndSendTelemetryDataAsynch(config);
         }
 
@@ -273,7 +278,7 @@ public class Server {
 
     private static IQueueRepository initQueuesRepository(IConfig config, Path dataPath, H2Builder h2Builder) throws IOException {
         final IQueueRepository queueRepository;
-        final String queueType = config.getProperty(BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME);
+        final String queueType = config.getProperty(IConfig.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME);
         if ("h2".equalsIgnoreCase(queueType)) {
             LOG.info("Configuring H2 queue store");
             queueRepository = h2Builder.queueRepository();
@@ -287,7 +292,7 @@ public class Server {
                 throw new IOException("Problem in configuring persistent queue on path " + dataPath, e);
             }
         } else {
-            final String errMsg = String.format("Invalid property for %s found [%s] while only h2 or segmented are admitted", BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, queueType);
+            final String errMsg = String.format("Invalid property for %s found [%s] while only h2 or segmented are admitted", IConfig.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, queueType);
             throw new RuntimeException(errMsg);
         }
         return queueRepository;
@@ -314,7 +319,7 @@ public class Server {
     }
 
     private String checkOrCreateUUID(IConfig config) {
-        final String storagePath = config.getProperty(BrokerConstants.DATA_PATH_PROPERTY_NAME, "");
+        final String storagePath = config.getProperty(IConfig.DATA_PATH_PROPERTY_NAME, "");
         final Path uuidFilePath = Paths.get(storagePath, ".moquette_uuid");
         if (Files.exists(uuidFilePath)) {
             try {
@@ -444,13 +449,13 @@ public class Server {
 
     private IAuthorizatorPolicy initializeAuthorizatorPolicy(IAuthorizatorPolicy authorizatorPolicy, IConfig props) {
         LOG.debug("Configuring MQTT authorizator policy");
-        String authorizatorClassName = props.getProperty(BrokerConstants.AUTHORIZATOR_CLASS_NAME, "");
+        String authorizatorClassName = props.getProperty(IConfig.AUTHORIZATOR_CLASS_NAME, "");
         if (authorizatorPolicy == null && !authorizatorClassName.isEmpty()) {
             authorizatorPolicy = loadClass(authorizatorClassName, IAuthorizatorPolicy.class, IConfig.class, props);
         }
 
         if (authorizatorPolicy == null) {
-            String aclFilePath = props.getProperty(BrokerConstants.ACL_FILE_PROPERTY_NAME, "");
+            String aclFilePath = props.getProperty(IConfig.ACL_FILE_PROPERTY_NAME, "");
             if (aclFilePath != null && !aclFilePath.isEmpty()) {
                 authorizatorPolicy = new DenyAllAuthorizatorPolicy();
                 try {
@@ -470,7 +475,7 @@ public class Server {
 
     private IAuthenticator initializeAuthenticator(IAuthenticator authenticator, IConfig props) {
         LOG.debug("Configuring MQTT authenticator");
-        String authenticatorClassName = props.getProperty(BrokerConstants.AUTHENTICATOR_CLASS_NAME, "");
+        String authenticatorClassName = props.getProperty(IConfig.AUTHENTICATOR_CLASS_NAME, "");
 
         if (authenticator == null && !authenticatorClassName.isEmpty()) {
             authenticator = loadClass(authenticatorClassName, IAuthenticator.class, IConfig.class, props);
@@ -478,7 +483,7 @@ public class Server {
 
         IResourceLoader resourceLoader = props.getResourceLoader();
         if (authenticator == null) {
-            String passwdPath = props.getProperty(BrokerConstants.PASSWORD_FILE_PROPERTY_NAME, "");
+            String passwdPath = props.getProperty(IConfig.PASSWORD_FILE_PROPERTY_NAME, "");
             if (passwdPath.isEmpty()) {
                 authenticator = new AcceptAllAuthenticator();
             } else {
