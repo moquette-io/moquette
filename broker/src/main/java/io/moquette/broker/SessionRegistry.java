@@ -309,7 +309,9 @@ public class SessionRegistry {
                 (MqttProperties.MqttProperty<Integer>) msg.variableHeader().properties()
                     .getProperty(MqttProperties.MqttPropertyType.SESSION_EXPIRY_INTERVAL.value());
             if (expiryIntervalProperty != null) {
-                expiryInterval = expiryIntervalProperty.value();
+                int preferredExpiryInterval = expiryIntervalProperty.value();
+                // limit the maximum expiry, use the value configured in "persistent_client_expiration"
+                expiryInterval = Math.min(preferredExpiryInterval, globalExpirySeconds);
             } else {
                 // the connect doesn't provide any expiry, fallback to global expiry
                 expiryInterval = clean ? 0 : globalExpirySeconds;
