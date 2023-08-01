@@ -77,7 +77,7 @@ public class ServerIntegrationDBAuthenticatorTest {
     }
 
     private Properties addDBAuthenticatorConf(Properties properties) {
-        properties.put(BrokerConstants.AUTHENTICATOR_CLASS_NAME, DBAuthenticator.class.getCanonicalName());
+        properties.put(IConfig.AUTHENTICATOR_CLASS_NAME, DBAuthenticator.class.getCanonicalName());
         properties.put(BrokerConstants.DB_AUTHENTICATOR_DRIVER, DBAuthenticatorTest.ORG_H2_DRIVER);
         properties.put(BrokerConstants.DB_AUTHENTICATOR_URL, DBAuthenticatorTest.JDBC_H2_MEM_TEST);
         properties.put(BrokerConstants.DB_AUTHENTICATOR_QUERY, "SELECT PASSWORD FROM ACCOUNT WHERE LOGIN=?");
