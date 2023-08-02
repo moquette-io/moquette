@@ -344,7 +344,23 @@ public class SessionRegistry {
         final String willTopic = msg.payload().willTopic();
         final boolean retained = msg.variableHeader().isWillRetain();
         final MqttQoS qos = MqttQoS.valueOf(msg.variableHeader().willQos());
-        return new ISessionsRepository.Will(willTopic, willPayload, qos, retained);
+
+        final int willDelayIntervalSeconds;
+        // retrieve Will Delay if present and if the connection is MQTT5
+        if (Utils.versionFromConnect(msg) == MqttVersion.MQTT_5) {
+            final MqttProperties.MqttProperty<Integer> willDelayIntervalProperty =
+                (MqttProperties.MqttProperty<Integer>) msg.variableHeader().properties()
+                    .getProperty(MqttProperties.MqttPropertyType.WILL_DELAY_INTERVAL.value());
+            if (willDelayIntervalProperty != null) {
+                willDelayIntervalSeconds = willDelayIntervalProperty.value();
+            } else {
+                willDelayIntervalSeconds = 0;
+            }
+        } else {
+            willDelayIntervalSeconds = 0;
+        }
+
+        return new ISessionsRepository.Will(willTopic, willPayload, qos, retained, willDelayIntervalSeconds);
     }
 
     Session retrieve(String clientID) {

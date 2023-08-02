@@ -37,6 +37,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -182,6 +185,7 @@ class PostOffice {
     private BrokerInterceptor interceptor;
     private final FailedPublishCollection failedPublishes = new FailedPublishCollection();
     private final SessionEventLoopGroup sessionLoops;
+    private final ScheduledExecutorService delayedWillPublications = Executors.newSingleThreadScheduledExecutor();
 
     PostOffice(ISubscriptionsDirectory subscriptions, IRetainedRepository retainedRepository,
                SessionRegistry sessionRegistry, BrokerInterceptor interceptor, Authorizator authorizator,
@@ -198,9 +202,17 @@ class PostOffice {
         this.sessionRegistry = sessionRegistry;
     }
 
-    public void fireWill(ISessionsRepository.Will will) {
-        // MQTT 3.1.2.8-17
-        publish2Subscribers(Unpooled.copiedBuffer(will.payload), new Topic(will.topic), will.qos);
+    public void fireWill(final Session.Will will) {
+        if (will.willDelayInterval == 0) {
+            // if interval is 0 fire immediately
+            // MQTT3  3.1.2.8-17
+            publish2Subscribers(Unpooled.copiedBuffer(will.payload), new Topic(will.topic), will.qos);
+        } else {
+            // MQTT5 MQTT-3.1.3-9
+            delayedWillPublications.schedule(() -> {
+                publish2Subscribers(Unpooled.copiedBuffer(will.payload), new Topic(will.topic), will.qos);
+            }, will.willDelayInterval, TimeUnit.SECONDS);
+        }
     }
 
     public void subscribeClientToTopics(MqttSubscribeMessage msg, String clientID, String username,
