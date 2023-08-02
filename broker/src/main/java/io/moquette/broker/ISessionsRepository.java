@@ -26,7 +26,7 @@ public interface ISessionsRepository {
         /**
          * Construct a new SessionData without expiration set yet.
          *
-         * @expiryInterval seconds after which the persistent session could be dropped.
+         * @param expiryInterval seconds after which the persistent session could be dropped.
          * */
         public SessionData(String clientId, MqttVersion version, int expiryInterval, Clock clock) {
             this.clientId = clientId;
@@ -38,7 +38,7 @@ public interface ISessionsRepository {
         /**
          * Construct SessionData with an expiration instant, created by loading from the storage.
          *
-         * @expiryInterval seconds after which the persistent session could be dropped.
+         * @param expiryInterval seconds after which the persistent session could be dropped.
          * */
         public SessionData(String clientId, Instant expireAt, MqttVersion version, int expiryInterval, Clock clock) {
             Objects.requireNonNull(expireAt, "An expiration time is requested");
