@@ -1,22 +1,36 @@
 package io.moquette.integration.mqtt5;
 
+import com.hivemq.client.internal.mqtt.message.publish.MqttWillPublish;
 import com.hivemq.client.mqtt.MqttClient;
+import com.hivemq.client.mqtt.MqttGlobalPublishFilter;
+import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
+import com.hivemq.client.mqtt.mqtt5.message.connect.Mqtt5Connect;
 import com.hivemq.client.mqtt.mqtt5.message.connect.connack.Mqtt5ConnAck;
 import com.hivemq.client.mqtt.mqtt5.message.connect.connack.Mqtt5ConnAckReasonCode;
+import com.hivemq.client.mqtt.mqtt5.message.disconnect.Mqtt5Disconnect;
+import com.hivemq.client.mqtt.mqtt5.message.disconnect.Mqtt5DisconnectReasonCode;
+import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5PublishResult;
+import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5WillPublish;
+import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5WillPublishBuilder;
 import io.moquette.testclient.Client;
 import io.netty.handler.codec.mqtt.MqttConnAckMessage;
 import io.netty.handler.codec.mqtt.MqttConnectReturnCode;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import org.awaitility.Awaitility;
+import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,6 +39,20 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 class ConnectTest extends AbstractServerIntegrationTest {
     private static final Logger LOG = LoggerFactory.getLogger(ConnectTest.class);
+
+    private ScheduledExecutorService scheduleTasks;
+
+    @BeforeEach
+    public void setUp() throws Exception {
+        super.setUp();
+        scheduleTasks = Executors.newSingleThreadScheduledExecutor();
+    }
+
+    @AfterEach
+    public void tearDown() throws Exception {
+        scheduleTasks.shutdown();
+        super.tearDown();
+    }
 
     @Override
     String clientName() {
@@ -104,4 +132,69 @@ class ConnectTest extends AbstractServerIntegrationTest {
     private void assertConnectionAccepted(MqttConnAckMessage connAck, String message) {
         assertEquals(MqttConnectReturnCode.CONNECTION_ACCEPTED, connAck.variableHeader().connectReturnCode(), message);
     }
+
+    @Test
+    public void fireWillAfterTheDelaySpecifiedInConnectProperties() throws InterruptedException {
+        final Mqtt5BlockingClient clientWithWill = createAndConnectClientWithWillTestament();
+
+        final Mqtt5BlockingClient testamentSubscriber = createAndConnectClientListeningToTestament();
+
+        // schedule a bad disconnect
+        scheduleTasks.schedule(() -> {
+            // disconnect in a way that the will is triggered
+            final Mqtt5Disconnect malformedPacketReason = Mqtt5Disconnect.builder()
+                .reasonCode(Mqtt5DisconnectReasonCode.MALFORMED_PACKET)
+                .build();
+            clientWithWill.disconnect(malformedPacketReason);
+        }, 500, TimeUnit.MILLISECONDS);
+
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = testamentSubscriber.publishes(MqttGlobalPublishFilter.ALL)) {
+            Optional<Mqtt5Publish> publishMessage = publishes.receive(10, TimeUnit.SECONDS);
+            final String payload = publishMessage.map(Mqtt5Publish::getPayloadAsBytes)
+                .map(b -> new String(b, StandardCharsets.UTF_8))
+                .orElse("Failed to load payload");
+            assertEquals("Goodbye", payload);
+        }
+    }
+
+    @NotNull
+    private Mqtt5BlockingClient createAndConnectClientListeningToTestament() {
+        final Mqtt5BlockingClient testamentSpy = MqttClient.builder()
+            .useMqttVersion5()
+            .identifier("testament_listener")
+            .serverHost("localhost")
+            .serverPort(1883)
+            .buildBlocking();
+        assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, testamentSpy.connect().getReasonCode(), "Testament spy connected");
+        testamentSpy.subscribeWith()
+            .topicFilter("/will_testament")
+            .qos(MqttQos.AT_MOST_ONCE)
+            .send();
+        return testamentSpy;
+    }
+
+    @NotNull
+    private Mqtt5BlockingClient createAndConnectClientWithWillTestament() {
+        final Mqtt5BlockingClient clientWithWill = MqttClient.builder()
+            .useMqttVersion5()
+            .identifier("simple_client")
+            .serverHost("localhost")
+            .serverPort(1883)
+            .buildBlocking();
+
+        Mqtt5Connect connectMessage = Mqtt5Connect.builder()
+            .keepAlive(10)
+            .willPublish()
+                .topic("/will_testament")
+                .payload("Goodbye".getBytes(StandardCharsets.UTF_8))
+                .delayInterval(1_000) // 1 second
+                .applyWillPublish()
+            .build();
+
+        Mqtt5ConnAck connectAck = clientWithWill.connect(connectMessage);
+        assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, connectAck.getReasonCode(), "Client connected");
+        return clientWithWill;
+    }
+
+    // TODO another test to verify that on same client ID no will message is triggered
 }
