@@ -40,6 +40,7 @@ import io.netty.handler.codec.mqtt.MqttPubAckMessage;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import io.netty.handler.codec.mqtt.MqttPublishVariableHeader;
 import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttReasonCodeAndPropertiesVariableHeader;
 import io.netty.handler.codec.mqtt.MqttSubAckMessage;
 import io.netty.handler.codec.mqtt.MqttSubscribeMessage;
 import io.netty.handler.codec.mqtt.MqttUnsubAckMessage;
@@ -506,6 +507,15 @@ final class MQTTConnection {
             if (!isBoundToSession()) {
                 LOG.debug("NOT processing disconnect {}, not bound.", clientID);
                 return null;
+            }
+            if (protocolVersion == MqttVersion.MQTT_5.protocolLevel()) {
+                MqttReasonCodeAndPropertiesVariableHeader disconnectHeader = (MqttReasonCodeAndPropertiesVariableHeader) msg.variableHeader();
+                if (disconnectHeader.reasonCode() != 0x00) {
+                    // handle the will
+                    if (bindedSession.hasWill()) {
+                        postOffice.fireWill(bindedSession.getWill());
+                    }
+                }
             }
             LOG.debug("Closing session on disconnect {}", clientID);
             sessionRegistry.connectionClosed(bindedSession);
