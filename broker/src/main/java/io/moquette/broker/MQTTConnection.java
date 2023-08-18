@@ -24,8 +24,26 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelPipeline;
-import io.netty.handler.codec.mqtt.*;
+import io.netty.handler.codec.mqtt.MqttConnAckMessage;
+import io.netty.handler.codec.mqtt.MqttConnectMessage;
+import io.netty.handler.codec.mqtt.MqttConnectPayload;
+import io.netty.handler.codec.mqtt.MqttConnectReturnCode;
+import io.netty.handler.codec.mqtt.MqttFixedHeader;
+import io.netty.handler.codec.mqtt.MqttMessage;
+import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders.ConnAckPropertiesBuilder;
+import io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader;
+import io.netty.handler.codec.mqtt.MqttMessageType;
+import io.netty.handler.codec.mqtt.MqttProperties;
+import io.netty.handler.codec.mqtt.MqttPubAckMessage;
+import io.netty.handler.codec.mqtt.MqttPublishMessage;
+import io.netty.handler.codec.mqtt.MqttPublishVariableHeader;
+import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttSubAckMessage;
+import io.netty.handler.codec.mqtt.MqttSubscribeMessage;
+import io.netty.handler.codec.mqtt.MqttUnsubAckMessage;
+import io.netty.handler.codec.mqtt.MqttUnsubscribeMessage;
+import io.netty.handler.codec.mqtt.MqttVersion;
 import io.netty.handler.timeout.IdleStateHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,6 +74,7 @@ final class MQTTConnection {
     private static final Logger LOG = LoggerFactory.getLogger(MQTTConnection.class);
 
     static final boolean sessionLoopDebug = Boolean.parseBoolean(System.getProperty("moquette.session_loop.debug", "false"));
+    private static final int UNDEFINED_VERSION = -1;
 
     final Channel channel;
     private final BrokerConfiguration brokerConfig;
@@ -65,6 +84,7 @@ final class MQTTConnection {
     private volatile boolean connected;
     private final AtomicInteger lastPacketId = new AtomicInteger(0);
     private Session bindedSession;
+    private int protocolVersion;
 
     MQTTConnection(Channel channel, BrokerConfiguration brokerConfig, IAuthenticator authenticator,
                    SessionRegistry sessionRegistry, PostOffice postOffice) {
@@ -74,6 +94,7 @@ final class MQTTConnection {
         this.sessionRegistry = sessionRegistry;
         this.postOffice = postOffice;
         this.connected = false;
+        this.protocolVersion = UNDEFINED_VERSION;
     }
 
     void handleMessage(MqttMessage msg) {
@@ -207,6 +228,7 @@ final class MQTTConnection {
         }
 
         final String sessionId = clientId;
+        protocolVersion = msg.variableHeader().version();
         return postOffice.routeCommand(clientId, "CONN", () -> {
             checkMatchSessionLoop(sessionId);
             executeConnect(msg, sessionId, serverGeneratedClientId);
@@ -348,11 +370,11 @@ final class MQTTConnection {
         pipeline.addFirst("idleStateHandler", new IdleStateHandler(idleTime, 0, 0));
     }
 
-    private boolean isNotProtocolVersion(MqttConnectMessage msg, MqttVersion version) {
+    private static boolean isNotProtocolVersion(MqttConnectMessage msg, MqttVersion version) {
         return !isProtocolVersion(msg, version);
     }
 
-    private boolean isProtocolVersion(MqttConnectMessage msg, MqttVersion version) {
+    private static boolean isProtocolVersion(MqttConnectMessage msg, MqttVersion version) {
         return msg.variableHeader().version() == version.protocolLevel();
     }
 
@@ -456,6 +478,7 @@ final class MQTTConnection {
             LOG.debug("Closing session on disconnect {}", clientID);
             sessionRegistry.connectionClosed(bindedSession);
             connected = false;
+            protocolVersion = UNDEFINED_VERSION;
             channel.close().addListener(FIRE_EXCEPTION_ON_FAILURE);
             String userName = NettyUtils.userName(channel);
             postOffice.clientDisconnected(clientID, userName);
