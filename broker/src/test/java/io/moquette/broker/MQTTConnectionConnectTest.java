@@ -15,35 +15,54 @@
  */
 package io.moquette.broker;
 
+import io.moquette.broker.security.IAuthenticator;
+import io.moquette.broker.security.PemUtils;
 import io.moquette.broker.security.PermitAllAuthorizatorPolicy;
 import io.moquette.broker.subscriptions.CTrieSubscriptionDirectory;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
-import io.moquette.broker.security.IAuthenticator;
 import io.moquette.persistence.MemorySubscriptionsRepository;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelOutboundHandlerAdapter;
+import io.netty.channel.ChannelPromise;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttVersion;
+import io.netty.handler.ssl.SslHandler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.net.SocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateEncodingException;
+import java.util.HashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLSession;
 
-import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
+import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
 import static io.moquette.broker.NettyChannelAssertions.assertEqualsConnAck;
-import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
+import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
+import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD;
+import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_REFUSED_IDENTIFIER_REJECTED;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 public class MQTTConnectionConnectTest {
 
@@ -219,6 +238,58 @@ public class MQTTConnectionConnectTest {
     }
 
     @Test
+    public void peerCertAsUsernameAuthentication() throws CertificateEncodingException, IOException, InterruptedException {
+        final byte[] PEER_CERT_BYTES = "PEER_CERT".getBytes(StandardCharsets.UTF_8);
+        MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).build();
+        BrokerConfiguration config = new BrokerConfiguration(false, true, false, false, 0);
+        Certificate peerCertificate = mock(Certificate.class);
+
+        // Add SslHandler to channel
+        sut = createMQTTConnection(config);
+        channel = (EmbeddedChannel) sut.channel;
+        channel.pipeline().addFirst("ssl", createFakeSslHandler(peerCertificate));
+
+        when(peerCertificate.getEncoded()).thenReturn(PEER_CERT_BYTES);
+        mockAuthenticator = new MockAuthenticator(singleton(FAKE_CLIENT_ID),
+            singletonMap(PemUtils.certificatesToPem(peerCertificate), null));
+
+        // Exercise
+        final MQTTConnection sslConnection = createMQTTConnection(config, sut.channel, postOffice);
+        sslConnection.processConnect(msg);
+
+        // Verify
+        Thread.sleep(100);
+        assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
+        assertTrue(channel.isOpen(), "Connection is accepted and therefore must remain open");
+    }
+
+    @Test
+    public void peerCertAsUsernameAuthentication_badCert() throws CertificateEncodingException, IOException, InterruptedException {
+        final byte[] PEER_CERT_BYTES = "BAD_PEER_CERT".getBytes(StandardCharsets.UTF_8);
+        MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).build();
+        BrokerConfiguration config = new BrokerConfiguration(false, true, false, false, 0);
+        Certificate peerCertificate = mock(Certificate.class);
+
+        // Add SslHandler to channel
+        sut = createMQTTConnection(config);
+        channel = (EmbeddedChannel) sut.channel;
+        channel.pipeline().addFirst("ssl", createFakeSslHandler(peerCertificate));
+
+        when(peerCertificate.getEncoded()).thenReturn(PEER_CERT_BYTES);
+        mockAuthenticator = new MockAuthenticator(singleton(FAKE_CLIENT_ID), new HashMap<>());
+
+        // Exercise
+        final MQTTConnection sslConnection = createMQTTConnection(config, sut.channel, postOffice);
+        sslConnection.processConnect(msg);
+
+        // Verify
+        Thread.sleep(100);
+        assertEqualsConnAck(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD, channel.readOutbound());
+        assertFalse(channel.isOpen(), "Connection must be closed by the broker");
+    }
+
+
+    @Test
     public void prohibitAnonymousClient() {
         MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).build();
         BrokerConfiguration config = new BrokerConfiguration(false, true, false, NO_BUFFER_FLUSH);
@@ -342,6 +413,66 @@ public class MQTTConnectionConnectTest {
             int nextPacketId = sut.nextPacketId();
             assertTrue(nextPacketId > 0, "Packet ID must be > 0");
             assertTrue(nextPacketId <= 65_535, "Packet ID must be <= 65_535");
+        }
+    }
+
+    private SslHandler createFakeSslHandler(Certificate peerCert) throws SSLPeerUnverifiedException {
+        SSLEngine mockSslEngine = mock(SSLEngine.class);
+        SslHandler sslHandler = new FakeSslHandler(mockSslEngine);
+
+        SSLSession mockSslSession = mock(SSLSession.class);
+        when(mockSslEngine.getSession()).thenReturn(mockSslSession);
+        when(mockSslSession.getPeerCertificates()).thenReturn(new Certificate[]{peerCert});
+
+        return sslHandler;
+    }
+
+    class FakeSslHandler extends SslHandler {
+        private ChannelOutboundHandlerAdapter outboundAdapter;
+
+        public FakeSslHandler(SSLEngine engine) {
+            super(engine);
+            outboundAdapter = new ChannelOutboundHandlerAdapter();
+        }
+
+        @Override
+        public void bind(ChannelHandlerContext ctx, SocketAddress localAddress, ChannelPromise promise) throws Exception {
+            outboundAdapter.bind(ctx, localAddress, promise);
+        }
+
+        @Override
+        public void connect(ChannelHandlerContext ctx, SocketAddress remoteAddress, SocketAddress localAddress, ChannelPromise promise) throws Exception {
+            outboundAdapter.connect(ctx, remoteAddress, localAddress, promise);
+        }
+
+        @Override
+        public void deregister(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
+            outboundAdapter.deregister(ctx, promise);
+        }
+
+        @Override
+        public void disconnect(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
+            outboundAdapter.disconnect(ctx, promise);
+        }
+
+        @Override
+        public void close(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
+            outboundAdapter.close(ctx, promise);
+        }
+
+        @Override
+        public void read(ChannelHandlerContext ctx) throws Exception {
+            outboundAdapter.read(ctx);
+        }
+
+        @Override
+        public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+            outboundAdapter.write(ctx, msg, promise);
+        }
+
+        @Override
+        public void flush(ChannelHandlerContext ctx) throws Exception {
+            outboundAdapter.flush(ctx);
         }
     }
 }
