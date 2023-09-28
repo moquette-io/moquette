@@ -414,18 +414,8 @@ final class MQTTConnection {
         }
 
         if (brokerConfig.isPeerCertificateAsUsername()) {
-            try {
-                // Use peer cert as username
-                SslHandler sslhandler = (SslHandler) channel.pipeline().get("ssl");
-                if (sslhandler != null) {
-                    Certificate[] certificateChain = sslhandler.engine().getSession().getPeerCertificates();
-                    userName = PemUtils.certificatesToPem(certificateChain);
-                }
-            } catch (SSLPeerUnverifiedException e) {
-                LOG.debug("No peer cert provided. CId={}", clientId);
-            } catch (CertificateEncodingException | IOException e) {
-                LOG.warn("Unable to decode client certificate. CId={}", clientId);
-            }
+            // Use peer cert as username
+            userName = readClientProvidedCertificates(clientId);
         }
 
         if (userName == null || userName.isEmpty()) {
@@ -443,6 +433,21 @@ final class MQTTConnection {
         }
         NettyUtils.userName(channel, userName);
         return true;
+    }
+
+    private String readClientProvidedCertificates(String clientId) {
+        try {
+            SslHandler sslhandler = (SslHandler) channel.pipeline().get("ssl");
+            if (sslhandler != null) {
+                Certificate[] certificateChain = sslhandler.engine().getSession().getPeerCertificates();
+                return PemUtils.certificatesToPem(certificateChain);
+            }
+        } catch (SSLPeerUnverifiedException e) {
+            LOG.debug("No peer cert provided. CId={}", clientId);
+        } catch (CertificateEncodingException | IOException e) {
+            LOG.warn("Unable to decode client certificate. CId={}", clientId);
+        }
+        return null;
     }
 
     void handleConnectionLost() {

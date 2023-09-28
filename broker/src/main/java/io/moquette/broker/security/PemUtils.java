@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 The original author or authors
+ * Copyright (c) 2023 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -30,7 +30,7 @@ public final class PemUtils {
     public static String certificatesToPem(Certificate... certificates)
         throws CertificateEncodingException, IOException {
         try (StringWriter str = new StringWriter();
-             PemWriter pemWriter = new PemWriter(str)) {
+               PemWriter pemWriter = new PemWriter(str)) {
             for (Certificate certificate : certificates) {
                 pemWriter.writeObject(certificateBoundaryType, certificate.getEncoded());
             }
@@ -49,6 +49,7 @@ public final class PemUtils {
     public static class PemWriter extends BufferedWriter {
         private static final int LINE_LENGTH = 64;
         private final char[] buf = new char[LINE_LENGTH];
+
         /**
          * Base constructor.
          *
@@ -57,6 +58,7 @@ public final class PemUtils {
         public PemWriter(Writer out) {
             super(out);
         }
+
         /**
          * Writes a pem encoded string.
          *
@@ -69,6 +71,7 @@ public final class PemUtils {
             writeEncoded(bytes);
             writePostEncapsulationBoundary(type);
         }
+
         private void writeEncoded(byte[] bytes) throws IOException {
             bytes = Base64.getEncoder().encode(bytes);
             for (int i = 0; i < bytes.length; i += buf.length) {
@@ -84,10 +87,12 @@ public final class PemUtils {
                 this.newLine();
             }
         }
+
         private void writePreEncapsulationBoundary(String type) throws IOException {
             this.write("-----BEGIN " + type + "-----");
             this.newLine();
         }
+
         private void writePostEncapsulationBoundary(String type) throws IOException {
             this.write("-----END " + type + "-----");
             this.newLine();
