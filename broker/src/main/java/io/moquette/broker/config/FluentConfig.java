@@ -17,6 +17,7 @@ import static io.moquette.broker.config.IConfig.BUFFER_FLUSH_MS_PROPERTY_NAME;
 import static io.moquette.broker.config.IConfig.DATA_PATH_PROPERTY_NAME;
 import static io.moquette.broker.config.IConfig.DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE;
 import static io.moquette.broker.config.IConfig.ENABLE_TELEMETRY_NAME;
+import static io.moquette.broker.config.IConfig.PEER_CERTIFICATE_AS_USERNAME;
 import static io.moquette.broker.config.IConfig.PORT_PROPERTY_NAME;
 import static io.moquette.broker.config.IConfig.JKS_PATH_PROPERTY_NAME;
 import static io.moquette.broker.config.IConfig.KEY_MANAGER_PASSWORD_PROPERTY_NAME;
@@ -84,6 +85,7 @@ public class FluentConfig {
         configAccumulator.put(PORT_PROPERTY_NAME, Integer.toString(BrokerConstants.PORT));
         configAccumulator.put(HOST_PROPERTY_NAME, BrokerConstants.HOST);
         configAccumulator.put(PASSWORD_FILE_PROPERTY_NAME, "");
+        configAccumulator.put(PEER_CERTIFICATE_AS_USERNAME, Boolean.FALSE.toString());
         configAccumulator.put(ALLOW_ANONYMOUS_PROPERTY_NAME, Boolean.TRUE.toString());
         configAccumulator.put(AUTHENTICATOR_CLASS_NAME, "");
         configAccumulator.put(AUTHORIZATOR_CLASS_NAME, "");
@@ -141,8 +143,13 @@ public class FluentConfig {
         return this;
     }
 
-    public FluentConfig allowAnonymous() {
-        configAccumulator.put(ALLOW_ANONYMOUS_PROPERTY_NAME, "true");
+    public FluentConfig enablePeerCertificateAsUsername() {
+        configAccumulator.put(PEER_CERTIFICATE_AS_USERNAME, "true");
+        return this;
+    }
+
+    public FluentConfig disablePeerCertificateAsUsername() {
+        configAccumulator.put(PEER_CERTIFICATE_AS_USERNAME, "false");
         return this;
     }
 

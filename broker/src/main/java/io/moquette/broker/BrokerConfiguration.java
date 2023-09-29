@@ -23,12 +23,14 @@ import java.util.Locale;
 class BrokerConfiguration {
 
     private final boolean allowAnonymous;
+    private final boolean peerCertificateAsUsername;
     private final boolean allowZeroByteClientId;
     private final boolean reauthorizeSubscriptionsOnConnect;
     private final int bufferFlushMillis;
 
     BrokerConfiguration(IConfig props) {
         allowAnonymous = props.boolProp(BrokerConstants.ALLOW_ANONYMOUS_PROPERTY_NAME, true);
+        peerCertificateAsUsername = props.boolProp(IConfig.PEER_CERTIFICATE_AS_USERNAME, false);
         allowZeroByteClientId = props.boolProp(BrokerConstants.ALLOW_ZERO_BYTE_CLIENT_ID_PROPERTY_NAME, false);
         reauthorizeSubscriptionsOnConnect = props.boolProp(BrokerConstants.REAUTHORIZE_SUBSCRIPTIONS_ON_CONNECT, false);
 
@@ -65,7 +67,14 @@ class BrokerConfiguration {
 
     public BrokerConfiguration(boolean allowAnonymous, boolean allowZeroByteClientId,
                                boolean reauthorizeSubscriptionsOnConnect, int bufferFlushMillis) {
+        this(allowAnonymous, false, allowZeroByteClientId,
+            reauthorizeSubscriptionsOnConnect, bufferFlushMillis);
+    }
+
+    public BrokerConfiguration(boolean allowAnonymous, boolean peerCertificateAsUsername, boolean allowZeroByteClientId,
+                               boolean reauthorizeSubscriptionsOnConnect, int bufferFlushMillis) {
         this.allowAnonymous = allowAnonymous;
+        this.peerCertificateAsUsername = peerCertificateAsUsername;
         this.allowZeroByteClientId = allowZeroByteClientId;
         this.reauthorizeSubscriptionsOnConnect = reauthorizeSubscriptionsOnConnect;
         this.bufferFlushMillis = bufferFlushMillis;
@@ -73,6 +82,10 @@ class BrokerConfiguration {
 
     public boolean isAllowAnonymous() {
         return allowAnonymous;
+    }
+
+    public boolean isPeerCertificateAsUsername() {
+        return peerCertificateAsUsername;
     }
 
     public boolean isAllowZeroByteClientId() {
