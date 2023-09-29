@@ -5,6 +5,8 @@
 
 package io.moquette.integration;
 
+import io.moquette.BrokerConstants;
+import io.moquette.broker.config.IConfig;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 
@@ -17,6 +19,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
+import java.util.Properties;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
@@ -131,6 +134,19 @@ public class ServerIntegrationSSLClientAuthBase {
             System.clearProperty("moquette.path");
         else
             System.setProperty("moquette.path", backup);
+    }
+
+    static Properties getDefaultServerProperties(String dbPath) {
+        Properties sslProps = new Properties();
+        sslProps.put(IConfig.SSL_PORT_PROPERTY_NAME, "8883");
+        sslProps.put(IConfig.JKS_PATH_PROPERTY_NAME, "src/test/resources/serverkeystore.jks");
+        sslProps.put(IConfig.KEY_STORE_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
+        sslProps.put(IConfig.KEY_MANAGER_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
+        sslProps.put(IConfig.DATA_PATH_PROPERTY_NAME, dbPath);
+        sslProps.put(IConfig.PERSISTENCE_ENABLED_PROPERTY_NAME, "true");
+        sslProps.put(BrokerConstants.NEED_CLIENT_AUTH, "true");
+        sslProps.put(IConfig.ENABLE_TELEMETRY_NAME, "false");
+        return sslProps;
     }
 
     Certificate getClientCert(String keystore, String alias)

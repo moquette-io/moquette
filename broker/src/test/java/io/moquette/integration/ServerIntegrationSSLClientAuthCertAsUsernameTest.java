@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The original author or authors
+ * Copyright (c) 2012-2023 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -16,7 +16,6 @@
 
 package io.moquette.integration;
 
-import io.moquette.BrokerConstants;
 import io.moquette.broker.Server;
 import io.moquette.broker.config.IConfig;
 import io.moquette.broker.config.MemoryConfig;
@@ -63,15 +62,7 @@ public class ServerIntegrationSSLClientAuthCertAsUsernameTest extends ServerInte
         System.setProperty("moquette.path", file);
         m_server = new Server();
 
-        Properties sslProps = new Properties();
-        sslProps.put(IConfig.SSL_PORT_PROPERTY_NAME, "8883");
-        sslProps.put(IConfig.JKS_PATH_PROPERTY_NAME, "src/test/resources/serverkeystore.jks");
-        sslProps.put(IConfig.KEY_STORE_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
-        sslProps.put(IConfig.KEY_MANAGER_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
-        sslProps.put(IConfig.DATA_PATH_PROPERTY_NAME, dbPath);
-        sslProps.put(IConfig.PERSISTENCE_ENABLED_PROPERTY_NAME, "true");
-        sslProps.put(BrokerConstants.NEED_CLIENT_AUTH, "true");
-        sslProps.put(IConfig.ENABLE_TELEMETRY_NAME, "false");
+        Properties sslProps = getDefaultServerProperties(dbPath);
         sslProps.put(IConfig.PEER_CERTIFICATE_AS_USERNAME, "true");
         m_server.startServer(new MemoryConfig(sslProps), null, null,
             (clientId, username, password) -> authenticator.checkValid(clientId, username, password), null);
