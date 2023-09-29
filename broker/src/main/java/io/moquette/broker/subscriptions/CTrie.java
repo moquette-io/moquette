@@ -2,10 +2,8 @@ package io.moquette.broker.subscriptions;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 public class CTrie {
 
@@ -35,7 +33,7 @@ public class CTrie {
         Token token = topic.headToken();
         while (!topic.isEmpty()) {
             Optional<INode> child = inode.mainNode().childOf(token);
-            if (child.isEmpty()) {
+            if (!child.isPresent()) {
                 break;
             }
             topic = topic.exceptHeadToken();

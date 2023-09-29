@@ -8,8 +8,8 @@
         <target.version>1.8</target.version>
         <junit.version>5.7.0</junit.version>
         <slf4j.version>1.7.36</slf4j.version>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
     </properties>
 
     <groupId>io.moquette</groupId>
