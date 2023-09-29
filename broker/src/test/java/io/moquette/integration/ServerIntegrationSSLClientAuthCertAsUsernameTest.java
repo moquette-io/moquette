@@ -19,11 +19,14 @@ package io.moquette.integration;
 import io.moquette.BrokerConstants;
 import io.moquette.broker.Server;
 import io.moquette.broker.config.IConfig;
+import io.moquette.broker.config.MemoryConfig;
+import io.moquette.broker.security.IAuthenticator;
+import io.moquette.broker.security.PemUtils;
 import org.eclipse.paho.client.mqttv3.IMqttClient;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttClientPersistence;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
-import org.eclipse.paho.client.mqttv3.MqttException;
+import org.eclipse.paho.client.mqttv3.MqttSecurityException;
 import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,23 +39,24 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.SSLSocketFactory;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+public class ServerIntegrationSSLClientAuthCertAsUsernameTest extends ServerIntegrationSSLClientAuthBase {
 
-public class ServerIntegrationSSLClientAuthTest extends ServerIntegrationSSLClientAuthBase {
-
-    private static final Logger LOG = LoggerFactory.getLogger(ServerIntegrationSSLClientAuthTest.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ServerIntegrationSSLClientAuthCertAsUsernameTest.class);
 
     Server m_server;
 
     IMqttClient m_client;
-    MessageCollector m_callback;
-
     @TempDir
     Path tempFolder;
+
+    IAuthenticator authenticator;
 
     protected void startServer(String dbPath) throws IOException {
         String file = getClass().getResource("/").getPath();
@@ -68,7 +72,9 @@ public class ServerIntegrationSSLClientAuthTest extends ServerIntegrationSSLClie
         sslProps.put(IConfig.PERSISTENCE_ENABLED_PROPERTY_NAME, "true");
         sslProps.put(BrokerConstants.NEED_CLIENT_AUTH, "true");
         sslProps.put(IConfig.ENABLE_TELEMETRY_NAME, "false");
-        m_server.startServer(sslProps);
+        sslProps.put(IConfig.PEER_CERTIFICATE_AS_USERNAME, "true");
+        m_server.startServer(new MemoryConfig(sslProps), null, null,
+            (clientId, username, password) -> authenticator.checkValid(clientId, username, password), null);
     }
 
     @BeforeEach
@@ -79,11 +85,11 @@ public class ServerIntegrationSSLClientAuthTest extends ServerIntegrationSSLClie
 
         startServer(dbPath);
 
-        MqttClientPersistence subDataStore = new MqttDefaultFilePersistence(IntegrationUtils.newFolder(tempFolder, "client").getAbsolutePath());
+        MqttClientPersistence subDataStore =
+            new MqttDefaultFilePersistence(IntegrationUtils.newFolder(tempFolder, "client").getAbsolutePath());
         m_client = new MqttClient("ssl://localhost:8883", "TestClient", subDataStore);
-        // m_client = new MqttClient("ssl://test.mosquitto.org:8883", "TestClient", s_dataStore);
 
-        m_callback = new MessageCollector();
+        MessageCollector m_callback = new MessageCollector();
         m_client.setCallback(m_callback);
     }
 
@@ -97,8 +103,14 @@ public class ServerIntegrationSSLClientAuthTest extends ServerIntegrationSSLClie
     }
 
     @Test
-    public void checkClientAuthentication() throws Exception {
-        LOG.info("*** checkClientAuthentication ***");
+    public void checkClientAuthenticationPeerCertAsUsername() throws Exception {
+        AtomicReference<String> usernameRef = new AtomicReference<>();
+        authenticator = (clientId, username, password) -> {
+            usernameRef.set(username);
+            return true;
+        };
+
+        LOG.info("*** checkClientAuthenticationPeerCertAsUsername ***");
         SSLSocketFactory ssf = configureSSLSocketFactory("signedclientkeystore.jks");
 
         MqttConnectOptions options = new MqttConnectOptions();
@@ -106,16 +118,28 @@ public class ServerIntegrationSSLClientAuthTest extends ServerIntegrationSSLClie
         m_client.connect(options);
         m_client.subscribe("/topic", 0);
         m_client.disconnect();
+
+        assertEquals(PemUtils.certificatesToPem(getClientCert("signedclientkeystore.jks", "signedtestclient")),
+            usernameRef.get());
     }
 
     @Test
-    public void checkClientAuthenticationFail() throws Exception {
-        LOG.info("*** checkClientAuthenticationFail ***");
-        SSLSocketFactory ssf = configureSSLSocketFactory("unsignedclientkeystore.jks");
+    public void checkClientAuthenticationFailPeerCertAsUsername() throws Exception {
+        AtomicReference<String> usernameRef = new AtomicReference<>();
+        authenticator = (clientId, username, password) -> {
+            usernameRef.set(username);
+            return false;
+        };
+
+        LOG.info("*** checkClientAuthenticationFailPeerCertAsUsername ***");
+        SSLSocketFactory ssf = configureSSLSocketFactory("signedclientkeystore.jks");
 
         MqttConnectOptions options = new MqttConnectOptions();
         options.setSocketFactory(ssf);
-        // actual a "Broken pipe" is thrown, this is not very specific.
-        assertThrows(MqttException.class, () -> m_client.connect(options));
+
+        MqttSecurityException ex = assertThrows(MqttSecurityException.class, () -> m_client.connect(options));
+        assertEquals("Bad user name or password", ex.getMessage());
+        assertEquals(PemUtils.certificatesToPem(getClientCert("signedclientkeystore.jks", "signedtestclient")),
+            usernameRef.get());
     }
 }
