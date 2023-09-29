@@ -16,9 +16,10 @@
 
 package io.moquette.broker;
 
+import io.moquette.broker.security.IAuthenticator;
+
 import java.util.Map;
 import java.util.Set;
-import io.moquette.broker.security.IAuthenticator;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -43,10 +44,12 @@ public class MockAuthenticator implements IAuthenticator {
         if (!m_userPwds.containsKey(username)) {
             return false;
         }
-        if (password == null) {
-            return false;
+        if (password != null) {
+            return m_userPwds.get(username).equals(new String(password, UTF_8));
+        } else {
+            // handle null password
+            return m_userPwds.get(username) == null;
         }
-        return m_userPwds.get(username).equals(new String(password, UTF_8));
     }
 
 }
