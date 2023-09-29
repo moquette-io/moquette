@@ -32,6 +32,7 @@ public abstract class IConfig {
     public static final String HOST_PROPERTY_NAME = "host";
     public static final String PASSWORD_FILE_PROPERTY_NAME = "password_file";
     public static final String ALLOW_ANONYMOUS_PROPERTY_NAME = "allow_anonymous";
+    public static final String PEER_CERTIFICATE_AS_USERNAME = "peer_certificate_as_username";
     public static final String AUTHENTICATOR_CLASS_NAME = "authenticator_class";
     public static final String AUTHORIZATOR_CLASS_NAME = "authorizator_class";
     public static final String PERSISTENT_QUEUE_TYPE_PROPERTY_NAME = "persistent_queue_type"; // h2 or segmented, default h2
