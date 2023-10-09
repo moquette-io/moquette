@@ -93,11 +93,11 @@ class Session {
     static final class Will {
 
         final String topic;
-        final ByteBuf payload;
+        final byte[] payload;
         final MqttQoS qos;
         final boolean retained;
 
-        Will(String topic, ByteBuf payload, MqttQoS qos, boolean retained) {
+        Will(String topic, byte[] payload, MqttQoS qos, boolean retained) {
             this.topic = topic;
             this.payload = payload;
             this.qos = qos;

@@ -200,7 +200,7 @@ class PostOffice {
 
     public void fireWill(Session.Will will) {
         // MQTT 3.1.2.8-17
-        publish2Subscribers(will.payload, new Topic(will.topic), will.qos);
+        publish2Subscribers(Unpooled.copiedBuffer(will.payload), new Topic(will.topic), will.qos);
     }
 
     public void subscribeClientToTopics(MqttSubscribeMessage msg, String clientID, String username,

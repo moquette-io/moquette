@@ -343,7 +343,7 @@ public class SessionRegistry {
     }
 
     private Session.Will createWill(MqttConnectMessage msg) {
-        final ByteBuf willPayload = Unpooled.copiedBuffer(msg.payload().willMessageInBytes());
+        final byte[] willPayload = msg.payload().willMessageInBytes();
         final String willTopic = msg.payload().willTopic();
         final boolean retained = msg.variableHeader().isWillRetain();
         final MqttQoS qos = MqttQoS.valueOf(msg.variableHeader().willQos());
