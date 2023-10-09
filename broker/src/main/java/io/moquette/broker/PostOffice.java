@@ -469,7 +469,15 @@ class PostOffice {
                 collector.add(sub);
             }
         }
-        payload.retain(collector.countBatches());
+
+        int subscriptionCount = collector.countBatches();
+        if (subscriptionCount <= 0) {
+            // no matching subscriptions, clean exit
+            LOG.trace("No matching subscriptions for topic: {}", topic);
+            return new RoutingResults(Collections.emptyList(), Collections.emptyList(), CompletableFuture.completedFuture(null));
+        }
+
+        payload.retain(subscriptionCount);
 
         List<RouteResult> publishResults = collector.routeBatchedPublishes((batch) -> {
             publishToSession(payload, topic, batch, publishingQos);
