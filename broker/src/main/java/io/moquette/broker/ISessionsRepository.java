@@ -39,6 +39,14 @@ public interface ISessionsRepository {
             this.will = Optional.empty();
         }
 
+        public SessionData(String clientId, MqttVersion version, Will will, int expiryInterval, Clock clock) {
+            this.clientId = clientId;
+            this.clock = clock;
+            this.expiryInterval = expiryInterval;
+            this.version = version;
+            this.will = Optional.of(will);
+        }
+
         /**
          * Construct SessionData with an expiration instant, created by loading from the storage.
          *
@@ -52,6 +60,27 @@ public interface ISessionsRepository {
             this.expiryInterval = expiryInterval;
             this.version = version;
             this.will = Optional.empty();
+        }
+
+        public SessionData(String clientId, Instant expireAt, MqttVersion version, Will will, int expiryInterval, Clock clock) {
+            Objects.requireNonNull(expireAt, "An expiration time is requested");
+            this.clock = clock;
+            this.clientId = clientId;
+            this.expireAt = expireAt;
+            this.expiryInterval = expiryInterval;
+            this.version = version;
+            this.will = Optional.of(will);
+        }
+
+        // Copy constructor
+        private SessionData(String clientId, Instant expireAt, MqttVersion version, Optional<Will> will, int expiryInterval, Clock clock) {
+            Objects.requireNonNull(expireAt, "An expiration time is requested");
+            this.clock = clock;
+            this.clientId = clientId;
+            this.expireAt = expireAt;
+            this.expiryInterval = expiryInterval;
+            this.version = version;
+            this.will = will;
         }
 
         public String clientId() {
@@ -77,7 +106,11 @@ public interface ISessionsRepository {
 
         public SessionData withExpirationComputed() {
             final Instant expiresAt = clock.instant().plusSeconds(expiryInterval);
-            return new SessionData(clientId, expiresAt, version, expiryInterval, clock);
+            if (hasWill()) {
+                return new SessionData(clientId, expiresAt, version, will, expiryInterval, clock);
+            } else {
+                return new SessionData(clientId, expiresAt, version, expiryInterval, clock);
+            }
         }
 
         @Override
@@ -119,6 +152,22 @@ public interface ISessionsRepository {
 
         public Will will() throws IllegalArgumentException {
             return will.orElseThrow(() -> new IllegalArgumentException("Session's will is not available"));
+        }
+
+        public SessionData withWill(Will will) {
+            if (expireAt != null) {
+                return new SessionData(clientId, expireAt, version, will, expiryInterval, clock);
+            } else {
+                return new SessionData(clientId, version, will, expiryInterval, clock);
+            }
+        }
+
+        public SessionData withoutWill() {
+            if (expireAt != null) {
+                return new SessionData(clientId, expireAt, version, expiryInterval, clock);
+            } else {
+                return new SessionData(clientId, version, expiryInterval, clock);
+            }
         }
     }
 

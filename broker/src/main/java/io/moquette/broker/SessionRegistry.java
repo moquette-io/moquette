@@ -20,7 +20,6 @@ import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
 import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttProperties;
 import io.netty.handler.codec.mqtt.MqttQoS;
@@ -258,7 +257,16 @@ public class SessionRegistry {
                 throw new SessionCorruptedException("old session moved in connected state by other thread");
             }
             // case 3, reopening existing session not clean session, so keep the existing subscriptions
-            copySessionConfig(msg, oldSession);
+            boolean hasWillFlag = msg.variableHeader().isWillFlag();
+            ISessionsRepository.SessionData newSessionData = oldSession.getSessionData();
+            if (hasWillFlag) {
+                newSessionData = newSessionData.withWill(createNewWill(msg));
+            } else {
+                newSessionData = newSessionData.withoutWill();
+            }
+            oldSession.updateSessionData(newSessionData);
+            oldSession.markAsNotClean();
+
             reactivateSubscriptions(oldSession, username);
 
             LOG.trace("case 3, oldSession with same CId {} disconnected", clientId);
@@ -317,37 +325,35 @@ public class SessionRegistry {
                 expiryInterval = clean ? 0 : globalExpirySeconds;
             }
         }
-        final ISessionsRepository.SessionData sessionData = new ISessionsRepository.SessionData(clientId,
-            mqttVersion, expiryInterval, clock);
+        final ISessionsRepository.SessionData sessionData;
         if (msg.variableHeader().isWillFlag()) {
-            final Session.Will will = createWill(msg);
-            newSession = new Session(sessionData, clean, will, queue);
+            final ISessionsRepository.Will will = createNewWill(msg);
+            sessionData = new ISessionsRepository.SessionData(clientId, mqttVersion, will, expiryInterval, clock);
         } else {
-            newSession = new Session(sessionData, clean, queue);
+            sessionData = new ISessionsRepository.SessionData(clientId, mqttVersion, expiryInterval, clock);
         }
 
+        newSession = new Session(sessionData, clean, queue);
         newSession.markConnecting();
         sessionsRepository.saveSession(sessionData);
         return newSession;
     }
 
-    private void copySessionConfig(MqttConnectMessage msg, Session session) {
-        final boolean clean = msg.variableHeader().isCleanSession();
-        final Session.Will will;
-        if (msg.variableHeader().isWillFlag()) {
-            will = createWill(msg);
-        } else {
-            will = null;
-        }
-        session.update(clean, will);
-    }
-
+    @Deprecated // use the ISessionRepository.Will
     private Session.Will createWill(MqttConnectMessage msg) {
         final byte[] willPayload = msg.payload().willMessageInBytes();
         final String willTopic = msg.payload().willTopic();
         final boolean retained = msg.variableHeader().isWillRetain();
         final MqttQoS qos = MqttQoS.valueOf(msg.variableHeader().willQos());
         return new Session.Will(willTopic, willPayload, qos, retained);
+    }
+
+    private ISessionsRepository.Will createNewWill(MqttConnectMessage msg) {
+        final byte[] willPayload = msg.payload().willMessageInBytes();
+        final String willTopic = msg.payload().willTopic();
+        final boolean retained = msg.variableHeader().isWillRetain();
+        final MqttQoS qos = MqttQoS.valueOf(msg.variableHeader().willQos());
+        return new ISessionsRepository.Will(willTopic, willPayload, qos, retained);
     }
 
     Session retrieve(String clientID) {

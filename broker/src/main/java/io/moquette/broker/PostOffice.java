@@ -198,7 +198,7 @@ class PostOffice {
         this.sessionRegistry = sessionRegistry;
     }
 
-    public void fireWill(Session.Will will) {
+    public void fireWill(ISessionsRepository.Will will) {
         // MQTT 3.1.2.8-17
         publish2Subscribers(Unpooled.copiedBuffer(will.payload), new Topic(will.topic), will.qos);
     }

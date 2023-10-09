@@ -95,15 +95,23 @@ class H2SessionsRepository implements ISessionsRepository {
             final MqttVersion version = readMQTTVersion(buff.get());
             final int expiryInterval = buff.getInt();
 
+            Will will = null;
             if (serDesVersion == SESSION_DATA_SERDES_V2 && buff.get() == WILL_PRESENT) {
-                Will will = willDataType.read(buff);
-                // TODO save Will reference into SessionData
+                will = willDataType.read(buff);
             }
 
             if (expiresAt == UNDEFINED_INSTANT) {
-                return new SessionData(clientId, version, expiryInterval, clock);
+                if (will != null) {
+                    return new SessionData(clientId, version, will, expiryInterval, clock);
+                } else {
+                    return new SessionData(clientId, version, expiryInterval, clock);
+                }
             } else {
-                return new SessionData(clientId, Instant.ofEpochMilli(expiresAt), version, expiryInterval, clock);
+                if (will != null) {
+                    return new SessionData(clientId, Instant.ofEpochMilli(expiresAt), version, will, expiryInterval, clock);
+                } else {
+                    return new SessionData(clientId, Instant.ofEpochMilli(expiresAt), version, expiryInterval, clock);
+                }
             }
         }
 
