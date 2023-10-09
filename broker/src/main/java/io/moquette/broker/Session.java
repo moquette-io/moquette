@@ -90,6 +90,9 @@ class Session {
         CONNECTED, CONNECTING, DISCONNECTING, DISCONNECTED, DESTROYED
     }
 
+    /**
+     * @deprecated use ISessionsRepository.Will
+     * */
     static final class Will {
 
         final String topic;

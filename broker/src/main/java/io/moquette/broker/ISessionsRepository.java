@@ -1,5 +1,6 @@
 package io.moquette.broker;
 
+import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttVersion;
 
 import java.time.Clock;
@@ -20,6 +21,8 @@ public interface ISessionsRepository {
         private final String clientId;
         private Instant expireAt = null;
         final MqttVersion version;
+
+        final Optional<Will> will;
         private final int expiryInterval;
         private transient final Clock clock;
 
@@ -33,6 +36,7 @@ public interface ISessionsRepository {
             this.clock = clock;
             this.expiryInterval = expiryInterval;
             this.version = version;
+            this.will = Optional.empty();
         }
 
         /**
@@ -47,6 +51,7 @@ public interface ISessionsRepository {
             this.expireAt = expireAt;
             this.expiryInterval = expiryInterval;
             this.version = version;
+            this.will = Optional.empty();
         }
 
         public String clientId() {
@@ -107,7 +112,30 @@ public interface ISessionsRepository {
         public int compareTo(Delayed o) {
             return Long.compare(getDelay(TimeUnit.MILLISECONDS), o.getDelay(TimeUnit.MILLISECONDS));
         }
+
+        public boolean hasWill() {
+            return will.isPresent();
+        }
+
+        public Will will() throws IllegalArgumentException {
+            return will.orElseThrow(() -> new IllegalArgumentException("Session's will is not available"));
+        }
     }
+
+     final class Will {
+
+         public final String topic;
+         public final byte[] payload;
+         public final MqttQoS qos;
+         public final boolean retained;
+
+         public Will(String topic, byte[] payload, MqttQoS qos, boolean retained) {
+             this.topic = topic;
+             this.payload = payload;
+             this.qos = qos;
+             this.retained = retained;
+         }
+     }
 
     /**
      * @return the full list of persisted sessions data.
