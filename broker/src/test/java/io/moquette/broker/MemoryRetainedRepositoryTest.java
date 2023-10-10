@@ -22,6 +22,7 @@ import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import org.junit.jupiter.api.Test;
 
+import java.util.Comparator;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -82,6 +83,7 @@ public class MemoryRetainedRepositoryTest {
         assertEquals("foo/bar/baz", retainedMessages.get(0).getTopic().toString());
 
         retainedMessages = repository.retainedOnTopic("foo/#");
+        retainedMessages.sort(Comparator.comparing(m -> m.getTopic().toString()));
 
         assertEquals(2, retainedMessages.size());
         assertEquals("foo/bar/baz", retainedMessages.get(0).getTopic().toString());
