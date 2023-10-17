@@ -83,7 +83,7 @@ public final class NettyUtils {
 	public static MqttMessage validateMessage(Object message) throws IOException, ClassCastException {
 		MqttMessage msg = (MqttMessage) message;
 		if (msg.decoderResult() != null && msg.decoderResult().isFailure()) {
-			throw new IOException("invalid massage", msg.decoderResult().cause());
+			throw new IOException("Invalid message", msg.decoderResult().cause());
 		}
 		if (msg.fixedHeader() == null) {
 			throw new IOException("Unknown packet, no fixedHeader present, no cause provided");
