@@ -1,5 +1,6 @@
 package io.moquette.broker;
 
+import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttVersion;
 
 import java.time.Clock;
@@ -20,6 +21,8 @@ public interface ISessionsRepository {
         private final String clientId;
         private Instant expireAt = null;
         final MqttVersion version;
+
+        final Optional<Will> will;
         private final int expiryInterval;
         private transient final Clock clock;
 
@@ -33,6 +36,15 @@ public interface ISessionsRepository {
             this.clock = clock;
             this.expiryInterval = expiryInterval;
             this.version = version;
+            this.will = Optional.empty();
+        }
+
+        public SessionData(String clientId, MqttVersion version, Will will, int expiryInterval, Clock clock) {
+            this.clientId = clientId;
+            this.clock = clock;
+            this.expiryInterval = expiryInterval;
+            this.version = version;
+            this.will = Optional.of(will);
         }
 
         /**
@@ -47,6 +59,28 @@ public interface ISessionsRepository {
             this.expireAt = expireAt;
             this.expiryInterval = expiryInterval;
             this.version = version;
+            this.will = Optional.empty();
+        }
+
+        public SessionData(String clientId, Instant expireAt, MqttVersion version, Will will, int expiryInterval, Clock clock) {
+            Objects.requireNonNull(expireAt, "An expiration time is requested");
+            this.clock = clock;
+            this.clientId = clientId;
+            this.expireAt = expireAt;
+            this.expiryInterval = expiryInterval;
+            this.version = version;
+            this.will = Optional.of(will);
+        }
+
+        // Copy constructor
+        private SessionData(String clientId, Instant expireAt, MqttVersion version, Optional<Will> will, int expiryInterval, Clock clock) {
+            Objects.requireNonNull(expireAt, "An expiration time is requested");
+            this.clock = clock;
+            this.clientId = clientId;
+            this.expireAt = expireAt;
+            this.expiryInterval = expiryInterval;
+            this.version = version;
+            this.will = will;
         }
 
         public String clientId() {
@@ -72,7 +106,11 @@ public interface ISessionsRepository {
 
         public SessionData withExpirationComputed() {
             final Instant expiresAt = clock.instant().plusSeconds(expiryInterval);
-            return new SessionData(clientId, expiresAt, version, expiryInterval, clock);
+            if (hasWill()) {
+                return new SessionData(clientId, expiresAt, version, will, expiryInterval, clock);
+            } else {
+                return new SessionData(clientId, expiresAt, version, expiryInterval, clock);
+            }
         }
 
         @Override
@@ -107,7 +145,46 @@ public interface ISessionsRepository {
         public int compareTo(Delayed o) {
             return Long.compare(getDelay(TimeUnit.MILLISECONDS), o.getDelay(TimeUnit.MILLISECONDS));
         }
+
+        public boolean hasWill() {
+            return will.isPresent();
+        }
+
+        public Will will() throws IllegalArgumentException {
+            return will.orElseThrow(() -> new IllegalArgumentException("Session's will is not available"));
+        }
+
+        public SessionData withWill(Will will) {
+            if (expireAt != null) {
+                return new SessionData(clientId, expireAt, version, will, expiryInterval, clock);
+            } else {
+                return new SessionData(clientId, version, will, expiryInterval, clock);
+            }
+        }
+
+        public SessionData withoutWill() {
+            if (expireAt != null) {
+                return new SessionData(clientId, expireAt, version, expiryInterval, clock);
+            } else {
+                return new SessionData(clientId, version, expiryInterval, clock);
+            }
+        }
     }
+
+     final class Will {
+
+         public final String topic;
+         public final byte[] payload;
+         public final MqttQoS qos;
+         public final boolean retained;
+
+         public Will(String topic, byte[] payload, MqttQoS qos, boolean retained) {
+             this.topic = topic;
+             this.payload = payload;
+             this.qos = qos;
+             this.retained = retained;
+         }
+     }
 
     /**
      * @return the full list of persisted sessions data.

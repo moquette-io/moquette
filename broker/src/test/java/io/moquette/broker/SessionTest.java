@@ -37,7 +37,7 @@ public class SessionTest {
         queuedMessages = new InMemoryQueue();
         final Clock clock = Clock.systemDefaultZone();
         final ISessionsRepository.SessionData data = new ISessionsRepository.SessionData(CLIENT_ID, MqttVersion.MQTT_3_1_1, INFINITE_EXPIRY, clock);
-        client = new Session(data, true, null, queuedMessages);
+        client = new Session(data, true, queuedMessages);
         createConnection(client);
     }
 
