@@ -193,8 +193,7 @@ class Session {
         }
 
         mqttConnection = null;
-        // TODO
-//        will = null;
+        updateSessionData(data.withoutWill());
 
         assignState(SessionStatus.DISCONNECTING, SessionStatus.DISCONNECTED);
     }

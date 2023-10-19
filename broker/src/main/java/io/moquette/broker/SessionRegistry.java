@@ -339,15 +339,6 @@ public class SessionRegistry {
         return newSession;
     }
 
-    @Deprecated // use the ISessionRepository.Will
-    private Session.Will createWill(MqttConnectMessage msg) {
-        final byte[] willPayload = msg.payload().willMessageInBytes();
-        final String willTopic = msg.payload().willTopic();
-        final boolean retained = msg.variableHeader().isWillRetain();
-        final MqttQoS qos = MqttQoS.valueOf(msg.variableHeader().willQos());
-        return new Session.Will(willTopic, willPayload, qos, retained);
-    }
-
     private ISessionsRepository.Will createNewWill(MqttConnectMessage msg) {
         final byte[] willPayload = msg.payload().willMessageInBytes();
         final String willTopic = msg.payload().willTopic();
