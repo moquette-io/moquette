@@ -202,8 +202,8 @@ class PostOffice {
         this.sessionRegistry = sessionRegistry;
     }
 
-    public void fireWill(final Session.Will will) {
-        if (will.willDelayInterval == 0) {
+    public void fireWill(final ISessionsRepository.Will will) {
+        if (will.delayInterval == 0) {
             // if interval is 0 fire immediately
             // MQTT3  3.1.2.8-17
             publish2Subscribers(Unpooled.copiedBuffer(will.payload), new Topic(will.topic), will.qos);
@@ -211,7 +211,7 @@ class PostOffice {
             // MQTT5 MQTT-3.1.3-9
             delayedWillPublications.schedule(() -> {
                 publish2Subscribers(Unpooled.copiedBuffer(will.payload), new Topic(will.topic), will.qos);
-            }, will.willDelayInterval, TimeUnit.SECONDS);
+            }, will.delayInterval, TimeUnit.SECONDS);
         }
     }
 

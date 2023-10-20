@@ -158,6 +158,7 @@ class H2SessionsRepository implements ISessionsRepository {
             byte retained = will.retained ? (byte) 0x10 : 0x00;
             byte qos = (byte) (will.qos.value() & 0x0F);
             buff.put((byte) (retained & qos));
+            buff.putInt(will.delayInterval);
         }
 
         @Override
@@ -170,8 +171,9 @@ class H2SessionsRepository implements ISessionsRepository {
             // MSB retained, LSB QoS
             final byte qos = (byte) (rawFlags & 0x0F);
             final boolean retained = ((rawFlags >> 4) & 0x0F) > 0;
+            final int willDelayInterval = buff.getInt();
 
-            return new Will(topic, payload, MqttQoS.valueOf(qos), retained);
+            return new Will(topic, payload, MqttQoS.valueOf(qos), retained, willDelayInterval);
         }
 
         @Override

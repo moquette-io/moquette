@@ -177,12 +177,14 @@ public interface ISessionsRepository {
          public final byte[] payload;
          public final MqttQoS qos;
          public final boolean retained;
+         public final int delayInterval;
 
-         public Will(String topic, byte[] payload, MqttQoS qos, boolean retained) {
+         public Will(String topic, byte[] payload, MqttQoS qos, boolean retained, int delayInterval) {
              this.topic = topic;
              this.payload = payload;
              this.qos = qos;
              this.retained = retained;
+             this.delayInterval = delayInterval;
          }
      }
 
