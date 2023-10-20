@@ -16,7 +16,6 @@ import io.netty.handler.codec.mqtt.MqttConnAckMessage;
 import io.netty.handler.codec.mqtt.MqttConnectReturnCode;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import io.netty.handler.codec.mqtt.MqttQoS;
-import org.assertj.core.api.Condition;
 import org.awaitility.Awaitility;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
@@ -32,8 +31,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.fail;
 
 class ConnectTest extends AbstractServerIntegrationTest {
     private static final Logger LOG = LoggerFactory.getLogger(ConnectTest.class);
@@ -156,8 +156,11 @@ class ConnectTest extends AbstractServerIntegrationTest {
 
         final Mqtt5BlockingClient testamentSubscriber = createAndConnectClientListeningToTestament();
 
-        // schedule a bad disconnect
-        scheduleDisconnectWithErrorCode(clientWithWill, Duration.ofMillis(500));
+        // client trigger a will message, disconnecting with bad reason code
+        final Mqtt5Disconnect malformedPacketReason = Mqtt5Disconnect.builder()
+            .reasonCode(Mqtt5DisconnectReasonCode.MALFORMED_PACKET)
+            .build();
+        clientWithWill.disconnect(malformedPacketReason);
 
         // reconnect another client with same clientId
         final Mqtt5BlockingClient client = MqttClient.builder()

@@ -285,6 +285,8 @@ final class MQTTConnection {
                         connected = true;
                         // OK continue with sending queued messages and normal flow
 
+                        postOffice.wipeExistingScheduledWill(clientIdUsed);
+
                         if (result.mode == SessionRegistry.CreationModeEnum.REOPEN_EXISTING) {
                             final Session session = result.session;
                             postOffice.routeCommand(session.getClientID(), "sendOfflineMessages", () -> {
@@ -454,7 +456,7 @@ final class MQTTConnection {
     // Invoked when a TCP connection drops and not when a client send DISCONNECT and close.
     private void processConnectionLost(String clientID) {
         if (bindedSession.hasWill()) {
-            postOffice.fireWill(bindedSession.getWill());
+            postOffice.fireWill(bindedSession.getWill(), clientID);
         }
         if (bindedSession.connected()) {
             LOG.debug("Closing session on connectionLost {}", clientID);
@@ -494,7 +496,7 @@ final class MQTTConnection {
                 if (disconnectHeader.reasonCode() != MqttReasonCodes.Disconnect.NORMAL_DISCONNECT.byteValue()) {
                     // handle the will
                     if (bindedSession.hasWill()) {
-                        postOffice.fireWill(bindedSession.getWill());
+                        postOffice.fireWill(bindedSession.getWill(), clientID);
                     }
                 }
             }

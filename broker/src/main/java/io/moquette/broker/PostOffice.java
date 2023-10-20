@@ -33,13 +33,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -185,7 +179,9 @@ class PostOffice {
     private BrokerInterceptor interceptor;
     private final FailedPublishCollection failedPublishes = new FailedPublishCollection();
     private final SessionEventLoopGroup sessionLoops;
-    private final ScheduledExecutorService delayedWillPublications = Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService delayedWillPublicationsScheduler = Executors.newSingleThreadScheduledExecutor();
+    /* Maps clientId to the corresponding future to be executed */
+    private final ConcurrentMap<String, ScheduledFuture<Void>> activeDelayedWillPublishes = new ConcurrentHashMap<>();
 
     PostOffice(ISubscriptionsDirectory subscriptions, IRetainedRepository retainedRepository,
                SessionRegistry sessionRegistry, BrokerInterceptor interceptor, Authorizator authorizator,
@@ -202,17 +198,41 @@ class PostOffice {
         this.sessionRegistry = sessionRegistry;
     }
 
-    public void fireWill(final ISessionsRepository.Will will) {
+    public void fireWill(final ISessionsRepository.Will will, String clientId) {
         if (will.delayInterval == 0) {
             // if interval is 0 fire immediately
             // MQTT3  3.1.2.8-17
             publish2Subscribers(Unpooled.copiedBuffer(will.payload), new Topic(will.topic), will.qos);
         } else {
             // MQTT5 MQTT-3.1.3-9
-            delayedWillPublications.schedule(() -> {
+            ScheduledFuture<Void> future = delayedWillPublicationsScheduler.schedule(() -> {
                 publish2Subscribers(Unpooled.copiedBuffer(will.payload), new Topic(will.topic), will.qos);
+                // clean the future handler from cache
+                activeDelayedWillPublishes.remove(clientId);
+                return null;
             }, will.delayInterval, TimeUnit.SECONDS);
+            activeDelayedWillPublishes.put(clientId, future);
+            LOG.debug("Scheduled will message for client {} on topic {}", clientId, will.topic);
         }
+    }
+
+    /**
+     * Wipe the eventual existing will delayed publish tasks.
+     *
+     * @param clientId session's Id.
+     * */
+    public void wipeExistingScheduledWill(String clientId) {
+        ScheduledFuture<Void> willTask = activeDelayedWillPublishes.remove(clientId);
+        if (willTask != null) {
+            willTask.cancel(true);
+            LOG.debug("Wiped task to delayed publish for old client {}", clientId);
+        }
+//        try {
+//            willTask.cancel(true);
+//        } catch (Throwable th) {
+//            LOG.error("Error during will task cancellation", th);
+//        }
+//        LOG.debug("Wiped task to delayed publish for old client {}", clientId);
     }
 
     public void subscribeClientToTopics(MqttSubscribeMessage msg, String clientID, String username,
