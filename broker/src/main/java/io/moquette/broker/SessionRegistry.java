@@ -349,8 +349,7 @@ public class SessionRegistry {
         // retrieve Will Delay if present and if the connection is MQTT5
         if (Utils.versionFromConnect(msg) == MqttVersion.MQTT_5) {
             final MqttProperties.MqttProperty<Integer> willDelayIntervalProperty =
-                (MqttProperties.MqttProperty<Integer>) msg.variableHeader().properties()
-                    .getProperty(MqttProperties.MqttPropertyType.WILL_DELAY_INTERVAL.value());
+                msg.payload().willProperties().getProperty(MqttProperties.MqttPropertyType.WILL_DELAY_INTERVAL.value());
             if (willDelayIntervalProperty != null) {
                 willDelayIntervalSeconds = willDelayIntervalProperty.value();
             } else {
