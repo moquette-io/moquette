@@ -209,7 +209,7 @@ class ConnectTest extends AbstractServerIntegrationTest {
 
     @NotNull
     private Mqtt5BlockingClient createAndConnectClientWithWillTestament(String clientId) {
-        int delayInSeconds = 1_000;
+        int delayInSeconds = 1;
         return createAndConnectClientWithWillTestament(clientId, delayInSeconds);
     }
 
