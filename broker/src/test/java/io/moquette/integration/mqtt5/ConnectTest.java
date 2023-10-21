@@ -209,6 +209,21 @@ class ConnectTest extends AbstractServerIntegrationTest {
         }
     }
 
+    @Test
+    public void noWillMessageIsFiredOnNormalDisconnection() throws InterruptedException {
+        final String clientId = "simple_client";
+        // create a client with will delay greater than session expiry
+        final Mqtt5BlockingClient clientWithWill = createAndConnectClientWithWillTestament(clientId,  10, 60);
+
+        final Mqtt5BlockingClient testamentSubscriber = createAndConnectClientListeningToTestament();
+
+        // normal session disconnection
+        clientWithWill.disconnect(Mqtt5Disconnect.builder().build());
+
+        // wait no will is published
+        verifyNoTestamentIsPublished(testamentSubscriber, Duration.ofSeconds(10));
+    }
+
     private void scheduleDisconnectWithErrorCode(Mqtt5BlockingClient clientWithWill, Duration delay) {
         scheduleTasks.schedule(() -> {
             // disconnect in a way that the will is triggered
