@@ -456,7 +456,9 @@ final class MQTTConnection {
     // Invoked when a TCP connection drops and not when a client send DISCONNECT and close.
     private void processConnectionLost(String clientID) {
         if (bindedSession.hasWill()) {
-            postOffice.fireWill(bindedSession.getWill(), clientID);
+//            bindedSession.getWill().delayInterval
+//            bindedSession.getSessionData().expireAt()
+            postOffice.fireWill(bindedSession);
         }
         if (bindedSession.connected()) {
             LOG.debug("Closing session on connectionLost {}", clientID);
@@ -496,7 +498,7 @@ final class MQTTConnection {
                 if (disconnectHeader.reasonCode() != MqttReasonCodes.Disconnect.NORMAL_DISCONNECT.byteValue()) {
                     // handle the will
                     if (bindedSession.hasWill()) {
-                        postOffice.fireWill(bindedSession.getWill(), clientID);
+                        postOffice.fireWill(bindedSession);
                     }
                 }
             }

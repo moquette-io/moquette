@@ -195,7 +195,7 @@ public class MQTTConnectionConnectTest {
         sut.handleConnectionLost();
 
         // Verify
-        verify(postOfficeMock).fireWill(any(ISessionsRepository.Will.class), eq(FAKE_CLIENT_ID));
+        verify(postOfficeMock).fireWill(any(Session.class));
         assertFalse(sut.isConnected(), "Connection MUST be disconnected");
     }
 

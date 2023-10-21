@@ -198,19 +198,24 @@ class PostOffice {
         this.sessionRegistry = sessionRegistry;
     }
 
-    public void fireWill(final ISessionsRepository.Will will, String clientId) {
+    public void fireWill(Session bindedSession) {
+        final ISessionsRepository.Will will =  bindedSession.getWill();
+        final String clientId = bindedSession.getClientID();
+
         if (will.delayInterval == 0) {
             // if interval is 0 fire immediately
             // MQTT3  3.1.2.8-17
             publish2Subscribers(Unpooled.copiedBuffer(will.payload), new Topic(will.topic), will.qos);
         } else {
             // MQTT5 MQTT-3.1.3-9
+            final int executionInterval = Math.min(bindedSession.getSessionData().expiryInterval(), will.delayInterval);
+
             ScheduledFuture<Void> future = delayedWillPublicationsScheduler.schedule(() -> {
                 publish2Subscribers(Unpooled.copiedBuffer(will.payload), new Topic(will.topic), will.qos);
                 // clean the future handler from cache
                 activeDelayedWillPublishes.remove(clientId);
                 return null;
-            }, will.delayInterval, TimeUnit.SECONDS);
+            }, executionInterval, TimeUnit.SECONDS);
             activeDelayedWillPublishes.put(clientId, future);
             LOG.debug("Scheduled will message for client {} on topic {}", clientId, will.topic);
         }
@@ -227,12 +232,6 @@ class PostOffice {
             willTask.cancel(true);
             LOG.debug("Wiped task to delayed publish for old client {}", clientId);
         }
-//        try {
-//            willTask.cancel(true);
-//        } catch (Throwable th) {
-//            LOG.error("Error during will task cancellation", th);
-//        }
-//        LOG.debug("Wiped task to delayed publish for old client {}", clientId);
     }
 
     public void subscribeClientToTopics(MqttSubscribeMessage msg, String clientID, String username,
