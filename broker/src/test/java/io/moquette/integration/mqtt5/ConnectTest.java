@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
@@ -141,12 +142,16 @@ class ConnectTest extends AbstractServerIntegrationTest {
         // schedule a bad disconnect
         scheduleDisconnectWithErrorCode(clientWithWill, Duration.ofMillis(500));
 
+        verifyPublishedMessage(testamentSubscriber, 10, "Will message must be received");
+    }
+
+    private static void verifyPublishedMessage(Mqtt5BlockingClient testamentSubscriber, int timeout, String message) throws InterruptedException {
         try (Mqtt5BlockingClient.Mqtt5Publishes publishes = testamentSubscriber.publishes(MqttGlobalPublishFilter.ALL)) {
-            Optional<Mqtt5Publish> publishMessage = publishes.receive(10, TimeUnit.SECONDS);
+            Optional<Mqtt5Publish> publishMessage = publishes.receive(timeout, TimeUnit.SECONDS);
             final String payload = publishMessage.map(Mqtt5Publish::getPayloadAsBytes)
                 .map(b -> new String(b, StandardCharsets.UTF_8))
                 .orElse("Failed to load payload");
-            assertEquals("Goodbye", payload);
+            assertEquals("Goodbye", payload, message);
         }
     }
 
@@ -200,13 +205,7 @@ class ConnectTest extends AbstractServerIntegrationTest {
             .build();
         clientWithWill.disconnect(malformedPacketReason);
 
-        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = testamentSubscriber.publishes(MqttGlobalPublishFilter.ALL)) {
-            Optional<Mqtt5Publish> publishMessage = publishes.receive(20, TimeUnit.SECONDS);
-            final String payload = publishMessage.map(Mqtt5Publish::getPayloadAsBytes)
-                .map(b -> new String(b, StandardCharsets.UTF_8))
-                .orElse("Failed to load payload");
-            assertEquals("Goodbye", payload);
-        }
+        verifyPublishedMessage(testamentSubscriber, 20, "Will message must be received");
     }
 
     @Test
@@ -222,6 +221,32 @@ class ConnectTest extends AbstractServerIntegrationTest {
 
         // wait no will is published
         verifyNoTestamentIsPublished(testamentSubscriber, Duration.ofSeconds(10));
+    }
+
+    @Test
+    public void delayedWillIsSentAlsoAfterAServerRestart() throws InterruptedException, IOException {
+        final String clientId = "simple_client";
+        final Mqtt5BlockingClient clientWithWill = createAndConnectClientWithWillTestament(clientId, 10);
+
+//        final Mqtt5BlockingClient testamentSubscriber = createAndConnectClientListeningToTestament();
+
+        // client trigger a will message, disconnecting with bad reason code
+        final Mqtt5Disconnect malformedPacketReason = Mqtt5Disconnect.builder()
+            .reasonCode(Mqtt5DisconnectReasonCode.MALFORMED_PACKET)
+            .build();
+        clientWithWill.disconnect(malformedPacketReason);
+
+        restartServerWithSuspension(Duration.ofSeconds(5));
+
+        final Mqtt5BlockingClient testamentSubscriber = createAndConnectClientListeningToTestament();
+
+        verifyPublishedMessage(testamentSubscriber, 10, "Will message must be received after server restart");
+    }
+
+    private void restartServerWithSuspension(Duration timeout) throws InterruptedException, IOException {
+        stopServer();
+        Thread.sleep(timeout.toMillis());
+        startServer(dbPath);
     }
 
     private void scheduleDisconnectWithErrorCode(Mqtt5BlockingClient clientWithWill, Duration delay) {
