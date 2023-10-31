@@ -120,7 +120,7 @@ public class SessionRegistryTest {
         sessionRepository = memorySessionsRepository();
         sut = new SessionRegistry(subscriptions, sessionRepository, queueRepository, permitAll, scheduler, slidingClock, GLOBAL_SESSION_EXPIRY_SECONDS, loopsGroup);
         final PostOffice postOffice = new PostOffice(subscriptions,
-            new MemoryRetainedRepository(), sut, ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup);
+            new MemoryRetainedRepository(), sut, sessionRepository, ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup);
         return new MQTTConnection(channel, config, mockAuthenticator, sut, postOffice);
     }
 

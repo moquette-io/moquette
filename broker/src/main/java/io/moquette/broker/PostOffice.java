@@ -21,25 +21,49 @@ import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.handler.codec.mqtt.*;
+import io.netty.handler.codec.mqtt.MqttConnectMessage;
+import io.netty.handler.codec.mqtt.MqttFixedHeader;
+import io.netty.handler.codec.mqtt.MqttMessageType;
+import io.netty.handler.codec.mqtt.MqttPublishMessage;
+import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttSubAckMessage;
+import io.netty.handler.codec.mqtt.MqttSubAckPayload;
+import io.netty.handler.codec.mqtt.MqttSubscribeMessage;
+import io.netty.handler.codec.mqtt.MqttTopicSubscription;
 import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.DelayQueue;
+import java.util.concurrent.Delayed;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static io.moquette.broker.Utils.messageId;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
-import static io.netty.handler.codec.mqtt.MqttQoS.*;
+import static io.netty.handler.codec.mqtt.MqttQoS.AT_LEAST_ONCE;
+import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
+import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
+import static io.netty.handler.codec.mqtt.MqttQoS.FAILURE;
 
 class PostOffice {
 
@@ -168,34 +192,97 @@ class PostOffice {
         }
     }
 
+    static final class ExpirableTracker<T extends ISessionsRepository.Expirable> implements Delayed {
+        private final T expirable;
+        private final Clock clock;
+
+        ExpirableTracker(T expirable, Clock clock) {
+            this.expirable = expirable;
+            this.clock = clock;
+        }
+
+        @Override
+        public long getDelay(TimeUnit unit) {
+            return unit.convert(expirable.expireAt().toEpochMilli() - clock.millis(), TimeUnit.MILLISECONDS);
+        }
+
+        @Override
+        public int compareTo(Delayed o) {
+            return Long.compare(getDelay(TimeUnit.MILLISECONDS), o.getDelay(TimeUnit.MILLISECONDS));
+        }
+
+        public T expirable() {
+            return expirable;
+        }
+    }
+
     private static final Logger LOG = LoggerFactory.getLogger(PostOffice.class);
 
     private static final Set<String> NO_FILTER = new HashSet<>();
 
+    static final Duration EXPIRED_WILL_FIRER_TASK_INTERVAL = Duration.ofSeconds(1);
+
     private final Authorizator authorizator;
     private final ISubscriptionsDirectory subscriptions;
     private final IRetainedRepository retainedRepository;
+    private final ISessionsRepository sessionRepository;
     private SessionRegistry sessionRegistry;
     private BrokerInterceptor interceptor;
     private final FailedPublishCollection failedPublishes = new FailedPublishCollection();
     private final SessionEventLoopGroup sessionLoops;
+    private final Clock clock;
     private final ScheduledExecutorService delayedWillPublicationsScheduler = Executors.newSingleThreadScheduledExecutor();
-    /* Maps clientId to the corresponding future to be executed */
-    private final ConcurrentMap<String, ScheduledFuture<Void>> activeDelayedWillPublishes = new ConcurrentHashMap<>();
+    private final DelayQueue<ExpirableTracker<ISessionsRepository.Will>> expiringWills = new DelayQueue();
+
+    // Maps clientId to the respective Will in the expiring queue.
+    private final Map<String, ExpirableTracker<ISessionsRepository.Will>> expiringWillsCache = new HashMap<>();
+    private final ScheduledFuture<?> expiredWillsTask;
+
+    /**
+     * Used only in tests
+     * */
+    PostOffice(ISubscriptionsDirectory subscriptions, IRetainedRepository retainedRepository,
+               SessionRegistry sessionRegistry, ISessionsRepository sessionRepository, BrokerInterceptor interceptor, Authorizator authorizator,
+               SessionEventLoopGroup sessionLoops) {
+        this(subscriptions, retainedRepository, sessionRegistry, sessionRepository, interceptor, authorizator, sessionLoops, Clock.systemDefaultZone());
+    }
 
     PostOffice(ISubscriptionsDirectory subscriptions, IRetainedRepository retainedRepository,
-               SessionRegistry sessionRegistry, BrokerInterceptor interceptor, Authorizator authorizator,
-               SessionEventLoopGroup sessionLoops) {
+               SessionRegistry sessionRegistry, ISessionsRepository sessionRepository, BrokerInterceptor interceptor,
+               Authorizator authorizator,
+               SessionEventLoopGroup sessionLoops, Clock clock) {
         this.authorizator = authorizator;
         this.subscriptions = subscriptions;
         this.retainedRepository = retainedRepository;
+        this.sessionRepository = sessionRepository;
         this.sessionRegistry = sessionRegistry;
         this.interceptor = interceptor;
         this.sessionLoops = sessionLoops;
+        this.clock = clock;
+
+        this.expiredWillsTask = delayedWillPublicationsScheduler.scheduleWithFixedDelay(this::checkExpiredWills,
+            EXPIRED_WILL_FIRER_TASK_INTERVAL.getSeconds(), EXPIRED_WILL_FIRER_TASK_INTERVAL.getSeconds(),
+            TimeUnit.SECONDS);
+
+        recreateWillExpires(sessionRepository);
     }
 
-    public void init(SessionRegistry sessionRegistry) {
-        this.sessionRegistry = sessionRegistry;
+    private void recreateWillExpires(ISessionsRepository sessionRepository) {
+        sessionRepository.listSessionsWill((clientId, will) -> {
+            ExpirableTracker<ISessionsRepository.Will> willTracker = new ExpirableTracker<>(will, clock);
+            expiringWills.add(willTracker);
+            expiringWillsCache.put(clientId, willTracker);
+        });
+    }
+
+    private void checkExpiredWills() {
+        List<ExpirableTracker<ISessionsRepository.Will>> expiredWills = new ArrayList<>();
+        int drainedWills = expiringWills.drainTo(expiredWills);
+        LOG.debug("Retrieved {} expired will on {}", drainedWills, expiringWills.size());
+
+        expiredWills.stream()
+            .map(ExpirableTracker::expirable)
+            .forEach(this::publishWill);
     }
 
     public void fireWill(Session bindedSession) {
@@ -205,20 +292,30 @@ class PostOffice {
         if (will.delayInterval == 0) {
             // if interval is 0 fire immediately
             // MQTT3  3.1.2.8-17
-            publish2Subscribers(Unpooled.copiedBuffer(will.payload), new Topic(will.topic), will.qos);
+            publishWill(will);
         } else {
             // MQTT5 MQTT-3.1.3-9
             final int executionInterval = Math.min(bindedSession.getSessionData().expiryInterval(), will.delayInterval);
 
-            ScheduledFuture<Void> future = delayedWillPublicationsScheduler.schedule(() -> {
-                publish2Subscribers(Unpooled.copiedBuffer(will.payload), new Topic(will.topic), will.qos);
-                // clean the future handler from cache
-                activeDelayedWillPublishes.remove(clientId);
-                return null;
-            }, executionInterval, TimeUnit.SECONDS);
-            activeDelayedWillPublishes.put(clientId, future);
+            trackWillSpecificationForFutureFire(bindedSession, will, clientId, executionInterval);
+
             LOG.debug("Scheduled will message for client {} on topic {}", clientId, will.topic);
         }
+    }
+
+    private void trackWillSpecificationForFutureFire(Session bindedSession, ISessionsRepository.Will will, String clientId, int executionInterval) {
+        // Update Session's SessionData with a new Will with computed expiration
+        final ISessionsRepository.Will willWithEOL = will.withExpirationComputed(executionInterval, clock);
+        // save the will in the will store
+        sessionRepository.saveWill(bindedSession.getClientID(), willWithEOL);
+
+        ExpirableTracker<ISessionsRepository.Will> tracker = new ExpirableTracker<>(willWithEOL, clock);
+        expiringWills.add(tracker);
+        expiringWillsCache.put(clientId, tracker);
+    }
+
+    private void publishWill(ISessionsRepository.Will will) {
+        publish2Subscribers(Unpooled.copiedBuffer(will.payload), new Topic(will.topic), will.qos);
     }
 
     /**
@@ -227,11 +324,17 @@ class PostOffice {
      * @param clientId session's Id.
      * */
     public void wipeExistingScheduledWill(String clientId) {
-        ScheduledFuture<Void> willTask = activeDelayedWillPublishes.remove(clientId);
-        if (willTask != null) {
-            willTask.cancel(true);
+        //remove the tracked will from expiringWills
+        ExpirableTracker<ISessionsRepository.Will> willTracker = expiringWillsCache.remove(clientId);
+        if (willTracker == null) {
+            return; // not found
+        }
+        boolean removed = expiringWills.remove(willTracker);
+        if (removed) {
             LOG.debug("Wiped task to delayed publish for old client {}", clientId);
         }
+
+        sessionRepository.deleteWill(clientId);
     }
 
     public void subscribeClientToTopics(MqttSubscribeMessage msg, String clientID, String username,
@@ -669,7 +772,17 @@ class PostOffice {
     }
 
     public void terminate() {
+        shutdownWillsTask();
         sessionLoops.terminate();
+    }
+
+    private void shutdownWillsTask() {
+        if (expiredWillsTask.cancel(false)) {
+            LOG.info("Successfully cancelled expired wills task");
+        } else {
+            LOG.warn("Can't cancel the execution of expired wills task, was already cancelled? {}, was done? {}",
+                expiredWillsTask.isCancelled(), expiredWillsTask.isDone());
+        }
     }
 
     /**

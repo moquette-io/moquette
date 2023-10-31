@@ -71,6 +71,7 @@ public class PostOfficeSubscribeTest {
     public static final BrokerConfiguration CONFIG = new BrokerConfiguration(true, true, false, NO_BUFFER_FLUSH);
     private MemoryQueueRepository queueRepository;
     private ScheduledExecutorService scheduler;
+    private ISessionsRepository fakeSessionRepo;
 
     @BeforeEach
     public void setUp() {
@@ -104,8 +105,9 @@ public class PostOfficeSubscribeTest {
         final PermitAllAuthorizatorPolicy authorizatorPolicy = new PermitAllAuthorizatorPolicy();
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
         final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024);
-        sessionRegistry = new SessionRegistry(subscriptions, memorySessionsRepository(), queueRepository, permitAll, scheduler, loopsGroup);
-        sut = new PostOffice(subscriptions, new MemoryRetainedRepository(), sessionRegistry,
+        fakeSessionRepo = memorySessionsRepository();
+        sessionRegistry = new SessionRegistry(subscriptions, fakeSessionRepo, queueRepository, permitAll, scheduler, loopsGroup);
+        sut = new PostOffice(subscriptions, new MemoryRetainedRepository(), sessionRegistry, fakeSessionRepo,
                              ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup);
     }
 
@@ -179,7 +181,7 @@ public class PostOfficeSubscribeTest {
             .thenReturn(false);
 
         final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024);
-        sut = new PostOffice(subscriptions, new MemoryRetainedRepository(), sessionRegistry,
+        sut = new PostOffice(subscriptions, new MemoryRetainedRepository(), sessionRegistry, fakeSessionRepo,
                              ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, new Authorizator(prohibitReadOnNewsTopic), loopsGroup);
 
         connection.processConnect(connectMessage).completableFuture().get();

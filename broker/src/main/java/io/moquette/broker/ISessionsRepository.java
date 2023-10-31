@@ -10,11 +10,16 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 
 /**
  * Used to store data about persisted sessions like MQTT version, session's properties.
  * */
 public interface ISessionsRepository {
+    interface Expirable {
+        Instant expireAt();
+
+    }
 
     // Data class
     final class SessionData implements Delayed {
@@ -171,13 +176,14 @@ public interface ISessionsRepository {
         }
     }
 
-     final class Will {
+     final class Will implements Expirable {
 
          public final String topic;
          public final byte[] payload;
          public final MqttQoS qos;
          public final boolean retained;
          public final int delayInterval;
+         private Instant expireAt = null;
 
          public Will(String topic, byte[] payload, MqttQoS qos, boolean retained, int delayInterval) {
              this.topic = topic;
@@ -185,6 +191,20 @@ public interface ISessionsRepository {
              this.qos = qos;
              this.retained = retained;
              this.delayInterval = delayInterval;
+         }
+
+         public Will(Will orig, Instant expireAt) {
+            this(orig.topic, orig.payload, orig.qos, orig.retained, orig.delayInterval);
+            this.expireAt = expireAt;
+         }
+
+         @Override
+         public Instant expireAt() {
+             return expireAt;
+         }
+
+         public Will withExpirationComputed(int executionInterval, Clock clock) {
+             return new Will(this, clock.instant().plusSeconds(executionInterval));
          }
      }
 
@@ -199,4 +219,25 @@ public interface ISessionsRepository {
     void saveSession(SessionData session);
 
     void delete(SessionData session);
+
+    /**
+     * Return the will definitions.
+     * Invokes a callback function accepting clientId and Will
+     * */
+    void listSessionsWill(BiConsumer<String, Will> visitor);
+
+    /**
+     * Persist the Will specification for client.
+     *
+     * @param clientId Identifier of the client that the Will belongs to.
+     * @param will Will specification to store.
+     * */
+    void saveWill(String clientId, ISessionsRepository.Will will);
+
+    /**
+     * Delete the Will specification of a client.
+     *
+     * @param clientId the identifier of the client.
+     * */
+    void deleteWill(String clientId);
 }

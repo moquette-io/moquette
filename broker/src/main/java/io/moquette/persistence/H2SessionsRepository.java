@@ -13,6 +13,7 @@ import java.nio.ByteBuffer;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.function.BiConsumer;
 
 class H2SessionsRepository implements ISessionsRepository {
 
@@ -24,6 +25,7 @@ class H2SessionsRepository implements ISessionsRepository {
     public static final byte WILL_NOT_PRESENT = (byte) 0x00;
 
     private final MVMap<String, SessionData> sessionMap;
+    private final MVMap<String, Will> willMap;
     private final Clock clock;
 
     public H2SessionsRepository(MVStore mvStore, Clock clock) {
@@ -33,6 +35,10 @@ class H2SessionsRepository implements ISessionsRepository {
                 .valueType(new SessionDataValueType());
 
         this.sessionMap = mvStore.openMap("sessions_store", sessionTypeBuilder);
+
+        MVMap.Builder<String, Will> willTypeBuilder = new MVMap.Builder<String, Will>()
+            .valueType(new WillDataValueType());
+        this.willMap = mvStore.openMap("will_specs_store", willTypeBuilder);
     }
 
     @Override
@@ -48,6 +54,22 @@ class H2SessionsRepository implements ISessionsRepository {
     @Override
     public void delete(SessionData session) {
         sessionMap.remove(session.clientId());
+    }
+
+    @Override
+    public void listSessionsWill(BiConsumer<String, Will> visitor) {
+        willMap.entrySet().stream()
+            .forEach(e -> visitor.accept(e.getKey(), e.getValue()));
+    }
+
+    @Override
+    public void saveWill(String clientId, Will will) {
+        willMap.put(clientId, will);
+    }
+
+    @Override
+    public void deleteWill(String clientId) {
+        willMap.remove(clientId);
     }
 
     /**
@@ -159,6 +181,11 @@ class H2SessionsRepository implements ISessionsRepository {
             byte qos = (byte) (will.qos.value() & 0x0F);
             buff.put((byte) (retained & qos));
             buff.putInt(will.delayInterval);
+            if (will.expireAt() == null) {
+                buff.putLong(UNDEFINED_INSTANT);
+            } else {
+                buff.putLong(will.expireAt().toEpochMilli());
+            }
         }
 
         @Override
@@ -172,8 +199,14 @@ class H2SessionsRepository implements ISessionsRepository {
             final byte qos = (byte) (rawFlags & 0x0F);
             final boolean retained = ((rawFlags >> 4) & 0x0F) > 0;
             final int willDelayInterval = buff.getInt();
+            Will will = new Will(topic, payload, MqttQoS.valueOf(qos), retained, willDelayInterval);
 
-            return new Will(topic, payload, MqttQoS.valueOf(qos), retained, willDelayInterval);
+            final long expiresAt = buff.getLong();
+            if (expiresAt != UNDEFINED_INSTANT) {
+                will = new Will(will, Instant.ofEpochMilli(expiresAt));
+            }
+
+            return will;
         }
 
         @Override

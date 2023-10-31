@@ -256,8 +256,8 @@ public class Server {
         final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(interceptor, sessionQueueSize);
         sessions = new SessionRegistry(subscriptions, sessionsRepository, queueRepository, authorizator, scheduler,
             clock, globalSessionExpiry, loopsGroup);
-        dispatcher = new PostOffice(subscriptions, retainedRepository, sessions, interceptor, authorizator,
-            loopsGroup);
+        dispatcher = new PostOffice(subscriptions, retainedRepository, sessions, sessionsRepository, interceptor,
+            authorizator, loopsGroup, clock);
         final BrokerConfiguration brokerConfig = new BrokerConfiguration(config);
         MQTTConnectionFactory connectionFactory = new MQTTConnectionFactory(brokerConfig, authenticator, sessions,
                                                                             dispatcher);

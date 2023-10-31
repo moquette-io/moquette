@@ -228,8 +228,6 @@ class ConnectTest extends AbstractServerIntegrationTest {
         final String clientId = "simple_client";
         final Mqtt5BlockingClient clientWithWill = createAndConnectClientWithWillTestament(clientId, 10);
 
-//        final Mqtt5BlockingClient testamentSubscriber = createAndConnectClientListeningToTestament();
-
         // client trigger a will message, disconnecting with bad reason code
         final Mqtt5Disconnect malformedPacketReason = Mqtt5Disconnect.builder()
             .reasonCode(Mqtt5DisconnectReasonCode.MALFORMED_PACKET)
