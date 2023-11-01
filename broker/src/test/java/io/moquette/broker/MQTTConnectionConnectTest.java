@@ -28,6 +28,7 @@ import io.netty.channel.ChannelPromise;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;
+import io.netty.handler.codec.mqtt.MqttProperties;
 import io.netty.handler.codec.mqtt.MqttVersion;
 import io.netty.handler.ssl.SslHandler;
 import org.junit.jupiter.api.AfterEach;
@@ -51,15 +52,14 @@ import javax.net.ssl.SSLSession;
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
 import static io.moquette.broker.NettyChannelAssertions.assertEqualsConnAck;
-import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
-import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD;
-import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_REFUSED_IDENTIFIER_REJECTED;
+import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -97,8 +97,9 @@ public class MQTTConnectionConnectTest {
         final PermitAllAuthorizatorPolicy authorizatorPolicy = new PermitAllAuthorizatorPolicy();
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
         final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024);
-        sessionRegistry = new SessionRegistry(subscriptions, memorySessionsRepository(), queueRepository, permitAll, scheduler, loopsGroup);
-        postOffice = new PostOffice(subscriptions, new MemoryRetainedRepository(), sessionRegistry,
+        ISessionsRepository fakeSessionRepo = memorySessionsRepository();
+        sessionRegistry = new SessionRegistry(subscriptions, fakeSessionRepo, queueRepository, permitAll, scheduler, loopsGroup);
+        postOffice = new PostOffice(subscriptions, new MemoryRetainedRepository(), sessionRegistry, fakeSessionRepo,
                                     ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup);
 
         sut = createMQTTConnection(CONFIG);
@@ -179,24 +180,48 @@ public class MQTTConnectionConnectTest {
         assertTrue(channel.isOpen(), "Connection is accepted and therefore should remain open");
     }
 
-    @Disabled("already covered by testWillMessageIsFiredOnClientKeepAliveExpiry and testWillMessageIsPublishedOnClientBadDisconnection")
     @Test
-    public void testWillIsFired() throws ExecutionException, InterruptedException {
-        final PostOffice postOfficeMock = mock(PostOffice.class);
-        sut = createMQTTConnectionWithPostOffice(CONFIG, postOfficeMock);
-        channel = (EmbeddedChannel) sut.channel;
+    public void whenConnectWithWillAndPayloadFormatIndicator_withInvalidWillPayload_thenReturnANegativeConnAck() throws ExecutionException, InterruptedException {
+        MqttProperties.MqttProperty<Integer> payloadFormatInvalid = new MqttProperties.IntegerProperty(MqttProperties.MqttPropertyType.PAYLOAD_FORMAT_INDICATOR.value(), 1);
 
-        MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).willFlag(true)
-            .willTopic("topic").willMessage("Topic message").build();
-        sut.processConnect(msg).completableFuture().get();
+        MqttProperties willProperties = new MqttProperties();
+        willProperties.add(payloadFormatInvalid);
+
+        byte[] invalidUtf8Payload = new byte[]{(byte) 0xC0, (byte) 0xC1, (byte) 0xF5, (byte) 0xFF};
+
+        MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID)
+            .protocolVersion(MqttVersion.MQTT_5)
+            .willFlag(true)
+            .willTopic("topic")
+            .willMessage(invalidUtf8Payload)
+            .willProperties(willProperties)
+            .build();
 
         // Exercise
-        sut.handleConnectionLost();
+        sut.processConnect(msg).completableFuture().get();
 
         // Verify
-        verify(postOfficeMock).fireWill(any(ISessionsRepository.Will.class));
-        assertFalse(sut.isConnected(), "Connection MUST be disconnected");
+        assertEqualsConnAck(CONNECTION_REFUSED_PAYLOAD_FORMAT_INVALID, channel.readOutbound());
     }
+
+//    @Disabled("already covered by testWillMessageIsFiredOnClientKeepAliveExpiry and testWillMessageIsPublishedOnClientBadDisconnection")
+//    @Test
+//    public void testWillIsFired() throws ExecutionException, InterruptedException {
+//        final PostOffice postOfficeMock = mock(PostOffice.class);
+//        sut = createMQTTConnectionWithPostOffice(CONFIG, postOfficeMock);
+//        channel = (EmbeddedChannel) sut.channel;
+//
+//        MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID).willFlag(true)
+//            .willTopic("topic").willMessage("Topic message").build();
+//        sut.processConnect(msg).completableFuture().get();
+//
+//        // Exercise
+//        sut.handleConnectionLost();
+//
+//        // Verify
+//        verify(postOfficeMock).fireWill(any(Session.class));
+//        assertFalse(sut.isConnected(), "Connection MUST be disconnected");
+//    }
 
     @Test
     public void acceptAnonymousClient() throws ExecutionException, InterruptedException {

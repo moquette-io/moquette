@@ -25,26 +25,8 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelPipeline;
-import io.netty.handler.codec.mqtt.MqttConnAckMessage;
-import io.netty.handler.codec.mqtt.MqttConnectMessage;
-import io.netty.handler.codec.mqtt.MqttConnectPayload;
-import io.netty.handler.codec.mqtt.MqttConnectReturnCode;
-import io.netty.handler.codec.mqtt.MqttFixedHeader;
-import io.netty.handler.codec.mqtt.MqttMessage;
-import io.netty.handler.codec.mqtt.MqttMessageBuilders;
+import io.netty.handler.codec.mqtt.*;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders.ConnAckPropertiesBuilder;
-import io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader;
-import io.netty.handler.codec.mqtt.MqttMessageType;
-import io.netty.handler.codec.mqtt.MqttProperties;
-import io.netty.handler.codec.mqtt.MqttPubAckMessage;
-import io.netty.handler.codec.mqtt.MqttPublishMessage;
-import io.netty.handler.codec.mqtt.MqttPublishVariableHeader;
-import io.netty.handler.codec.mqtt.MqttQoS;
-import io.netty.handler.codec.mqtt.MqttSubAckMessage;
-import io.netty.handler.codec.mqtt.MqttSubscribeMessage;
-import io.netty.handler.codec.mqtt.MqttUnsubAckMessage;
-import io.netty.handler.codec.mqtt.MqttUnsubscribeMessage;
-import io.netty.handler.codec.mqtt.MqttVersion;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.IdleStateHandler;
 import org.slf4j.Logger;
@@ -52,6 +34,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.StandardCharsets;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
 import java.util.List;
@@ -64,13 +50,7 @@ import javax.net.ssl.SSLPeerUnverifiedException;
 import static io.moquette.BrokerConstants.INFLIGHT_WINDOW_SIZE;
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 import static io.netty.channel.ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE;
-import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
-import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_REFUSED_BAD_USERNAME_OR_PASSWORD;
-import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD;
-import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_REFUSED_CLIENT_IDENTIFIER_NOT_VALID;
-import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_REFUSED_IDENTIFIER_REJECTED;
-import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_REFUSED_SERVER_UNAVAILABLE;
-import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION;
+import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_LEAST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
@@ -257,6 +237,21 @@ final class MQTTConnection {
      * Invoked by the Session's event loop.
      * */
     private void executeConnect(MqttConnectMessage msg, String clientId, boolean serverGeneratedClientId) {
+        if (isProtocolVersion(msg, MqttVersion.MQTT_5)) {
+            // if MQTT5 validate the payload of the will
+            boolean hasPayloadFormatIndicator = extractWillPayloadFormatIndicator(msg.payload().willProperties());
+            if (hasPayloadFormatIndicator) {
+                byte[] willPayload = msg.payload().willMessageInBytes();
+                boolean validWillPayload = checkUTF8Validity(willPayload);
+                if (!validWillPayload) {
+                    final ConnAckPropertiesBuilder builder = prepareConnAckPropertiesBuilder(false, clientId);
+                    builder.reasonString("Not UTF8 payload in Will");
+                    abortConnectionV5(CONNECTION_REFUSED_PAYLOAD_FORMAT_INVALID, builder);
+                    return;
+                }
+            }
+        }
+
         final SessionRegistry.SessionCreationResult result;
         try {
             LOG.trace("Binding MQTTConnection to session");
@@ -303,6 +298,8 @@ final class MQTTConnection {
                         connected = true;
                         // OK continue with sending queued messages and normal flow
 
+                        postOffice.wipeExistingScheduledWill(clientIdUsed);
+
                         if (result.mode == SessionRegistry.CreationModeEnum.REOPEN_EXISTING) {
                             final Session session = result.session;
                             postOffice.routeCommand(session.getClientID(), "sendOfflineMessages", () -> {
@@ -328,6 +325,30 @@ final class MQTTConnection {
 
             }
         });
+    }
+
+    /**
+     * @return the value of the Payload Format Indicator property from Will specification.
+     * */
+    private static boolean extractWillPayloadFormatIndicator(MqttProperties mqttProperties) {
+        final MqttProperties.MqttProperty<Integer> payloadFormatIndicatorProperty =
+            mqttProperties.getProperty(MqttProperties.MqttPropertyType.PAYLOAD_FORMAT_INDICATOR.value());
+        boolean hasPayloadFormatIndicator = false;
+        if (payloadFormatIndicatorProperty != null) {
+            int payloadFormatIndicator = payloadFormatIndicatorProperty.value();
+            hasPayloadFormatIndicator = payloadFormatIndicator == 1;
+        }
+        return hasPayloadFormatIndicator;
+    }
+
+    private static boolean checkUTF8Validity(byte[] rawBytes) {
+        CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder();
+        try {
+            decoder.decode(ByteBuffer.wrap(rawBytes));
+        } catch (CharacterCodingException ex) {
+            return false;
+        }
+        return true;
     }
 
     private MqttProperties prepareConnAckProperties(boolean serverGeneratedClientId, String clientId) {
@@ -472,7 +493,7 @@ final class MQTTConnection {
     // Invoked when a TCP connection drops and not when a client send DISCONNECT and close.
     private void processConnectionLost(String clientID) {
         if (bindedSession.hasWill()) {
-            postOffice.fireWill(bindedSession.getWill());
+            postOffice.fireWill(bindedSession);
         }
         if (bindedSession.connected()) {
             LOG.debug("Closing session on connectionLost {}", clientID);
@@ -506,6 +527,15 @@ final class MQTTConnection {
             if (!isBoundToSession()) {
                 LOG.debug("NOT processing disconnect {}, not bound.", clientID);
                 return null;
+            }
+            if (protocolVersion == MqttVersion.MQTT_5.protocolLevel()) {
+                MqttReasonCodeAndPropertiesVariableHeader disconnectHeader = (MqttReasonCodeAndPropertiesVariableHeader) msg.variableHeader();
+                if (disconnectHeader.reasonCode() != MqttReasonCodes.Disconnect.NORMAL_DISCONNECT.byteValue()) {
+                    // handle the will
+                    if (bindedSession.hasWill()) {
+                        postOffice.fireWill(bindedSession);
+                    }
+                }
             }
             LOG.debug("Closing session on disconnect {}", clientID);
             sessionRegistry.connectionClosed(bindedSession);

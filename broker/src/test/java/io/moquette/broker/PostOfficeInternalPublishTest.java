@@ -103,8 +103,9 @@ public class PostOfficeInternalPublishTest {
         final PermitAllAuthorizatorPolicy authorizatorPolicy = new PermitAllAuthorizatorPolicy();
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
         final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024);
-        sessionRegistry = new SessionRegistry(subscriptions, memorySessionsRepository(), queueRepository, permitAll, scheduler, loopsGroup);
-        sut = new PostOffice(subscriptions, retainedRepository, sessionRegistry,
+        ISessionsRepository fakeSessionRepo = memorySessionsRepository();
+        sessionRegistry = new SessionRegistry(subscriptions, fakeSessionRepo, queueRepository, permitAll, scheduler, loopsGroup);
+        sut = new PostOffice(subscriptions, retainedRepository, sessionRegistry, fakeSessionRepo,
                              ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup);
     }
 

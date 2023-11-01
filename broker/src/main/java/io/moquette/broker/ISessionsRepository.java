@@ -4,17 +4,24 @@ import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttVersion;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 
 /**
  * Used to store data about persisted sessions like MQTT version, session's properties.
  * */
 public interface ISessionsRepository {
+    interface Expirable {
+        Instant expireAt();
+
+    }
 
     // Data class
     final class SessionData implements Delayed {
@@ -171,18 +178,126 @@ public interface ISessionsRepository {
         }
     }
 
-     final class Will {
+    final class WillOptions {
+
+        private final Duration messageExpiry;
+        private final String contentType;
+        private final String responseTopic;
+        private final byte[] correlationData;
+        private final Map<String, String> userProperties;
+        private final boolean empty;
+
+        private WillOptions(Duration messageExpiry, String contentType, String responseTopic, byte[] correlationData,
+                            Map<String, String> userProperties, boolean empty) {
+            this.messageExpiry = messageExpiry;
+            this.contentType = contentType;
+            this.responseTopic = responseTopic;
+            this.correlationData = correlationData;
+            this.userProperties = userProperties;
+            this.empty = empty;
+        }
+
+        public static WillOptions empty() {
+            return new WillOptions(null, null, null, null, null, true);
+        }
+
+        public WillOptions withMessageExpiry(Duration interval) {
+            Objects.requireNonNull(interval, "A valid interval duration must be provided");
+            return new WillOptions(interval, this.contentType, this.responseTopic, this.correlationData, this.userProperties, true);
+        }
+
+        public WillOptions withContentType(String contentType) {
+            Objects.requireNonNull(contentType, "A valid contentType string must be provided");
+            return new WillOptions(this.messageExpiry, contentType, this.responseTopic, this.correlationData, this.userProperties, true);
+        }
+
+        public WillOptions withResponseTopic(String responseTopic) {
+            Objects.requireNonNull(responseTopic, "A valid responseTopic string must be provided");
+            return new WillOptions(this.messageExpiry, this.contentType, responseTopic, this.correlationData, this.userProperties, true);
+        }
+
+        public WillOptions withCorrelationData(byte[] correlationData) {
+            Objects.requireNonNull(correlationData, "A valid correlationData string must be provided");
+            return new WillOptions(this.messageExpiry, this.contentType, this.responseTopic, correlationData, this.userProperties, true);
+        }
+
+        public WillOptions withUserProperties(Map<String, String> properties) {
+            Objects.requireNonNull(properties, "A valid properties Map must be provided");
+            return new WillOptions(this.messageExpiry, this.contentType, this.responseTopic, this.correlationData, properties, true);
+        }
+
+        public Optional<Duration> messageExpiry() {
+            return Optional.ofNullable(this.messageExpiry);
+        }
+
+        public Optional<String> contentType() {
+            return Optional.ofNullable(this.contentType);
+        }
+
+        public Optional<String> responseTopic() {
+            return Optional.ofNullable(this.responseTopic);
+        }
+
+        public Optional<byte[]> correlationData() {
+            return Optional.ofNullable(this.correlationData);
+        }
+
+        public Optional<Map<String, String>> userProperties() {
+            return Optional.ofNullable(this.userProperties);
+        }
+
+        public boolean notEmpty() {
+            return empty;
+        }
+    }
+
+     final class Will implements Expirable {
 
          public final String topic;
          public final byte[] payload;
          public final MqttQoS qos;
          public final boolean retained;
+         public final int delayInterval;
+         public final WillOptions properties;
+         private Instant expireAt = null;
 
-         public Will(String topic, byte[] payload, MqttQoS qos, boolean retained) {
+         public Will(String topic, byte[] payload, MqttQoS qos, boolean retained, int delayInterval) {
              this.topic = topic;
              this.payload = payload;
              this.qos = qos;
              this.retained = retained;
+             this.delayInterval = delayInterval;
+             this.properties = ISessionsRepository.WillOptions.empty();
+         }
+
+         /**
+          * Used only when update with an expire instant.
+          * */
+         public Will(Will orig, Instant expireAt) {
+            this(orig.topic, orig.payload, orig.qos, orig.retained, orig.delayInterval);
+            this.expireAt = expireAt;
+         }
+
+         /**
+          * Used only when update with optional properties are provided.
+          * */
+         public Will(Will orig, WillOptions properties) {
+             this.topic = orig.topic;
+             this.payload = orig.payload;
+             this.qos = orig.qos;
+             this.retained = orig.retained;
+             this.delayInterval = orig.delayInterval;
+             this.expireAt = orig.expireAt;
+             this.properties = properties;
+         }
+
+         @Override
+         public Instant expireAt() {
+             return expireAt;
+         }
+
+         public Will withExpirationComputed(int executionInterval, Clock clock) {
+             return new Will(this, clock.instant().plusSeconds(executionInterval));
          }
      }
 
@@ -197,4 +312,25 @@ public interface ISessionsRepository {
     void saveSession(SessionData session);
 
     void delete(SessionData session);
+
+    /**
+     * Return the will definitions.
+     * Invokes a callback function accepting clientId and Will
+     * */
+    void listSessionsWill(BiConsumer<String, Will> visitor);
+
+    /**
+     * Persist the Will specification for client.
+     *
+     * @param clientId Identifier of the client that the Will belongs to.
+     * @param will Will specification to store.
+     * */
+    void saveWill(String clientId, ISessionsRepository.Will will);
+
+    /**
+     * Delete the Will specification of a client.
+     *
+     * @param clientId the identifier of the client.
+     * */
+    void deleteWill(String clientId);
 }

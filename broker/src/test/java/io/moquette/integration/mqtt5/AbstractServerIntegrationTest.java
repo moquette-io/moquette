@@ -22,7 +22,7 @@ abstract class AbstractServerIntegrationTest {
 
     @TempDir
     Path tempFolder;
-    private String dbPath;
+    protected String dbPath;
 
     Client lowLevelClient;
 
@@ -53,7 +53,7 @@ abstract class AbstractServerIntegrationTest {
         stopServer();
     }
 
-    private void stopServer() {
+    protected void stopServer() {
         broker.stopServer();
     }
 }
