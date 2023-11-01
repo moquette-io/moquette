@@ -31,12 +31,7 @@ import java.net.InetSocketAddress;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.DelayQueue;
@@ -345,21 +340,61 @@ public class SessionRegistry {
         final boolean retained = msg.variableHeader().isWillRetain();
         final MqttQoS qos = MqttQoS.valueOf(msg.variableHeader().willQos());
 
-        final int willDelayIntervalSeconds;
+        if (Utils.versionFromConnect(msg) != MqttVersion.MQTT_5) {
+            return new ISessionsRepository.Will(willTopic, willPayload, qos, retained, 0);
+        }
+
         // retrieve Will Delay if present and if the connection is MQTT5
-        if (Utils.versionFromConnect(msg) == MqttVersion.MQTT_5) {
-            final MqttProperties.MqttProperty<Integer> willDelayIntervalProperty =
-                msg.payload().willProperties().getProperty(MqttProperties.MqttPropertyType.WILL_DELAY_INTERVAL.value());
-            if (willDelayIntervalProperty != null) {
-                willDelayIntervalSeconds = willDelayIntervalProperty.value();
-            } else {
-                willDelayIntervalSeconds = 0;
-            }
+        final int willDelayIntervalSeconds;
+        MqttProperties willProperties = msg.payload().willProperties();
+        final MqttProperties.MqttProperty<Integer> willDelayIntervalProperty =
+            willProperties.getProperty(MqttProperties.MqttPropertyType.WILL_DELAY_INTERVAL.value());
+        if (willDelayIntervalProperty != null) {
+            willDelayIntervalSeconds = willDelayIntervalProperty.value();
         } else {
             willDelayIntervalSeconds = 0;
         }
+        ISessionsRepository.Will will = new ISessionsRepository.Will(willTopic, willPayload, qos, retained, willDelayIntervalSeconds);
 
-        return new ISessionsRepository.Will(willTopic, willPayload, qos, retained, willDelayIntervalSeconds);
+        ISessionsRepository.WillOptions options = ISessionsRepository.WillOptions.empty();
+        MqttProperties.MqttProperty<Integer> messageExpiryIntervalProperty =
+            willProperties.getProperty(MqttProperties.MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL.value());
+        if (messageExpiryIntervalProperty != null) {
+            Integer messageExpiryIntervalSeconds = messageExpiryIntervalProperty.value();
+            options = options.withMessageExpiry(Duration.ofSeconds(messageExpiryIntervalSeconds));
+        }
+
+        MqttProperties.MqttProperty<String> contentTypeProperty =
+            willProperties.getProperty(MqttProperties.MqttPropertyType.CONTENT_TYPE.value());
+        if (contentTypeProperty != null) {
+            options = options.withContentType(contentTypeProperty.value());
+        }
+
+        MqttProperties.MqttProperty<String> responseTopicProperty =
+            willProperties.getProperty(MqttProperties.MqttPropertyType.RESPONSE_TOPIC.value());
+        if (responseTopicProperty != null) {
+            options = options.withResponseTopic(responseTopicProperty.value());
+        }
+
+        MqttProperties.MqttProperty<byte[]> correlationDataProperty =
+            willProperties.getProperty(MqttProperties.MqttPropertyType.CORRELATION_DATA.value());
+        if (correlationDataProperty != null) {
+            options = options.withCorrelationData(correlationDataProperty.value());
+        }
+
+        List<? extends MqttProperties.MqttProperty> userProperties = willProperties.getProperties(MqttProperties.MqttPropertyType.USER_PROPERTY.value());
+        if (userProperties != null && !userProperties.isEmpty()) {
+            Map<String, String> props = new HashMap<>(userProperties.size());
+            for (MqttProperties.UserProperty userProperty: (List<MqttProperties.UserProperty>) userProperties) {
+                props.put(userProperty.value().key, userProperty.value().value);
+            }
+            options = options.withUserProperties(props);
+        }
+        if (options.notEmpty()) {
+            return new ISessionsRepository.Will(will, options);
+        } else {
+            return will;
+        }
     }
 
     Session retrieve(String clientID) {

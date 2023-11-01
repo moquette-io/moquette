@@ -303,6 +303,10 @@ class ConnectTest extends AbstractServerIntegrationTest {
                 .topic("/will_testament")
                 .payload("Goodbye".getBytes(StandardCharsets.UTF_8))
                 .delayInterval(delayInSeconds) // 1 second
+                .contentType("something content type here")
+                .userProperties()
+                    .add("test_property", "value of a property")
+                .applyUserProperties()
             .applyWillPublish();
 
         return createAndConnectWithBuilder(clientId, connectBuilder);
@@ -334,26 +338,6 @@ class ConnectTest extends AbstractServerIntegrationTest {
         Mqtt5ConnAck connectAck = clientWithWill.connect(connectBuilder.build());
         assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, connectAck.getReasonCode(), "Client must result connected");
         return clientWithWill;
-    }
-
-    private static boolean checkUTF8Validity(byte[] rawBytes) {
-        java.nio.charset.CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder();
-        try {
-            decoder.decode(ByteBuffer.wrap(rawBytes));
-        } catch (java.nio.charset.CharacterCodingException ex) {
-            return false;
-        }
-        return true;
-    }
-
-    @Test
-    public void validUTF8RawBytesShouldBePositivelyValidated() {
-        assertTrue(checkUTF8Validity(new byte[]{0x31, 0x32}));
-    }
-
-    @Test
-    public void invalidUTF8RawBytesShouldNegativelyValidated() {
-        assertFalse(checkUTF8Validity(new byte[]{(byte) 0xC0, (byte) 0xC1, (byte) 0xF5, (byte) 0xFF}));
     }
 
 }
