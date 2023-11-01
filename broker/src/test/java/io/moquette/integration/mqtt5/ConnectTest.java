@@ -26,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
@@ -33,9 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.*;
 
 class ConnectTest extends AbstractServerIntegrationTest {
     private static final Logger LOG = LoggerFactory.getLogger(ConnectTest.class);
@@ -335,6 +334,26 @@ class ConnectTest extends AbstractServerIntegrationTest {
         Mqtt5ConnAck connectAck = clientWithWill.connect(connectBuilder.build());
         assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, connectAck.getReasonCode(), "Client must result connected");
         return clientWithWill;
+    }
+
+    private static boolean checkUTF8Validity(byte[] rawBytes) {
+        java.nio.charset.CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder();
+        try {
+            decoder.decode(ByteBuffer.wrap(rawBytes));
+        } catch (java.nio.charset.CharacterCodingException ex) {
+            return false;
+        }
+        return true;
+    }
+
+    @Test
+    public void validUTF8RawBytesShouldBePositivelyValidated() {
+        assertTrue(checkUTF8Validity(new byte[]{0x31, 0x32}));
+    }
+
+    @Test
+    public void invalidUTF8RawBytesShouldNegativelyValidated() {
+        assertFalse(checkUTF8Validity(new byte[]{(byte) 0xC0, (byte) 0xC1, (byte) 0xF5, (byte) 0xFF}));
     }
 
 }
