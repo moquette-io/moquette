@@ -1,4 +1,5 @@
 Version 0.18-SNAPSHOT:
+   [feature] Handle will delay interval and MQTT5's Will optional properties (#770)
    [fix] Handle empty collector batches in PostOffice (#777)
    [feature] Introduce a new option "PEER_CERTIFICATE_AS_USERNAME". When enabled, the client certificate is provided as the username to the authenticator.
 
