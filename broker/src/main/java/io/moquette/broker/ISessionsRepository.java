@@ -1,5 +1,6 @@
 package io.moquette.broker;
 
+import io.moquette.broker.scheduler.Expirable;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttVersion;
 
@@ -18,10 +19,6 @@ import java.util.function.BiConsumer;
  * Used to store data about persisted sessions like MQTT version, session's properties.
  * */
 public interface ISessionsRepository {
-    interface Expirable {
-        Instant expireAt();
-
-    }
 
     // Data class
     final class SessionData implements Delayed {

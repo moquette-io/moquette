@@ -15,6 +15,8 @@
  */
 package io.moquette.broker;
 
+import io.moquette.broker.scheduler.ExpirableTracker;
+import io.moquette.broker.scheduler.ScheduledExpirationService;
 import io.moquette.interception.BrokerInterceptor;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
 import io.moquette.broker.subscriptions.Subscription;
@@ -35,7 +37,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -49,12 +50,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.DelayQueue;
-import java.util.concurrent.Delayed;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -192,35 +187,9 @@ class PostOffice {
         }
     }
 
-    static final class ExpirableTracker<T extends ISessionsRepository.Expirable> implements Delayed {
-        private final T expirable;
-        private final Clock clock;
-
-        ExpirableTracker(T expirable, Clock clock) {
-            this.expirable = expirable;
-            this.clock = clock;
-        }
-
-        @Override
-        public long getDelay(TimeUnit unit) {
-            return unit.convert(expirable.expireAt().toEpochMilli() - clock.millis(), TimeUnit.MILLISECONDS);
-        }
-
-        @Override
-        public int compareTo(Delayed o) {
-            return Long.compare(getDelay(TimeUnit.MILLISECONDS), o.getDelay(TimeUnit.MILLISECONDS));
-        }
-
-        public T expirable() {
-            return expirable;
-        }
-    }
-
     private static final Logger LOG = LoggerFactory.getLogger(PostOffice.class);
 
     private static final Set<String> NO_FILTER = new HashSet<>();
-
-    static final Duration EXPIRED_WILL_FIRER_TASK_INTERVAL = Duration.ofSeconds(1);
 
     private final Authorizator authorizator;
     private final ISubscriptionsDirectory subscriptions;
@@ -231,12 +200,9 @@ class PostOffice {
     private final FailedPublishCollection failedPublishes = new FailedPublishCollection();
     private final SessionEventLoopGroup sessionLoops;
     private final Clock clock;
-    private final ScheduledExecutorService delayedWillPublicationsScheduler = Executors.newSingleThreadScheduledExecutor();
-    private final DelayQueue<ExpirableTracker<ISessionsRepository.Will>> expiringWills = new DelayQueue();
-
+    private final ScheduledExpirationService willExpirationService;
     // Maps clientId to the respective Will in the expiring queue.
     private final Map<String, ExpirableTracker<ISessionsRepository.Will>> expiringWillsCache = new HashMap<>();
-    private final ScheduledFuture<?> expiredWillsTask;
 
     /**
      * Used only in tests
@@ -260,29 +226,15 @@ class PostOffice {
         this.sessionLoops = sessionLoops;
         this.clock = clock;
 
-        this.expiredWillsTask = delayedWillPublicationsScheduler.scheduleWithFixedDelay(this::checkExpiredWills,
-            EXPIRED_WILL_FIRER_TASK_INTERVAL.getSeconds(), EXPIRED_WILL_FIRER_TASK_INTERVAL.getSeconds(),
-            TimeUnit.SECONDS);
-
+        this.willExpirationService = new ScheduledExpirationService(clock, this::publishWill);
         recreateWillExpires(sessionRepository);
     }
 
     private void recreateWillExpires(ISessionsRepository sessionRepository) {
         sessionRepository.listSessionsWill((clientId, will) -> {
-            ExpirableTracker<ISessionsRepository.Will> willTracker = new ExpirableTracker<>(will, clock);
-            expiringWills.add(willTracker);
+            ExpirableTracker<ISessionsRepository.Will> willTracker = willExpirationService.track(will);
             expiringWillsCache.put(clientId, willTracker);
         });
-    }
-
-    private void checkExpiredWills() {
-        List<ExpirableTracker<ISessionsRepository.Will>> expiredWills = new ArrayList<>();
-        int drainedWills = expiringWills.drainTo(expiredWills);
-        LOG.debug("Retrieved {} expired will on {}", drainedWills, expiringWills.size());
-
-        expiredWills.stream()
-            .map(ExpirableTracker::expirable)
-            .forEach(this::publishWill);
     }
 
     public void fireWill(Session bindedSession) {
@@ -308,9 +260,7 @@ class PostOffice {
         final ISessionsRepository.Will willWithEOL = will.withExpirationComputed(executionInterval, clock);
         // save the will in the will store
         sessionRepository.saveWill(bindedSession.getClientID(), willWithEOL);
-
-        ExpirableTracker<ISessionsRepository.Will> tracker = new ExpirableTracker<>(willWithEOL, clock);
-        expiringWills.add(tracker);
+        ExpirableTracker<ISessionsRepository.Will> tracker = willExpirationService.track(willWithEOL);
         expiringWillsCache.put(clientId, tracker);
     }
 
@@ -329,8 +279,7 @@ class PostOffice {
         if (willTracker == null) {
             return; // not found
         }
-        boolean removed = expiringWills.remove(willTracker);
-        if (removed) {
+        if (willExpirationService.untrack(willTracker)) {
             LOG.debug("Wiped task to delayed publish for old client {}", clientId);
         }
 
@@ -772,17 +721,8 @@ class PostOffice {
     }
 
     public void terminate() {
-        shutdownWillsTask();
+        willExpirationService.shutdown();
         sessionLoops.terminate();
-    }
-
-    private void shutdownWillsTask() {
-        if (expiredWillsTask.cancel(false)) {
-            LOG.info("Successfully cancelled expired wills task");
-        } else {
-            LOG.warn("Can't cancel the execution of expired wills task, was already cancelled? {}, was done? {}",
-                expiredWillsTask.isCancelled(), expiredWillsTask.isDone());
-        }
     }
 
     /**
