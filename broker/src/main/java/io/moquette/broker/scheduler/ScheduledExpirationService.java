@@ -1,6 +1,5 @@
 package io.moquette.broker.scheduler;
 
-import io.moquette.broker.ISessionsRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,45 +20,45 @@ public class ScheduledExpirationService<T extends Expirable> {
 
     static final Duration FIRER_TASK_INTERVAL = Duration.ofSeconds(1);
     private final ScheduledExecutorService delayedWillPublicationsScheduler = Executors.newSingleThreadScheduledExecutor();
-    private final DelayQueue<ExpirableTracker<T>> expiringWills = new DelayQueue();
-    private final ScheduledFuture<?> expiredWillsTask;
+    private final DelayQueue<ExpirableTracker<T>> expiringEntities = new DelayQueue();
+    private final ScheduledFuture<?> expiredEntityTask;
     private final Clock clock;
     private final Consumer<T> action;
 
     public ScheduledExpirationService(Clock clock, Consumer<T> action) {
         this.clock = clock;
         this.action = action;
-        this.expiredWillsTask = delayedWillPublicationsScheduler.scheduleWithFixedDelay(this::checkExpiredWills,
+        this.expiredEntityTask = delayedWillPublicationsScheduler.scheduleWithFixedDelay(this::checkExpiredEntities,
             FIRER_TASK_INTERVAL.getSeconds(), FIRER_TASK_INTERVAL.getSeconds(),
             TimeUnit.SECONDS);
     }
 
-    private void checkExpiredWills() {
-        List<ExpirableTracker<T>> expiredWills = new ArrayList<>();
-        int drainedWills = expiringWills.drainTo(expiredWills);
-        LOG.debug("Retrieved {} expired will on {}", drainedWills, expiringWills.size());
+    private void checkExpiredEntities() {
+        List<ExpirableTracker<T>> expiredEntities = new ArrayList<>();
+        int drainedEntities = expiringEntities.drainTo(expiredEntities);
+        LOG.debug("Retrieved {} expired entity on {}", drainedEntities, expiringEntities.size());
 
-        expiredWills.stream()
+        expiredEntities.stream()
             .map(ExpirableTracker::expirable)
             .forEach(action);
     }
 
-    public ExpirableTracker<T> track(T will) {
-        ExpirableTracker<T> willTracker = new ExpirableTracker<>(will, clock);
-        expiringWills.add(willTracker);
-        return willTracker;
+    public ExpirableTracker<T> track(T entity) {
+        ExpirableTracker<T> entityTracker = new ExpirableTracker<>(entity, clock);
+        expiringEntities.add(entityTracker);
+        return entityTracker;
     }
 
-    public boolean untrack(ExpirableTracker<T> willTracker) {
-        return expiringWills.remove(willTracker);
+    public boolean untrack(ExpirableTracker<T> entityTracker) {
+        return expiringEntities.remove(entityTracker);
     }
 
     public void shutdown() {
-        if (expiredWillsTask.cancel(false)) {
-            LOG.info("Successfully cancelled expired wills task");
+        if (expiredEntityTask.cancel(false)) {
+            LOG.info("Successfully cancelled expired entities task");
         } else {
-            LOG.warn("Can't cancel the execution of expired wills task, was already cancelled? {}, was done? {}",
-                expiredWillsTask.isCancelled(), expiredWillsTask.isDone());
+            LOG.warn("Can't cancel the execution of expired entities task, was already cancelled? {}, was done? {}",
+                expiredEntityTask.isCancelled(), expiredEntityTask.isDone());
         }
     }
 }
