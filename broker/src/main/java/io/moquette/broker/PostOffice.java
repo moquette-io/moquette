@@ -40,10 +40,8 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -202,7 +200,7 @@ class PostOffice {
     private final Clock clock;
     private final ScheduledExpirationService<ISessionsRepository.Will> willExpirationService;
     // Maps clientId to the respective Will in the expiring queue.
-    private final Map<String, ExpirableTracker<ISessionsRepository.Will>> expiringWillsCache = new HashMap<>();
+//    private final Map<String, ExpirableTracker<ISessionsRepository.Will>> expiringWillsCache = new HashMap<>();
 
     /**
      * Used only in tests
@@ -231,10 +229,7 @@ class PostOffice {
     }
 
     private void recreateWillExpires(ISessionsRepository sessionRepository) {
-        sessionRepository.listSessionsWill((clientId, will) -> {
-            ExpirableTracker<ISessionsRepository.Will> willTracker = willExpirationService.track(will);
-            expiringWillsCache.put(clientId, willTracker);
-        });
+        sessionRepository.listSessionsWill(willExpirationService::track);
     }
 
     public void fireWill(Session bindedSession) {
@@ -260,8 +255,7 @@ class PostOffice {
         final ISessionsRepository.Will willWithEOL = will.withExpirationComputed(executionInterval, clock);
         // save the will in the will store
         sessionRepository.saveWill(bindedSession.getClientID(), willWithEOL);
-        ExpirableTracker<ISessionsRepository.Will> tracker = willExpirationService.track(willWithEOL);
-        expiringWillsCache.put(clientId, tracker);
+        willExpirationService.track(clientId, willWithEOL);
     }
 
     private void publishWill(ISessionsRepository.Will will) {
@@ -274,12 +268,7 @@ class PostOffice {
      * @param clientId session's Id.
      * */
     public void wipeExistingScheduledWill(String clientId) {
-        //remove the tracked will from expiringWills
-        ExpirableTracker<ISessionsRepository.Will> willTracker = expiringWillsCache.remove(clientId);
-        if (willTracker == null) {
-            return; // not found
-        }
-        if (willExpirationService.untrack(willTracker)) {
+        if (willExpirationService.untrack(clientId)) {
             LOG.debug("Wiped task to delayed publish for old client {}", clientId);
         }
 

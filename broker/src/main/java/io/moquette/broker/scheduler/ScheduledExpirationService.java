@@ -6,7 +6,9 @@ import org.slf4j.LoggerFactory;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -24,6 +26,8 @@ public class ScheduledExpirationService<T extends Expirable> {
     private final ScheduledFuture<?> expiredEntityTask;
     private final Clock clock;
     private final Consumer<T> action;
+
+    private final Map<String, ExpirableTracker<T>> expiringEntitiesCache = new HashMap<>();
 
     public ScheduledExpirationService(Clock clock, Consumer<T> action) {
         this.clock = clock;
@@ -43,14 +47,32 @@ public class ScheduledExpirationService<T extends Expirable> {
             .forEach(action);
     }
 
+    @Deprecated
     public ExpirableTracker<T> track(T entity) {
         ExpirableTracker<T> entityTracker = new ExpirableTracker<>(entity, clock);
         expiringEntities.add(entityTracker);
         return entityTracker;
     }
 
+    public void track(String entityId, T entity) {
+        if (!entity.expireAt().isPresent()) {
+            throw new RuntimeException("Can't track for expiration an entity without expiry instant, client_id: " + entityId);
+        }
+        ExpirableTracker<T> tracker = track(entity);
+        expiringEntitiesCache.put(entityId, tracker);
+    }
+
+    @Deprecated
     public boolean untrack(ExpirableTracker<T> entityTracker) {
         return expiringEntities.remove(entityTracker);
+    }
+
+    public boolean untrack(String entityId) {
+        ExpirableTracker<T> entityTracker = expiringEntitiesCache.get(entityId);
+        if (entityTracker == null) {
+            return false; // not found
+        }
+        return untrack(entityTracker);
     }
 
     public void shutdown() {

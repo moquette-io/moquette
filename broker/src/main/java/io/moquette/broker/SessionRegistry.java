@@ -16,7 +16,6 @@
 package io.moquette.broker;
 
 import io.moquette.broker.Session.SessionStatus;
-import io.moquette.broker.scheduler.ExpirableTracker;
 import io.moquette.broker.scheduler.ScheduledExpirationService;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
 import io.moquette.broker.subscriptions.Subscription;
@@ -37,7 +36,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Collectors;
 
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
@@ -133,8 +131,6 @@ public class SessionRegistry {
     private final Authorizator authorizator;
     private final Clock clock;
 
-    private final Map<String, ExpirableTracker<ISessionsRepository.SessionData>> expiringSessionsCache = new HashMap<>();
-
     // Used in testing
     SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory,
                     ISessionsRepository sessionsRepository,
@@ -170,20 +166,13 @@ public class SessionRegistry {
         sessionsRepository.delete(expiredSession);
     }
 
-    private ExpirableTracker<ISessionsRepository.SessionData> trackForRemovalOnExpiration(ISessionsRepository.SessionData session) {
-        if (!session.expireAt().isPresent()) {
-            throw new RuntimeException("Can't track for expiration a session without expiry instant, client_id: " + session.clientId());
-        }
+    private void trackForRemovalOnExpiration(ISessionsRepository.SessionData session) {
         LOG.debug("start tracking the session {} for removal", session.clientId());
-        return sessionExpirationService.track(session);
+        sessionExpirationService.track(session.clientId(), session);
     }
 
     private void untrackFromRemovalOnExpiration(ISessionsRepository.SessionData session) {
-        ExpirableTracker<ISessionsRepository.SessionData> tracker = expiringSessionsCache.get(session.clientId());
-        if (tracker == null) {
-            return; // not found
-        }
-        sessionExpirationService.untrack(tracker);
+        sessionExpirationService.untrack(session.clientId());
     }
 
     private void recreateSessionPool() {
@@ -196,8 +185,7 @@ public class SessionRegistry {
                 Session rehydrated = new Session(session, false, persistentQueue);
                 pool.put(session.clientId(), rehydrated);
 
-                ExpirableTracker<ISessionsRepository.SessionData> sessionTracker = trackForRemovalOnExpiration(session);
-                expiringSessionsCache.put(session.clientId(), sessionTracker);
+                trackForRemovalOnExpiration(session);
             }
         }
         if (!queues.isEmpty()) {
@@ -408,8 +396,7 @@ public class SessionRegistry {
         } else {
             //bound session has expiry, disconnect it and add to the queue for removal
             ISessionsRepository.SessionData sessionData = session.getSessionData().withExpirationComputed();
-            ExpirableTracker<ISessionsRepository.SessionData> tracker = trackForRemovalOnExpiration(sessionData);
-            expiringSessionsCache.put(session.getClientID(), tracker);
+            trackForRemovalOnExpiration(sessionData);
         }
     }
 
@@ -428,11 +415,11 @@ public class SessionRegistry {
         final Session old = pool.remove(clientID);
         if (old != null) {
             // remove from expired tracker if present
-            ExpirableTracker<ISessionsRepository.SessionData> tracker = expiringSessionsCache.get(clientID);
-            if (tracker == null) {
-                return; // not found
-            }
-            sessionExpirationService.untrack(tracker);
+//            ExpirableTracker<ISessionsRepository.SessionData> tracker = expiringSessionsCache.get(clientID);
+//            if (tracker == null) {
+//                return; // not found
+//            }
+            sessionExpirationService.untrack(clientID);
             loopsGroup.routeCommand(clientID, "Clean up removed session", () -> {
                 old.cleanUp();
                 return null;
