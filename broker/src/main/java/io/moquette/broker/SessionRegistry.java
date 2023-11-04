@@ -415,10 +415,6 @@ public class SessionRegistry {
         final Session old = pool.remove(clientID);
         if (old != null) {
             // remove from expired tracker if present
-//            ExpirableTracker<ISessionsRepository.SessionData> tracker = expiringSessionsCache.get(clientID);
-//            if (tracker == null) {
-//                return; // not found
-//            }
             sessionExpirationService.untrack(clientID);
             loopsGroup.routeCommand(clientID, "Clean up removed session", () -> {
                 old.cleanUp();

@@ -138,16 +138,6 @@ public interface ISessionsRepository {
                 '}';
         }
 
-//        @Override
-//        public long getDelay(TimeUnit unit) {
-//            return unit.convert(expireAt.toEpochMilli() - clock.millis(), TimeUnit.MILLISECONDS);
-//        }
-//
-//        @Override
-//        public int compareTo(Delayed o) {
-//            return Long.compare(getDelay(TimeUnit.MILLISECONDS), o.getDelay(TimeUnit.MILLISECONDS));
-//        }
-
         public boolean hasWill() {
             return will.isPresent();
         }

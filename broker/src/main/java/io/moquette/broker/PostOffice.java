@@ -15,7 +15,6 @@
  */
 package io.moquette.broker;
 
-import io.moquette.broker.scheduler.ExpirableTracker;
 import io.moquette.broker.scheduler.ScheduledExpirationService;
 import io.moquette.interception.BrokerInterceptor;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
@@ -199,8 +198,6 @@ class PostOffice {
     private final SessionEventLoopGroup sessionLoops;
     private final Clock clock;
     private final ScheduledExpirationService<ISessionsRepository.Will> willExpirationService;
-    // Maps clientId to the respective Will in the expiring queue.
-//    private final Map<String, ExpirableTracker<ISessionsRepository.Will>> expiringWillsCache = new HashMap<>();
 
     /**
      * Used only in tests
