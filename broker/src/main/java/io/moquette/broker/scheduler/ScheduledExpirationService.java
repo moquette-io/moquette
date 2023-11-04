@@ -53,8 +53,7 @@ public class ScheduledExpirationService<T extends Expirable> {
         }
         ExpirableTracker<T> entityTracker = new ExpirableTracker<>(entity, clock);
         expiringEntities.add(entityTracker);
-        ExpirableTracker<T> tracker = entityTracker;
-        expiringEntitiesCache.put(entityId, tracker);
+        expiringEntitiesCache.put(entityId, entityTracker);
     }
 
     public boolean untrack(String entityId) {
