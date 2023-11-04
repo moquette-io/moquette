@@ -15,18 +15,18 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-public class ScheduledExpirationService {
+public class ScheduledExpirationService<T extends Expirable> {
 
     private static final Logger LOG = LoggerFactory.getLogger(ScheduledExpirationService.class);
 
     static final Duration FIRER_TASK_INTERVAL = Duration.ofSeconds(1);
     private final ScheduledExecutorService delayedWillPublicationsScheduler = Executors.newSingleThreadScheduledExecutor();
-    private final DelayQueue<ExpirableTracker<ISessionsRepository.Will>> expiringWills = new DelayQueue();
+    private final DelayQueue<ExpirableTracker<T>> expiringWills = new DelayQueue();
     private final ScheduledFuture<?> expiredWillsTask;
     private final Clock clock;
-    private final Consumer<ISessionsRepository.Will> action;
+    private final Consumer<T> action;
 
-    public ScheduledExpirationService(Clock clock, Consumer<ISessionsRepository.Will> action) {
+    public ScheduledExpirationService(Clock clock, Consumer<T> action) {
         this.clock = clock;
         this.action = action;
         this.expiredWillsTask = delayedWillPublicationsScheduler.scheduleWithFixedDelay(this::checkExpiredWills,
@@ -35,7 +35,7 @@ public class ScheduledExpirationService {
     }
 
     private void checkExpiredWills() {
-        List<ExpirableTracker<ISessionsRepository.Will>> expiredWills = new ArrayList<>();
+        List<ExpirableTracker<T>> expiredWills = new ArrayList<>();
         int drainedWills = expiringWills.drainTo(expiredWills);
         LOG.debug("Retrieved {} expired will on {}", drainedWills, expiringWills.size());
 
@@ -44,13 +44,13 @@ public class ScheduledExpirationService {
             .forEach(action);
     }
 
-    public ExpirableTracker<ISessionsRepository.Will> track(ISessionsRepository.Will will) {
-        ExpirableTracker<ISessionsRepository.Will> willTracker = new ExpirableTracker<>(will, clock);
+    public ExpirableTracker<T> track(T will) {
+        ExpirableTracker<T> willTracker = new ExpirableTracker<>(will, clock);
         expiringWills.add(willTracker);
         return willTracker;
     }
 
-    public boolean untrack(ExpirableTracker<ISessionsRepository.Will> willTracker) {
+    public boolean untrack(ExpirableTracker<T> willTracker) {
         return expiringWills.remove(willTracker);
     }
 

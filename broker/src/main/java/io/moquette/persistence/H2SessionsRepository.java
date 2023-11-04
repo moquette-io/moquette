@@ -188,11 +188,7 @@ class H2SessionsRepository implements ISessionsRepository {
             byte qos = (byte) (will.qos.value() & 0x0F);
             buff.put((byte) (retained & qos));
             buff.putInt(will.delayInterval);
-            if (will.expireAt() == null) {
-                buff.putLong(UNDEFINED_INSTANT);
-            } else {
-                buff.putLong(will.expireAt().toEpochMilli());
-            }
+            buff.putLong(will.expireAt().map(Instant::toEpochMilli).orElse(UNDEFINED_INSTANT));
             if (will.properties.notEmpty()) {
                 willOptionsDataType.write(buff, will.properties);
             }

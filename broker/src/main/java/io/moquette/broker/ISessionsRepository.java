@@ -21,7 +21,7 @@ import java.util.function.BiConsumer;
 public interface ISessionsRepository {
 
     // Data class
-    final class SessionData implements Delayed {
+    final class SessionData implements Expirable {
         private final String clientId;
         private Instant expireAt = null;
         final MqttVersion version;
@@ -140,15 +140,15 @@ public interface ISessionsRepository {
                 '}';
         }
 
-        @Override
-        public long getDelay(TimeUnit unit) {
-            return unit.convert(expireAt.toEpochMilli() - clock.millis(), TimeUnit.MILLISECONDS);
-        }
-
-        @Override
-        public int compareTo(Delayed o) {
-            return Long.compare(getDelay(TimeUnit.MILLISECONDS), o.getDelay(TimeUnit.MILLISECONDS));
-        }
+//        @Override
+//        public long getDelay(TimeUnit unit) {
+//            return unit.convert(expireAt.toEpochMilli() - clock.millis(), TimeUnit.MILLISECONDS);
+//        }
+//
+//        @Override
+//        public int compareTo(Delayed o) {
+//            return Long.compare(getDelay(TimeUnit.MILLISECONDS), o.getDelay(TimeUnit.MILLISECONDS));
+//        }
 
         public boolean hasWill() {
             return will.isPresent();
@@ -289,8 +289,8 @@ public interface ISessionsRepository {
          }
 
          @Override
-         public Instant expireAt() {
-             return expireAt;
+         public Optional<Instant> expireAt() {
+             return Optional.ofNullable(expireAt);
          }
 
          public Will withExpirationComputed(int executionInterval, Clock clock) {

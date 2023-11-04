@@ -16,7 +16,7 @@ public final class ExpirableTracker<T extends Expirable> implements Delayed {
 
     @Override
     public long getDelay(TimeUnit unit) {
-        return unit.convert(expirable.expireAt().toEpochMilli() - clock.millis(), TimeUnit.MILLISECONDS);
+        return unit.convert(expirable.expireAt().get().toEpochMilli() - clock.millis(), TimeUnit.MILLISECONDS);
     }
 
     @Override

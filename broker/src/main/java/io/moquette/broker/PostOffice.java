@@ -200,7 +200,7 @@ class PostOffice {
     private final FailedPublishCollection failedPublishes = new FailedPublishCollection();
     private final SessionEventLoopGroup sessionLoops;
     private final Clock clock;
-    private final ScheduledExpirationService willExpirationService;
+    private final ScheduledExpirationService<ISessionsRepository.Will> willExpirationService;
     // Maps clientId to the respective Will in the expiring queue.
     private final Map<String, ExpirableTracker<ISessionsRepository.Will>> expiringWillsCache = new HashMap<>();
 
@@ -226,7 +226,7 @@ class PostOffice {
         this.sessionLoops = sessionLoops;
         this.clock = clock;
 
-        this.willExpirationService = new ScheduledExpirationService(clock, this::publishWill);
+        this.willExpirationService = new ScheduledExpirationService<>(clock, this::publishWill);
         recreateWillExpires(sessionRepository);
     }
 
