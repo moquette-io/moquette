@@ -9,6 +9,7 @@ import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVStore;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -40,7 +41,7 @@ public class H2RetainedRepository implements IRetainedRepository {
     }
 
     @Override
-    public List<RetainedMessage> retainedOnTopic(String topic) {
+    public Collection<RetainedMessage> retainedOnTopic(String topic) {
         final Topic searchTopic = new Topic(topic);
         final List<RetainedMessage> matchingMessages = new ArrayList<>();
         for (Map.Entry<Topic, RetainedMessage> entry : queueMap.entrySet()) {
