@@ -16,6 +16,7 @@
 package io.moquette.broker;
 
 import io.moquette.broker.Session.SessionStatus;
+import io.moquette.broker.scheduler.ScheduledExpirationService;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
 import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.Topic;
@@ -34,20 +35,17 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.DelayQueue;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
 
 public class SessionRegistry {
 
-    private final ScheduledFuture<?> scheduledExpiredSessions;
     private int globalExpirySeconds;
     private final SessionEventLoopGroup loopsGroup;
     static final Duration EXPIRED_SESSION_CLEANER_TASK_INTERVAL = Duration.ofSeconds(1);
+    private ScheduledExpirationService<ISessionsRepository.SessionData> sessionExpirationService;
 
     public abstract static class EnqueuedMessage {
 
@@ -131,7 +129,6 @@ public class SessionRegistry {
     private final ISessionsRepository sessionsRepository;
     private final IQueueRepository queueRepository;
     private final Authorizator authorizator;
-    private final DelayQueue<ISessionsRepository.SessionData> removableSessions = new DelayQueue<>();
     private final Clock clock;
 
     // Used in testing
@@ -155,37 +152,27 @@ public class SessionRegistry {
         this.sessionsRepository = sessionsRepository;
         this.queueRepository = queueRepository;
         this.authorizator = authorizator;
-        this.scheduledExpiredSessions = scheduler.scheduleWithFixedDelay(this::checkExpiredSessions,
-            EXPIRED_SESSION_CLEANER_TASK_INTERVAL.getSeconds(), EXPIRED_SESSION_CLEANER_TASK_INTERVAL.getSeconds(),
-            TimeUnit.SECONDS);
+        sessionExpirationService = new ScheduledExpirationService<>(clock, this::removeExpiredSession);
         this.clock = clock;
         this.globalExpirySeconds = globalExpirySeconds;
         this.loopsGroup = loopsGroup;
         recreateSessionPool();
     }
 
-    private void checkExpiredSessions() {
-        List<ISessionsRepository.SessionData> expiredSessions = new ArrayList<>();
-        int drainedSessions = removableSessions.drainTo(expiredSessions);
-        LOG.debug("Retrieved {} expired sessions or {}", drainedSessions, removableSessions.size());
-        for (ISessionsRepository.SessionData expiredSession : expiredSessions) {
-            final String expiredAt = expiredSession.expireAt().map(Instant::toString).orElse("UNDEFINED");
-            LOG.debug("Removing session {}, expired on {}", expiredSession.clientId(), expiredAt);
-            remove(expiredSession.clientId());
-            sessionsRepository.delete(expiredSession);
-        }
+    private void removeExpiredSession(ISessionsRepository.SessionData expiredSession) {
+        final String expiredAt = expiredSession.expireAt().map(Instant::toString).orElse("UNDEFINED");
+        LOG.debug("Removing session {}, expired on {}", expiredSession.clientId(), expiredAt);
+        remove(expiredSession.clientId());
+        sessionsRepository.delete(expiredSession);
     }
 
     private void trackForRemovalOnExpiration(ISessionsRepository.SessionData session) {
-        if (!session.expireAt().isPresent()) {
-            throw new RuntimeException("Can't track for expiration a session without expiry instant, client_id: " + session.clientId());
-        }
         LOG.debug("start tracking the session {} for removal", session.clientId());
-        removableSessions.add(session);
+        sessionExpirationService.track(session.clientId(), session);
     }
 
     private void untrackFromRemovalOnExpiration(ISessionsRepository.SessionData session) {
-        removableSessions.remove(session);
+        sessionExpirationService.untrack(session.clientId());
     }
 
     private void recreateSessionPool() {
@@ -197,6 +184,7 @@ public class SessionRegistry {
                 queues.remove(session.clientId());
                 Session rehydrated = new Session(session, false, persistentQueue);
                 pool.put(session.clientId(), rehydrated);
+
                 trackForRemovalOnExpiration(session);
             }
         }
@@ -407,7 +395,8 @@ public class SessionRegistry {
             purgeSessionState(session);
         } else {
             //bound session has expiry, disconnect it and add to the queue for removal
-            trackForRemovalOnExpiration(session.getSessionData().withExpirationComputed());
+            ISessionsRepository.SessionData sessionData = session.getSessionData().withExpirationComputed();
+            trackForRemovalOnExpiration(sessionData);
         }
     }
 
@@ -426,7 +415,7 @@ public class SessionRegistry {
         final Session old = pool.remove(clientID);
         if (old != null) {
             // remove from expired tracker if present
-            removableSessions.remove(old.getSessionData());
+            sessionExpirationService.untrack(clientID);
             loopsGroup.routeCommand(clientID, "Clean up removed session", () -> {
                 old.cleanUp();
                 return null;
@@ -481,12 +470,7 @@ public class SessionRegistry {
      * Close all resources related to session management
      */
     public void close() {
-        if (scheduledExpiredSessions.cancel(false)) {
-            LOG.info("Successfully cancelled expired sessions task");
-        } else {
-            LOG.warn("Can't cancel the execution of expired sessions task, was already cancelled? {}, was done? {}",
-                scheduledExpiredSessions.isCancelled(), scheduledExpiredSessions.isDone());
-        }
+        sessionExpirationService.shutdown();
         // Update all not clean session with the proper expiry date
         updateNotCleanSessionsWithProperExpire();
         queueRepository.close();

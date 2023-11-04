@@ -1,5 +1,6 @@
 package io.moquette.broker;
 
+import io.moquette.broker.scheduler.Expirable;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttVersion;
 
@@ -10,21 +11,15 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.Delayed;
-import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
 /**
  * Used to store data about persisted sessions like MQTT version, session's properties.
  * */
 public interface ISessionsRepository {
-    interface Expirable {
-        Instant expireAt();
-
-    }
 
     // Data class
-    final class SessionData implements Delayed {
+    final class SessionData implements Expirable {
         private final String clientId;
         private Instant expireAt = null;
         final MqttVersion version;
@@ -141,16 +136,6 @@ public interface ISessionsRepository {
                 ", version=" + version +
                 ", expiryInterval=" + expiryInterval +
                 '}';
-        }
-
-        @Override
-        public long getDelay(TimeUnit unit) {
-            return unit.convert(expireAt.toEpochMilli() - clock.millis(), TimeUnit.MILLISECONDS);
-        }
-
-        @Override
-        public int compareTo(Delayed o) {
-            return Long.compare(getDelay(TimeUnit.MILLISECONDS), o.getDelay(TimeUnit.MILLISECONDS));
         }
 
         public boolean hasWill() {
@@ -292,8 +277,8 @@ public interface ISessionsRepository {
          }
 
          @Override
-         public Instant expireAt() {
-             return expireAt;
+         public Optional<Instant> expireAt() {
+             return Optional.ofNullable(expireAt);
          }
 
          public Will withExpirationComputed(int executionInterval, Clock clock) {
