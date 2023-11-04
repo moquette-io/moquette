@@ -443,9 +443,9 @@ public class PostOfficePublishTest {
     }
 
     private void assertMessageIsRetained(String expectedTopicName, ByteBuf expectedPayload) {
-        List<RetainedMessage> msgs = retainedRepository.retainedOnTopic(expectedTopicName);
+        Collection<RetainedMessage> msgs = retainedRepository.retainedOnTopic(expectedTopicName);
         assertEquals(1, msgs.size());
-        RetainedMessage msg = msgs.get(0);
+        RetainedMessage msg = msgs.iterator().next();
         assertEquals(ByteBufUtil.hexDump(expectedPayload), ByteBufUtil.hexDump(msg.getPayload()));
     }
 }

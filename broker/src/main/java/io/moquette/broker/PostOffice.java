@@ -374,7 +374,7 @@ class PostOffice {
         Session targetSession = this.sessionRegistry.retrieve(clientID);
         for (Subscription subscription : newSubscriptions) {
             final String topicFilter = subscription.getTopicFilter().toString();
-            final List<RetainedMessage> retainedMsgs = retainedRepository.retainedOnTopic(topicFilter);
+            final Collection<RetainedMessage> retainedMsgs = retainedRepository.retainedOnTopic(topicFilter);
 
             if (retainedMsgs.isEmpty()) {
                 // not found

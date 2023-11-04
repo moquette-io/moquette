@@ -20,6 +20,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,7 +53,7 @@ final class MemoryRetainedRepository implements IRetainedRepository {
     }
 
     @Override
-    public List<RetainedMessage> retainedOnTopic(String topic) {
+    public Collection<RetainedMessage> retainedOnTopic(String topic) {
         final Topic searchTopic = new Topic(topic);
         final List<RetainedMessage> matchingMessages = new ArrayList<>();
         for (Map.Entry<Topic, RetainedMessage> entry : storage.entrySet()) {
