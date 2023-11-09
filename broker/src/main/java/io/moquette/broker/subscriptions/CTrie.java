@@ -50,37 +50,37 @@ public class CTrie {
         MATCH, GODEEP, STOP
     }
 
-    private NavigationAction evaluate(Topic topic, CNode cnode) {
+    private NavigationAction evaluate(Topic topicName, CNode cnode) {
         if (Token.MULTI.equals(cnode.getToken())) {
             return NavigationAction.MATCH;
         }
-        if (topic.isEmpty()) {
+        if (topicName.isEmpty()) {
             return NavigationAction.STOP;
         }
-        final Token token = topic.headToken();
-        if (!(Token.SINGLE.equals(cnode.getToken()) || cnode.getToken().equals(token) || ROOT.equals(cnode.getToken()))) {
-            return NavigationAction.STOP;
+        final Token token = topicName.headToken();
+        if (Token.SINGLE.equals(cnode.getToken()) || cnode.getToken().equals(token) || ROOT.equals(cnode.getToken())) {
+            return NavigationAction.GODEEP;
         }
-        return NavigationAction.GODEEP;
+        return NavigationAction.STOP;
     }
 
-    public List<Subscription> recursiveMatch(Topic topic) {
-        return recursiveMatch(topic, this.root);
+    public List<Subscription> recursiveMatch(Topic topicName) {
+        return recursiveMatch(topicName, this.root);
     }
 
-    private List<Subscription> recursiveMatch(Topic topic, INode inode) {
+    private List<Subscription> recursiveMatch(Topic topicName, INode inode) {
         CNode cnode = inode.mainNode();
         if (cnode instanceof TNode) {
             return Collections.emptyList();
         }
-        NavigationAction action = evaluate(topic, cnode);
+        NavigationAction action = evaluate(topicName, cnode);
         if (action == NavigationAction.MATCH) {
             return cnode.subscriptions;
         }
         if (action == NavigationAction.STOP) {
             return Collections.emptyList();
         }
-        Topic remainingTopic = (ROOT.equals(cnode.getToken())) ? topic : topic.exceptHeadToken();
+        Topic remainingTopic = (ROOT.equals(cnode.getToken())) ? topicName : topicName.exceptHeadToken();
         List<Subscription> subscriptions = new ArrayList<>();
 
         // We should only consider the maximum three children children of
