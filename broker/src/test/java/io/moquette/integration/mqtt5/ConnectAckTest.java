@@ -21,7 +21,7 @@ class ConnectAckTest extends  AbstractServerIntegrationTest {
     private MqttConnAckMessage connAck;
 
     @Override
-    String clientName() {
+    public String clientName() {
         return "client";
     }
 

@@ -114,8 +114,8 @@ public class CTrieTest {
         assertTrue(subscriptions.contains(happinessSensor));
     }
 
-    static Subscription clientSubOnTopic(String clientID, String topicName) {
-        return new Subscription(clientID, asTopic(topicName), null);
+    static Subscription clientSubOnTopic(String clientID, String topicFilter) {
+        return new Subscription(clientID, asTopic(topicFilter), null);
     }
 
     @Test

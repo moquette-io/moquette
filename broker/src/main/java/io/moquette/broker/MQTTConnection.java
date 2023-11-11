@@ -608,6 +608,11 @@ final class MQTTConnection {
             dropConnection();
         }
 
+        if (!topic.isEmpty() && topic.headToken().isReserved()) {
+            LOG.warn("Avoid to publish on topic which contains reserved topic (starts with $)");
+            return PostOffice.RouteResult.failed(clientId);
+        }
+
         // retain else msg is cleaned by the NewNettyMQTTHandler and is not available
         // in execution by SessionEventLoop
         msg.retain();
@@ -615,8 +620,9 @@ final class MQTTConnection {
             case AT_MOST_ONCE:
                 return postOffice.routeCommand(clientId, "PUB QoS0", () -> {
                     checkMatchSessionLoop(clientId);
-                    if (!isBoundToSession())
+                    if (!isBoundToSession()) {
                         return null;
+                    }
                     postOffice.receivedPublishQos0(topic, username, clientId, msg);
                     return null;
                 }).ifFailed(msg::release);

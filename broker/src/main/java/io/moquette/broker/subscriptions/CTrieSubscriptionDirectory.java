@@ -71,18 +71,18 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
      * contain character # and + because they are reserved to listeners subscriptions, and not topic
      * publishing.
      *
-     * @param topic
-     *            to use fo searching matching subscriptions.
+     * @param topicName
+     *            to use for search matching subscriptions.
      * @return the list of matching subscriptions, or empty if not matching.
      */
     @Override
-    public List<Subscription> matchWithoutQosSharpening(Topic topic) {
-        return ctrie.recursiveMatch(topic);
+    public List<Subscription> matchWithoutQosSharpening(Topic topicName) {
+        return ctrie.recursiveMatch(topicName);
     }
 
     @Override
-    public List<Subscription> matchQosSharpening(Topic topic) {
-        final List<Subscription> subscriptions = matchWithoutQosSharpening(topic);
+    public List<Subscription> matchQosSharpening(Topic topicName) {
+        final List<Subscription> subscriptions = matchWithoutQosSharpening(topicName);
 
         Map<String, Subscription> subsGroupedByClient = new HashMap<>();
         for (Subscription sub : subscriptions) {
