@@ -20,6 +20,9 @@ import io.moquette.broker.ISubscriptionsRepository;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * Contains all topic filters that are used to  match against topic names.
+ * */
 public interface ISubscriptionsDirectory {
 
     void init(ISubscriptionsRepository sessionsRepository);

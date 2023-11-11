@@ -50,8 +50,17 @@ public class CTrie {
         MATCH, GODEEP, STOP
     }
 
-    private NavigationAction evaluate(Topic topicName, CNode cnode) {
+    private NavigationAction evaluate(Topic topicName, CNode cnode, int depth) {
+        // depth 0 is the root node of all the topics, so for topic filter
+        // monitor/sensor we have <root> -> monitor -> sensor
+        final boolean isFirstLevel = depth == 1;
         if (Token.MULTI.equals(cnode.getToken())) {
+            Token token = topicName.headToken();
+            if (token != null && token.isReserved() && isFirstLevel) {
+                // [MQTT-4.7.2-1] single wildcard can't match reserved topics
+                // if reserved token is the first of the topicName
+                return NavigationAction.STOP;
+            }
             return NavigationAction.MATCH;
         }
         if (topicName.isEmpty()) {
@@ -59,21 +68,25 @@ public class CTrie {
         }
         final Token token = topicName.headToken();
         if (Token.SINGLE.equals(cnode.getToken()) || cnode.getToken().equals(token) || ROOT.equals(cnode.getToken())) {
+            if (Token.SINGLE.equals(cnode.getToken()) && token.isReserved() && isFirstLevel) {
+                // [MQTT-4.7.2-1] single wildcard can't match reserved topics
+                return NavigationAction.STOP;
+            }
             return NavigationAction.GODEEP;
         }
         return NavigationAction.STOP;
     }
 
     public List<Subscription> recursiveMatch(Topic topicName) {
-        return recursiveMatch(topicName, this.root);
+        return recursiveMatch(topicName, this.root, 0);
     }
 
-    private List<Subscription> recursiveMatch(Topic topicName, INode inode) {
+    private List<Subscription> recursiveMatch(Topic topicName, INode inode, int depth) {
         CNode cnode = inode.mainNode();
         if (cnode instanceof TNode) {
             return Collections.emptyList();
         }
-        NavigationAction action = evaluate(topicName, cnode);
+        NavigationAction action = evaluate(topicName, cnode, depth);
         if (action == NavigationAction.MATCH) {
             return cnode.subscriptions;
         }
@@ -87,18 +100,18 @@ public class CTrie {
         // type #, + or exact match
         Optional<INode> subInode = cnode.childOf(Token.MULTI);
         if (subInode.isPresent()) {
-            subscriptions.addAll(recursiveMatch(remainingTopic, subInode.get()));
+            subscriptions.addAll(recursiveMatch(remainingTopic, subInode.get(), depth + 1));
         }
         subInode = cnode.childOf(Token.SINGLE);
         if (subInode.isPresent()) {
-            subscriptions.addAll(recursiveMatch(remainingTopic, subInode.get()));
+            subscriptions.addAll(recursiveMatch(remainingTopic, subInode.get(), depth + 1));
         }
         if (remainingTopic.isEmpty()) {
             subscriptions.addAll(cnode.subscriptions);
         } else {
             subInode = cnode.childOf(remainingTopic.headToken());
             if (subInode.isPresent()) {
-                subscriptions.addAll(recursiveMatch(remainingTopic, subInode.get()));
+                subscriptions.addAll(recursiveMatch(remainingTopic, subInode.get(), depth + 1));
             }
         }
         return subscriptions;

@@ -171,26 +171,39 @@ public class CTrieSubscriptionDirectoryMatchingTest {
         assertMatch("foo/bar/+", "foo/bar/");
     }
 
-    private void assertMatch(String s, String t) {
-        sut = new CTrieSubscriptionDirectory();
-        ISubscriptionsRepository sessionsRepository = new MemorySubscriptionsRepository();
-        sut.init(sessionsRepository);
-
-        Subscription sub = clientSubOnTopic("AnySensor1", s);
-        sut.add(sub);
-
-        assertThat(sut.matchWithoutQosSharpening(asTopic(t))).isNotEmpty();
+    @Test
+    public void givenTopicFilterStartingWithSingleWildcardDoesntMatchSpecialTopicNames() {
+        assertNotMatch("+/monitor/clients", "$SYS/monitor/clients");
+        assertMatch("outer/+/inner", "outer/$something/inner");
+        assertMatch("$SYS/monitor/+", "$SYS/monitor/clients");
     }
 
-    private void assertNotMatch(String subscription, String topic) {
+    @Test
+    public void givenTopicFilterStartingWithMultiWildcardDoesntMatchSpecialTopicNames() {
+        assertNotMatch("#", "$SYS/monitor/clients");
+        assertMatch("$SYS/#", "$SYS");
+    }
+
+    private void assertMatch(String topicFilter, String topicName) {
         sut = new CTrieSubscriptionDirectory();
         ISubscriptionsRepository sessionsRepository = new MemorySubscriptionsRepository();
         sut.init(sessionsRepository);
 
-        Subscription sub = clientSubOnTopic("AnySensor1", subscription);
+        Subscription sub = clientSubOnTopic("AnySensor1", topicFilter);
         sut.add(sub);
 
-        assertThat(sut.matchWithoutQosSharpening(asTopic(topic))).isEmpty();
+        assertThat(sut.matchWithoutQosSharpening(asTopic(topicName))).isNotEmpty();
+    }
+
+    private void assertNotMatch(String topicFilter, String topicName) {
+        sut = new CTrieSubscriptionDirectory();
+        ISubscriptionsRepository sessionsRepository = new MemorySubscriptionsRepository();
+        sut.init(sessionsRepository);
+
+        Subscription sub = clientSubOnTopic("AnySensor1", topicFilter);
+        sut.add(sub);
+
+        assertThat(sut.matchWithoutQosSharpening(asTopic(topicName))).isEmpty();
     }
 
     @Test

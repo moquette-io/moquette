@@ -86,4 +86,11 @@ public class Token implements Comparable<Token> {
         }
         return name.compareTo(other.name);
     }
+
+    /**
+     * Token which starts with $ is reserved
+     * */
+    public boolean isReserved() {
+        return name.startsWith("$");
+    }
 }
