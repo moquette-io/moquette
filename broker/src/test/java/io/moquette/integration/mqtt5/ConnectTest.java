@@ -54,7 +54,7 @@ class ConnectTest extends AbstractServerIntegrationTest {
     }
 
     @Override
-    String clientName() {
+    public String clientName() {
         return "subscriber";
     }
 

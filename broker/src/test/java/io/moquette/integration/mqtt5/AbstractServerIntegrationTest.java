@@ -16,7 +16,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Properties;
 
-abstract class AbstractServerIntegrationTest {
+public abstract class AbstractServerIntegrationTest {
     Server broker;
     IConfig config;
 
@@ -26,7 +26,7 @@ abstract class AbstractServerIntegrationTest {
 
     Client lowLevelClient;
 
-    abstract String clientName();
+    public abstract String clientName();
 
     protected void startServer(String dbPath) throws IOException {
         broker = new Server();
