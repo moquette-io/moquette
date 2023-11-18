@@ -218,6 +218,39 @@ public class Client {
         return (MqttSubAckMessage) subAckMessage;
     }
 
+    public MqttMessage subscribeWithError(String topic, MqttQoS qos) {
+        final MqttSubscribeMessage subscribeMessage = MqttMessageBuilders.subscribe()
+            .messageId(1)
+            .addSubscription(qos, topic)
+            .build();
+
+        final CountDownLatch subscribeAckLatch = new CountDownLatch(1);
+        this.setCallback(msg -> {
+            receivedMsg.getAndSet(msg);
+            LOG.debug("Subscribe callback invocation, received message {}", msg.fixedHeader().messageType());
+            subscribeAckLatch.countDown();
+
+            // clear the callback
+            setCallback(null);
+        });
+
+        LOG.debug("Sending SUBSCRIBE message");
+        sendMessage(subscribeMessage);
+        LOG.debug("Sent SUBSCRIBE message");
+
+        boolean waitElapsed;
+        try {
+            waitElapsed = !subscribeAckLatch.await(200, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            throw new RuntimeException("Interrupted while waiting", e);
+        }
+
+        if (waitElapsed) {
+            throw new RuntimeException("Cannot receive SubscribeAck in 200 ms");
+        }
+        return this.receivedMsg.get();
+    }
+
     public void disconnect() {
         final MqttMessage disconnectMessage = MqttMessageBuilders.disconnect().build();
         sendMessage(disconnectMessage);

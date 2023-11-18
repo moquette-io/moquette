@@ -528,7 +528,7 @@ final class MQTTConnection {
                 LOG.debug("NOT processing disconnect {}, not bound.", clientID);
                 return null;
             }
-            if (protocolVersion == MqttVersion.MQTT_5.protocolLevel()) {
+            if (isProtocolVersion5()) {
                 MqttReasonCodeAndPropertiesVariableHeader disconnectHeader = (MqttReasonCodeAndPropertiesVariableHeader) msg.variableHeader();
                 if (disconnectHeader.reasonCode() != MqttReasonCodes.Disconnect.NORMAL_DISCONNECT.byteValue()) {
                     // handle the will
@@ -547,6 +547,10 @@ final class MQTTConnection {
             LOG.trace("dispatch disconnection userName={}", userName);
             return null;
         });
+    }
+
+    boolean isProtocolVersion5() {
+        return protocolVersion == MqttVersion.MQTT_5.protocolLevel();
     }
 
     PostOffice.RouteResult processSubscribe(MqttSubscribeMessage msg) {
@@ -833,5 +837,22 @@ final class MQTTConnection {
 
     public void bindSession(Session session) {
         bindedSession = session;
+    }
+
+    /**
+     * Invoked internally by broker to disconnect a client and close the connection
+     * */
+    void brokerDisconnect() {
+        final MqttMessage disconnectMsg = MqttMessageBuilders.disconnect().build();
+        channel.writeAndFlush(disconnectMsg)
+            .addListener(ChannelFutureListener.CLOSE);
+    }
+
+    void brokerDisconnect(MqttReasonCodes.Disconnect reasonCode) {
+        final MqttMessage disconnectMsg = MqttMessageBuilders.disconnect()
+            .reasonCode(reasonCode.byteValue())
+            .build();
+        channel.writeAndFlush(disconnectMsg)
+            .addListener(ChannelFutureListener.CLOSE);
     }
 }

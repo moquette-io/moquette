@@ -22,13 +22,7 @@ import io.moquette.broker.SessionRegistry.PublishedMessage;
 import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
-import io.netty.handler.codec.mqtt.MqttFixedHeader;
-import io.netty.handler.codec.mqtt.MqttMessage;
-import io.netty.handler.codec.mqtt.MqttMessageType;
-import io.netty.handler.codec.mqtt.MqttPublishMessage;
-import io.netty.handler.codec.mqtt.MqttPublishVariableHeader;
-import io.netty.handler.codec.mqtt.MqttQoS;
-import io.netty.handler.codec.mqtt.MqttVersion;
+import io.netty.handler.codec.mqtt.*;
 import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -514,6 +508,14 @@ class Session {
 
     ISessionsRepository.SessionData getSessionData() {
         return this.data;
+    }
+
+    /**
+     * Disconnect the client from the broker, sending a disconnect and closing the connection
+     * */
+    public void disconnectFromBroker() {
+        mqttConnection.brokerDisconnect(MqttReasonCodes.Disconnect.MALFORMED_PACKET);
+        disconnect();
     }
 
     @Override
