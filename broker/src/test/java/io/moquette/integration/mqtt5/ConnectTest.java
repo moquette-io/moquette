@@ -128,7 +128,7 @@ class ConnectTest extends AbstractServerIntegrationTest {
         reconnectingSubscriber.disconnect();
     }
 
-    private void assertConnectionAccepted(MqttConnAckMessage connAck, String message) {
+    public static void assertConnectionAccepted(MqttConnAckMessage connAck, String message) {
         assertEquals(MqttConnectReturnCode.CONNECTION_ACCEPTED, connAck.variableHeader().connectReturnCode(), message);
     }
 

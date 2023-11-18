@@ -344,4 +344,11 @@ public class PostOfficeSubscribeTest {
         Subscription subQos2 = new Subscription("Sub B", new Topic("a/+"), EXACTLY_ONCE);
         assertEquals(EXACTLY_ONCE, PostOffice.lowerQosToTheSubscriptionDesired(subQos2, EXACTLY_ONCE));
     }
+
+    @Test
+    public void testExtractShareName() {
+        assertEquals("", PostOffice.extractShareName("$share//measures/+/1"));
+        assertEquals("myShared", PostOffice.extractShareName("$share/myShared/measures/+/1"));
+        assertEquals("#", PostOffice.extractShareName("$share/#/measures/+/1"));
+    }
 }
