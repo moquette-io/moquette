@@ -7,6 +7,26 @@ import java.util.Optional;
 
 public class CTrie {
 
+    /**
+     * Models a request to subscribe a client, it's carrier for the Subscription
+     * */
+    public final static class SubscriptionRequest {
+
+        private final Subscription subscription;
+
+        public SubscriptionRequest(Subscription subscription) {
+            this.subscription = subscription;
+        }
+
+        public Topic getTopicFilter() {
+            return subscription.topicFilter;
+        }
+
+        public Subscription subscription() {
+            return subscription;
+        }
+    }
+
     interface IVisitor<T> {
 
         void visit(CNode node, int deep);
@@ -117,31 +137,31 @@ public class CTrie {
         return subscriptions;
     }
 
-    public void addToTree(Subscription newSubscription) {
+    public void addToTree(SubscriptionRequest request) {
         Action res;
         do {
-            res = insert(newSubscription.topicFilter, this.root, newSubscription);
+            res = insert(request.getTopicFilter(), this.root, request);
         } while (res == Action.REPEAT);
     }
 
-    private Action insert(Topic topic, final INode inode, Subscription newSubscription) {
+    private Action insert(Topic topic, final INode inode, SubscriptionRequest request) {
         final Token token = topic.headToken();
         final CNode cnode = inode.mainNode();
         if (!topic.isEmpty()) {
             Optional<INode> nextInode = cnode.childOf(token);
             if (nextInode.isPresent()) {
                 Topic remainingTopic = topic.exceptHeadToken();
-                return insert(remainingTopic, nextInode.get(), newSubscription);
+                return insert(remainingTopic, nextInode.get(), request);
             }
         }
         if (topic.isEmpty()) {
-            return insertSubscription(inode, cnode, newSubscription);
+            return insertSubscription(inode, cnode, request);
         } else {
-            return createNodeAndInsertSubscription(topic, inode, cnode, newSubscription);
+            return createNodeAndInsertSubscription(topic, inode, cnode, request);
         }
     }
 
-    private Action insertSubscription(INode inode, CNode cnode, Subscription newSubscription) {
+    private Action insertSubscription(INode inode, CNode cnode, SubscriptionRequest newSubscription) {
         final CNode updatedCnode;
         if (cnode instanceof TNode) {
             updatedCnode = new CNode(cnode.getToken());
@@ -152,8 +172,8 @@ public class CTrie {
         return inode.compareAndSet(cnode, updatedCnode) ? Action.OK : Action.REPEAT;
     }
 
-    private Action createNodeAndInsertSubscription(Topic topic, INode inode, CNode cnode, Subscription newSubscription) {
-        final INode newInode = createPathRec(topic, newSubscription);
+    private Action createNodeAndInsertSubscription(Topic topic, INode inode, CNode cnode, SubscriptionRequest request) {
+        final INode newInode = createPathRec(topic, request);
         final CNode updatedCnode;
         if (cnode instanceof TNode) {
             updatedCnode = new CNode(cnode.getToken());
@@ -165,21 +185,21 @@ public class CTrie {
         return inode.compareAndSet(cnode, updatedCnode) ? Action.OK : Action.REPEAT;
     }
 
-    private INode createPathRec(Topic topic, Subscription newSubscription) {
+    private INode createPathRec(Topic topic, SubscriptionRequest request) {
         Topic remainingTopic = topic.exceptHeadToken();
         if (!remainingTopic.isEmpty()) {
-            INode inode = createPathRec(remainingTopic, newSubscription);
+            INode inode = createPathRec(remainingTopic, request);
             CNode cnode = new CNode(topic.headToken());
             cnode.add(inode);
             return new INode(cnode);
         } else {
-            return createLeafNodes(topic.headToken(), newSubscription);
+            return createLeafNodes(topic.headToken(), request);
         }
     }
 
-    private INode createLeafNodes(Token token, Subscription newSubscription) {
+    private INode createLeafNodes(Token token, SubscriptionRequest request) {
         CNode newLeafCnode = new CNode(token);
-        newLeafCnode.addSubscription(newSubscription);
+        newLeafCnode.addSubscription(request);
 
         return new INode(newLeafCnode);
     }

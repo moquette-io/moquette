@@ -64,7 +64,7 @@ public class CTrieSpeedTest {
         int log = CHECK_INTERVAL;
         CTrie tree = new CTrie();
         for (Subscription result : results) {
-            tree.addToTree(result);
+            tree.addToTree(new CTrie.SubscriptionRequest(result));
             count++;
             log--;
             if (log <= 0) {

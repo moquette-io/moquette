@@ -15,6 +15,8 @@
  */
 package io.moquette.broker.subscriptions;
 
+import io.moquette.broker.subscriptions.CTrie.SubscriptionRequest;
+
 import java.util.*;
 
 class CNode implements Comparable<CNode> {
@@ -84,7 +86,9 @@ class CNode implements Comparable<CNode> {
         this.children.remove(idx);
     }
 
-    CNode addSubscription(Subscription newSubscription) {
+    CNode addSubscription(SubscriptionRequest request) {
+        final Subscription newSubscription = request.subscription();
+
         // if already contains one with same topic and same client, keep that with higher QoS
         int idx = Collections.binarySearch(subscriptions, newSubscription);
         if (idx >= 0) {

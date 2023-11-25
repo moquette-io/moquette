@@ -16,6 +16,7 @@
 package io.moquette.broker.subscriptions;
 
 import io.moquette.broker.ISubscriptionsRepository;
+import io.moquette.broker.subscriptions.CTrie.SubscriptionRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +43,7 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
 
         for (Subscription subscription : this.subscriptionsRepository.listAllSubscriptions()) {
             LOG.debug("Re-subscribing {}", subscription);
-            ctrie.addToTree(subscription);
+            ctrie.addToTree(new SubscriptionRequest(subscription));
         }
         if (LOG.isTraceEnabled()) {
             LOG.trace("Stored subscriptions have been reloaded. SubscriptionTree = {}", dumpTree());
@@ -97,7 +98,7 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
 
     @Override
     public void add(Subscription newSubscription) {
-        ctrie.addToTree(newSubscription);
+        ctrie.addToTree(new SubscriptionRequest(newSubscription));
         subscriptionsRepository.addNewSubscription(newSubscription);
     }
 
