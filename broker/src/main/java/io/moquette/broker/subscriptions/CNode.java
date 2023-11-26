@@ -23,18 +23,24 @@ class CNode implements Comparable<CNode> {
 
     private final Token token;
     private final List<INode> children;
+    // Sorted list of subscriptions. The sort is necessary for fast access, instead of linear scan.
     List<Subscription> subscriptions;
+    // the list of SharedSubscription is sorted. The sort is necessary for fast access, instead of linear scan.
+    private Map<ShareName, List<SharedSubscription>> sharedSubscriptions;
 
     CNode(Token token) {
         this.children = new ArrayList<>();
         this.subscriptions = new ArrayList<>();
+        this.sharedSubscriptions = new HashMap<>();
         this.token = token;
     }
 
     //Copy constructor
-    private CNode(Token token, List<INode> children, List<Subscription> subscriptions) {
+    private CNode(Token token, List<INode> children, List<Subscription> subscriptions, Map<ShareName,
+                  List<SharedSubscription>> sharedSubscriptions) {
         this.token = token; // keep reference, root comparison in directory logic relies on it for now.
         this.subscriptions = new ArrayList<>(subscriptions);
+        this.sharedSubscriptions = new HashMap<>(sharedSubscriptions);
         this.children = new ArrayList<>(children);
     }
 
@@ -59,9 +65,9 @@ class CNode implements Comparable<CNode> {
         return Collections.binarySearch(children, tempTokenNode, (INode node, INode tokenHolder) -> node.mainNode().token.compareTo(tokenHolder.mainNode().token));
     }
 
-    private boolean equalsToken(Token token) {
-        return token != null && this.token != null && this.token.equals(token);
-    }
+//    private boolean equalsToken(Token token) {
+//        return token != null && this.token != null && this.token.equals(token);
+//    }
 
     @Override
     public int hashCode() {
@@ -69,7 +75,7 @@ class CNode implements Comparable<CNode> {
     }
 
     CNode copy() {
-        return new CNode(this.token, this.children, this.subscriptions);
+        return new CNode(this.token, this.children, this.subscriptions, this.sharedSubscriptions);
     }
 
     public void add(INode newINode) {
@@ -86,6 +92,7 @@ class CNode implements Comparable<CNode> {
         this.children.remove(idx);
     }
 
+    // Mutating operation
     CNode addSubscription(SubscriptionRequest request) {
         final Subscription newSubscription = request.subscription();
 
@@ -98,6 +105,7 @@ class CNode implements Comparable<CNode> {
                 subscriptions.set(idx, newSubscription);
             }
         } else {
+            // insert into the expected index so that the sorting is maintained
             this.subscriptions.add(-1 - idx, new Subscription(newSubscription));
         }
         return this;

@@ -304,7 +304,7 @@ class PostOffice {
             }).collect(Collectors.toList());
 
         for (Subscription subscription : newSubscriptions) {
-            subscriptions.add(subscription);
+            subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subscription.getRequestedQos());
         }
 
         // add the subscriptions to Session

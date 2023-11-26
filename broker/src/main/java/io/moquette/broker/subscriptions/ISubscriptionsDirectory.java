@@ -16,6 +16,7 @@
 package io.moquette.broker.subscriptions;
 
 import io.moquette.broker.ISubscriptionsRepository;
+import io.netty.handler.codec.mqtt.MqttQoS;
 
 import java.util.List;
 import java.util.Set;
@@ -33,7 +34,7 @@ public interface ISubscriptionsDirectory {
 
     List<Subscription> matchQosSharpening(Topic topic);
 
-    void add(Subscription newSubscription);
+    void add(String clientId, Topic filter, MqttQoS requestedQoS);
 
     void removeSubscription(Topic topic, String clientID);
 

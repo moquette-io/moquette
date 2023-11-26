@@ -1,5 +1,7 @@
 package io.moquette.broker.subscriptions;
 
+import io.netty.handler.codec.mqtt.MqttQoS;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -12,18 +14,43 @@ public class CTrie {
      * */
     public final static class SubscriptionRequest {
 
-        private final Subscription subscription;
+        private Topic topicFilter;
+        private String clientId;
+        private MqttQoS requestedQoS;
 
-        public SubscriptionRequest(Subscription subscription) {
-            this.subscription = subscription;
+        private SubscriptionRequest(String clientId, Topic topicFilter) {
+            this.topicFilter = topicFilter;
+            this.clientId = clientId;
+        }
+
+        private SubscriptionRequest(String clientId, Topic topicFilter, MqttQoS requestedQoS) {
+            this.topicFilter = topicFilter;
+            this.clientId = clientId;
+            this.requestedQoS = requestedQoS;
+        }
+
+        public static SubscriptionRequest buildNonShared(Subscription subscription) {
+            return buildNonShared(subscription.clientId, subscription.topicFilter, subscription.getRequestedQos());
+        }
+
+        public static SubscriptionRequest buildNonShared(String clientId, Topic topicFilter, MqttQoS requestedQoS) {
+            SubscriptionRequest request = new SubscriptionRequest(clientId, topicFilter, requestedQoS);
+            request.topicFilter = topicFilter;
+            request.clientId = clientId;
+            request.requestedQoS = requestedQoS;
+            return request;
         }
 
         public Topic getTopicFilter() {
-            return subscription.topicFilter;
+            return topicFilter;
         }
 
         public Subscription subscription() {
-            return subscription;
+            return new Subscription(clientId, topicFilter, requestedQoS);
+        }
+
+        public String getClientId() {
+            return clientId;
         }
     }
 
