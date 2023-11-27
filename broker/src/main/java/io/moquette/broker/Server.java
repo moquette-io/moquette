@@ -63,6 +63,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.HashSet;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -564,6 +565,24 @@ public class Server {
         }
         LOG.trace("Internal publishing message CId: {}, messageId: {}", clientId, messageID);
         final RoutingResults routingResults = dispatcher.internalPublish(msg);
+        msg.payload().release();
+        return routingResults;
+    }
+    public RoutingResults publishToClient(MqttPublishMessage msg, final String clientId) {
+        return publishToClients(msg,Collections.singletonList(clientId));
+    }
+    public RoutingResults publishToClients(MqttPublishMessage msg, final Collection<String> clientIds) {
+        final int messageID = msg.variableHeader().packetId();
+        if (!initialized) {
+            LOG.error("Moquette is not started, message cannot be published. CId: [{}], messageId: {}",
+                String.join(",",clientIds),
+                messageID);
+            throw new IllegalStateException("Can't publish on a integration is not yet started");
+        }
+        LOG.trace("publishing to message CId: [{}], messageId: {}", String.join(",",clientIds), messageID);
+        final RoutingResults routingResults = clientIds.isEmpty()?
+            dispatcher.internalPublish(msg):
+            dispatcher.internalPublish(msg,new HashSet<>(clientIds));
         msg.payload().release();
         return routingResults;
     }
