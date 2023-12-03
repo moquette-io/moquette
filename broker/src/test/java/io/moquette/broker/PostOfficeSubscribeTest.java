@@ -351,4 +351,11 @@ public class PostOfficeSubscribeTest {
         assertEquals("myShared", PostOffice.extractShareName("$share/myShared/measures/+/1"));
         assertEquals("#", PostOffice.extractShareName("$share/#/measures/+/1"));
     }
+
+    @Test
+    public void testExtractFilterFromShared() {
+        assertEquals("measures/+/1", PostOffice.extractFilterFromShared("$share//measures/+/1"));
+        assertEquals("measures/+/1", PostOffice.extractFilterFromShared("$share/myShared/measures/+/1"));
+        assertEquals("measures/+/1", PostOffice.extractFilterFromShared("$share/#/measures/+/1"));
+    }
 }

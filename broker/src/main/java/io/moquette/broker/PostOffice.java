@@ -16,6 +16,7 @@
 package io.moquette.broker;
 
 import io.moquette.broker.scheduler.ScheduledExpirationService;
+import io.moquette.broker.subscriptions.ShareName;
 import io.moquette.interception.BrokerInterceptor;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
 import io.moquette.broker.subscriptions.Subscription;
@@ -37,13 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -273,25 +268,54 @@ class PostOffice {
         sessionRepository.deleteWill(clientId);
     }
 
+    // Used for internal purposes of subscribeClientToTopics method
+    private static final class SharedSubscriptionData {
+        final ShareName name;
+        final Topic topicFilter;
+        final MqttQoS requestedQoS;
+
+        private SharedSubscriptionData(ShareName name, Topic topicFilter, MqttQoS requestedQoS) {
+            Objects.requireNonNull(name);
+            Objects.requireNonNull(topicFilter);
+            Objects.requireNonNull(requestedQoS);
+            this.name = name;
+            this.topicFilter = topicFilter;
+            this.requestedQoS = requestedQoS;
+        }
+
+        static SharedSubscriptionData fromMqttSubscription(MqttTopicSubscription sub) {
+            return new SharedSubscriptionData(new ShareName(extractShareName(sub.topicName())),
+                Topic.asTopic(extractFilterFromShared(sub.topicName())), sub.qualityOfService());
+        }
+    }
+
     public void subscribeClientToTopics(MqttSubscribeMessage msg, String clientID, String username,
                                         MQTTConnection mqttConnection) {
         // verify which topics of the subscribe ongoing has read access permission
         int messageID = messageId(msg);
         final Session session = sessionRegistry.retrieve(clientID);
 
+        final List<SharedSubscriptionData> sharedSubscriptions;
+
         if (mqttConnection.isProtocolVersion5()) {
-            for (MqttTopicSubscription topicFilter : msg.payload().topicSubscriptions()) {
-                if (isSharedSubscription(topicFilter.topicName())) {
-                    final String shareName = extractShareName(topicFilter.topicName());
-                    if (!validateShareName(shareName)) {
-                        // this is a malformed packet, MQTT-4.13.1-1, disconnect it
-                        LOG.info("{} used an invalid shared subscription name {}, disconnecting", clientID, shareName);
-                        session.disconnectFromBroker();
-                        return;
-                    }
-                }
+            sharedSubscriptions = msg.payload().topicSubscriptions().stream()
+                .filter(sub -> isSharedSubscription(sub.topicName()))
+                .map(SharedSubscriptionData::fromMqttSubscription)
+                .collect(Collectors.toList());
+
+            Optional<SharedSubscriptionData> invalidSharedSubscription = sharedSubscriptions.stream()
+                .filter(subData -> !validateShareName(subData.name.toString()))
+                .findFirst();
+            if (invalidSharedSubscription.isPresent()) {
+                // this is a malformed packet, MQTT-4.13.1-1, disconnect it
+                LOG.info("{} used an invalid shared subscription name {}, disconnecting", clientID, invalidSharedSubscription.get().name);
+                session.disconnectFromBroker();
+                return;
             }
+        } else {
+            sharedSubscriptions = Collections.emptyList();
         }
+        // TODO verify read access also for shared subscriptions
         List<MqttTopicSubscription> ackTopics = authorizator.verifyTopicsReadAccess(clientID, username, msg);
         MqttSubAckMessage ackMessage = doAckMessageFromValidateFilters(ackTopics, messageID);
 
@@ -305,6 +329,10 @@ class PostOffice {
 
         for (Subscription subscription : newSubscriptions) {
             subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subscription.getRequestedQos());
+        }
+
+        for (SharedSubscriptionData sharedSubData : sharedSubscriptions) {
+            subscriptions.addShared(clientID, sharedSubData.name, sharedSubData.topicFilter, sharedSubData.requestedQoS);
         }
 
         // add the subscriptions to Session
@@ -328,6 +356,16 @@ class PostOffice {
         int afterShare = "$share/".length();
         int endOfShareName = sharedTopicFilter.indexOf('/', afterShare);
         return sharedTopicFilter.substring(afterShare, endOfShareName);
+    }
+
+    /**
+     * @return the filter part from full topic filter of format $share/{shareName}/{topicFilter}
+     * */
+    // VisibleForTesting
+    protected static String extractFilterFromShared(String fullSharedTopicFilter) {
+        int afterShare = "$share/".length();
+        int endOfShareName = fullSharedTopicFilter.indexOf('/', afterShare);
+        return fullSharedTopicFilter.substring(endOfShareName + 1);
     }
 
     /**

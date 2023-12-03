@@ -86,6 +86,7 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
     public List<Subscription> matchQosSharpening(Topic topicName) {
         final List<Subscription> subscriptions = matchWithoutQosSharpening(topicName);
 
+        // for each session select the subscription with higher QoS
         Map<String, Subscription> subsGroupedByClient = new HashMap<>();
         for (Subscription sub : subscriptions) {
             Subscription existingSub = subsGroupedByClient.get(sub.clientId);
@@ -102,6 +103,15 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
         SubscriptionRequest subRequest = SubscriptionRequest.buildNonShared(clientId, filter, requestedQoS);
         ctrie.addToTree(subRequest);
         subscriptionsRepository.addNewSubscription(subRequest.subscription());
+    }
+
+    @Override
+    public void addShared(String clientId, ShareName name, Topic topicFilter, MqttQoS requestedQoS) {
+        SubscriptionRequest shareSubRequest = SubscriptionRequest.buildShared(name, topicFilter, clientId, requestedQoS);
+        ctrie.addToTree(shareSubRequest);
+
+        // TODO Has to be stored? this has to refer also the share name?
+//        subscriptionsRepository.addNewSubscription(shareSubRequest.subscription());
     }
 
     /**

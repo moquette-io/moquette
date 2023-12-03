@@ -18,6 +18,9 @@ public class CTrie {
         private String clientId;
         private MqttQoS requestedQoS;
 
+        private boolean shared = false;
+        private ShareName shareName;
+
         private SubscriptionRequest(String clientId, Topic topicFilter) {
             this.topicFilter = topicFilter;
             this.clientId = clientId;
@@ -41,6 +44,17 @@ public class CTrie {
             return request;
         }
 
+        public static SubscriptionRequest buildShared(ShareName shareName, Topic topicFilter, String clientId, MqttQoS requestedQoS) {
+            if (topicFilter.headToken().name().startsWith("$share")) {
+                throw new IllegalArgumentException("Topic filter of a shared subscription can't contains $share and share name");
+            }
+
+            SubscriptionRequest request = new SubscriptionRequest(clientId, topicFilter, requestedQoS);
+            request.shared = true;
+            request.shareName = shareName;
+            return request;
+        }
+
         public Topic getTopicFilter() {
             return topicFilter;
         }
@@ -49,9 +63,22 @@ public class CTrie {
             return new Subscription(clientId, topicFilter, requestedQoS);
         }
 
+        public SharedSubscription sharedSubscription() {
+            return new SharedSubscription(shareName, topicFilter, clientId, requestedQoS);
+        }
+
+        public boolean isShared() {
+            return shared;
+        }
+
+        public ShareName getSharedName() {
+            return shareName;
+        }
+
         public String getClientId() {
             return clientId;
         }
+
     }
 
     interface IVisitor<T> {
@@ -135,7 +162,7 @@ public class CTrie {
         }
         NavigationAction action = evaluate(topicName, cnode, depth);
         if (action == NavigationAction.MATCH) {
-            return cnode.subscriptions;
+            return cnode.sharedAndNonSharedSubscriptions();
         }
         if (action == NavigationAction.STOP) {
             return Collections.emptyList();
@@ -154,7 +181,7 @@ public class CTrie {
             subscriptions.addAll(recursiveMatch(remainingTopic, subInode.get(), depth + 1));
         }
         if (remainingTopic.isEmpty()) {
-            subscriptions.addAll(cnode.subscriptions);
+            subscriptions.addAll(cnode.sharedAndNonSharedSubscriptions());
         } else {
             subInode = cnode.childOf(remainingTopic.headToken());
             if (subInode.isPresent()) {

@@ -30,18 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class CTrieSubscriptionDirectoryMatchingTest {
-
-    private CTrieSubscriptionDirectory sut;
-    private ISubscriptionsRepository sessionsRepository;
-
-    @BeforeEach
-    public void setUp() {
-        sut = new CTrieSubscriptionDirectory();
-
-        this.sessionsRepository = new MemorySubscriptionsRepository();
-        sut.init(this.sessionsRepository);
-    }
+public class CTrieSubscriptionDirectoryMatchingTest extends CTrieSubscriptionDirectMatchingCommon {
 
     @Test
     public void testMatchSimple() {
