@@ -7,8 +7,8 @@ import com.hivemq.client.mqtt.mqtt5.message.connect.connack.Mqtt5ConnAckReasonCo
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
 import io.moquette.broker.Server;
 import io.moquette.broker.config.MemoryConfig;
+import io.moquette.broker.security.DeclarativeAuthorizatorPolicy;
 import io.moquette.broker.security.IAuthorizatorPolicy;
-import io.moquette.broker.subscriptions.Topic;
 import io.moquette.integration.IntegrationUtils;
 import io.moquette.testclient.Client;
 import io.netty.handler.codec.mqtt.*;
@@ -19,9 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Optional;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import static io.moquette.integration.mqtt5.ConnectTest.assertConnectionAccepted;
@@ -77,18 +75,9 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
         stopServer();
 
         LOG.info("Stopped existing server");
-        new IAuthorizatorPolicy() {
-            @Override
-            public boolean canWrite(Topic topic, String user, String client) {
-                return true;
-            }
+        final IAuthorizatorPolicy policy = new DeclarativeAuthorizatorPolicy.Builder().build();
+        startServer(dbPath, policy);
 
-            @Override
-            public boolean canRead(Topic topic, String user, String client) {
-                return false;
-            }
-        };
-        startServer(dbPath, null);
         LOG.info("Started new server");
 
         // Connect the client to newly started broker
