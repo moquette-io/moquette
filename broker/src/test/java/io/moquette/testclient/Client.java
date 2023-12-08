@@ -256,6 +256,10 @@ public class Client {
         sendMessage(disconnectMessage);
     }
 
+    public void shutdownConnection() throws InterruptedException {
+        this.workerGroup.shutdownGracefully().sync();
+    }
+
     public void setCallback(ICallback callback) {
         this.callback = callback;
     }
