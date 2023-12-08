@@ -11,18 +11,18 @@ public class DeclarativeAuthorizatorPolicy implements IAuthorizatorPolicy {
         private DeclarativeAuthorizatorPolicy instance;
 
         public Builder readFrom(Topic topic, String user, String client) {
-            final DeclarativeAuthorizatorPolicy policy = lazyGet();
+            final DeclarativeAuthorizatorPolicy policy = createOrGet();
             policy.addReadFrom(topic, user, client);
             return this;
         }
 
         public Builder writeTo(Topic topic, String user, String client) {
-            final DeclarativeAuthorizatorPolicy policy = lazyGet();
+            final DeclarativeAuthorizatorPolicy policy = createOrGet();
             policy.addWriteTo(topic, user, client);
             return this;
         }
 
-        private DeclarativeAuthorizatorPolicy lazyGet() {
+        private DeclarativeAuthorizatorPolicy createOrGet() {
             if (instance == null) {
                 instance = new DeclarativeAuthorizatorPolicy();
             }
@@ -30,7 +30,7 @@ public class DeclarativeAuthorizatorPolicy implements IAuthorizatorPolicy {
         }
 
         public IAuthorizatorPolicy build() {
-            return instance;
+            return createOrGet();
         }
     }
 
@@ -41,7 +41,7 @@ public class DeclarativeAuthorizatorPolicy implements IAuthorizatorPolicy {
 
         public TopicUserClient(Topic topic, String user, String client) {
             Objects.requireNonNull(topic);
-            Objects.requireNonNull(user);
+            user = user == null ? "<>" : user;
             Objects.requireNonNull(client);
             this.topic = topic;
             this.user = user;

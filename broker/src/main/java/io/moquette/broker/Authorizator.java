@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 import static io.moquette.broker.Utils.messageId;
 import static io.netty.handler.codec.mqtt.MqttQoS.FAILURE;
@@ -39,6 +40,15 @@ final class Authorizator {
         this.policy = policy;
     }
 
+
+    List<MqttTopicSubscription> verifyAlsoSharedTopicsReadAccess(String clientID, String username, MqttSubscribeMessage msg) {
+        return verifyTopicsReadAccessWithTopicExtractor(clientID, username, msg, Authorizator::extractShareTopic);
+    }
+
+    private static Topic extractShareTopic(String s) {
+        return Topic.asTopic(PostOffice.extractFilterFromShared(s));
+    }
+
     /**
      * @param clientID
      *            the clientID
@@ -49,11 +59,16 @@ final class Authorizator {
      * @return the list of verified topics for the given subscribe message.
      */
     List<MqttTopicSubscription> verifyTopicsReadAccess(String clientID, String username, MqttSubscribeMessage msg) {
+        return verifyTopicsReadAccessWithTopicExtractor(clientID, username, msg, Topic::asTopic);
+    }
+
+    private List<MqttTopicSubscription> verifyTopicsReadAccessWithTopicExtractor(String clientID, String username,
+                                                 MqttSubscribeMessage msg, Function<String, Topic> topicExtractor) {
         List<MqttTopicSubscription> ackTopics = new ArrayList<>();
 
         final int messageId = messageId(msg);
         for (MqttTopicSubscription req : msg.payload().topicSubscriptions()) {
-            Topic topic = new Topic(req.topicName());
+            Topic topic = topicExtractor.apply(req.topicName());
             if (!policy.canRead(topic, username, clientID)) {
                 // send SUBACK with 0x80, the user hasn't credentials to read the topic
                 LOG.warn("Client does not have read permissions on the topic username: {}, messageId: {}, " +

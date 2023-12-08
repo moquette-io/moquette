@@ -315,8 +315,13 @@ class PostOffice {
         } else {
             sharedSubscriptions = Collections.emptyList();
         }
-        // TODO verify read access also for shared subscriptions
-        List<MqttTopicSubscription> ackTopics = authorizator.verifyTopicsReadAccess(clientID, username, msg);
+
+        List<MqttTopicSubscription> ackTopics;
+        if (mqttConnection.isProtocolVersion5()) {
+            ackTopics = authorizator.verifyAlsoSharedTopicsReadAccess(clientID, username, msg);
+        } else {
+            ackTopics = authorizator.verifyTopicsReadAccess(clientID, username, msg);
+        }
         MqttSubAckMessage ackMessage = doAckMessageFromValidateFilters(ackTopics, messageID);
 
         // store topics subscriptions in session
