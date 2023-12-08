@@ -50,6 +50,7 @@ public abstract class AbstractServerIntegrationTest {
 
     @AfterEach
     public void tearDown() throws Exception {
+        lowLevelClient.shutdownConnection();
         stopServer();
     }
 
