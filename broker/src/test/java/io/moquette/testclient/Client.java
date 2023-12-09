@@ -23,6 +23,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.mqtt.*;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -180,36 +181,29 @@ public class Client {
         return (MqttConnAckMessage) connAckMessage;
     }
 
+    public MqttSubAckMessage subscribe(String topic1, MqttQoS qos1, String topic2, MqttQoS qos2) {
+        final MqttSubscribeMessage subscribeMessage = MqttMessageBuilders.subscribe()
+            .messageId(1)
+            .addSubscription(qos1, topic1)
+            .addSubscription(qos2, topic2)
+            .build();
+
+        return doSubscribeWithAckCasting(subscribeMessage);
+    }
+
     public MqttSubAckMessage subscribe(String topic, MqttQoS qos) {
         final MqttSubscribeMessage subscribeMessage = MqttMessageBuilders.subscribe()
             .messageId(1)
             .addSubscription(qos, topic)
             .build();
 
-        final CountDownLatch subscribeAckLatch = new CountDownLatch(1);
-        this.setCallback(msg -> {
-            receivedMsg.getAndSet(msg);
-            LOG.debug("Subscribe callback invocation, received message {}", msg.fixedHeader().messageType());
-            subscribeAckLatch.countDown();
+        return doSubscribeWithAckCasting(subscribeMessage);
+    }
 
-            // clear the callback
-            setCallback(null);
-        });
+    @NotNull
+    private MqttSubAckMessage doSubscribeWithAckCasting(MqttSubscribeMessage subscribeMessage) {
+        doSubscribe(subscribeMessage);
 
-        LOG.debug("Sending SUBSCRIBE message");
-        sendMessage(subscribeMessage);
-        LOG.debug("Sent SUBSCRIBE message");
-
-        boolean waitElapsed;
-        try {
-            waitElapsed = !subscribeAckLatch.await(200, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            throw new RuntimeException("Interrupted while waiting", e);
-        }
-
-        if (waitElapsed) {
-            throw new RuntimeException("Cannot receive SubscribeAck in 200 ms");
-        }
         final MqttMessage subAckMessage = this.receivedMsg.get();
         if (!(subAckMessage instanceof MqttSubAckMessage)) {
             MqttMessageType messageType = subAckMessage.fixedHeader().messageType();
@@ -218,12 +212,7 @@ public class Client {
         return (MqttSubAckMessage) subAckMessage;
     }
 
-    public MqttMessage subscribeWithError(String topic, MqttQoS qos) {
-        final MqttSubscribeMessage subscribeMessage = MqttMessageBuilders.subscribe()
-            .messageId(1)
-            .addSubscription(qos, topic)
-            .build();
-
+    private void doSubscribe(MqttSubscribeMessage subscribeMessage) {
         final CountDownLatch subscribeAckLatch = new CountDownLatch(1);
         this.setCallback(msg -> {
             receivedMsg.getAndSet(msg);
@@ -248,6 +237,15 @@ public class Client {
         if (waitElapsed) {
             throw new RuntimeException("Cannot receive SubscribeAck in 200 ms");
         }
+    }
+
+    public MqttMessage subscribeWithError(String topic, MqttQoS qos) {
+        final MqttSubscribeMessage subscribeMessage = MqttMessageBuilders.subscribe()
+            .messageId(1)
+            .addSubscription(qos, topic)
+            .build();
+
+        doSubscribe(subscribeMessage);
         return this.receivedMsg.get();
     }
 

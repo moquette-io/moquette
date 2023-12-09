@@ -9,6 +9,7 @@ import io.moquette.broker.Server;
 import io.moquette.broker.config.MemoryConfig;
 import io.moquette.broker.security.DeclarativeAuthorizatorPolicy;
 import io.moquette.broker.security.IAuthorizatorPolicy;
+import io.moquette.broker.subscriptions.Topic;
 import io.moquette.integration.IntegrationUtils;
 import io.moquette.testclient.Client;
 import io.netty.handler.codec.mqtt.*;
@@ -74,25 +75,51 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
         // stop already started broker instance
         stopServer();
 
-        LOG.info("Stopped existing server");
         final IAuthorizatorPolicy policy = new DeclarativeAuthorizatorPolicy.Builder().build();
         startServer(dbPath, policy);
-
-        LOG.info("Started new server");
 
         // Connect the client to newly started broker
         lowLevelClient = new Client("localhost").clientId(clientName());
 
         connectLowLevel();
 
-        MqttMessage received = lowLevelClient.subscribeWithError("$share/metrics/measures/temp", MqttQoS.AT_LEAST_ONCE);
+        MqttSubAckMessage subAckMessage = lowLevelClient.subscribe("$share/metrics/measures/temp", MqttQoS.AT_LEAST_ONCE);
 
-        verifyOfType(received, MqttMessageType.SUBACK);
-        MqttSubAckMessage subAckMessage = (MqttSubAckMessage) received;
         List<Integer> grantedQoSes = subAckMessage.payload().grantedQoSLevels();
         assertEquals(1, grantedQoSes.size(),
             "Granted qos list must be the same cardinality of the subscribe request");
         assertEquals(MqttQoS.FAILURE.value(), grantedQoSes.iterator().next(),
+            "Not readable topic should reflect also in shared subscription");
+    }
+
+
+    @Test
+    public void givenClientSubscribingToSharedAndNonSharedWhenTheSharedIsNotRedableReceivesPositiveAckForNonShared() throws IOException {
+        // stop already started broker instance
+        stopServer();
+
+        final String clientId = clientName();
+        final IAuthorizatorPolicy policy = new DeclarativeAuthorizatorPolicy.Builder()
+            .readFrom(Topic.asTopic("/sensors/living/temp"), null, clientId)
+            .build();
+        startServer(dbPath, policy);
+
+        // Connect the client to newly started broker
+        lowLevelClient = new Client("localhost").clientId(clientId);
+
+        connectLowLevel();
+
+        MqttSubAckMessage subAckMessage = lowLevelClient.subscribe(
+            "/sensors/living/temp", MqttQoS.EXACTLY_ONCE,
+            "$share/metrics/measures/temp", MqttQoS.AT_LEAST_ONCE);
+
+        List<Integer> grantedQoSes = subAckMessage.payload().grantedQoSLevels();
+        assertEquals(2, grantedQoSes.size(),
+            "Granted qos list must be the same cardinality of the subscribe request");
+        Iterator<Integer> replyQoSes = grantedQoSes.iterator();
+        assertEquals(MqttQoS.EXACTLY_ONCE.value(), replyQoSes.next(),
+            "Non shared readable subscription must be accepted");
+        assertEquals(MqttQoS.FAILURE.value(), replyQoSes.next(),
             "Not readable topic should reflect also in shared subscription");
     }
 

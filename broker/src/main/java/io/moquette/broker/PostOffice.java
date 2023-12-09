@@ -33,7 +33,6 @@ import io.netty.handler.codec.mqtt.MqttSubAckPayload;
 import io.netty.handler.codec.mqtt.MqttSubscribeMessage;
 import io.netty.handler.codec.mqtt.MqttTopicSubscription;
 import io.netty.util.ReferenceCountUtil;
-import org.apache.commons.codec.binary.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -284,8 +283,8 @@ class PostOffice {
         }
 
         static SharedSubscriptionData fromMqttSubscription(MqttTopicSubscription sub) {
-            return new SharedSubscriptionData(new ShareName(extractShareName(sub.topicName())),
-                Topic.asTopic(extractFilterFromShared(sub.topicName())), sub.qualityOfService());
+            return new SharedSubscriptionData(new ShareName(SharedSubscriptionUtils.extractShareName(sub.topicName())),
+                Topic.asTopic(SharedSubscriptionUtils.extractFilterFromShared(sub.topicName())), sub.qualityOfService());
         }
     }
 
@@ -299,12 +298,12 @@ class PostOffice {
 
         if (mqttConnection.isProtocolVersion5()) {
             sharedSubscriptions = msg.payload().topicSubscriptions().stream()
-                .filter(sub -> isSharedSubscription(sub.topicName()))
+                .filter(sub -> SharedSubscriptionUtils.isSharedSubscription(sub.topicName()))
                 .map(SharedSubscriptionData::fromMqttSubscription)
                 .collect(Collectors.toList());
 
             Optional<SharedSubscriptionData> invalidSharedSubscription = sharedSubscriptions.stream()
-                .filter(subData -> !validateShareName(subData.name.toString()))
+                .filter(subData -> !SharedSubscriptionUtils.validateShareName(subData.name.toString()))
                 .findFirst();
             if (invalidSharedSubscription.isPresent()) {
                 // this is a malformed packet, MQTT-4.13.1-1, disconnect it
@@ -351,43 +350,6 @@ class PostOffice {
         for (Subscription subscription : newSubscriptions) {
             interceptor.notifyTopicSubscribed(subscription, username);
         }
-    }
-
-    /**
-     * @return the share name in the topic filter of format $share/{shareName}/{topicFilter}
-     * */
-    // VisibleForTesting
-    protected static String extractShareName(String sharedTopicFilter) {
-        int afterShare = "$share/".length();
-        int endOfShareName = sharedTopicFilter.indexOf('/', afterShare);
-        return sharedTopicFilter.substring(afterShare, endOfShareName);
-    }
-
-    /**
-     * @return the filter part from full topic filter of format $share/{shareName}/{topicFilter}
-     * */
-    // VisibleForTesting
-    protected static String extractFilterFromShared(String fullSharedTopicFilter) {
-        int afterShare = "$share/".length();
-        int endOfShareName = fullSharedTopicFilter.indexOf('/', afterShare);
-        return fullSharedTopicFilter.substring(endOfShareName + 1);
-    }
-
-    /**
-     * @return true if shareName is well formed, is at least one characted and doesn't contain wildcard matchers
-     * */
-    private boolean validateShareName(String shareName) {
-        // MQTT-4.8.2-1 MQTT-4.8.2-2, must be longer than 1 char and do not contain + or #
-        Objects.requireNonNull(shareName);
-        return shareName.length() > 0 && !shareName.contains("+") && !shareName.contains("#");
-    }
-
-    /**
-     * @return true if topic filter is shared format
-     * */
-    private static boolean isSharedSubscription(String topicFilter) {
-        Objects.requireNonNull(topicFilter, "topicFilter can't be null");
-        return topicFilter.startsWith("$share/");
     }
 
     private void publishRetainedMessagesForSubscriptions(String clientID, List<Subscription> newSubscriptions) {

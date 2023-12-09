@@ -46,7 +46,11 @@ final class Authorizator {
     }
 
     private static Topic extractShareTopic(String s) {
-        return Topic.asTopic(PostOffice.extractFilterFromShared(s));
+        if (SharedSubscriptionUtils.isSharedSubscription(s)) {
+            return Topic.asTopic(SharedSubscriptionUtils.extractFilterFromShared(s));
+        } else {
+            return Topic.asTopic(s);
+        }
     }
 
     /**
