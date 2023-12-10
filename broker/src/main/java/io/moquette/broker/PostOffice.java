@@ -323,14 +323,16 @@ class PostOffice {
         }
         MqttSubAckMessage ackMessage = doAckMessageFromValidateFilters(ackTopics, messageID);
 
-        // store topics subscriptions in session
+        // store topics of non-shared subscriptions in session
         List<Subscription> newSubscriptions = ackTopics.stream()
-            .filter(req -> req.qualityOfService() != FAILURE)
-            .map(req -> {
-                final Topic topic = new Topic(req.topicName());
-                return new Subscription(clientID, topic, req.qualityOfService());
+            .filter(sub -> sub.qualityOfService() != FAILURE)
+            .filter(sub -> !SharedSubscriptionUtils.isSharedSubscription(sub.topicName()))
+            .map(sub -> {
+                final Topic topic = new Topic(sub.topicName());
+                return new Subscription(clientID, topic, sub.qualityOfService());
             }).collect(Collectors.toList());
 
+        //TODO here the shared subscription appears 2 times, one in newSubscriptions and the other in sharedSubscriptions
         for (Subscription subscription : newSubscriptions) {
             subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subscription.getRequestedQos());
         }

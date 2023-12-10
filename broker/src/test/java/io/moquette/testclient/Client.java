@@ -28,8 +28,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -57,7 +59,7 @@ public class Client {
     private ICallback callback;
     private String clientId;
     private AtomicReference<MqttMessage> receivedMsg = new AtomicReference<>();
-    private final Queue<MqttMessage> receivedMessages = new LinkedBlockingQueue<>();
+    private final BlockingQueue<MqttMessage> receivedMessages = new LinkedBlockingQueue<>();
 
     public Client(String host) {
         this(host, BrokerConstants.PORT);
@@ -296,6 +298,10 @@ public class Client {
             return Optional.empty();
         }
         return Optional.of(receivedMessages.poll());
+    }
+
+    public MqttMessage receiveNextMessage(Duration waitTime) throws InterruptedException {
+        return receivedMessages.poll(waitTime.toMillis(), TimeUnit.MILLISECONDS);
     }
 
     @SuppressWarnings("FutureReturnValueIgnored")

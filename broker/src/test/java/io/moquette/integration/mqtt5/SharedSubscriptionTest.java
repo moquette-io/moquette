@@ -2,6 +2,7 @@ package io.moquette.integration.mqtt5;
 
 import com.hivemq.client.mqtt.MqttClient;
 import com.hivemq.client.mqtt.MqttGlobalPublishFilter;
+import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import com.hivemq.client.mqtt.mqtt5.message.connect.connack.Mqtt5ConnAckReasonCode;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
@@ -12,7 +13,13 @@ import io.moquette.broker.security.IAuthorizatorPolicy;
 import io.moquette.broker.subscriptions.Topic;
 import io.moquette.integration.IntegrationUtils;
 import io.moquette.testclient.Client;
-import io.netty.handler.codec.mqtt.*;
+import io.netty.handler.codec.mqtt.MqttConnAckMessage;
+import io.netty.handler.codec.mqtt.MqttMessage;
+import io.netty.handler.codec.mqtt.MqttMessageType;
+import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttReasonCodeAndPropertiesVariableHeader;
+import io.netty.handler.codec.mqtt.MqttReasonCodes;
+import io.netty.handler.codec.mqtt.MqttSubAckMessage;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -20,12 +27,15 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.time.Duration;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import static io.moquette.integration.mqtt5.ConnectTest.assertConnectionAccepted;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
 
@@ -181,7 +191,32 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
     }
 
     @Test
-    public void whenAClientSubscribeToASharedTopicThenDoesntReceiveAnyRetainedMessagedOnTheMatchingTopicFilter() {
-        fail("Implement");
+    public void whenAClientSubscribeToASharedTopicThenDoesntReceiveAnyRetainedMessagedOnTheMatchingTopicFilter() throws InterruptedException {
+        // publish a message with retained on a shared topic
+        Mqtt5BlockingClient publisherClient = createPublisherClient();
+        publisherClient.publishWith()
+            .topic("temperature/living")
+            .payload("18".getBytes(StandardCharsets.UTF_8))
+            .qos(MqttQos.AT_LEAST_ONCE) // Broker retains only QoS1 and QoS2
+            .retain(true)
+            .send();
+
+        // Connect a subscriber client
+        lowLevelClient = new Client("localhost").clientId(clientName());
+
+        connectLowLevel();
+
+        // subscribe to a shared topic
+        MqttSubAckMessage subAckMessage = lowLevelClient.subscribe(
+            "$share/collectors/temperature/#", MqttQoS.AT_LEAST_ONCE);
+
+        List<Integer> grantedQoSes = subAckMessage.payload().grantedQoSLevels();
+        assertEquals(1, grantedQoSes.size(),
+            "Granted qos list must be the same cardinality of the subscribe request");
+        assertEquals(MqttQoS.AT_LEAST_ONCE.value(), grantedQoSes.iterator().next(),
+            "Client is subscribed to the shared topic");
+
+        MqttMessage received = lowLevelClient.receiveNextMessage(Duration.ofSeconds(1));
+        assertNull(received, "No retained messages MUST be published");
     }
 }

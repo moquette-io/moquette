@@ -26,7 +26,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
@@ -144,8 +143,8 @@ class ConnectTest extends AbstractServerIntegrationTest {
         verifyPublishedMessage(testamentSubscriber, 10, "Will message must be received");
     }
 
-    private static void verifyPublishedMessage(Mqtt5BlockingClient testamentSubscriber, int timeout, String message) throws InterruptedException {
-        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = testamentSubscriber.publishes(MqttGlobalPublishFilter.ALL)) {
+    private static void verifyPublishedMessage(Mqtt5BlockingClient subscriber, int timeout, String message) throws InterruptedException {
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriber.publishes(MqttGlobalPublishFilter.ALL)) {
             Optional<Mqtt5Publish> publishMessage = publishes.receive(timeout, TimeUnit.SECONDS);
             final String payload = publishMessage.map(Mqtt5Publish::getPayloadAsBytes)
                 .map(b -> new String(b, StandardCharsets.UTF_8))
@@ -182,11 +181,15 @@ class ConnectTest extends AbstractServerIntegrationTest {
     }
 
     private static void verifyNoTestamentIsPublished(Mqtt5BlockingClient testamentSubscriber, Duration timeout) throws InterruptedException {
-        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = testamentSubscriber.publishes(MqttGlobalPublishFilter.ALL)) {
-            Optional<Mqtt5Publish> publishedWill = publishes.receive(timeout.getSeconds(), TimeUnit.SECONDS);
+        verifyNoPublish(testamentSubscriber, timeout, "No will message should be published");
+    }
+
+    protected static void verifyNoPublish(Mqtt5BlockingClient subscriber, Duration timeout, String message) throws InterruptedException {
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriber.publishes(MqttGlobalPublishFilter.ALL)) {
+            Optional<Mqtt5Publish> publishedMessage = publishes.receive(timeout.getSeconds(), TimeUnit.SECONDS);
 
             // verify no published will in 10 seconds
-            assertFalse(publishedWill.isPresent(), "No will message should be published");
+            assertFalse(publishedMessage.isPresent(), message);
         }
     }
 

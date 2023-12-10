@@ -77,7 +77,7 @@ final class Authorizator {
                 // send SUBACK with 0x80, the user hasn't credentials to read the topic
                 LOG.warn("Client does not have read permissions on the topic username: {}, messageId: {}, " +
                          "topic: {}", username, messageId, topic);
-                ackTopics.add(new MqttTopicSubscription(topic.toString(), FAILURE));
+                ackTopics.add(new MqttTopicSubscription(req.topicName(), FAILURE));
             } else {
                 MqttQoS qos;
                 if (topic.isValid()) {
@@ -89,7 +89,7 @@ final class Authorizator {
                         username, messageId, topic);
                     qos = FAILURE;
                 }
-                ackTopics.add(new MqttTopicSubscription(topic.toString(), qos));
+                ackTopics.add(new MqttTopicSubscription(req.topicName(), qos));
             }
         }
         return ackTopics;
