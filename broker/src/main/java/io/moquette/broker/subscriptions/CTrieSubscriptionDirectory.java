@@ -89,10 +89,13 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
         // for each session select the subscription with higher QoS
         Map<String, Subscription> subsGroupedByClient = new HashMap<>();
         for (Subscription sub : subscriptions) {
-            Subscription existingSub = subsGroupedByClient.get(sub.clientId);
-            // update the selected subscriptions if not present or if has a greater qos
+            // If same client is subscribed to two different shared subscription that overlaps
+            // then it has to return both subscriptions, because the share name made them independent.
+            final String key = sub.clientAndShareName();
+            Subscription existingSub = subsGroupedByClient.get(key);
+            // update the selected subscriptions if not present or if it has a greater qos
             if (existingSub == null || existingSub.qosLessThan(sub)) {
-                subsGroupedByClient.put(sub.clientId, sub);
+                subsGroupedByClient.put(key, sub);
             }
         }
         return new ArrayList<>(subsGroupedByClient.values());

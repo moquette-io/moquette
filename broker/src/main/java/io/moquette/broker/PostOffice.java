@@ -332,7 +332,6 @@ class PostOffice {
                 return new Subscription(clientID, topic, sub.qualityOfService());
             }).collect(Collectors.toList());
 
-        //TODO here the shared subscription appears 2 times, one in newSubscriptions and the other in sharedSubscriptions
         for (Subscription subscription : newSubscriptions) {
             subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subscription.getRequestedQos());
         }

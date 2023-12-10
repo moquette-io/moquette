@@ -37,18 +37,18 @@ public class CTrieSharedSubscriptionDirectoryMatchingTest extends CTrieSubscript
         sut.addShared("TempSensor1", new ShareName("temp_sensors"), asTopic("/livingroom"), MqttQoS.AT_MOST_ONCE);
 
         assertThat(sut.matchWithoutQosSharpening(asTopic("/livingroom")))
-            .contains(SubscriptionTestUtils.asSubscription("TempSensor1", "/livingroom"));
+            .contains(SubscriptionTestUtils.asSubscription("TempSensor1", "/livingroom", "temp_sensors"));
     }
 
     @Test
-    public void whenManySharedSubscriptionsOfDifferentShareNameMatchATopicThenOneSubscriptionForEachShareNameMutBeSelected() {
+    public void whenManySharedSubscriptionsOfDifferentShareNameMatchATopicThenOneSubscriptionForEachShareNameMustBeSelected() {
         sut.addShared("TempSensor1", new ShareName("temp_sensors"), asTopic("/livingroom"), MqttQoS.AT_MOST_ONCE);
         sut.addShared("TempSensor1", new ShareName("livingroom_devices"), asTopic("/livingroom"), MqttQoS.AT_MOST_ONCE);
 
         List<Subscription> matchingSubscriptions = sut.matchWithoutQosSharpening(asTopic("/livingroom"));
         assertThat(matchingSubscriptions)
-            .containsOnly(SubscriptionTestUtils.asSubscription("TempSensor1", "/livingroom"),
-                SubscriptionTestUtils.asSubscription("TempSensor1", "/livingroom"))
+            .containsOnly(SubscriptionTestUtils.asSubscription("TempSensor1", "/livingroom", "temp_sensors"),
+                SubscriptionTestUtils.asSubscription("TempSensor1", "/livingroom", "livingroom_devices"))
             .as("One shared subscription for each share name must be present");
     }
 }

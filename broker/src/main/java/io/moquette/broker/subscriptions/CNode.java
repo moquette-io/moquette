@@ -96,10 +96,11 @@ class CNode implements Comparable<CNode> {
         // for each sharedSubscription related to a ShareName, select one subscription
         for (Map.Entry<ShareName, List<SharedSubscription>> subsForName : sharedSubscriptions.entrySet()) {
             List<SharedSubscription> list = subsForName.getValue();
+            final String shareName = subsForName.getKey().getShareName();
             // select a subscription randomly
             int randIdx = SECURE_RANDOM.nextInt(list.size());
             SharedSubscription sub = list.get(randIdx);
-            selectedSubscriptions.add(new Subscription(sub.clientId(), sub.topicFilter(), sub.requestedQoS()));
+            selectedSubscriptions.add(new Subscription(sub.clientId(), sub.topicFilter(), sub.requestedQoS(), shareName));
         }
         return selectedSubscriptions;
     }

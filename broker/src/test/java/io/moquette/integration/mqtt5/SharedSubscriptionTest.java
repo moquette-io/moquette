@@ -16,6 +16,7 @@ import io.moquette.testclient.Client;
 import io.netty.handler.codec.mqtt.MqttConnAckMessage;
 import io.netty.handler.codec.mqtt.MqttMessage;
 import io.netty.handler.codec.mqtt.MqttMessageType;
+import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttReasonCodeAndPropertiesVariableHeader;
 import io.netty.handler.codec.mqtt.MqttReasonCodes;
@@ -68,7 +69,7 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
     }
 
     @Test
-    public void whenAClientSendASharedSubscriptionThenReceivedSubscriptionACKWithTheSharedTopicFilter() {
+    public void givenClientSubscribingToSharedTopicThenReceiveTheExpectedSubscriptionACK() {
         connectLowLevel();
 
         MqttMessage received = lowLevelClient.subscribeWithError("$share/metrics/measures/temp", MqttQoS.AT_LEAST_ONCE);
@@ -104,7 +105,7 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
 
 
     @Test
-    public void givenClientSubscribingToSharedAndNonSharedWhenTheSharedIsNotRedableReceivesPositiveAckForNonShared() throws IOException {
+    public void givenClientSubscribingToSharedAndNonSharedWhenTheSharedIsNotReadableReceivesPositiveAckOnlyForNonShared() throws IOException {
         // stop already started broker instance
         stopServer();
 
@@ -156,6 +157,47 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
         verifyPublishedMessage(subscriberClient, 10, "18", "Shared message must be received");
     }
 
+    @Test
+    public void givenAClientWithOverlappingSharedSubscriptionsThenReceivesMultiplePublishes() throws InterruptedException {
+        // Connect a subscriber client
+        lowLevelClient = new Client("localhost").clientId(clientName());
+
+        connectLowLevel();
+
+        // subscribe to a shared topic
+        MqttSubAckMessage subAckMessage = lowLevelClient.subscribe(
+            "$share/collectors/metric/temperature/#", MqttQoS.AT_MOST_ONCE,
+            "$share/thermo_living/metric/temperature/living", MqttQoS.AT_MOST_ONCE);
+
+        List<Integer> grantedQoSes = subAckMessage.payload().grantedQoSLevels();
+        assertEquals(2, grantedQoSes.size(),
+            "Granted qos list must be the same cardinality of the subscribe request");
+        assertEquals(MqttQoS.AT_MOST_ONCE.value(), grantedQoSes.iterator().next(),
+            "Client is subscribed to the shared topic");
+        assertEquals(MqttQoS.AT_MOST_ONCE.value(), grantedQoSes.iterator().next(),
+            "Client is subscribed to the shared topic");
+
+        Mqtt5BlockingClient publisherClient = createPublisherClient();
+        publisherClient.publishWith()
+            .topic("metric/temperature/living")
+            .qos(MqttQos.AT_MOST_ONCE)
+            .payload("18".getBytes(StandardCharsets.UTF_8))
+            .send();
+
+        MqttMessage received = lowLevelClient.receiveNextMessage(Duration.ofSeconds(1));
+        verifyPubPayload(received, "18");
+        received = lowLevelClient.receiveNextMessage(Duration.ofSeconds(1));
+        verifyPubPayload(received, "18");
+    }
+
+    private static void verifyPubPayload(MqttMessage received, String expectedPayload) {
+        assertNotNull(received);
+        assertEquals(MqttPublishMessage.class, received.getClass());
+        MqttPublishMessage pub = (MqttPublishMessage) received;
+        String payload = pub.payload().asByteBuf().toString(StandardCharsets.UTF_8);
+        assertEquals(expectedPayload, payload);
+    }
+
     @NotNull
     private Mqtt5BlockingClient createSubscriberClient() {
         final Mqtt5BlockingClient client = MqttClient.builder()
@@ -187,6 +229,9 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
                 .map(b -> new String(b, StandardCharsets.UTF_8))
                 .orElse("Failed to load payload");
             assertEquals(expectedPayload, payload, message);
+//
+//            Optional<Mqtt5Publish> publishMessage2 = publishes.receive(timeout, TimeUnit.SECONDS);
+//            System.out.println(publishMessage2);
         }
     }
 

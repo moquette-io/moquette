@@ -24,4 +24,9 @@ public class SubscriptionTestUtils {
     static Subscription asSubscription(String clientId, String topicFilter) {
         return new Subscription(clientId, asTopic(topicFilter), null);
     }
+
+    @NotNull
+    static Subscription asSubscription(String clientId, String topicFilter, String shareName) {
+        return new Subscription(clientId, asTopic(topicFilter), null, shareName);
+    }
 }

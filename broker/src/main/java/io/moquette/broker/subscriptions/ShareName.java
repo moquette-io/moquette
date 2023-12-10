@@ -40,6 +40,10 @@ public final class ShareName {
         return Objects.equals(shareName, shareName1.shareName);
     }
 
+    public String getShareName() {
+        return shareName;
+    }
+
     @Override
     public int hashCode() {
         return Objects.hash(shareName);
