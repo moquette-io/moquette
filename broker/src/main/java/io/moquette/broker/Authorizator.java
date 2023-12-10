@@ -48,9 +48,8 @@ final class Authorizator {
     private static Topic extractShareTopic(String s) {
         if (SharedSubscriptionUtils.isSharedSubscription(s)) {
             return Topic.asTopic(SharedSubscriptionUtils.extractFilterFromShared(s));
-        } else {
-            return Topic.asTopic(s);
         }
+        return Topic.asTopic(s);
     }
 
     /**
@@ -73,26 +72,31 @@ final class Authorizator {
         final int messageId = messageId(msg);
         for (MqttTopicSubscription req : msg.payload().topicSubscriptions()) {
             Topic topic = topicExtractor.apply(req.topicName());
-            if (!policy.canRead(topic, username, clientID)) {
-                // send SUBACK with 0x80, the user hasn't credentials to read the topic
-                LOG.warn("Client does not have read permissions on the topic username: {}, messageId: {}, " +
-                         "topic: {}", username, messageId, topic);
-                ackTopics.add(new MqttTopicSubscription(req.topicName(), FAILURE));
-            } else {
-                MqttQoS qos;
-                if (topic.isValid()) {
-                    LOG.debug("Client will be subscribed to the topic username: {}, messageId: {}, topic: {}",
-                        username, messageId, topic);
-                    qos = req.qualityOfService();
-                } else {
-                    LOG.warn("Topic filter is not valid username: {}, messageId: {}, topic: {}",
-                        username, messageId, topic);
-                    qos = FAILURE;
-                }
-                ackTopics.add(new MqttTopicSubscription(req.topicName(), qos));
-            }
+            final MqttQoS qos = getQoSCheckingAlsoPermissionsOnTopic(clientID, username, messageId, topic,
+                req.qualityOfService());
+            ackTopics.add(new MqttTopicSubscription(req.topicName(), qos));
         }
         return ackTopics;
+    }
+
+    private MqttQoS getQoSCheckingAlsoPermissionsOnTopic(String clientID, String username, int messageId,
+                                                         Topic topic, MqttQoS requestedQoS) {
+        if (policy.canRead(topic, username, clientID)) {
+            if (topic.isValid()) {
+                LOG.debug("Client will be subscribed to the topic username: {}, messageId: {}, topic: {}",
+                    username, messageId, topic);
+                return requestedQoS;
+            }
+
+            LOG.warn("Topic filter is not valid username: {}, messageId: {}, topic: {}",
+                username, messageId, topic);
+            return FAILURE;
+        }
+
+        // send SUBACK with 0x80, the user hasn't credentials to read the topic
+        LOG.warn("Client does not have read permissions on the topic username: {}, messageId: {}, " +
+                 "topic: {}", username, messageId, topic);
+        return FAILURE;
     }
 
     /**
