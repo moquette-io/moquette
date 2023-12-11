@@ -179,11 +179,7 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
             "Client is subscribed to the shared topic");
 
         Mqtt5BlockingClient publisherClient = createPublisherClient();
-        publisherClient.publishWith()
-            .topic("metric/temperature/living")
-            .qos(MqttQos.AT_MOST_ONCE)
-            .payload("18".getBytes(StandardCharsets.UTF_8))
-            .send();
+        publish(publisherClient, "metric/temperature/living", MqttQos.AT_MOST_ONCE);
 
         MqttMessage received = lowLevelClient.receiveNextMessage(Duration.ofSeconds(1));
         verifyPubPayload(received, "18");
@@ -275,35 +271,36 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
     @Test
     public void givenSharedSubscriptionWithCertainQoSWhenSameClientWithSameShareSubscribeToSameTopicFilterThenQoSUpdates() throws InterruptedException {
         final Mqtt5BlockingClient subscriberClient = createSubscriberClient();
-        subscriberClient.subscribeWith()
-            .topicFilter("$share/collectors/metric/temperature/living")
-            .qos(MqttQos.AT_MOST_ONCE)
-            .send();
+        subscribe(subscriberClient, "$share/collectors/metric/temperature/living", MqttQos.AT_MOST_ONCE);
 
         Mqtt5BlockingClient publisherClient = createPublisherClient();
-        publisherClient.publishWith()
-            .topic("metric/temperature/living")
-            .qos(MqttQos.AT_LEAST_ONCE)
-            .payload("18".getBytes(StandardCharsets.UTF_8))
-            .send();
+        publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
 
         // because the PUB is at QoS1 and the subscription is at QoS0, the subscribed doesn't receive any message
         verifyNoPublish(subscriberClient,Duration.ofSeconds(1), "No message is expected at Qos0 subscription");
 
         // update QoS for shared subscription
-        subscriberClient.subscribeWith()
-            .topicFilter("$share/collectors/metric/temperature/living")
-            .qos(MqttQos.AT_LEAST_ONCE)
-            .send();
+        subscribe(subscriberClient, "$share/collectors/metric/temperature/living", MqttQos.AT_LEAST_ONCE);
 
         // publish the message again
-        publisherClient.publishWith()
-            .topic("metric/temperature/living")
-            .qos(MqttQos.AT_LEAST_ONCE)
-            .payload("18".getBytes(StandardCharsets.UTF_8))
-            .send();
+        publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
 
         // This time the publish reaches the subscription
         verifyPublishedMessage(subscriberClient, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 10);
+    }
+
+    private static void publish(Mqtt5BlockingClient publisherClient, String topicName, MqttQos mqttQos) {
+        publisherClient.publishWith()
+            .topic(topicName)
+            .qos(mqttQos)
+            .payload("18".getBytes(StandardCharsets.UTF_8))
+            .send();
+    }
+
+    private static void subscribe(Mqtt5BlockingClient subscriberClient, String topicFilter, MqttQos mqttQos) {
+        subscriberClient.subscribeWith()
+            .topicFilter(topicFilter)
+            .qos(mqttQos)
+            .send();
     }
 }
