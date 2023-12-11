@@ -36,6 +36,7 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import static io.moquette.integration.mqtt5.ConnectTest.assertConnectionAccepted;
+import static io.moquette.integration.mqtt5.ConnectTest.verifyNoPublish;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
@@ -222,16 +223,22 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
         return client;
     }
 
-    private static void verifyPublishedMessage(Mqtt5BlockingClient subscriber, int timeout, String expectedPayload, String message) throws InterruptedException {
+    private static void verifyPublishedMessage(Mqtt5BlockingClient subscriber, int timeout, String expectedPayload, String errorMessage) throws InterruptedException {
+        verifyPublishedMessage(subscriber, MqttQos.AT_MOST_ONCE, expectedPayload, errorMessage, timeout);
+    }
+
+    private static void verifyPublishedMessage(Mqtt5BlockingClient subscriber, MqttQos expectedQos, String expectedPayload, String errorMessage, int timeout) throws InterruptedException {
         try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriber.publishes(MqttGlobalPublishFilter.ALL)) {
             Optional<Mqtt5Publish> publishMessage = publishes.receive(timeout, TimeUnit.SECONDS);
-            final String payload = publishMessage.map(Mqtt5Publish::getPayloadAsBytes)
-                .map(b -> new String(b, StandardCharsets.UTF_8))
-                .orElse("Failed to load payload");
-            assertEquals(expectedPayload, payload, message);
-//
-//            Optional<Mqtt5Publish> publishMessage2 = publishes.receive(timeout, TimeUnit.SECONDS);
-//            System.out.println(publishMessage2);
+            if (!publishMessage.isPresent()) {
+                fail("Expected to receive a publish message");
+                return;
+            }
+            Mqtt5Publish msgPub = publishMessage.get();
+            final String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
+            assertEquals(expectedPayload, payload, errorMessage);
+
+            assertEquals(expectedQos, msgPub.getQos());
         }
     }
 
@@ -263,5 +270,40 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
 
         MqttMessage received = lowLevelClient.receiveNextMessage(Duration.ofSeconds(1));
         assertNull(received, "No retained messages MUST be published");
+    }
+
+    @Test
+    public void givenSharedSubscriptionWithCertainQoSWhenSameClientWithSameShareSubscribeToSameTopicFilterThenQoSUpdates() throws InterruptedException {
+        final Mqtt5BlockingClient subscriberClient = createSubscriberClient();
+        subscriberClient.subscribeWith()
+            .topicFilter("$share/collectors/metric/temperature/living")
+            .qos(MqttQos.AT_MOST_ONCE)
+            .send();
+
+        Mqtt5BlockingClient publisherClient = createPublisherClient();
+        publisherClient.publishWith()
+            .topic("metric/temperature/living")
+            .qos(MqttQos.AT_LEAST_ONCE)
+            .payload("18".getBytes(StandardCharsets.UTF_8))
+            .send();
+
+        // because the PUB is at QoS1 and the subscription is at QoS0, the subscribed doesn't receive any message
+        verifyNoPublish(subscriberClient,Duration.ofSeconds(1), "No message is expected at Qos0 subscription");
+
+        // update QoS for shared subscription
+        subscriberClient.subscribeWith()
+            .topicFilter("$share/collectors/metric/temperature/living")
+            .qos(MqttQos.AT_LEAST_ONCE)
+            .send();
+
+        // publish the message again
+        publisherClient.publishWith()
+            .topic("metric/temperature/living")
+            .qos(MqttQos.AT_LEAST_ONCE)
+            .payload("18".getBytes(StandardCharsets.UTF_8))
+            .send();
+
+        // This time the publish reaches the subscription
+        verifyPublishedMessage(subscriberClient, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 10);
     }
 }

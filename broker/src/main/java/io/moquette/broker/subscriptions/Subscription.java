@@ -30,7 +30,6 @@ public final class Subscription implements Serializable, Comparable<Subscription
     private final MqttQoS requestedQos; // max QoS acceptable
     final String clientId;
     final Topic topicFilter;
-
     final String shareName;
 
     public Subscription(String clientId, Topic topicFilter, MqttQoS requestedQos) {
@@ -96,6 +95,7 @@ public final class Subscription implements Serializable, Comparable<Subscription
         }
     }
 
+    // The identity is important because used in CTries CNodes to check when a subscription is a duplicate or not.
     @Override
     public int compareTo(Subscription o) {
         int compare = this.clientId.compareTo(o.clientId);
