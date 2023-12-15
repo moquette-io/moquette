@@ -18,7 +18,16 @@ package io.moquette.broker.subscriptions;
 import io.moquette.broker.subscriptions.CTrie.SubscriptionRequest;
 
 import java.security.SecureRandom;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Random;
+import java.util.Set;
 
 class CNode implements Comparable<CNode> {
 
@@ -26,8 +35,7 @@ class CNode implements Comparable<CNode> {
     private final Token token;
     private final List<INode> children;
     // Sorted list of subscriptions. The sort is necessary for fast access, instead of linear scan.
-    //TODO move to private and add access read method
-    List<Subscription> subscriptions;
+    private List<Subscription> subscriptions;
     // the list of SharedSubscription is sorted. The sort is necessary for fast access, instead of linear scan.
     private Map<ShareName, List<SharedSubscription>> sharedSubscriptions;
 
@@ -103,6 +111,10 @@ class CNode implements Comparable<CNode> {
             selectedSubscriptions.add(new Subscription(sub.clientId(), sub.topicFilter(), sub.requestedQoS(), shareName));
         }
         return selectedSubscriptions;
+    }
+
+    List<Subscription> subscriptions() {
+        return subscriptions;
     }
 
     // Mutating operation

@@ -31,18 +31,18 @@ class DumpTreeVisitor implements CTrie.IVisitor<String> {
         if (node instanceof TNode) {
             return "TNode";
         }
-        if (node.subscriptions.isEmpty()) {
+        if (node.subscriptions().isEmpty()) {
             return StringUtil.EMPTY_STRING;
         }
         StringBuilder subScriptionsStr = new StringBuilder(" ~~[");
         int counter = 0;
-        for (Subscription couple : node.subscriptions) {
+        for (Subscription couple : node.subscriptions()) {
             subScriptionsStr
                 .append("{filter=").append(couple.topicFilter).append(", ")
                 .append("qos=").append(couple.getRequestedQos()).append(", ")
                 .append("client='").append(couple.clientId).append("'}");
             counter++;
-            if (counter < node.subscriptions.size()) {
+            if (counter < node.subscriptions().size()) {
                 subScriptionsStr.append(";");
             }
         }

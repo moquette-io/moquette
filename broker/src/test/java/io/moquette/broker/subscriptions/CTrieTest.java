@@ -50,15 +50,15 @@ public class CTrieTest {
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/"));
         assertTrue(matchedNode.isPresent(), "Node on path / must be present");
         //verify structure, only root INode and the first CNode should be present
-        assertThat(this.sut.root.mainNode().subscriptions).isEmpty();
+        assertThat(this.sut.root.mainNode().subscriptions()).isEmpty();
         assertThat(this.sut.root.mainNode().allChildren()).isNotEmpty();
 
         INode firstLayer = this.sut.root.mainNode().allChildren().get(0);
-        assertThat(firstLayer.mainNode().subscriptions).isEmpty();
+        assertThat(firstLayer.mainNode().subscriptions()).isEmpty();
         assertThat(firstLayer.mainNode().allChildren()).isNotEmpty();
 
         INode secondLayer = firstLayer.mainNode().allChildren().get(0);
-        assertThat(secondLayer.mainNode().subscriptions).isNotEmpty();
+        assertThat(secondLayer.mainNode().subscriptions()).isNotEmpty();
         assertThat(secondLayer.mainNode().allChildren()).isEmpty();
     }
 
@@ -71,7 +71,7 @@ public class CTrieTest {
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/temp"));
         assertTrue(matchedNode.isPresent(), "Node on path /temp must be present");
-        assertFalse(matchedNode.get().subscriptions.isEmpty());
+        assertFalse(matchedNode.get().subscriptions().isEmpty());
     }
 
     @Test
@@ -98,7 +98,7 @@ public class CTrieTest {
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/temp"));
         assertTrue(matchedNode.isPresent(), "Node on path /temp must be present");
-        final List<Subscription> subscriptions = matchedNode.get().subscriptions;
+        final List<Subscription> subscriptions = matchedNode.get().subscriptions();
         assertTrue(subscriptions.contains(asSubscription("TempSensor2", "/temp")));
     }
 
@@ -116,7 +116,7 @@ public class CTrieTest {
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/italy/happiness"));
         assertTrue(matchedNode.isPresent(), "Node on path /italy/happiness must be present");
-        final List<Subscription> subscriptions = matchedNode.get().subscriptions;
+        final List<Subscription> subscriptions = matchedNode.get().subscriptions();
         assertTrue(subscriptions.contains(asSubscription("HappinessSensor", "/italy/happiness")));
     }
 

@@ -112,9 +112,6 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
     public void addShared(String clientId, ShareName name, Topic topicFilter, MqttQoS requestedQoS) {
         SubscriptionRequest shareSubRequest = SubscriptionRequest.buildShared(name, topicFilter, clientId, requestedQoS);
         ctrie.addToTree(shareSubRequest);
-
-        // TODO Has to be stored? this has to refer also the share name?
-//        subscriptionsRepository.addNewSubscription(shareSubRequest.subscription());
     }
 
     /**
