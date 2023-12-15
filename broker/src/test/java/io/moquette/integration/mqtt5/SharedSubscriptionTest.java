@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import static io.moquette.integration.mqtt5.ConnectTest.assertConnectionAccepted;
 import static io.moquette.integration.mqtt5.ConnectTest.verifyNoPublish;
@@ -143,19 +144,18 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
     }
 
     @Test
-    public void givenASharedSubscriptionClientReceivesANotification() throws InterruptedException {
+    public void givenASharedSubscriptionClientReceivesANotification() throws Exception {
         final Mqtt5BlockingClient subscriberClient = createSubscriberClient();
         subscriberClient.subscribeWith()
             .topicFilter("$share/collectors/metric/temperature/#")
             .send();
 
         Mqtt5BlockingClient publisherClient = createPublisherClient();
-        publisherClient.publishWith()
-                .topic("metric/temperature/living")
-                .payload("18".getBytes(StandardCharsets.UTF_8))
-                .send();
 
-        verifyPublishedMessage(subscriberClient, 10, "18", "Shared message must be received");
+        verifyPublishedMessage(subscriberClient, unused -> publisherClient.publishWith()
+            .topic("metric/temperature/living")
+            .payload("18".getBytes(StandardCharsets.UTF_8))
+            .send(), MqttQos.AT_MOST_ONCE, "18", "Shared message must be received", 10);
     }
 
     @Test
@@ -193,6 +193,7 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
         MqttPublishMessage pub = (MqttPublishMessage) received;
         String payload = pub.payload().asByteBuf().toString(StandardCharsets.UTF_8);
         assertEquals(expectedPayload, payload);
+        assertTrue(pub.release(), "received message must be deallocated");
     }
 
     @NotNull
@@ -219,12 +220,8 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
         return client;
     }
 
-    private static void verifyPublishedMessage(Mqtt5BlockingClient subscriber, int timeout, String expectedPayload, String errorMessage) throws InterruptedException {
-        verifyPublishedMessage(subscriber, MqttQos.AT_MOST_ONCE, expectedPayload, errorMessage, timeout);
-    }
-
-    private static void verifyPublishedMessage(Mqtt5BlockingClient subscriber, MqttQos expectedQos, String expectedPayload, String errorMessage, int timeoutSeconds) throws InterruptedException {
-        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriber.publishes(MqttGlobalPublishFilter.ALL)) {
+    private static void verifyPublishedMessage(Mqtt5BlockingClient client, MqttQos expectedQos, String expectedPayload, String errorMessage, int timeoutSeconds) throws InterruptedException {
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = client.publishes(MqttGlobalPublishFilter.ALL)) {
             Optional<Mqtt5Publish> publishMessage = publishes.receive(timeoutSeconds, TimeUnit.SECONDS);
             if (!publishMessage.isPresent()) {
                 fail("Expected to receive a publish message");
@@ -233,7 +230,22 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
             Mqtt5Publish msgPub = publishMessage.get();
             final String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
             assertEquals(expectedPayload, payload, errorMessage);
+            assertEquals(expectedQos, msgPub.getQos());
+        }
+    }
 
+    private static void verifyPublishedMessage(Mqtt5BlockingClient client, Consumer<Void> action, MqttQos expectedQos,
+                                               String expectedPayload, String errorMessage, int timeoutSeconds) throws Exception {
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = client.publishes(MqttGlobalPublishFilter.ALL)) {
+            action.accept(null);
+            Optional<Mqtt5Publish> publishMessage = publishes.receive(timeoutSeconds, TimeUnit.SECONDS);
+            if (!publishMessage.isPresent()) {
+                fail("Expected to receive a publish message");
+                return;
+            }
+            Mqtt5Publish msgPub = publishMessage.get();
+            final String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
+            assertEquals(expectedPayload, payload, errorMessage);
             assertEquals(expectedQos, msgPub.getQos());
         }
     }
@@ -269,7 +281,7 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
     }
 
     @Test
-    public void givenSharedSubscriptionWithCertainQoSWhenSameClientWithSameShareSubscribeToSameTopicFilterThenQoSUpdates() throws InterruptedException {
+    public void givenSharedSubscriptionWithCertainQoSWhenSameClientWithSameShareSubscribeToSameTopicFilterThenQoSUpdates() throws Exception {
         final Mqtt5BlockingClient subscriberClient = createSubscriberClient();
         subscribe(subscriberClient, "$share/collectors/metric/temperature/living", MqttQos.AT_MOST_ONCE);
 
@@ -279,14 +291,16 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
         // because the PUB is at QoS1 and the subscription is at QoS0, the subscribed doesn't receive any message
         verifyNoPublish(subscriberClient,Duration.ofSeconds(1), "No message is expected at Qos0 subscription");
 
+        LOG.info("Before repeating with AT_LEAST_ONCE");
+
         // update QoS for shared subscription
         subscribe(subscriberClient, "$share/collectors/metric/temperature/living", MqttQos.AT_LEAST_ONCE);
 
-        // publish the message again
-        publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
-
         // This time the publish reaches the subscription
-        verifyPublishedMessage(subscriberClient, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 30);
+        verifyPublishedMessage(subscriberClient, v -> {
+            // publish the message again and verify the captured message
+            publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
+        }, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 30);
     }
 
     private static void publish(Mqtt5BlockingClient publisherClient, String topicName, MqttQos mqttQos) {

@@ -690,10 +690,10 @@ final class MQTTConnection {
         final String topicName = publishMsg.variableHeader().topicName();
         MqttQoS qos = publishMsg.fixedHeader().qosLevel();
         if (LOG.isTraceEnabled()) {
-            LOG.trace("Sending PUBLISH({}) message. MessageId={}, topic={}, payload={}", qos, packetId, topicName,
-                DebugUtils.payload2Str(publishMsg.payload()));
+            LOG.trace("Sending PUBLISH({}) message. MessageId={}, topic={}, payload={} to {}", qos, packetId, topicName,
+                DebugUtils.payload2Str(publishMsg.payload()), getClientId());
         } else {
-            LOG.debug("Sending PUBLISH({}) message. MessageId={}, topic={}", qos, packetId, topicName);
+            LOG.debug("Sending PUBLISH({}) message. MessageId={}, topic={} to {}", qos, packetId, topicName, getClientId());
         }
         sendIfWritableElseDrop(publishMsg);
     }
@@ -703,7 +703,7 @@ final class MQTTConnection {
             LOG.debug("OUT {}", msg.fixedHeader().messageType());
         }
         if (channel.isWritable()) {
-
+            LOG.debug("Sending message {} on the wire to {}", msg.fixedHeader().messageType(), getClientId());
             // Sending to external, retain a duplicate. Just retain is not
             // enough, since the receiver must have full control.
             Object retainedDup = msg;
@@ -718,6 +718,8 @@ final class MQTTConnection {
                 channelFuture = channel.write(retainedDup);
             }
             channelFuture.addListener(FIRE_EXCEPTION_ON_FAILURE);
+        } else {
+            LOG.debug("Dropping message {} from the wire, msg: {}", msg.fixedHeader().messageType(), msg);
         }
     }
 
