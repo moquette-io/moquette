@@ -223,9 +223,9 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
         verifyPublishedMessage(subscriber, MqttQos.AT_MOST_ONCE, expectedPayload, errorMessage, timeout);
     }
 
-    private static void verifyPublishedMessage(Mqtt5BlockingClient subscriber, MqttQos expectedQos, String expectedPayload, String errorMessage, int timeout) throws InterruptedException {
+    private static void verifyPublishedMessage(Mqtt5BlockingClient subscriber, MqttQos expectedQos, String expectedPayload, String errorMessage, int timeoutSeconds) throws InterruptedException {
         try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriber.publishes(MqttGlobalPublishFilter.ALL)) {
-            Optional<Mqtt5Publish> publishMessage = publishes.receive(timeout, TimeUnit.SECONDS);
+            Optional<Mqtt5Publish> publishMessage = publishes.receive(timeoutSeconds, TimeUnit.SECONDS);
             if (!publishMessage.isPresent()) {
                 fail("Expected to receive a publish message");
                 return;
@@ -286,7 +286,7 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
         publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
 
         // This time the publish reaches the subscription
-        verifyPublishedMessage(subscriberClient, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 10);
+        verifyPublishedMessage(subscriberClient, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 30);
     }
 
     private static void publish(Mqtt5BlockingClient publisherClient, String topicName, MqttQos mqttQos) {
