@@ -592,7 +592,14 @@ final class MQTTConnection {
     void sendUnsubAckMessage(List<String> topics, String clientID, int messageID) {
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.UNSUBACK, false, AT_MOST_ONCE,
             false, 0);
-        MqttUnsubAckMessage ackMessage = new MqttUnsubAckMessage(fixedHeader, from(messageID));
+        final MqttUnsubAckMessage ackMessage;
+        if (isProtocolVersion5()) {
+            // adds the unsubscribe reason codes in the payload
+            MqttUnsubAckPayload payload = new MqttUnsubAckPayload(MqttReasonCodes.UnsubAck.SUCCESS.byteValue());
+            ackMessage = new MqttUnsubAckMessage(fixedHeader, from(messageID), payload);
+        } else {
+            ackMessage = new MqttUnsubAckMessage(fixedHeader, from(messageID));
+        }
 
         LOG.trace("Sending UNSUBACK message. messageId: {}, topics: {}", messageID, topics);
         channel.writeAndFlush(ackMessage).addListener(FIRE_EXCEPTION_ON_FAILURE);
