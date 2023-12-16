@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 import static io.moquette.broker.Utils.messageId;
 import static io.netty.handler.codec.mqtt.MqttQoS.FAILURE;
@@ -39,6 +40,18 @@ final class Authorizator {
         this.policy = policy;
     }
 
+
+    List<MqttTopicSubscription> verifyAlsoSharedTopicsReadAccess(String clientID, String username, MqttSubscribeMessage msg) {
+        return verifyTopicsReadAccessWithTopicExtractor(clientID, username, msg, Authorizator::extractShareTopic);
+    }
+
+    private static Topic extractShareTopic(String s) {
+        if (SharedSubscriptionUtils.isSharedSubscription(s)) {
+            return Topic.asTopic(SharedSubscriptionUtils.extractFilterFromShared(s));
+        }
+        return Topic.asTopic(s);
+    }
+
     /**
      * @param clientID
      *            the clientID
@@ -49,31 +62,41 @@ final class Authorizator {
      * @return the list of verified topics for the given subscribe message.
      */
     List<MqttTopicSubscription> verifyTopicsReadAccess(String clientID, String username, MqttSubscribeMessage msg) {
+        return verifyTopicsReadAccessWithTopicExtractor(clientID, username, msg, Topic::asTopic);
+    }
+
+    private List<MqttTopicSubscription> verifyTopicsReadAccessWithTopicExtractor(String clientID, String username,
+                                                 MqttSubscribeMessage msg, Function<String, Topic> topicExtractor) {
         List<MqttTopicSubscription> ackTopics = new ArrayList<>();
 
         final int messageId = messageId(msg);
         for (MqttTopicSubscription req : msg.payload().topicSubscriptions()) {
-            Topic topic = new Topic(req.topicName());
-            if (!policy.canRead(topic, username, clientID)) {
-                // send SUBACK with 0x80, the user hasn't credentials to read the topic
-                LOG.warn("Client does not have read permissions on the topic username: {}, messageId: {}, " +
-                         "topic: {}", username, messageId, topic);
-                ackTopics.add(new MqttTopicSubscription(topic.toString(), FAILURE));
-            } else {
-                MqttQoS qos;
-                if (topic.isValid()) {
-                    LOG.debug("Client will be subscribed to the topic username: {}, messageId: {}, topic: {}",
-                        username, messageId, topic);
-                    qos = req.qualityOfService();
-                } else {
-                    LOG.warn("Topic filter is not valid username: {}, messageId: {}, topic: {}",
-                        username, messageId, topic);
-                    qos = FAILURE;
-                }
-                ackTopics.add(new MqttTopicSubscription(topic.toString(), qos));
-            }
+            Topic topic = topicExtractor.apply(req.topicName());
+            final MqttQoS qos = getQoSCheckingAlsoPermissionsOnTopic(clientID, username, messageId, topic,
+                req.qualityOfService());
+            ackTopics.add(new MqttTopicSubscription(req.topicName(), qos));
         }
         return ackTopics;
+    }
+
+    private MqttQoS getQoSCheckingAlsoPermissionsOnTopic(String clientID, String username, int messageId,
+                                                         Topic topic, MqttQoS requestedQoS) {
+        if (policy.canRead(topic, username, clientID)) {
+            if (topic.isValid()) {
+                LOG.debug("Client will be subscribed to the topic username: {}, messageId: {}, topic: {}",
+                    username, messageId, topic);
+                return requestedQoS;
+            }
+
+            LOG.warn("Topic filter is not valid username: {}, messageId: {}, topic: {}",
+                username, messageId, topic);
+            return FAILURE;
+        }
+
+        // send SUBACK with 0x80, the user hasn't credentials to read the topic
+        LOG.warn("Client does not have read permissions on the topic username: {}, messageId: {}, " +
+                 "topic: {}", username, messageId, topic);
+        return FAILURE;
     }
 
     /**

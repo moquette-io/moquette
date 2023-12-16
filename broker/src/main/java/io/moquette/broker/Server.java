@@ -169,7 +169,7 @@ public class Server {
      * @throws IOException in case of any IO Error.
      */
     public void startServer(IConfig config, List<? extends InterceptHandler> handlers) throws IOException {
-        LOG.debug("Starting moquette integration using IConfig instance and intercept handlers");
+        LOG.debug("Starting Moquette integration using IConfig instance and intercept handlers");
         startServer(config, handlers, null, null, null);
     }
 

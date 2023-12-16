@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The original author or authors
+ * Copyright (c) 2012-2023 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -15,19 +15,20 @@
  */
 package io.moquette.broker.subscriptions;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import io.moquette.broker.ISubscriptionsRepository;
+import io.moquette.persistence.MemorySubscriptionsRepository;
+import org.junit.jupiter.api.BeforeEach;
 
-class SubscriptionCounterVisitor implements CTrie.IVisitor<Integer> {
+abstract class CTrieSubscriptionDirectMatchingCommon {
 
-    private AtomicInteger accumulator = new AtomicInteger(0);
+    protected CTrieSubscriptionDirectory sut;
+    protected ISubscriptionsRepository sessionsRepository;
 
-    @Override
-    public void visit(CNode node, int deep) {
-        accumulator.addAndGet(node.subscriptions().size());
-    }
+    @BeforeEach
+    public void setUp() {
+        sut = new CTrieSubscriptionDirectory();
 
-    @Override
-    public Integer getResult() {
-        return accumulator.get();
+        this.sessionsRepository = new MemorySubscriptionsRepository();
+        sut.init(this.sessionsRepository);
     }
 }

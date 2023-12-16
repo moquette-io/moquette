@@ -19,6 +19,7 @@ package io.moquette.broker.subscriptions;
 import io.netty.handler.codec.mqtt.MqttQoS;
 
 import java.io.Serializable;
+import java.util.Objects;
 
 /**
  * Maintain the information about which Topic a certain ClientID is subscribed and at which QoS
@@ -29,17 +30,24 @@ public final class Subscription implements Serializable, Comparable<Subscription
     private final MqttQoS requestedQos; // max QoS acceptable
     final String clientId;
     final Topic topicFilter;
+    final String shareName;
 
     public Subscription(String clientId, Topic topicFilter, MqttQoS requestedQos) {
+        this(clientId, topicFilter, requestedQos, "");
+    }
+
+    public Subscription(String clientId, Topic topicFilter, MqttQoS requestedQos, String shareName) {
         this.requestedQos = requestedQos;
         this.clientId = clientId;
         this.topicFilter = topicFilter;
+        this.shareName = shareName;
     }
 
     public Subscription(Subscription orig) {
         this.requestedQos = orig.requestedQos;
         this.clientId = orig.clientId;
         this.topicFilter = orig.topicFilter;
+        this.shareName = orig.shareName;
     }
 
     public String getClientId() {
@@ -60,28 +68,22 @@ public final class Subscription implements Serializable, Comparable<Subscription
 
     @Override
     public boolean equals(Object o) {
-        if (this == o)
-            return true;
-        if (o == null || getClass() != o.getClass())
-            return false;
-
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
         Subscription that = (Subscription) o;
-
-        if (clientId != null ? !clientId.equals(that.clientId) : that.clientId != null)
-            return false;
-        return !(topicFilter != null ? !topicFilter.equals(that.topicFilter) : that.topicFilter != null);
+        return Objects.equals(clientId, that.clientId) &&
+            Objects.equals(shareName, that.shareName) &&
+            Objects.equals(topicFilter, that.topicFilter);
     }
 
     @Override
     public int hashCode() {
-        int result = clientId != null ? clientId.hashCode() : 0;
-        result = 31 * result + (topicFilter != null ? topicFilter.hashCode() : 0);
-        return result;
+        return Objects.hash(clientId, shareName, topicFilter);
     }
 
     @Override
     public String toString() {
-        return String.format("[filter:%s, clientID: %s, qos: %s]", topicFilter, clientId, requestedQos);
+        return String.format("[filter:%s, clientID: %s, qos: %s - shareName: %s]", topicFilter, clientId, requestedQos, shareName);
     }
 
     @Override
@@ -93,12 +95,21 @@ public final class Subscription implements Serializable, Comparable<Subscription
         }
     }
 
+    // The identity is important because used in CTries CNodes to check when a subscription is a duplicate or not.
     @Override
     public int compareTo(Subscription o) {
         int compare = this.clientId.compareTo(o.clientId);
         if (compare != 0) {
             return compare;
         }
+        compare = this.shareName.compareTo(o.shareName);
+        if (compare != 0) {
+            return compare;
+        }
         return this.topicFilter.compareTo(o.topicFilter);
+    }
+
+    public String clientAndShareName() {
+        return clientId + (shareName.isEmpty() ? "" : "-" + shareName);
     }
 }

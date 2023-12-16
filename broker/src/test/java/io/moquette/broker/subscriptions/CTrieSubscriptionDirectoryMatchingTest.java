@@ -22,126 +22,109 @@ import io.netty.handler.codec.mqtt.MqttQoS;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.Optional;
-import java.util.Set;
-
-import static io.moquette.broker.subscriptions.CTrieTest.clientSubOnTopic;
-import static io.moquette.broker.subscriptions.Topic.asTopic;
 import java.util.List;
+import java.util.Optional;
+
+import static io.moquette.broker.subscriptions.Topic.asTopic;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class CTrieSubscriptionDirectoryMatchingTest {
-
-    private CTrieSubscriptionDirectory sut;
-    private ISubscriptionsRepository sessionsRepository;
-
-    @BeforeEach
-    public void setUp() {
-        sut = new CTrieSubscriptionDirectory();
-
-        this.sessionsRepository = new MemorySubscriptionsRepository();
-        sut.init(this.sessionsRepository);
-    }
+public class CTrieSubscriptionDirectoryMatchingTest extends CTrieSubscriptionDirectMatchingCommon {
 
     @Test
     public void testMatchSimple() {
-        Subscription slashSub = clientSubOnTopic("TempSensor1", "/");
-        sut.add(slashSub);
+        sut.add("TempSensor1", asTopic("/"), null);
         assertThat(sut.matchWithoutQosSharpening(asTopic("finance"))).isEmpty();
 
-        Subscription slashFinanceSub = clientSubOnTopic("TempSensor1", "/finance");
-        sut.add(slashFinanceSub);
+        sut.add("TempSensor1", asTopic("/finance"), null);
         assertThat(sut.matchWithoutQosSharpening(asTopic("finance"))).isEmpty();
 
-        assertThat(sut.matchWithoutQosSharpening(asTopic("/finance"))).contains(slashFinanceSub);
-        assertThat(sut.matchWithoutQosSharpening(asTopic("/"))).contains(slashSub);
-    }
-
-    @Test
-    public void testMatchSimpleMulti() {
-        Subscription anySub = clientSubOnTopic("TempSensor1", "#");
-        sut.add(anySub);
-        assertThat(sut.matchWithoutQosSharpening(asTopic("finance"))).contains(anySub);
-
-        Subscription financeAnySub = clientSubOnTopic("TempSensor1", "finance/#");
-        sut.add(financeAnySub);
-        assertThat(sut.matchWithoutQosSharpening(asTopic("finance"))).containsExactlyInAnyOrder(financeAnySub, anySub);
+        assertThat(sut.matchWithoutQosSharpening(asTopic("/finance"))).contains(SubscriptionTestUtils.asSubscription("TempSensor1", "/finance"));
+        assertThat(sut.matchWithoutQosSharpening(asTopic("/"))).contains(SubscriptionTestUtils.asSubscription("TempSensor1", "/"));
     }
 
     @Test
     public void testMatchingDeepMulti_one_layer() {
-        Subscription anySub = clientSubOnTopic("AllSensor1", "#");
-        Subscription financeAnySub = clientSubOnTopic("FinanceSensor", "finance/#");
-        sut.add(anySub);
-        sut.add(financeAnySub);
+        sut.add("AllSensor1", asTopic("#"), null);
+        sut.add("FinanceSensor", asTopic("finance/#"), null);
 
         // Verify
+        Subscription anySub = SubscriptionTestUtils.asSubscription("AllSensor1", "#");
+        Subscription financeAnySub = SubscriptionTestUtils.asSubscription("FinanceSensor", "finance/#");
         assertThat(sut.matchWithoutQosSharpening(asTopic("finance/stock")))
             .containsExactlyInAnyOrder(financeAnySub, anySub);
         assertThat(sut.matchWithoutQosSharpening(asTopic("finance/stock/ibm")))
             .containsExactlyInAnyOrder(financeAnySub, anySub);
-//        System.out.println(sut.dumpTree());
+    }
+
+    @Test
+    public void testMatchSimpleMulti() {
+        Subscription anySub = SubscriptionTestUtils.asSubscription("TempSensor1", "#");
+        sut.add("TempSensor1", asTopic("#"), null);
+        assertThat(sut.matchWithoutQosSharpening(asTopic("finance"))).contains(anySub);
+
+        Subscription financeAnySub = SubscriptionTestUtils.asSubscription("TempSensor1", "finance/#");
+        sut.add("TempSensor1", asTopic("finance/#"), null);
+        assertThat(sut.matchWithoutQosSharpening(asTopic("finance"))).containsExactlyInAnyOrder(financeAnySub, anySub);
     }
 
     @Test
     public void testMatchingDeepMulti_two_layer() {
-        Subscription financeAnySub = clientSubOnTopic("FinanceSensor", "finance/stock/#");
-        sut.add(financeAnySub);
+        sut.add("FinanceSensor", asTopic("finance/stock/#"), null);
 
         // Verify
+        Subscription financeAnySub = SubscriptionTestUtils.asSubscription("FinanceSensor", "finance/stock/#");
         assertThat(sut.matchWithoutQosSharpening(asTopic("finance/stock/ibm"))).containsExactly(financeAnySub);
     }
 
     @Test
     public void testMatchSimpleSingle() {
-        Subscription anySub = clientSubOnTopic("AnySensor", "+");
-        sut.add(anySub);
+        Subscription anySub = SubscriptionTestUtils.asSubscription("AnySensor", "+");
+        sut.add("AnySensor", asTopic("+"), null);
         assertThat(sut.matchWithoutQosSharpening(asTopic("finance"))).containsExactly(anySub);
 
-        Subscription financeOne = clientSubOnTopic("AnySensor", "finance/+");
-        sut.add(financeOne);
+        Subscription financeOne = SubscriptionTestUtils.asSubscription("AnySensor", "finance/+");
+        sut.add("AnySensor", asTopic("finance/+"), null);
         assertThat(sut.matchWithoutQosSharpening(asTopic("finance/stock"))).containsExactly(financeOne);
     }
 
     @Test
     public void testMatchManySingle() {
-        Subscription manySub = clientSubOnTopic("AnySensor", "+/+");
-        sut.add(manySub);
+        sut.add("AnySensor", asTopic("+/+"), null);
 
         // verify
+        Subscription manySub = SubscriptionTestUtils.asSubscription("AnySensor", "+/+");
         assertThat(sut.matchWithoutQosSharpening(asTopic("/finance"))).contains(manySub);
     }
 
     @Test
     public void testMatchSlashSingle() {
-        Subscription slashPlusSub = clientSubOnTopic("AnySensor", "/+");
-        sut.add(slashPlusSub);
-        Subscription anySub = clientSubOnTopic("AnySensor", "+");
-        sut.add(anySub);
+        sut.add("AnySensor", asTopic("/+"), null);
+        sut.add("AnySensor", asTopic("+"), null);
 
         // Verify
+        Subscription slashPlusSub = SubscriptionTestUtils.asSubscription("AnySensor", "/+");
+        Subscription anySub = SubscriptionTestUtils.asSubscription("AnySensor", "+");
         assertThat(sut.matchWithoutQosSharpening(asTopic("/finance"))).containsOnly(slashPlusSub);
         assertThat(sut.matchWithoutQosSharpening(asTopic("/finance"))).doesNotContain(anySub);
     }
 
     @Test
     public void testMatchManyDeepSingle() {
-        Subscription slashPlusSub = clientSubOnTopic("FinanceSensor1", "/finance/+/ibm");
-        sut.add(slashPlusSub);
-        Subscription slashPlusDeepSub = clientSubOnTopic("FinanceSensor2", "/+/stock/+");
-        sut.add(slashPlusDeepSub);
+        sut.add("FinanceSensor1", asTopic("/finance/+/ibm"), null);
+        sut.add("FinanceSensor2", asTopic("/+/stock/+"), null);
 
         // Verify
+        Subscription slashPlusSub = SubscriptionTestUtils.asSubscription("FinanceSensor1", "/finance/+/ibm");
+        Subscription slashPlusDeepSub = SubscriptionTestUtils.asSubscription("FinanceSensor2", "/+/stock/+");
         assertThat(sut.matchWithoutQosSharpening(asTopic("/finance/stock/ibm")))
             .containsExactlyInAnyOrder(slashPlusSub, slashPlusDeepSub);
     }
 
     @Test
     public void testMatchSimpleMulti_allTheTree() {
-        Subscription sub = clientSubOnTopic("AnySensor1", "#");
-        sut.add(sub);
+        sut.add("AnySensor1", asTopic("#"), null);
 
         assertThat(sut.matchWithoutQosSharpening(asTopic("finance"))).isNotEmpty();
         assertThat(sut.matchWithoutQosSharpening(asTopic("finance/ibm"))).isNotEmpty();
@@ -189,8 +172,7 @@ public class CTrieSubscriptionDirectoryMatchingTest {
         ISubscriptionsRepository sessionsRepository = new MemorySubscriptionsRepository();
         sut.init(sessionsRepository);
 
-        Subscription sub = clientSubOnTopic("AnySensor1", topicFilter);
-        sut.add(sub);
+        sut.add("AnySensor1", asTopic(topicFilter), null);
 
         assertThat(sut.matchWithoutQosSharpening(asTopic(topicName))).isNotEmpty();
     }
@@ -200,8 +182,7 @@ public class CTrieSubscriptionDirectoryMatchingTest {
         ISubscriptionsRepository sessionsRepository = new MemorySubscriptionsRepository();
         sut.init(sessionsRepository);
 
-        Subscription sub = clientSubOnTopic("AnySensor1", topicFilter);
-        sut.add(sub);
+        sut.add("AnySensor1", asTopic(topicFilter), null);
 
         assertThat(sut.matchWithoutQosSharpening(asTopic(topicName))).isEmpty();
     }
@@ -210,11 +191,11 @@ public class CTrieSubscriptionDirectoryMatchingTest {
     public void testOverlappingSubscriptions() {
         Subscription genericSub = new Subscription("Sensor1", asTopic("a/+"), MqttQoS.AT_MOST_ONCE);
         this.sessionsRepository.addNewSubscription(genericSub);
-        sut.add(genericSub);
+        sut.add(genericSub.clientId, genericSub.topicFilter, genericSub.getRequestedQos());
 
         Subscription specificSub = new Subscription("Sensor1", asTopic("a/b"), MqttQoS.AT_MOST_ONCE);
         this.sessionsRepository.addNewSubscription(specificSub);
-        sut.add(specificSub);
+        sut.add(specificSub.clientId, specificSub.topicFilter, specificSub.getRequestedQos());
 
         //Exercise
         final List<Subscription> matchingForSpecific = sut.matchQosSharpening(asTopic("a/b"));
@@ -225,27 +206,24 @@ public class CTrieSubscriptionDirectoryMatchingTest {
 
     @Test
     public void removeSubscription_withDifferentClients_subscribedSameTopic() {
-        Subscription slashSub = clientSubOnTopic("Sensor1", "/topic");
-        sut.add(slashSub);
-        Subscription slashSub2 = clientSubOnTopic("Sensor2", "/topic");
-        sut.add(slashSub2);
+        sut.add("Sensor1", asTopic("/topic"), null);
+        sut.add("Sensor2", asTopic("/topic"), null);
 
         // Exercise
-        sut.removeSubscription(asTopic("/topic"), slashSub2.clientId);
+        sut.removeSubscription(asTopic("/topic"), "Sensor2");
 
         // Verify
         Subscription remainedSubscription = sut.matchWithoutQosSharpening(asTopic("/topic")).iterator().next();
-        assertThat(remainedSubscription.clientId).isEqualTo(slashSub.clientId);
-        assertEquals(slashSub.clientId, remainedSubscription.clientId);
+        assertThat(remainedSubscription.clientId).isEqualTo("Sensor1");
+        assertEquals("Sensor1", remainedSubscription.clientId);
     }
 
     @Test
     public void removeSubscription_sameClients_subscribedSameTopic() {
-        Subscription slashSub = clientSubOnTopic("Sensor1", "/topic");
-        sut.add(slashSub);
+        sut.add("Sensor1", asTopic("/topic"), null);
 
         // Exercise
-        sut.removeSubscription(asTopic("/topic"), slashSub.clientId);
+        sut.removeSubscription(asTopic("/topic"), "Sensor1");
 
         // Verify
         final List<Subscription> matchingSubscriptions = sut.matchWithoutQosSharpening(asTopic("/topic"));
@@ -258,12 +236,12 @@ public class CTrieSubscriptionDirectoryMatchingTest {
     @Test
     public void duplicatedSubscriptionsWithDifferentQos() {
         Subscription client2Sub = new Subscription("client2", asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE);
-        this.sut.add(client2Sub);
+        this.sut.add("client2", asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE);
         Subscription client1SubQoS0 = new Subscription("client1", asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE);
-        this.sut.add(client1SubQoS0);
+        this.sut.add("client1", asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE);
 
         Subscription client1SubQoS2 = new Subscription("client1", asTopic("client/test/b"), MqttQoS.EXACTLY_ONCE);
-        this.sut.add(client1SubQoS2);
+        this.sut.add("client1", asTopic("client/test/b"), MqttQoS.EXACTLY_ONCE);
 
         // Verify
         List<Subscription> subscriptions = this.sut.matchQosSharpening(asTopic("client/test/b"));

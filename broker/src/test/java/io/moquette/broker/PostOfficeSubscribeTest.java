@@ -34,7 +34,6 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.charset.Charset;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.*;
 
 import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
@@ -347,8 +346,15 @@ public class PostOfficeSubscribeTest {
 
     @Test
     public void testExtractShareName() {
-        assertEquals("", PostOffice.extractShareName("$share//measures/+/1"));
-        assertEquals("myShared", PostOffice.extractShareName("$share/myShared/measures/+/1"));
-        assertEquals("#", PostOffice.extractShareName("$share/#/measures/+/1"));
+        assertEquals("", SharedSubscriptionUtils.extractShareName("$share//measures/+/1"));
+        assertEquals("myShared", SharedSubscriptionUtils.extractShareName("$share/myShared/measures/+/1"));
+        assertEquals("#", SharedSubscriptionUtils.extractShareName("$share/#/measures/+/1"));
+    }
+
+    @Test
+    public void testExtractFilterFromShared() {
+        assertEquals("measures/+/1", SharedSubscriptionUtils.extractFilterFromShared("$share//measures/+/1"));
+        assertEquals("measures/+/1", SharedSubscriptionUtils.extractFilterFromShared("$share/myShared/measures/+/1"));
+        assertEquals("measures/+/1", SharedSubscriptionUtils.extractFilterFromShared("$share/#/measures/+/1"));
     }
 }

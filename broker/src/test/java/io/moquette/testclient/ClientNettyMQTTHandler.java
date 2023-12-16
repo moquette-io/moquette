@@ -44,6 +44,12 @@ class ClientNettyMQTTHandler extends ChannelInboundHandlerAdapter {
         ctx.close().addListener(CLOSE_ON_FAILURE);
     }
 
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        LOG.error("Raw client received an error", cause);
+        ctx.fireExceptionCaught(cause);
+    }
+
     void setClient(Client client) {
         m_client = client;
     }

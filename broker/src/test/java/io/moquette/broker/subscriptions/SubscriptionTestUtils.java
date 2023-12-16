@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The original author or authors
+ * Copyright (c) 2012-2023 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -15,19 +15,18 @@
  */
 package io.moquette.broker.subscriptions;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import org.jetbrains.annotations.NotNull;
 
-class SubscriptionCounterVisitor implements CTrie.IVisitor<Integer> {
+import static io.moquette.broker.subscriptions.Topic.asTopic;
 
-    private AtomicInteger accumulator = new AtomicInteger(0);
-
-    @Override
-    public void visit(CNode node, int deep) {
-        accumulator.addAndGet(node.subscriptions().size());
+public class SubscriptionTestUtils {
+    @NotNull
+    static Subscription asSubscription(String clientId, String topicFilter) {
+        return new Subscription(clientId, asTopic(topicFilter), null);
     }
 
-    @Override
-    public Integer getResult() {
-        return accumulator.get();
+    @NotNull
+    static Subscription asSubscription(String clientId, String topicFilter, String shareName) {
+        return new Subscription(clientId, asTopic(topicFilter), null, shareName);
     }
 }
