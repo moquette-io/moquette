@@ -167,22 +167,23 @@ class ConnectTest extends AbstractServerIntegrationTest {
             .build();
         clientWithWill.disconnect(malformedPacketReason);
 
-        // reconnect another client with same clientId
-        final Mqtt5BlockingClient client = MqttClient.builder()
-            .useMqttVersion5()
-            .identifier(clientId)
-            .serverHost("localhost")
-            .serverPort(1883)
-            .buildBlocking();
-        Mqtt5ConnAck connectAck = client.connect();
-        assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, connectAck.getReasonCode(), "Client connected");
-
         // wait no will is published
-        verifyNoTestamentIsPublished(testamentSubscriber, Duration.ofSeconds(10));
+        verifyNoTestamentIsPublished(testamentSubscriber, unused -> {
+            // reconnect another client with same clientId
+            final Mqtt5BlockingClient client = MqttClient.builder()
+                .useMqttVersion5()
+                .identifier(clientId)
+                .serverHost("localhost")
+                .serverPort(1883)
+                .buildBlocking();
+            Mqtt5ConnAck connectAck = client.connect();
+            assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, connectAck.getReasonCode(), "Client connected");
+
+        }, Duration.ofSeconds(10));
     }
 
-    private static void verifyNoTestamentIsPublished(Mqtt5BlockingClient testamentSubscriber, Duration timeout) throws InterruptedException {
-        verifyNoPublish(testamentSubscriber, v -> {}, timeout, "No will message should be published");
+    private static void verifyNoTestamentIsPublished(Mqtt5BlockingClient testamentSubscriber, Consumer<Void> action, Duration timeout) throws InterruptedException {
+        verifyNoPublish(testamentSubscriber, action, timeout, "No will message should be published");
     }
 
     protected static void verifyNoPublish(Mqtt5BlockingClient subscriber, Consumer<Void> action, Duration timeout, String message) throws InterruptedException {
@@ -220,11 +221,11 @@ class ConnectTest extends AbstractServerIntegrationTest {
 
         final Mqtt5BlockingClient testamentSubscriber = createAndConnectClientListeningToTestament();
 
-        // normal session disconnection
-        clientWithWill.disconnect(Mqtt5Disconnect.builder().build());
-
         // wait no will is published
-        verifyNoTestamentIsPublished(testamentSubscriber, Duration.ofSeconds(10));
+        verifyNoTestamentIsPublished(testamentSubscriber, unused -> {
+            // normal session disconnection
+            clientWithWill.disconnect(Mqtt5Disconnect.builder().build());
+        }, Duration.ofSeconds(10));
     }
 
     @Test
@@ -235,13 +236,13 @@ class ConnectTest extends AbstractServerIntegrationTest {
 
         final Mqtt5BlockingClient testamentSubscriber = createAndConnectClientListeningToTestament();
 
-        // normal session disconnection with will
-        clientWithWill.disconnect(Mqtt5Disconnect.builder()
-            .reasonCode(Mqtt5DisconnectReasonCode.DISCONNECT_WITH_WILL_MESSAGE)
-            .build());
-
         // wait no will is published
-        verifyNoTestamentIsPublished(testamentSubscriber, Duration.ofSeconds(10));
+        verifyNoTestamentIsPublished(testamentSubscriber, unused -> {
+            // normal session disconnection with will
+            clientWithWill.disconnect(Mqtt5Disconnect.builder()
+                .reasonCode(Mqtt5DisconnectReasonCode.DISCONNECT_WITH_WILL_MESSAGE)
+                .build());
+        }, Duration.ofSeconds(10));
     }
 
     @Test
