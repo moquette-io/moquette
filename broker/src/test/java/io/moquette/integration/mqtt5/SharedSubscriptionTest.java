@@ -286,10 +286,11 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
         subscribe(subscriberClient, "$share/collectors/metric/temperature/living", MqttQos.AT_MOST_ONCE);
 
         Mqtt5BlockingClient publisherClient = createPublisherClient();
-        publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
 
         // because the PUB is at QoS1 and the subscription is at QoS0, the subscribed doesn't receive any message
-        verifyNoPublish(subscriberClient,Duration.ofSeconds(1), "No message is expected at Qos0 subscription");
+        verifyPublishedMessage(subscriberClient,
+            unused -> publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE),
+            MqttQos.AT_MOST_ONCE, "18", "QoS0 publish message is expected by the subscriber when subscribed with AT_MOST_ONCE", 1);
 
         LOG.info("Before repeating with AT_LEAST_ONCE");
 

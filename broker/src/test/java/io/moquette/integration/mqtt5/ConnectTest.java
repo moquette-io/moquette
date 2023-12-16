@@ -32,6 +32,7 @@ import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -181,11 +182,12 @@ class ConnectTest extends AbstractServerIntegrationTest {
     }
 
     private static void verifyNoTestamentIsPublished(Mqtt5BlockingClient testamentSubscriber, Duration timeout) throws InterruptedException {
-        verifyNoPublish(testamentSubscriber, timeout, "No will message should be published");
+        verifyNoPublish(testamentSubscriber, v -> {}, timeout, "No will message should be published");
     }
 
-    protected static void verifyNoPublish(Mqtt5BlockingClient subscriber, Duration timeout, String message) throws InterruptedException {
+    protected static void verifyNoPublish(Mqtt5BlockingClient subscriber, Consumer<Void> action, Duration timeout, String message) throws InterruptedException {
         try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriber.publishes(MqttGlobalPublishFilter.ALL)) {
+            action.accept(null);
             Optional<Mqtt5Publish> publishedMessage = publishes.receive(timeout.getSeconds(), TimeUnit.SECONDS);
 
             // verify no published will in 10 seconds
