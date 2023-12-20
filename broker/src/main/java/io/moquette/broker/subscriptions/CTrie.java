@@ -312,12 +312,6 @@ public class CTrie {
         return new INode(newLeafCnode);
     }
 
-    public void removeFromTree(Topic topic, String clientID) {
-        // wrapper method, to remove
-        UnsubscribeRequest deletionRequest = UnsubscribeRequest.buildNonShared(clientID, topic);
-        removeFromTree(deletionRequest);
-    }
-
     public void removeFromTree(UnsubscribeRequest request) {
         Action res;
         do {
