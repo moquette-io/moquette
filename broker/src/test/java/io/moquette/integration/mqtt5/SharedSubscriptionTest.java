@@ -359,4 +359,14 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
             }, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 2);
         }
     }
+
+    @Test
+    public void givenASharedSubscriptionWhenLastSubscribedClientUnsubscribeThenTheSharedSubscriptionTerminates() {
+        fail("TODO implement");
+    }
+
+    @Test
+    public void givenASharedSubscriptionWhenLastSubscribedClientSessionTerminatesThenTheSharedSubscriptionTerminates() {
+        fail("TODO implement");
+    }
 }
