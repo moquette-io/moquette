@@ -6,6 +6,8 @@ import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import com.hivemq.client.mqtt.mqtt5.message.connect.connack.Mqtt5ConnAckReasonCode;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
+import com.hivemq.client.mqtt.mqtt5.message.unsubscribe.unsuback.Mqtt5UnsubAck;
+import com.hivemq.client.mqtt.mqtt5.message.unsubscribe.unsuback.Mqtt5UnsubAckReasonCode;
 import io.moquette.broker.Server;
 import io.moquette.broker.config.MemoryConfig;
 import io.moquette.broker.security.DeclarativeAuthorizatorPolicy;
@@ -37,8 +39,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import static io.moquette.integration.mqtt5.ConnectTest.assertConnectionAccepted;
-import static io.moquette.integration.mqtt5.ConnectTest.verifyNoPublish;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
 
@@ -198,13 +203,19 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
 
     @NotNull
     private Mqtt5BlockingClient createSubscriberClient() {
+        String clientId = clientName();
+        return createSubscriberClient(clientId);
+    }
+
+    @NotNull
+    private static Mqtt5BlockingClient createSubscriberClient(String clientId) {
         final Mqtt5BlockingClient client = MqttClient.builder()
             .useMqttVersion5()
-            .identifier(clientName())
+            .identifier(clientId)
             .serverHost("localhost")
             .serverPort(1883)
             .buildBlocking();
-        assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, client.connect().getReasonCode(), "Subscriber connected");
+        assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, client.connect().getReasonCode(), clientId + " connected");
         return client;
     }
 
@@ -220,19 +231,19 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
         return client;
     }
 
-    private static void verifyPublishedMessage(Mqtt5BlockingClient client, MqttQos expectedQos, String expectedPayload, String errorMessage, int timeoutSeconds) throws InterruptedException {
-        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = client.publishes(MqttGlobalPublishFilter.ALL)) {
-            Optional<Mqtt5Publish> publishMessage = publishes.receive(timeoutSeconds, TimeUnit.SECONDS);
-            if (!publishMessage.isPresent()) {
-                fail("Expected to receive a publish message");
-                return;
-            }
-            Mqtt5Publish msgPub = publishMessage.get();
-            final String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
-            assertEquals(expectedPayload, payload, errorMessage);
-            assertEquals(expectedQos, msgPub.getQos());
-        }
-    }
+//    private static void verifyPublishedMessage(Mqtt5BlockingClient client, MqttQos expectedQos, String expectedPayload, String errorMessage, int timeoutSeconds) throws InterruptedException {
+//        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = client.publishes(MqttGlobalPublishFilter.ALL)) {
+//            Optional<Mqtt5Publish> publishMessage = publishes.receive(timeoutSeconds, TimeUnit.SECONDS);
+//            if (!publishMessage.isPresent()) {
+//                fail("Expected to receive a publish message");
+//                return;
+//            }
+//            Mqtt5Publish msgPub = publishMessage.get();
+//            final String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
+//            assertEquals(expectedPayload, payload, errorMessage);
+//            assertEquals(expectedQos, msgPub.getQos());
+//        }
+//    }
 
     private static void verifyPublishedMessage(Mqtt5BlockingClient client, Consumer<Void> action, MqttQos expectedQos,
                                                String expectedPayload, String errorMessage, int timeoutSeconds) throws Exception {
@@ -287,12 +298,9 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
 
         Mqtt5BlockingClient publisherClient = createPublisherClient();
 
-        // because the PUB is at QoS1 and the subscription is at QoS0, the subscribed doesn't receive any message
         verifyPublishedMessage(subscriberClient,
             unused -> publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE),
             MqttQos.AT_MOST_ONCE, "18", "QoS0 publish message is expected by the subscriber when subscribed with AT_MOST_ONCE", 1);
-
-        LOG.info("Before repeating with AT_LEAST_ONCE");
 
         // update QoS for shared subscription
         subscribe(subscriberClient, "$share/collectors/metric/temperature/living", MqttQos.AT_LEAST_ONCE);
@@ -317,5 +325,38 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
             .topicFilter(topicFilter)
             .qos(mqttQos)
             .send();
+    }
+
+    @Test
+    public void givenMultipleClientSubscribedToSharedSubscriptionWhenOneUnsubscribeThenTheSharedSubscriptionRemainsValid() throws Exception {
+        String fullSharedSubscriptionTopicFilter = "$share/collectors/metric/temperature/living";
+
+        // subscribe first client to share subscription
+        final Mqtt5BlockingClient subscriber1 = createSubscriberClient("subscriber1");
+        subscribe(subscriber1, fullSharedSubscriptionTopicFilter, MqttQos.AT_LEAST_ONCE);
+
+        // subscribe second client to share subscription
+        final Mqtt5BlockingClient subscriber2 = createSubscriberClient("subscriber2");
+        subscribe(subscriber2, fullSharedSubscriptionTopicFilter, MqttQos.AT_LEAST_ONCE);
+
+        // unsubscribe successfully the first subscriber
+        Mqtt5UnsubAck result = subscriber1.unsubscribeWith()
+            .topicFilter(fullSharedSubscriptionTopicFilter)
+            .send();
+        assertTrue(result.getReasonCodes().stream().allMatch(rc -> rc == Mqtt5UnsubAckReasonCode.SUCCESS),
+            "Unsubscribe of shared subscription must be successful");
+
+
+        // verify it's received from the survivor subscriber2
+        Mqtt5BlockingClient publisherClient = createPublisherClient();
+        // try 4 times we should hit all the 4 times the subscriber2
+        // if the other shared subscription remains active we have 50% of possibility
+        // to hit the not removed subscriber, so 4 iterations should be enough.
+        for (int i = 0; i < 4; i++) {
+            verifyPublishedMessage(subscriber2, v -> {
+                // push a message to the shared subscription
+                publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
+            }, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 2);
+        }
     }
 }
