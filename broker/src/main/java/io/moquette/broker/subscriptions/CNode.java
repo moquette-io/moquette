@@ -16,18 +16,12 @@
 package io.moquette.broker.subscriptions;
 
 import io.moquette.broker.subscriptions.CTrie.SubscriptionRequest;
+import io.moquette.broker.subscriptions.CTrie.UnsubscribeRequest;
+import io.netty.handler.codec.mqtt.MqttQoS;
 
 import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 class CNode implements Comparable<CNode> {
 
@@ -164,8 +158,28 @@ class CNode implements Comparable<CNode> {
         return !this.subscriptions.isEmpty();
     }
 
-    //TODO this is equivalent to negate(containsOnly(clientId))
     public boolean contains(String clientId) {
+        return containsSubscriptionsForClient(clientId) || containsSharedSubscriptionsForClient(clientId);
+    }
+
+    private boolean containsSharedSubscriptionsForClient(String clientId) {
+        boolean result = false;
+        for (List<SharedSubscription> sharedForShareName : this.sharedSubscriptions.values()) {
+            SharedSubscription keyWrapper = wrapKey(clientId);
+            Comparator<SharedSubscription> comparJustByClientId = Comparator.comparing(SharedSubscription::clientId);
+            int res = Collections.binarySearch(sharedForShareName, keyWrapper, comparJustByClientId);
+            result = res >= 0 || result;
+        }
+        return result;
+    }
+
+    private static SharedSubscription wrapKey(String clientId) {
+        MqttQoS unusedQoS = MqttQoS.AT_MOST_ONCE;
+        return new SharedSubscription(null, Topic.asTopic("unused"), clientId, unusedQoS);
+    }
+
+    //TODO this is equivalent to negate(containsOnly(clientId))
+    private boolean containsSubscriptionsForClient(String clientId) {
         for (Subscription sub : this.subscriptions) {
             if (sub.clientId.equals(clientId)) {
                 return true;
@@ -174,14 +188,32 @@ class CNode implements Comparable<CNode> {
         return false;
     }
 
-    void removeSubscriptionsFor(String clientId) {
-        Set<Subscription> toRemove = new HashSet<>();
-        for (Subscription sub : this.subscriptions) {
-            if (sub.clientId.equals(clientId)) {
-                toRemove.add(sub);
+    void removeSubscriptionsFor(UnsubscribeRequest request) {
+        String clientId = request.getClientId();
+
+        if (request.isShared()) {
+            List<SharedSubscription> subscriptionsForName = this.sharedSubscriptions.get(request.getSharedName());
+            List<SharedSubscription> toRemove = subscriptionsForName.stream()
+                .filter(sub -> sub.clientId().equals(clientId))
+                .collect(Collectors.toList());
+            subscriptionsForName.removeAll(toRemove);
+
+            if (subscriptionsForName.isEmpty()) {
+                this.sharedSubscriptions.remove(request.getSharedName());
+            } else {
+                this.sharedSubscriptions.replace(request.getSharedName(), subscriptionsForName);
             }
+        } else {
+            // collect Subscription instances to remove
+            Set<Subscription> toRemove = new HashSet<>();
+            for (Subscription sub : this.subscriptions) {
+                if (sub.clientId.equals(clientId)) {
+                    toRemove.add(sub);
+                }
+            }
+            // effectively remove the instances
+            this.subscriptions.removeAll(toRemove);
         }
-        this.subscriptions.removeAll(toRemove);
     }
 
     @Override

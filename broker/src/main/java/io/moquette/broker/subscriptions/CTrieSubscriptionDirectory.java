@@ -17,6 +17,7 @@ package io.moquette.broker.subscriptions;
 
 import io.moquette.broker.ISubscriptionsRepository;
 import io.moquette.broker.subscriptions.CTrie.SubscriptionRequest;
+import io.moquette.broker.subscriptions.CTrie.UnsubscribeRequest;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,8 +124,15 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
      */
     @Override
     public void removeSubscription(Topic topic, String clientID) {
-        ctrie.removeFromTree(topic, clientID);
+        UnsubscribeRequest request = UnsubscribeRequest.buildNonShared(clientID, topic);
+        ctrie.removeFromTree(request);
         this.subscriptionsRepository.removeSubscription(topic.toString(), clientID);
+    }
+
+    @Override
+    public void removeSharedSubscription(ShareName name, Topic topicFilter, String clientId) {
+        UnsubscribeRequest request = UnsubscribeRequest.buildShared(name, topicFilter, clientId);
+        ctrie.removeFromTree(request);
     }
 
     @Override

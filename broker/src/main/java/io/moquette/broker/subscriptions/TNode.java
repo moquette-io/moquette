@@ -54,7 +54,7 @@ class TNode extends CNode {
     }
 
     @Override
-    void removeSubscriptionsFor(String clientId) {
+    void removeSubscriptionsFor(CTrie.UnsubscribeRequest request) {
         throw new IllegalStateException("Can't be invoked on TNode");
     }
 
