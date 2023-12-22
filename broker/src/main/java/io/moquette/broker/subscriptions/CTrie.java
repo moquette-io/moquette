@@ -14,9 +14,9 @@ public class CTrie {
      * */
     public final static class SubscriptionRequest {
 
-        private Topic topicFilter;
-        private String clientId;
-        private MqttQoS requestedQoS;
+        private final Topic topicFilter;
+        private final String clientId;
+        private final MqttQoS requestedQoS;
 
         private boolean shared = false;
         private ShareName shareName;
@@ -32,11 +32,7 @@ public class CTrie {
         }
 
         public static SubscriptionRequest buildNonShared(String clientId, Topic topicFilter, MqttQoS requestedQoS) {
-            SubscriptionRequest request = new SubscriptionRequest(clientId, topicFilter, requestedQoS);
-            request.topicFilter = topicFilter;
-            request.clientId = clientId; // ? is it needed ?
-            request.requestedQoS = requestedQoS;
-            return request;
+            return new SubscriptionRequest(clientId, topicFilter, requestedQoS);
         }
 
         public static SubscriptionRequest buildShared(ShareName shareName, Topic topicFilter, String clientId, MqttQoS requestedQoS) {
@@ -80,8 +76,8 @@ public class CTrie {
      * Models a request to unsubscribe a client, it's carrier for the Subscription
      * */
     public final static class UnsubscribeRequest {
-        private Topic topicFilter;
-        private String clientId;
+        private final Topic topicFilter;
+        private final String clientId;
         private boolean shared = false;
         private ShareName shareName;
 
