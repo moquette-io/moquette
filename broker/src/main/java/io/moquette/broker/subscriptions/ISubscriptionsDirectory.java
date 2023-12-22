@@ -40,7 +40,23 @@ public interface ISubscriptionsDirectory {
 
     void removeSubscription(Topic topic, String clientID);
 
+    /**
+     * Removes shared subscription.
+     *
+     * @param name part of the shared subscription.
+     * @param topicFilter topic filter part.
+     * @param clientId the client session to unsubscribe.
+     * */
+    void removeSharedSubscription(ShareName name, Topic topicFilter, String clientId);
+
     int size();
 
     String dumpTree();
+
+    /**
+     * Removes all the shared subscriptions for the given session.
+     *
+     * @param clientId The session identifier.
+     * */
+    void removeSharedSubscriptionsForClient(String clientId);
 }

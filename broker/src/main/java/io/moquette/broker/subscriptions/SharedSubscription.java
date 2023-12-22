@@ -48,6 +48,10 @@ class SharedSubscription implements Comparable<SharedSubscription> {
         return requestedQoS;
     }
 
+    public ShareName getShareName() {
+        return shareName;
+    }
+
     @Override
     public int compareTo(SharedSubscription o) {
         return this.clientId.compareTo(o.clientId);

@@ -14,17 +14,12 @@ public class CTrie {
      * */
     public final static class SubscriptionRequest {
 
-        private Topic topicFilter;
-        private String clientId;
-        private MqttQoS requestedQoS;
+        private final Topic topicFilter;
+        private final String clientId;
+        private final MqttQoS requestedQoS;
 
         private boolean shared = false;
         private ShareName shareName;
-
-        private SubscriptionRequest(String clientId, Topic topicFilter) {
-            this.topicFilter = topicFilter;
-            this.clientId = clientId;
-        }
 
         private SubscriptionRequest(String clientId, Topic topicFilter, MqttQoS requestedQoS) {
             this.topicFilter = topicFilter;
@@ -37,11 +32,7 @@ public class CTrie {
         }
 
         public static SubscriptionRequest buildNonShared(String clientId, Topic topicFilter, MqttQoS requestedQoS) {
-            SubscriptionRequest request = new SubscriptionRequest(clientId, topicFilter, requestedQoS);
-            request.topicFilter = topicFilter;
-            request.clientId = clientId;
-            request.requestedQoS = requestedQoS;
-            return request;
+            return new SubscriptionRequest(clientId, topicFilter, requestedQoS);
         }
 
         public static SubscriptionRequest buildShared(ShareName shareName, Topic topicFilter, String clientId, MqttQoS requestedQoS) {
@@ -79,6 +70,52 @@ public class CTrie {
             return clientId;
         }
 
+    }
+
+    /**
+     * Models a request to unsubscribe a client, it's carrier for the Subscription
+     * */
+    public final static class UnsubscribeRequest {
+        private final Topic topicFilter;
+        private final String clientId;
+        private boolean shared = false;
+        private ShareName shareName;
+
+        private UnsubscribeRequest(String clientId, Topic topicFilter) {
+            this.topicFilter = topicFilter;
+            this.clientId = clientId;
+        }
+
+        public static UnsubscribeRequest buildNonShared(String clientId, Topic topicFilter) {
+            return new UnsubscribeRequest(clientId, topicFilter);
+        }
+
+        public static UnsubscribeRequest buildShared(ShareName shareName, Topic topicFilter, String clientId) {
+            if (topicFilter.headToken().name().startsWith("$share")) {
+                throw new IllegalArgumentException("Topic filter of a shared subscription can't contains $share and share name");
+            }
+
+            UnsubscribeRequest request = new UnsubscribeRequest(clientId, topicFilter);
+            request.shared = true;
+            request.shareName = shareName;
+            return request;
+        }
+
+        public Topic getTopicFilter() {
+            return topicFilter;
+        }
+
+        public boolean isShared() {
+            return shared;
+        }
+
+        public ShareName getSharedName() {
+            return shareName;
+        }
+
+        public String getClientId() {
+            return clientId;
+        }
     }
 
     interface IVisitor<T> {
@@ -258,21 +295,21 @@ public class CTrie {
         return new INode(newLeafCnode);
     }
 
-    public void removeFromTree(Topic topic, String clientID) {
+    public void removeFromTree(UnsubscribeRequest request) {
         Action res;
         do {
-            res = remove(clientID, topic, this.root, NO_PARENT);
+            res = remove(request.getClientId(), request.getTopicFilter(), this.root, NO_PARENT, request);
         } while (res == Action.REPEAT);
     }
 
-    private Action remove(String clientId, Topic topic, INode inode, INode iParent) {
+    private Action remove(String clientId, Topic topic, INode inode, INode iParent, UnsubscribeRequest request) {
         Token token = topic.headToken();
         final CNode cnode = inode.mainNode();
         if (!topic.isEmpty()) {
             Optional<INode> nextInode = cnode.childOf(token);
             if (nextInode.isPresent()) {
                 Topic remainingTopic = topic.exceptHeadToken();
-                return remove(clientId, remainingTopic, nextInode.get(), inode);
+                return remove(clientId, remainingTopic, nextInode.get(), inode, request);
             }
         }
         if (cnode instanceof TNode) {
@@ -290,7 +327,7 @@ public class CTrie {
             return inode.compareAndSet(cnode, tnode) ? cleanTomb(inode, iParent) : Action.REPEAT;
         } else if (cnode.contains(clientId) && topic.isEmpty()) {
             CNode updatedCnode = cnode.copy();
-            updatedCnode.removeSubscriptionsFor(clientId);
+            updatedCnode.removeSubscriptionsFor(request);
             return inode.compareAndSet(cnode, updatedCnode) ? Action.OK : Action.REPEAT;
         } else {
             //someone else already removed
@@ -302,13 +339,11 @@ public class CTrie {
      *
      * Cleans Disposes of TNode in separate Atomic CAS operation per
      * http://bravenewgeek.com/breaking-and-entering-lose-the-lock-while-embracing-concurrency/
-     *
      * We roughly follow this theory above, but we allow CNode with no Subscriptions to linger (for now).
-     *
      *
      * @param inode inode that handle to the tomb node.
      * @param iParent inode parent.
-     * @return REPEAT if the this methods wasn't successful or OK.
+     * @return REPEAT if this method wasn't successful or OK.
      */
     private Action cleanTomb(INode inode, INode iParent) {
         CNode updatedCnode = iParent.mainNode().copy();

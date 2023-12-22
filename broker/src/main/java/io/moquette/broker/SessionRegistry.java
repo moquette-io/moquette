@@ -164,6 +164,8 @@ public class SessionRegistry {
         LOG.debug("Removing session {}, expired on {}", expiredSession.clientId(), expiredAt);
         remove(expiredSession.clientId());
         sessionsRepository.delete(expiredSession);
+
+        subscriptionsDirectory.removeSharedSubscriptionsForClient(expiredSession.clientId());
     }
 
     private void trackForRemovalOnExpiration(ISessionsRepository.SessionData session) {
@@ -409,6 +411,8 @@ public class SessionRegistry {
 
         unsubscribe(session);
         remove(session.getClientID());
+
+        subscriptionsDirectory.removeSharedSubscriptionsForClient(session.getClientID());
     }
 
     void remove(String clientID) {

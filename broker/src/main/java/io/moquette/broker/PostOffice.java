@@ -418,7 +418,13 @@ class PostOffice {
             }
 
             LOG.trace("Removing subscription topic={}", topic);
-            subscriptions.removeSubscription(topic, clientID);
+            if (SharedSubscriptionUtils.isSharedSubscription(t)) {
+                String topicFilterPart = SharedSubscriptionUtils.extractFilterFromShared(t);
+                ShareName shareName = new ShareName(SharedSubscriptionUtils.extractShareName(t));
+                subscriptions.removeSharedSubscription(shareName, Topic.asTopic(topicFilterPart), clientID);
+            } else {
+                subscriptions.removeSubscription(topic, clientID);
+            }
 
             session.removeSubscription(topic);
 
