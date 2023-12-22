@@ -23,6 +23,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
 
@@ -30,6 +32,8 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
 
     private CTrie ctrie;
     private volatile ISubscriptionsRepository subscriptionsRepository;
+
+    private ConcurrentMap<String, List<SharedSubscription>> clientSharedSubscriptions = new ConcurrentHashMap<>();
 
     @Override
     public void init(ISubscriptionsRepository subscriptionsRepository) {
@@ -113,6 +117,9 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
     public void addShared(String clientId, ShareName name, Topic topicFilter, MqttQoS requestedQoS) {
         SubscriptionRequest shareSubRequest = SubscriptionRequest.buildShared(name, topicFilter, clientId, requestedQoS);
         ctrie.addToTree(shareSubRequest);
+
+        List<SharedSubscription> sharedSubscriptions = clientSharedSubscriptions.computeIfAbsent(clientId, unused -> new ArrayList<>());
+        sharedSubscriptions.add(shareSubRequest.sharedSubscription());
     }
 
     /**
@@ -133,6 +140,13 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
     public void removeSharedSubscription(ShareName name, Topic topicFilter, String clientId) {
         UnsubscribeRequest request = UnsubscribeRequest.buildShared(name, topicFilter, clientId);
         ctrie.removeFromTree(request);
+
+        SharedSubscription sharedSubscription = new SharedSubscription(name, topicFilter, clientId, MqttQoS.AT_MOST_ONCE /* UNUSED in compare */);
+        List<SharedSubscription> sharedSubscriptions = clientSharedSubscriptions.get(clientId);
+        if (sharedSubscriptions != null && !sharedSubscriptions.isEmpty()) {
+            sharedSubscriptions.remove(sharedSubscription);
+            clientSharedSubscriptions.replace(clientId, sharedSubscriptions);
+        }
     }
 
     @Override
@@ -143,5 +157,17 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
     @Override
     public String dumpTree() {
         return ctrie.dumpTree();
+    }
+
+    @Override
+    public void removeSharedSubscriptionsForClient(String clientId) {
+        List<SharedSubscription> sessionSharedSubscriptions = clientSharedSubscriptions
+            .computeIfAbsent(clientId, s -> Collections.emptyList());
+
+        // remove the client from all shared subscriptions
+        for (SharedSubscription subscription : sessionSharedSubscriptions) {
+            UnsubscribeRequest request = UnsubscribeRequest.buildShared(subscription.getShareName(), subscription.topicFilter(), clientId);
+            ctrie.removeFromTree(request);
+        }
     }
 }

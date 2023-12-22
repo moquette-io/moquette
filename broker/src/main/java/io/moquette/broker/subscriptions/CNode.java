@@ -166,8 +166,8 @@ class CNode implements Comparable<CNode> {
         boolean result = false;
         for (List<SharedSubscription> sharedForShareName : this.sharedSubscriptions.values()) {
             SharedSubscription keyWrapper = wrapKey(clientId);
-            Comparator<SharedSubscription> comparJustByClientId = Comparator.comparing(SharedSubscription::clientId);
-            int res = Collections.binarySearch(sharedForShareName, keyWrapper, comparJustByClientId);
+            Comparator<SharedSubscription> compareByClientId = Comparator.comparing(SharedSubscription::clientId);
+            int res = Collections.binarySearch(sharedForShareName, keyWrapper, compareByClientId);
             result = res >= 0 || result;
         }
         return result;

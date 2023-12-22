@@ -51,4 +51,18 @@ public class CTrieSharedSubscriptionDirectoryMatchingTest extends CTrieSubscript
                 SubscriptionTestUtils.asSubscription("TempSensor1", "/livingroom", "livingroom_devices"))
             .as("One shared subscription for each share name must be present");
     }
+
+    @Test
+    public void givenSessionHasMultipleSharedSubscriptionWhenTheClientIsRemovedThenNoMatchingShouldHappen() {
+        String clientId = "TempSensor1";
+        sut.addShared(clientId, new ShareName("temp_sensors"), asTopic("/livingroom"), MqttQoS.AT_MOST_ONCE);
+        sut.addShared(clientId, new ShareName("livingroom_devices"), asTopic("/livingroom"), MqttQoS.AT_MOST_ONCE);
+
+        // Exercise
+        sut.removeSharedSubscriptionsForClient(clientId);
+
+        // Verify
+        List<Subscription> matchingSubscriptions = sut.matchWithoutQosSharpening(asTopic("/livingroom"));
+        assertThat(matchingSubscriptions).isEmpty();
+    }
 }

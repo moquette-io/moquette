@@ -21,11 +21,6 @@ public class CTrie {
         private boolean shared = false;
         private ShareName shareName;
 
-//        private SubscriptionRequest(String clientId, Topic topicFilter) {
-//            this.topicFilter = topicFilter;
-//            this.clientId = clientId;
-//        }
-
         private SubscriptionRequest(String clientId, Topic topicFilter, MqttQoS requestedQoS) {
             this.topicFilter = topicFilter;
             this.clientId = clientId;
@@ -113,14 +108,6 @@ public class CTrie {
         public Topic getTopicFilter() {
             return topicFilter;
         }
-//
-//        public Subscription subscription() {
-//            return new Subscription(clientId, topicFilter, requestedQoS);
-//        }
-//
-//        public SharedSubscription sharedSubscription() {
-//            return new SharedSubscription(shareName, topicFilter, clientId, requestedQoS);
-//        }
 
         public boolean isShared() {
             return shared;

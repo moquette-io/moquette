@@ -52,4 +52,11 @@ public interface ISubscriptionsDirectory {
     int size();
 
     String dumpTree();
+
+    /**
+     * Removes all the shared subscriptions for the given session.
+     *
+     * @param clientId The session identifier.
+     * */
+    void removeSharedSubscriptionsForClient(String clientId);
 }
