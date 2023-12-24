@@ -25,11 +25,9 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -58,23 +56,30 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
             LOG.debug("Re-subscribing {}", subscription);
             ctrie.addToTree(SubscriptionRequest.buildNonShared(subscription));
         }
+
+        for (SharedSubscription shared : subscriptionsRepository.listAllSharedSubscription()) {
+            LOG.debug("Re-subscribing shared {}", shared);
+            ctrie.addToTree(SubscriptionRequest.buildShared(shared.getShareName(), shared.topicFilter(),
+                shared.clientId(), shared.requestedQoS()));
+        }
+
         if (LOG.isTraceEnabled()) {
             LOG.trace("Stored subscriptions have been reloaded. SubscriptionTree = {}", dumpTree());
         }
     }
 
-    /**
-     * @return the list of client ids that has a subscription stored.
-     */
-    @Override
-    public Set<String> listAllSessionIds() {
-        final Set<Subscription> subscriptions = subscriptionsRepository.listAllSubscriptions();
-        final Set<String> clientIds = new HashSet<>(subscriptions.size());
-        for (Subscription subscription : subscriptions) {
-            clientIds.add(subscription.clientId);
-        }
-        return clientIds;
-    }
+//    /**
+//     * @return the set of client ids that has a subscription stored.
+//     */
+//    @Override
+//    public Set<String> listAllSessionIds() {
+//        final Set<Subscription> subscriptions = subscriptionsRepository.listAllSubscriptions();
+//        final Set<String> clientIds = new HashSet<>(subscriptions.size());
+//        for (Subscription subscription : subscriptions) {
+//            clientIds.add(subscription.clientId);
+//        }
+//        return clientIds;
+//    }
 
     Optional<CNode> lookup(Topic topic) {
         return ctrie.lookup(topic);
@@ -125,6 +130,8 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
         SubscriptionRequest shareSubRequest = SubscriptionRequest.buildShared(name, topicFilter, clientId, requestedQoS);
         ctrie.addToTree(shareSubRequest);
 
+        subscriptionsRepository.addNewSharedSubscription(clientId, name, topicFilter, requestedQoS);
+
         List<SharedSubscription> sharedSubscriptions = clientSharedSubscriptions.computeIfAbsent(clientId, unused -> new ArrayList<>());
         sharedSubscriptions.add(shareSubRequest.sharedSubscription());
     }
@@ -147,6 +154,8 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
     public void removeSharedSubscription(ShareName name, Topic topicFilter, String clientId) {
         UnsubscribeRequest request = UnsubscribeRequest.buildShared(name, topicFilter, clientId);
         ctrie.removeFromTree(request);
+
+        subscriptionsRepository.removeSharedSubscription(clientId, name, topicFilter);
 
         SharedSubscription sharedSubscription = new SharedSubscription(name, topicFilter, clientId, MqttQoS.AT_MOST_ONCE /* UNUSED in compare */);
         List<SharedSubscription> sharedSubscriptions = clientSharedSubscriptions.get(clientId);
@@ -176,5 +185,7 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
             UnsubscribeRequest request = UnsubscribeRequest.buildShared(subscription.getShareName(), subscription.topicFilter(), clientId);
             ctrie.removeFromTree(request);
         }
+
+        subscriptionsRepository.removeAllSharedSubscriptions(clientId);
     }
 }

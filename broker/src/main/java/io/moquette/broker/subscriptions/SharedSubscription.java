@@ -22,7 +22,7 @@ import java.util.Objects;
 /**
  * Shared subscription data class.
  * */
-class SharedSubscription implements Comparable<SharedSubscription> {
+public final class SharedSubscription implements Comparable<SharedSubscription> {
     private final ShareName shareName;
     private final Topic topicFilter;
     private final String clientId;

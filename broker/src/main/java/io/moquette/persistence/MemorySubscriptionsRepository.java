@@ -16,15 +16,22 @@
 package io.moquette.persistence;
 
 import io.moquette.broker.ISubscriptionsRepository;
+import io.moquette.broker.subscriptions.ShareName;
+import io.moquette.broker.subscriptions.SharedSubscription;
 import io.moquette.broker.subscriptions.Subscription;
+import io.moquette.broker.subscriptions.Topic;
+import io.netty.handler.codec.mqtt.MqttQoS;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.Collections;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 public class MemorySubscriptionsRepository implements ISubscriptionsRepository {
 
+    private static final Logger LOG = LoggerFactory.getLogger(MemorySubscriptionsRepository.class);
     private final Set<Subscription> subscriptions = new ConcurrentSkipListSet<>();
+    private final Map<String, Map<Couple<ShareName, Topic>, MqttQoS>> sharedSubscriptions = new HashMap<>();
 
     @Override
     public Set<Subscription> listAllSubscriptions() {
@@ -42,5 +49,45 @@ public class MemorySubscriptionsRepository implements ISubscriptionsRepository {
             .filter(s -> s.getTopicFilter().toString().equals(topic) && s.getClientId().equals(clientID))
             .findFirst()
             .ifPresent(subscriptions::remove);
+    }
+
+    @Override
+    public void removeAllSharedSubscriptions(String clientId) {
+        sharedSubscriptions.remove(clientId);
+    }
+
+    @Override
+    public void removeSharedSubscription(String clientId, ShareName share, Topic topicFilter) {
+        Map<Couple<ShareName, Topic>, MqttQoS> subsMap = sharedSubscriptions.get(clientId);
+        if (subsMap == null) {
+            LOG.info("Removing a non existing shared subscription for client: {}", clientId);
+            return;
+        }
+        subsMap.remove(Couple.of(share, topicFilter));
+        if (subsMap.isEmpty()) {
+            // clean up an empty sub map
+            sharedSubscriptions.remove(clientId);
+        }
+    }
+
+    @Override
+    public void addNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, MqttQoS requestedQoS) {
+        Map<Couple<ShareName, Topic>, MqttQoS> subsMap = sharedSubscriptions.computeIfAbsent(clientId, unused -> new HashMap<>());
+        subsMap.put(Couple.of(share, topicFilter), requestedQoS);
+    }
+
+    @Override
+    public Collection<SharedSubscription> listAllSharedSubscription() {
+        final List<SharedSubscription> result = new ArrayList<>();
+        for (Map.Entry<String, Map<Couple<ShareName, Topic>, MqttQoS>> entry : sharedSubscriptions.entrySet()) {
+            final String clientId = entry.getKey();
+            for (Map.Entry<Couple<ShareName, Topic>, MqttQoS> nestedEntry : entry.getValue().entrySet()) {
+                final ShareName share = nestedEntry.getKey().v1;
+                final Topic filter = nestedEntry.getKey().v2;
+                final MqttQoS qos = nestedEntry.getValue();
+                result.add(new SharedSubscription(share, filter, clientId, qos));
+            }
+        }
+        return result;
     }
 }

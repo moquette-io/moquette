@@ -28,7 +28,7 @@ public interface ISubscriptionsDirectory {
 
     void init(ISubscriptionsRepository sessionsRepository);
 
-    Set<String> listAllSessionIds();
+//    Set<String> listAllSessionIds();
 
     List<Subscription> matchWithoutQosSharpening(Topic topic);
 
