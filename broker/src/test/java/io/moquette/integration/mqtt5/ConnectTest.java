@@ -263,12 +263,6 @@ class ConnectTest extends AbstractServerIntegrationTest {
         verifyPublishedMessage(testamentSubscriber, 10, "Will message must be received after server restart");
     }
 
-    private void restartServerWithSuspension(Duration timeout) throws InterruptedException, IOException {
-        stopServer();
-        Thread.sleep(timeout.toMillis());
-        startServer(dbPath);
-    }
-
     private void scheduleDisconnectWithErrorCode(Mqtt5BlockingClient clientWithWill, Duration delay) {
         scheduleTasks.schedule(() -> {
             // disconnect in a way that the will is triggered

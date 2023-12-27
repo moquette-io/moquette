@@ -15,8 +15,13 @@
  */
 package io.moquette.broker;
 
+import io.moquette.broker.subscriptions.ShareName;
+import io.moquette.broker.subscriptions.SharedSubscription;
 import io.moquette.broker.subscriptions.Subscription;
+import io.moquette.broker.subscriptions.Topic;
+import io.netty.handler.codec.mqtt.MqttQoS;
 
+import java.util.Collection;
 import java.util.Set;
 
 public interface ISubscriptionsRepository {
@@ -26,4 +31,24 @@ public interface ISubscriptionsRepository {
     void addNewSubscription(Subscription subscription);
 
     void removeSubscription(String topic, String clientID);
+
+    /**
+     * Remove all shared subscription from Storage for a client.
+     * */
+    void removeAllSharedSubscriptions(String clientId);
+
+    /**
+     * Remove shared subscription from Storage.
+     * */
+    void removeSharedSubscription(String clientId, ShareName share, Topic topicFilter);
+
+    /**
+     * Add shared subscription from Storage.
+     * */
+    void addNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, MqttQoS requestedQoS);
+
+    /**
+     * List all shared subscriptions to re-add to the tree during a restart.
+     * */
+    Collection<SharedSubscription> listAllSharedSubscription();
 }

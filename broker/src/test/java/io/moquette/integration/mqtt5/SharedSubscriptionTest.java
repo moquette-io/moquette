@@ -5,8 +5,6 @@ import com.hivemq.client.mqtt.MqttGlobalPublishFilter;
 import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import com.hivemq.client.mqtt.mqtt5.message.connect.Mqtt5Connect;
-import com.hivemq.client.mqtt.mqtt5.message.connect.Mqtt5ConnectBuilder;
-import com.hivemq.client.mqtt.mqtt5.message.connect.connack.Mqtt5ConnAck;
 import com.hivemq.client.mqtt.mqtt5.message.connect.connack.Mqtt5ConnAckReasonCode;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
 import com.hivemq.client.mqtt.mqtt5.message.unsubscribe.unsuback.Mqtt5UnsubAck;
@@ -225,6 +223,21 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
 
     @NotNull
     private static Mqtt5BlockingClient createCleanStartClient(String clientId) {
+        return createClientWithStartFlagAndClientId(true, clientId);
+    }
+
+    @NotNull
+    private static Mqtt5BlockingClient createNonCleanStartClient(String clientId) {
+        return createClientWithStartFlagAndClientId(false, clientId);
+    }
+
+    @NotNull
+    private static Mqtt5BlockingClient createPublisherClient() {
+        return createClientWithStartFlagAndClientId(true, "publisher");
+    }
+
+    @NotNull
+    private static Mqtt5BlockingClient createClientWithStartFlagAndClientId(boolean cleanStart, String clientId) {
         final Mqtt5BlockingClient client = MqttClient.builder()
             .useMqttVersion5()
             .identifier(clientId)
@@ -232,22 +245,9 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
             .serverPort(1883)
             .buildBlocking();
         Mqtt5Connect connectRequest = Mqtt5Connect.builder()
-            .cleanStart(true)
+            .cleanStart(cleanStart)
             .build();
-        Mqtt5ConnAck connectAck = client.connect(connectRequest);
-        assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, connectAck.getReasonCode(), clientId + " connected");
-        return client;
-    }
-
-    @NotNull
-    private Mqtt5BlockingClient createPublisherClient() {
-        final Mqtt5BlockingClient client = MqttClient.builder()
-            .useMqttVersion5()
-            .identifier("publisher")
-            .serverHost("localhost")
-            .serverPort(1883)
-            .buildBlocking();
-        assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, client.connect().getReasonCode(), "Publisher connected");
+        assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, client.connect(connectRequest).getReasonCode(), clientId + " connected");
         return client;
     }
 
@@ -419,5 +419,34 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
             // push a message to the shared subscription
             publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
         }, Duration.ofSeconds(2), "Shared message must be received");
+    }
+
+    @Test
+    public void givenASharedSubscriptionWhenBrokerRestartsAndClientReconnectsThenSharedSubscriptionIsReloaded() throws Exception {
+        String fullSharedSubscriptionTopicFilter = "$share/collectors/metric/temperature/living";
+
+        // subscribe client to shared subscription
+        Mqtt5BlockingClient subscriber = createNonCleanStartClient("subscriber");
+        subscribe(subscriber, fullSharedSubscriptionTopicFilter, MqttQos.AT_LEAST_ONCE);
+
+        // verify subscribed to the shared receives a message
+        final Mqtt5BlockingClient publisherClient = createPublisherClient();
+        verifyPublishedMessage(subscriber, v -> {
+            // push a message to the shared subscription
+            publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
+        }, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 2);
+
+        // restart the broker
+        restartServerWithSuspension(Duration.ofSeconds(2));
+
+        // reconnect subscriber
+        subscriber = createNonCleanStartClient("subscriber");
+
+        // verify after restart the shared subscription becomes again active
+        final Mqtt5BlockingClient publisherClientReconnected = createPublisherClient();
+        verifyPublishedMessage(subscriber, v -> {
+            // push a message to the shared subscription
+            publish(publisherClientReconnected, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
+        }, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 2);
     }
 }
