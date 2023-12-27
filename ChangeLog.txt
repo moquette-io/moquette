@@ -2,6 +2,7 @@ Version 0.18-SNAPSHOT:
    [feature] shared subscriptions:
      - Initial implementation of shared subscription subscribe and publish part. (#796)
      - Added unsubscribe of shared subscriptions. (#799)
+     - Implemented persistence for shared subscriptions to sustain broker restarts (#802)
    [fix] Implements requirements on reserved topics (starts with $). Implements the matching rules and avoid to proceed with processing on client's publishes on those topics (#793)
    [feature] Handle will delay interval and MQTT5's Will optional properties (#770)
    [fix] Handle empty collector batches in PostOffice (#777)
