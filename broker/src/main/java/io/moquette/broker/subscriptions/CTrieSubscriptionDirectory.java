@@ -27,7 +27,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -38,7 +37,7 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
     private CTrie ctrie;
     private volatile ISubscriptionsRepository subscriptionsRepository;
 
-    private ConcurrentMap<String, List<SharedSubscription>> clientSharedSubscriptions = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, List<SharedSubscription>> clientSharedSubscriptions = new ConcurrentHashMap<>();
 
     @Override
     public void init(ISubscriptionsRepository subscriptionsRepository) {
@@ -66,23 +65,6 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Stored subscriptions have been reloaded. SubscriptionTree = {}", dumpTree());
         }
-    }
-
-//    /**
-//     * @return the set of client ids that has a subscription stored.
-//     */
-//    @Override
-//    public Set<String> listAllSessionIds() {
-//        final Set<Subscription> subscriptions = subscriptionsRepository.listAllSubscriptions();
-//        final Set<String> clientIds = new HashSet<>(subscriptions.size());
-//        for (Subscription subscription : subscriptions) {
-//            clientIds.add(subscription.clientId);
-//        }
-//        return clientIds;
-//    }
-
-    Optional<CNode> lookup(Topic topic) {
-        return ctrie.lookup(topic);
     }
 
     /**
