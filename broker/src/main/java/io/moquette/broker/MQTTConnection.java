@@ -369,7 +369,7 @@ final class MQTTConnection {
             .retainAvailable(true)
             .wildcardSubscriptionAvailable(true)
             .subscriptionIdentifiersAvailable(false)
-            .sharedSubscriptionAvailable(false);
+            .sharedSubscriptionAvailable(true);
         return builder;
     }
 
