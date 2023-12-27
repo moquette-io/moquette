@@ -32,27 +32,7 @@ import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class H2PersistentQueueTest {
-
-    private MVStore mvStore;
-
-    @BeforeEach
-    public void setUp() {
-        this.mvStore = new MVStore.Builder()
-            .fileName(BrokerConstants.DEFAULT_PERSISTENT_PATH)
-            .autoCommitDisabled()
-            .open();
-    }
-
-    @AfterEach
-    public void tearDown() {
-        this.mvStore.close();
-        File dbFile = new File(BrokerConstants.DEFAULT_PERSISTENT_PATH);
-        if (dbFile.exists()) {
-            dbFile.delete();
-        }
-        assertFalse(dbFile.exists());
-    }
+public class H2PersistentQueueTest extends H2BaseTest {
 
     @Test
     public void testAdd() {
