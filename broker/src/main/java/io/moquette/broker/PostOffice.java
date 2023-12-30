@@ -332,14 +332,20 @@ class PostOffice {
 
         for (Subscription subscription : newSubscriptions) {
             if (subscritionIdOpt.isPresent()) {
-                subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subscription.getRequestedQos(), subscritionIdOpt.get());
+                subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subscription.getRequestedQos(),
+                    subscritionIdOpt.get());
             } else {
                 subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subscription.getRequestedQos());
             }
         }
 
         for (SharedSubscriptionData sharedSubData : sharedSubscriptions) {
-            subscriptions.addShared(clientID, sharedSubData.name, sharedSubData.topicFilter, sharedSubData.requestedQoS);
+            if (subscritionIdOpt.isPresent()) {
+                subscriptions.addShared(clientID, sharedSubData.name, sharedSubData.topicFilter, sharedSubData.requestedQoS,
+                    subscritionIdOpt.get());
+            } else {
+                subscriptions.addShared(clientID, sharedSubData.name, sharedSubData.topicFilter, sharedSubData.requestedQoS);
+            }
         }
 
         // add the subscriptions to Session

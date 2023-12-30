@@ -108,6 +108,12 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
     }
 
     @Override
+    public void add(String clientId, Topic filter, MqttQoS requestedQoS, SubscriptionIdentifier subscriptionId) {
+        // TODO implement, save the subscription Id into the ctrie
+        throw new IllegalStateException("Implement this");
+    }
+
+    @Override
     public void addShared(String clientId, ShareName name, Topic topicFilter, MqttQoS requestedQoS) {
         SubscriptionRequest shareSubRequest = SubscriptionRequest.buildShared(name, topicFilter, clientId, requestedQoS);
         ctrie.addToTree(shareSubRequest);
@@ -116,6 +122,12 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
 
         List<SharedSubscription> sharedSubscriptions = clientSharedSubscriptions.computeIfAbsent(clientId, unused -> new ArrayList<>());
         sharedSubscriptions.add(shareSubRequest.sharedSubscription());
+    }
+
+    @Override
+    public void addShared(String clientId, ShareName name, Topic topicFilter, MqttQoS requestedQoS, SubscriptionIdentifier subscriptionId) {
+        // TODO implement, save the subscription Id into the ctrie
+        throw new IllegalStateException("Implement this");
     }
 
     /**

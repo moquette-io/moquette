@@ -34,7 +34,11 @@ public interface ISubscriptionsDirectory {
 
     void add(String clientId, Topic filter, MqttQoS requestedQoS);
 
+    void add(String clientId, Topic filter, MqttQoS requestedQoS, SubscriptionIdentifier subscriptionId);
+
     void addShared(String clientId, ShareName name, Topic topicFilter, MqttQoS requestedQoS);
+
+    void addShared(String clientId, ShareName name, Topic topicFilter, MqttQoS requestedQoS, SubscriptionIdentifier subscriptionId);
 
     void removeSubscription(Topic topic, String clientID);
 
