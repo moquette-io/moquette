@@ -1,4 +1,6 @@
 Version 0.18-SNAPSHOT:
+   [feature] subscription identifiers: (issue #801)
+     - Implements the validation of subscription identifier properties in SUBSCRIBE. (#803)
    [feature] shared subscriptions:
      - Initial implementation of shared subscription subscribe and publish part. (#796)
      - Added unsubscribe of shared subscriptions. (#799)
