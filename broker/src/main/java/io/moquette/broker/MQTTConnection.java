@@ -368,7 +368,7 @@ final class MQTTConnection {
             .receiveMaximum(INFLIGHT_WINDOW_SIZE)
             .retainAvailable(true)
             .wildcardSubscriptionAvailable(true)
-            .subscriptionIdentifiersAvailable(false)
+            .subscriptionIdentifiersAvailable(false) // TODO make it true
             .sharedSubscriptionAvailable(true);
         return builder;
     }
@@ -858,6 +858,7 @@ final class MQTTConnection {
     }
 
     void brokerDisconnect(MqttReasonCodes.Disconnect reasonCode) {
+        this.connected = false;
         final MqttMessage disconnectMsg = MqttMessageBuilders.disconnect()
             .reasonCode(reasonCode.byteValue())
             .build();

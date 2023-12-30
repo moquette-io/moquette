@@ -28,7 +28,9 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.*;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -40,13 +42,11 @@ import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsReposit
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static io.moquette.broker.PostOfficePublishTest.ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID;
 import static io.moquette.broker.PostOfficePublishTest.SUBSCRIBER_ID;
-import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -114,14 +114,14 @@ public class PostOfficeSubscribeTest {
         return new MQTTConnection(channel, config, mockAuthenticator, sessionRegistry, sut);
     }
 
-    protected void connect() {
-        MqttConnectMessage connectMessage = MqttMessageBuilders.connect()
-            .clientId(FAKE_CLIENT_ID)
-            .build();
-        connection.processConnect(connectMessage);
-        MqttConnAckMessage connAck = channel.readOutbound();
-        assertEquals(CONNECTION_ACCEPTED, connAck.variableHeader().connectReturnCode(), "Connect must be accepted");
-    }
+//    protected void connect() {
+//        MqttConnectMessage connectMessage = MqttMessageBuilders.connect()
+//            .clientId(FAKE_CLIENT_ID)
+//            .build();
+//        connection.processConnect(connectMessage);
+//        MqttConnAckMessage connAck = channel.readOutbound();
+//        assertEquals(CONNECTION_ACCEPTED, connAck.variableHeader().connectReturnCode(), "Connect must be accepted");
+//    }
 
     @Test
     public void testSubscribe() throws ExecutionException, InterruptedException {
@@ -356,5 +356,63 @@ public class PostOfficeSubscribeTest {
         assertEquals("measures/+/1", SharedSubscriptionUtils.extractFilterFromShared("$share//measures/+/1"));
         assertEquals("measures/+/1", SharedSubscriptionUtils.extractFilterFromShared("$share/myShared/measures/+/1"));
         assertEquals("measures/+/1", SharedSubscriptionUtils.extractFilterFromShared("$share/#/measures/+/1"));
+    }
+
+    @Test
+    public void givenConnectedMQTT5ClientWhenSubscribeWithMultipleSubscriptionIdentifiersThenTheSessionIsDisconnected() throws ExecutionException, InterruptedException {
+        connectAsMqtt5(connection);
+
+        MqttSubscribeMessage subscribe = createSubscribeWithSubscriptionIdentifiers(123, 456);
+
+        sut.subscribeClientToTopics(subscribe, FAKE_CLIENT_ID, "", connection);
+
+        Assertions.assertAll("Session and connection move in close state",
+            () -> {
+                MqttMessage disconnect = channel.readOutbound();
+                assertEquals(MqttReasonCodes.Disconnect.MALFORMED_PACKET.byteValue(), ((MqttReasonCodeAndPropertiesVariableHeader) disconnect.variableHeader()).reasonCode());
+                },
+            () -> assertFalse(channel.isActive()),
+            () -> assertFalse(connection.isConnected()));
+    }
+
+    @Test
+    public void givenConnectedMQTT5ClientWhenSubscribeWithInvalidSubscriptionIdentifierThenTheSessionIsDisconnected() throws ExecutionException, InterruptedException {
+        connectAsMqtt5(connection);
+
+        MqttSubscribeMessage subscribe = createSubscribeWithSubscriptionIdentifiers(-1);
+
+        sut.subscribeClientToTopics(subscribe, FAKE_CLIENT_ID, "", connection);
+
+        Assertions.assertAll("Session and connection move in close state",
+            () -> {
+                MqttMessage disconnect = channel.readOutbound();
+                assertEquals(MqttReasonCodes.Disconnect.MALFORMED_PACKET.byteValue(), ((MqttReasonCodeAndPropertiesVariableHeader) disconnect.variableHeader()).reasonCode());
+            },
+            () -> assertFalse(channel.isActive()),
+            () -> assertFalse(connection.isConnected()));
+    }
+
+    @NotNull
+    private static MqttSubscribeMessage createSubscribeWithSubscriptionIdentifiers(int... subscriptionIdentifiers) {
+        final MqttProperties subscribeProperties = new MqttProperties();
+        for (int subscriptionId : subscriptionIdentifiers) {
+            subscribeProperties.add(new MqttProperties.IntegerProperty(MqttProperties.MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value(), subscriptionId));
+        }
+
+        return MqttMessageBuilders.subscribe()
+            .addSubscription(AT_MOST_ONCE, NEWS_TOPIC)
+            .messageId(1)
+            .properties(subscribeProperties)
+            .build();
+    }
+
+    private void connectAsMqtt5(MQTTConnection connection) throws InterruptedException, ExecutionException {
+        MqttConnectMessage connectMessage = MqttMessageBuilders.connect()
+            .clientId(FAKE_CLIENT_ID)
+            .protocolVersion(MqttVersion.MQTT_5)
+            .build();
+
+        connection.processConnect(connectMessage).completableFuture().get();
+        ConnectionTestUtils.assertConnectAccepted((EmbeddedChannel) connection.channel);
     }
 }

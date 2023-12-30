@@ -16,35 +16,17 @@
 package io.moquette.broker;
 
 import io.moquette.broker.scheduler.ScheduledExpirationService;
-import io.moquette.broker.subscriptions.ShareName;
+import io.moquette.broker.subscriptions.*;
 import io.moquette.interception.BrokerInterceptor;
-import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
-import io.moquette.broker.subscriptions.Subscription;
-import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.handler.codec.mqtt.MqttConnectMessage;
-import io.netty.handler.codec.mqtt.MqttFixedHeader;
-import io.netty.handler.codec.mqtt.MqttMessageType;
-import io.netty.handler.codec.mqtt.MqttPublishMessage;
-import io.netty.handler.codec.mqtt.MqttQoS;
-import io.netty.handler.codec.mqtt.MqttSubAckMessage;
-import io.netty.handler.codec.mqtt.MqttSubAckPayload;
-import io.netty.handler.codec.mqtt.MqttSubscribeMessage;
-import io.netty.handler.codec.mqtt.MqttTopicSubscription;
+import io.netty.handler.codec.mqtt.*;
 import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -302,6 +284,7 @@ class PostOffice {
         final Session session = sessionRegistry.retrieve(clientID);
 
         final List<SharedSubscriptionData> sharedSubscriptions;
+        final Optional<SubscriptionIdentifier> subscritionIdOpt;
 
         if (mqttConnection.isProtocolVersion5()) {
             sharedSubscriptions = msg.payload().topicSubscriptions().stream()
@@ -318,8 +301,16 @@ class PostOffice {
                 session.disconnectFromBroker();
                 return;
             }
+
+            try {
+                subscritionIdOpt = verifyAndExtractMessageIdentifier(msg);
+            } catch (IllegalArgumentException ex) {
+                session.disconnectFromBroker();
+                return;
+            }
         } else {
             sharedSubscriptions = Collections.emptyList();
+            subscritionIdOpt = Optional.empty();
         }
 
         List<MqttTopicSubscription> ackTopics;
@@ -340,11 +331,21 @@ class PostOffice {
             }).collect(Collectors.toList());
 
         for (Subscription subscription : newSubscriptions) {
-            subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subscription.getRequestedQos());
+            if (subscritionIdOpt.isPresent()) {
+                subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subscription.getRequestedQos(),
+                    subscritionIdOpt.get());
+            } else {
+                subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subscription.getRequestedQos());
+            }
         }
 
         for (SharedSubscriptionData sharedSubData : sharedSubscriptions) {
-            subscriptions.addShared(clientID, sharedSubData.name, sharedSubData.topicFilter, sharedSubData.requestedQoS);
+            if (subscritionIdOpt.isPresent()) {
+                subscriptions.addShared(clientID, sharedSubData.name, sharedSubData.topicFilter, sharedSubData.requestedQoS,
+                    subscritionIdOpt.get());
+            } else {
+                subscriptions.addShared(clientID, sharedSubData.name, sharedSubData.topicFilter, sharedSubData.requestedQoS);
+            }
         }
 
         // add the subscriptions to Session
@@ -357,6 +358,27 @@ class PostOffice {
 
         for (Subscription subscription : newSubscriptions) {
             interceptor.notifyTopicSubscribed(subscription, username);
+        }
+    }
+
+    private static Optional<SubscriptionIdentifier> verifyAndExtractMessageIdentifier(MqttSubscribeMessage msg) {
+        final List<MqttProperties.MqttProperty<Integer>> subscriptionIdentifierProperties =
+            (List<MqttProperties.MqttProperty<Integer>>) msg.idAndPropertiesVariableHeader().properties()
+                .getProperties(MqttProperties.MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value());
+        if (subscriptionIdentifierProperties.size() > 1) {
+            // more than 1 SUBSCRIPTION_IDENTIFIER property during subscribe is a protocol error
+            LOG.warn("Received a Subscribe with more than one subscription identifier property ({})", subscriptionIdentifierProperties.size());
+            throw new IllegalArgumentException("More than one subscription identifier properties");
+        }
+        if (subscriptionIdentifierProperties.isEmpty()) {
+            return Optional.empty();
+        }
+        Integer value = subscriptionIdentifierProperties.iterator().next().value();
+        try {
+            return Optional.of(new SubscriptionIdentifier(value));
+        } catch (IllegalArgumentException ex) {
+            LOG.warn("Received a Subscribe with SubscriptionIdentifier value {} out of range 1..268435455", value);
+            throw ex;
         }
     }
 
