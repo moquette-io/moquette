@@ -20,6 +20,7 @@ import io.netty.handler.codec.mqtt.MqttQoS;
 
 import java.io.Serializable;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Maintain the information about which Topic a certain ClientID is subscribed and at which QoS
@@ -32,15 +33,28 @@ public final class Subscription implements Serializable, Comparable<Subscription
     final Topic topicFilter;
     final String shareName;
 
+    // TODO remove transient when the subscription identifier has to be persisted
+    private transient final Optional<SubscriptionIdentifier> subscriptionId;
+
     public Subscription(String clientId, Topic topicFilter, MqttQoS requestedQos) {
-        this(clientId, topicFilter, requestedQos, "");
+        this(clientId, topicFilter, requestedQos, "", null);
+    }
+
+    public Subscription(String clientId, Topic topicFilter, MqttQoS requestedQos, SubscriptionIdentifier subscriptionId) {
+        this(clientId, topicFilter, requestedQos, "", subscriptionId);
     }
 
     public Subscription(String clientId, Topic topicFilter, MqttQoS requestedQos, String shareName) {
+        this(clientId, topicFilter, requestedQos, shareName, null);
+    }
+
+    public Subscription(String clientId, Topic topicFilter, MqttQoS requestedQos, String shareName,
+                        SubscriptionIdentifier subscriptionId) {
         this.requestedQos = requestedQos;
         this.clientId = clientId;
         this.topicFilter = topicFilter;
         this.shareName = shareName;
+        this.subscriptionId = Optional.ofNullable(subscriptionId);
     }
 
     public Subscription(Subscription orig) {
@@ -48,6 +62,7 @@ public final class Subscription implements Serializable, Comparable<Subscription
         this.clientId = orig.clientId;
         this.topicFilter = orig.topicFilter;
         this.shareName = orig.shareName;
+        this.subscriptionId = orig.subscriptionId;
     }
 
     public String getClientId() {
@@ -64,6 +79,14 @@ public final class Subscription implements Serializable, Comparable<Subscription
 
     public boolean qosLessThan(Subscription sub) {
         return requestedQos.value() < sub.requestedQos.value();
+    }
+
+    public boolean hasSubscriptionIdentifier() {
+        return subscriptionId.isPresent();
+    }
+
+    public SubscriptionIdentifier getSubscriptionIdentifier() {
+        return subscriptionId.get();
     }
 
     @Override

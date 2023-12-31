@@ -19,7 +19,6 @@ package io.moquette.broker.subscriptions;
 import io.moquette.broker.ISubscriptionsRepository;
 import io.moquette.persistence.MemorySubscriptionsRepository;
 import io.netty.handler.codec.mqtt.MqttQoS;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -27,8 +26,7 @@ import java.util.Optional;
 
 import static io.moquette.broker.subscriptions.Topic.asTopic;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class CTrieSubscriptionDirectoryMatchingTest extends CTrieSubscriptionDirectMatchingCommon {
 
@@ -259,5 +257,50 @@ public class CTrieSubscriptionDirectoryMatchingTest extends CTrieSubscriptionDir
 
         // client1SubQoS2 should override client1SubQoS0
         assertThat(client1Sub.getRequestedQos()).isEqualTo(client1SubQoS2.getRequestedQos());
+    }
+
+    @Test
+    public void givenSubscriptionWithSubscriptionIdWhenNewSubscriptionIsProcessedThenSubscriptionIdIsUpdated() {
+        // subscribe a client on topic with subscription identifier
+        sut.add("client", asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE, new SubscriptionIdentifier(1));
+
+        // verify it contains the subscription identifier
+        final List<Subscription> matchingSubscriptions = sut.matchQosSharpening(asTopic("client/test/b"));
+        verifySubscriptionIdentifierIsPresent(matchingSubscriptions, new SubscriptionIdentifier(1));
+
+        // update the subscription of same clientId on same topic filter but with different subscription identifier
+        sut.add("client", asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE, new SubscriptionIdentifier(123));
+
+        // verify the subscription identifier is updated
+        final List<Subscription> reloadedSubscriptions = sut.matchQosSharpening(asTopic("client/test/b"));
+        verifySubscriptionIdentifierIsPresent(reloadedSubscriptions, new SubscriptionIdentifier(123));
+    }
+
+    private static void verifySubscriptionIdentifierIsPresent(List<Subscription> matchingSubscriptions, SubscriptionIdentifier subscriptionIdentifier) {
+        assertAll("subscription contains the subscription identifier",
+            () -> assertEquals(1, matchingSubscriptions.size()),
+            () -> assertTrue(matchingSubscriptions.iterator().next().hasSubscriptionIdentifier()),
+            () -> assertEquals(subscriptionIdentifier, matchingSubscriptions.iterator().next().getSubscriptionIdentifier())
+        );
+    }
+
+    @Test
+    public void givenSubscriptionWithSubscriptionIdWhenNewSubscriptionWithoutSubscriptionIdIsProcessedThenSubscriptionIdIsWiped() {
+        // subscribe a client on topic with subscription identifier
+        sut.add("client", asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE, new SubscriptionIdentifier(1));
+
+        // verify it contains the subscription identifier
+        SubscriptionIdentifier expectedSubscriptionId = new SubscriptionIdentifier(1);
+        verifySubscriptionIdentifierIsPresent(sut.matchQosSharpening(asTopic("client/test/b")), expectedSubscriptionId);
+
+        // update the subscription of same clientId on same topic filter but removing subscription identifier
+        sut.add("client", asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE);
+
+        // verify the subscription identifier is removed
+        final List<Subscription> reloadedSubscriptions = sut.matchQosSharpening(asTopic("client/test/b"));
+        assertAll("subscription doesn't contain subscription identifier",
+            () -> assertEquals(1, reloadedSubscriptions.size()),
+            () -> assertFalse(reloadedSubscriptions.iterator().next().hasSubscriptionIdentifier())
+        );
     }
 }

@@ -18,6 +18,7 @@ package io.moquette.broker.subscriptions;
 import io.netty.handler.codec.mqtt.MqttQoS;
 
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Shared subscription data class.
@@ -27,6 +28,7 @@ public final class SharedSubscription implements Comparable<SharedSubscription> 
     private final Topic topicFilter;
     private final String clientId;
     private final MqttQoS requestedQoS;
+    private final Optional<SubscriptionIdentifier> subscriptionId;
 
     public SharedSubscription(ShareName shareName, Topic topicFilter, String clientId, MqttQoS requestedQoS) {
         Objects.requireNonNull(requestedQoS, "qos parameter can't be null");
@@ -34,6 +36,17 @@ public final class SharedSubscription implements Comparable<SharedSubscription> 
         this.topicFilter = topicFilter;
         this.clientId = clientId;
         this.requestedQoS = requestedQoS;
+        this.subscriptionId = Optional.empty();
+    }
+
+    public SharedSubscription(ShareName shareName, Topic topicFilter, String clientId, MqttQoS requestedQoS
+        , SubscriptionIdentifier subscriptionId) {
+        Objects.requireNonNull(requestedQoS, "qos parameter can't be null");
+        this.shareName = shareName;
+        this.topicFilter = topicFilter;
+        this.clientId = clientId;
+        this.requestedQoS = requestedQoS;
+        this.subscriptionId = Optional.of(subscriptionId);
     }
 
     public String clientId() {
