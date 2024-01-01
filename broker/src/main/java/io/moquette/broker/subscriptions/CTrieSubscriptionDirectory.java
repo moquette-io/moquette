@@ -103,31 +103,41 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
     @Override
     public void add(String clientId, Topic filter, MqttQoS requestedQoS) {
         SubscriptionRequest subRequest = SubscriptionRequest.buildNonShared(clientId, filter, requestedQoS);
+        addNonSharedSubscriptionRequest(subRequest);
+    }
+
+    @Override
+    public void add(String clientId, Topic filter, MqttQoS requestedQoS, SubscriptionIdentifier subscriptionId) {
+        SubscriptionRequest subRequest = SubscriptionRequest.buildNonShared(clientId, filter, requestedQoS, subscriptionId);
+        addNonSharedSubscriptionRequest(subRequest);
+    }
+
+    private void addNonSharedSubscriptionRequest(SubscriptionRequest subRequest) {
         ctrie.addToTree(subRequest);
         subscriptionsRepository.addNewSubscription(subRequest.subscription());
     }
 
     @Override
-    public void add(String clientId, Topic filter, MqttQoS requestedQoS, SubscriptionIdentifier subscriptionId) {
-        // TODO implement, save the subscription Id into the ctrie
-        throw new IllegalStateException("Implement this");
-    }
-
-    @Override
     public void addShared(String clientId, ShareName name, Topic topicFilter, MqttQoS requestedQoS) {
         SubscriptionRequest shareSubRequest = SubscriptionRequest.buildShared(name, topicFilter, clientId, requestedQoS);
+        addSharedSubscriptionRequest(shareSubRequest);
+    }
+
+    private void addSharedSubscriptionRequest(SubscriptionRequest shareSubRequest) {
         ctrie.addToTree(shareSubRequest);
 
-        subscriptionsRepository.addNewSharedSubscription(clientId, name, topicFilter, requestedQoS);
+        subscriptionsRepository.addNewSharedSubscription(shareSubRequest.getClientId(), shareSubRequest.getSharedName(),
+            shareSubRequest.getTopicFilter(), shareSubRequest.getRequestedQoS());
 
-        List<SharedSubscription> sharedSubscriptions = clientSharedSubscriptions.computeIfAbsent(clientId, unused -> new ArrayList<>());
+        List<SharedSubscription> sharedSubscriptions = clientSharedSubscriptions.computeIfAbsent(shareSubRequest.getClientId(), unused -> new ArrayList<>());
         sharedSubscriptions.add(shareSubRequest.sharedSubscription());
     }
 
     @Override
-    public void addShared(String clientId, ShareName name, Topic topicFilter, MqttQoS requestedQoS, SubscriptionIdentifier subscriptionId) {
-        // TODO implement, save the subscription Id into the ctrie
-        throw new IllegalStateException("Implement this");
+    public void addShared(String clientId, ShareName name, Topic topicFilter, MqttQoS requestedQoS,
+                          SubscriptionIdentifier subscriptionId) {
+        SubscriptionRequest shareSubRequest = SubscriptionRequest.buildShared(name, topicFilter, clientId, requestedQoS, subscriptionId);
+        addSharedSubscriptionRequest(shareSubRequest);
     }
 
     /**

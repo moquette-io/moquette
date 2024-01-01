@@ -5,7 +5,9 @@ import io.netty.handler.codec.mqtt.MqttQoS;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 public class CTrie {
 
@@ -20,11 +22,20 @@ public class CTrie {
 
         private boolean shared = false;
         private ShareName shareName;
+        private Optional<SubscriptionIdentifier> subscriptionIdOpt;
+
+        private SubscriptionRequest(String clientId, Topic topicFilter, MqttQoS requestedQoS, SubscriptionIdentifier subscriptionId) {
+            this.topicFilter = topicFilter;
+            this.clientId = clientId;
+            this.requestedQoS = requestedQoS;
+            this.subscriptionIdOpt = Optional.of(subscriptionId);
+        }
 
         private SubscriptionRequest(String clientId, Topic topicFilter, MqttQoS requestedQoS) {
             this.topicFilter = topicFilter;
             this.clientId = clientId;
             this.requestedQoS = requestedQoS;
+            this.subscriptionIdOpt = Optional.empty();
         }
 
         public static SubscriptionRequest buildNonShared(Subscription subscription) {
@@ -35,12 +46,29 @@ public class CTrie {
             return new SubscriptionRequest(clientId, topicFilter, requestedQoS);
         }
 
+        public static SubscriptionRequest buildNonShared(String clientId, Topic topicFilter, MqttQoS requestedQoS,
+                                                         SubscriptionIdentifier subscriptionId) {
+            Objects.requireNonNull(subscriptionId, "SubscriptionId param can't be null");
+            return new SubscriptionRequest(clientId, topicFilter, requestedQoS, subscriptionId);
+        }
+
+        public static SubscriptionRequest buildShared(ShareName shareName, Topic topicFilter, String clientId,
+                                                      MqttQoS requestedQoS, SubscriptionIdentifier subscriptionId) {
+            Objects.requireNonNull(subscriptionId, "SubscriptionId param can't be null");
+            return buildSharedHelper(shareName, topicFilter,
+                () -> new SubscriptionRequest(clientId, topicFilter, requestedQoS, subscriptionId));
+        }
+
         public static SubscriptionRequest buildShared(ShareName shareName, Topic topicFilter, String clientId, MqttQoS requestedQoS) {
+            return buildSharedHelper(shareName, topicFilter,
+                () -> new SubscriptionRequest(clientId, topicFilter, requestedQoS));
+        }
+
+        private static SubscriptionRequest buildSharedHelper(ShareName shareName, Topic topicFilter, Supplier<SubscriptionRequest> instantiator) {
             if (topicFilter.headToken().name().startsWith("$share")) {
                 throw new IllegalArgumentException("Topic filter of a shared subscription can't contains $share and share name");
             }
-
-            SubscriptionRequest request = new SubscriptionRequest(clientId, topicFilter, requestedQoS);
+            SubscriptionRequest request = instantiator.get();
             request.shared = true;
             request.shareName = shareName;
             return request;
@@ -50,12 +78,20 @@ public class CTrie {
             return topicFilter;
         }
 
+        public MqttQoS getRequestedQoS() {
+            return requestedQoS;
+        }
+
         public Subscription subscription() {
-            return new Subscription(clientId, topicFilter, requestedQoS);
+            return subscriptionIdOpt
+                .map(subscriptionIdentifier -> new Subscription(clientId, topicFilter, requestedQoS, subscriptionIdentifier))
+                .orElseGet(() -> new Subscription(clientId, topicFilter, requestedQoS));
         }
 
         public SharedSubscription sharedSubscription() {
-            return new SharedSubscription(shareName, topicFilter, clientId, requestedQoS);
+            return subscriptionIdOpt
+                .map(subId -> new SharedSubscription(shareName, topicFilter, clientId, requestedQoS, subId))
+                .orElseGet(() -> new SharedSubscription(shareName, topicFilter, clientId, requestedQoS));
         }
 
         public boolean isShared() {

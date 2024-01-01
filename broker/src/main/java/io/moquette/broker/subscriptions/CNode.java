@@ -112,7 +112,7 @@ class CNode implements Comparable<CNode> {
             // select a subscription randomly
             int randIdx = SECURE_RANDOM.nextInt(list.size());
             SharedSubscription sub = list.get(randIdx);
-            selectedSubscriptions.add(new Subscription(sub.clientId(), sub.topicFilter(), sub.requestedQoS(), shareName));
+            selectedSubscriptions.add(sub.createSubscription());
         }
         return selectedSubscriptions;
     }
@@ -144,15 +144,31 @@ class CNode implements Comparable<CNode> {
             if (idx >= 0) {
                 // Subscription already exists
                 final Subscription existing = subscriptions.get(idx);
-                if (existing.getRequestedQos().value() < newSubscription.getRequestedQos().value()) {
+                if (needsToUpdateExistingSubscription(newSubscription, existing)) {
                     subscriptions.set(idx, newSubscription);
                 }
             } else {
                 // insert into the expected index so that the sorting is maintained
-                this.subscriptions.add(-1 - idx, new Subscription(newSubscription));
+                this.subscriptions.add(-1 - idx, newSubscription);
             }
         }
         return this;
+    }
+
+    private static boolean needsToUpdateExistingSubscription(Subscription newSubscription, Subscription existing) {
+        if ((newSubscription.hasSubscriptionIdentifier() && existing.hasSubscriptionIdentifier()) &&
+            newSubscription.getSubscriptionIdentifier().equals(existing.getSubscriptionIdentifier())
+        ) {
+            // if subscription identifier hasn't changed,
+            // then check QoS but don't lower the requested QoS level
+            return existing.getRequestedQos().value() < newSubscription.getRequestedQos().value();
+        }
+
+        // subscription identifier changed
+        // TODO need to understand if requestedQoS has to be also replaced or not, if not
+        // the existing QoS has to be copied. This to avoid that a subscription identifier
+        // change silently break the rule of existing qos never lowered.
+        return true;
     }
 
     /**
