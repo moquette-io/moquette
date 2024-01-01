@@ -1,16 +1,16 @@
 package io.moquette.persistence;
 
-import io.moquette.broker.subscriptions.ShareName;
-import io.moquette.broker.subscriptions.SharedSubscription;
-import io.moquette.broker.subscriptions.Topic;
+import io.moquette.broker.subscriptions.*;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collection;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class H2SubscriptionsRepositorySharedSubscriptionsTest extends H2BaseTest {
 
@@ -23,6 +23,19 @@ class H2SubscriptionsRepositorySharedSubscriptionsTest extends H2BaseTest {
     }
 
     @Test
+    public void givenNewSubscriptionWhenItsStoredThenCanGetRetrieved() {
+        Subscription subscription = new Subscription("subscriber", Topic.asTopic("metering/temperature"),
+            MqttQoS.AT_MOST_ONCE, new SubscriptionIdentifier(1));
+        sut.addNewSubscription(subscription);
+
+        // verify deserialize
+        Set<Subscription> subs = sut.listAllSubscriptions();
+        assertEquals(1, subs.size());
+        Subscription reloadedSub = subs.iterator().next();
+        assertEquals(1, reloadedSub.getSubscriptionIdentifier().value());
+    }
+
+    @Test
     public void givenAPersistedSharedSubscriptionWhenListedThenItAppears() {
         sut.addNewSharedSubscription("subscriber", new ShareName("thermometers"),
             Topic.asTopic("/first_floor/living/temp"), MqttQoS.AT_MOST_ONCE);
@@ -31,8 +44,8 @@ class H2SubscriptionsRepositorySharedSubscriptionsTest extends H2BaseTest {
         assertThat(subscriptions).hasSize(1);
         SharedSubscription subscription = subscriptions.iterator().next();
         Assertions.assertAll("First subscription match the previously stored",
-            () -> Assertions.assertEquals("subscriber", subscription.clientId()),
-            () -> Assertions.assertEquals("thermometers", subscription.getShareName().getShareName()));
+            () -> assertEquals("subscriber", subscription.clientId()),
+            () -> assertEquals("thermometers", subscription.getShareName().getShareName()));
     }
 
     @Test
