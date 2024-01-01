@@ -144,7 +144,6 @@ class CNode implements Comparable<CNode> {
             if (idx >= 0) {
                 // Subscription already exists
                 final Subscription existing = subscriptions.get(idx);
-                // TODO has to update also if subscription identifier changes!
                 if (needsToUpdateExistingSubscription(newSubscription, existing)) {
                     subscriptions.set(idx, newSubscription);
                 }
@@ -160,9 +159,8 @@ class CNode implements Comparable<CNode> {
         if ((newSubscription.hasSubscriptionIdentifier() && existing.hasSubscriptionIdentifier()) &&
             newSubscription.getSubscriptionIdentifier().equals(existing.getSubscriptionIdentifier())
         ) {
-            // if subscription identifier hasn't changed, then check QoS
-//            return false;
-            // don't lower the requested QoS level
+            // if subscription identifier hasn't changed,
+            // then check QoS but don't lower the requested QoS level
             return existing.getRequestedQos().value() < newSubscription.getRequestedQos().value();
         }
 
