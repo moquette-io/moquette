@@ -112,7 +112,7 @@ class CNode implements Comparable<CNode> {
             // select a subscription randomly
             int randIdx = SECURE_RANDOM.nextInt(list.size());
             SharedSubscription sub = list.get(randIdx);
-            selectedSubscriptions.add(new Subscription(sub.clientId(), sub.topicFilter(), sub.requestedQoS(), shareName));
+            selectedSubscriptions.add(sub.createSubscription());
         }
         return selectedSubscriptions;
     }

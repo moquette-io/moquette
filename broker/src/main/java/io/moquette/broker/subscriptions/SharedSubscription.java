@@ -65,6 +65,18 @@ public final class SharedSubscription implements Comparable<SharedSubscription> 
         return shareName;
     }
 
+    /**
+     * Create a new Subscription instance from the data present in SharedSubscription
+     * */
+    Subscription createSubscription() {
+        if (subscriptionId.isPresent()) {
+            return new Subscription(clientId, topicFilter, requestedQoS, shareName.getShareName(), subscriptionId.get());
+        } else {
+            return new Subscription(clientId, topicFilter, requestedQoS, shareName.getShareName());
+        }
+    }
+
+
     @Override
     public int compareTo(SharedSubscription o) {
         return this.clientId.compareTo(o.clientId);
