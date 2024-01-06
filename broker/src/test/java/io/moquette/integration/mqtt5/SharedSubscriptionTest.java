@@ -1,11 +1,8 @@
 package io.moquette.integration.mqtt5;
 
-import com.hivemq.client.mqtt.MqttClient;
 import com.hivemq.client.mqtt.MqttGlobalPublishFilter;
 import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
-import com.hivemq.client.mqtt.mqtt5.message.connect.Mqtt5Connect;
-import com.hivemq.client.mqtt.mqtt5.message.connect.connack.Mqtt5ConnAckReasonCode;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
 import com.hivemq.client.mqtt.mqtt5.message.unsubscribe.unsuback.Mqtt5UnsubAck;
 import com.hivemq.client.mqtt.mqtt5.message.unsubscribe.unsuback.Mqtt5UnsubAckReasonCode;
@@ -24,7 +21,6 @@ import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttReasonCodeAndPropertiesVariableHeader;
 import io.netty.handler.codec.mqtt.MqttReasonCodes;
 import io.netty.handler.codec.mqtt.MqttSubAckMessage;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
+public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(SharedSubscriptionTest.class);
 
@@ -201,54 +197,6 @@ public class SharedSubscriptionTest extends AbstractServerIntegrationTest {
         String payload = pub.payload().asByteBuf().toString(StandardCharsets.UTF_8);
         assertEquals(expectedPayload, payload);
         assertTrue(pub.release(), "received message must be deallocated");
-    }
-
-    @NotNull
-    private Mqtt5BlockingClient createSubscriberClient() {
-        String clientId = clientName();
-        return createSubscriberClient(clientId);
-    }
-
-    @NotNull
-    private static Mqtt5BlockingClient createSubscriberClient(String clientId) {
-        final Mqtt5BlockingClient client = MqttClient.builder()
-            .useMqttVersion5()
-            .identifier(clientId)
-            .serverHost("localhost")
-            .serverPort(1883)
-            .buildBlocking();
-        assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, client.connect().getReasonCode(), clientId + " connected");
-        return client;
-    }
-
-    @NotNull
-    private static Mqtt5BlockingClient createCleanStartClient(String clientId) {
-        return createClientWithStartFlagAndClientId(true, clientId);
-    }
-
-    @NotNull
-    private static Mqtt5BlockingClient createNonCleanStartClient(String clientId) {
-        return createClientWithStartFlagAndClientId(false, clientId);
-    }
-
-    @NotNull
-    private static Mqtt5BlockingClient createPublisherClient() {
-        return createClientWithStartFlagAndClientId(true, "publisher");
-    }
-
-    @NotNull
-    private static Mqtt5BlockingClient createClientWithStartFlagAndClientId(boolean cleanStart, String clientId) {
-        final Mqtt5BlockingClient client = MqttClient.builder()
-            .useMqttVersion5()
-            .identifier(clientId)
-            .serverHost("localhost")
-            .serverPort(1883)
-            .buildBlocking();
-        Mqtt5Connect connectRequest = Mqtt5Connect.builder()
-            .cleanStart(cleanStart)
-            .build();
-        assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, client.connect(connectRequest).getReasonCode(), clientId + " connected");
-        return client;
     }
 
     private static void verifyPublishedMessage(Mqtt5BlockingClient client, Consumer<Void> action, MqttQos expectedQos,
