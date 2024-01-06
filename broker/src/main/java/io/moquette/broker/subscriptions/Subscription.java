@@ -33,8 +33,7 @@ public final class Subscription implements Serializable, Comparable<Subscription
     final Topic topicFilter;
     final String shareName;
 
-    // TODO remove transient when the subscription identifier has to be persisted
-    private transient final Optional<SubscriptionIdentifier> subscriptionId;
+    private final Optional<SubscriptionIdentifier> subscriptionId;
 
     public Subscription(String clientId, Topic topicFilter, MqttQoS requestedQos) {
         this(clientId, topicFilter, requestedQos, "", null);
@@ -134,5 +133,13 @@ public final class Subscription implements Serializable, Comparable<Subscription
 
     public String clientAndShareName() {
         return clientId + (shareName.isEmpty() ? "" : "-" + shareName);
+    }
+
+    public boolean hasShareName() {
+        return shareName != null;
+    }
+
+    public String getShareName() {
+        return shareName;
     }
 }

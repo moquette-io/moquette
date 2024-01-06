@@ -39,8 +39,8 @@ public final class SharedSubscription implements Comparable<SharedSubscription> 
         this.subscriptionId = Optional.empty();
     }
 
-    public SharedSubscription(ShareName shareName, Topic topicFilter, String clientId, MqttQoS requestedQoS
-        , SubscriptionIdentifier subscriptionId) {
+    public SharedSubscription(ShareName shareName, Topic topicFilter, String clientId, MqttQoS requestedQoS,
+                              SubscriptionIdentifier subscriptionId) {
         Objects.requireNonNull(requestedQoS, "qos parameter can't be null");
         this.shareName = shareName;
         this.topicFilter = topicFilter;
@@ -76,6 +76,13 @@ public final class SharedSubscription implements Comparable<SharedSubscription> 
         }
     }
 
+    public boolean hasSubscriptionIdentifier() {
+        return subscriptionId.isPresent();
+    }
+
+    public SubscriptionIdentifier getSubscriptionIdentifier() {
+        return subscriptionId.get();
+    }
 
     @Override
     public int compareTo(SharedSubscription o) {

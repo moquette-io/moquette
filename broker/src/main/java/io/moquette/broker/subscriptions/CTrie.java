@@ -106,6 +106,13 @@ public class CTrie {
             return clientId;
         }
 
+        public boolean hasSubscriptionIdentifier() {
+            return subscriptionIdOpt.isPresent();
+        }
+
+        public SubscriptionIdentifier getSubscriptionIdentifier() {
+            return subscriptionIdOpt.get();
+        }
     }
 
     /**
