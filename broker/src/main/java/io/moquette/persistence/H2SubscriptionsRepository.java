@@ -16,6 +16,7 @@ import org.h2.mvstore.type.StringDataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -31,7 +32,7 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
     private static final String SUBSCRIPTIONS_MAP = "subscriptions";
     private static final String SHARED_SUBSCRIPTIONS_MAP = "shared_subscriptions";
     private final MVStore mvStore;
-    private final MVMap.Builder<Couple<ShareName, Topic>, Integer> submapBuilder;
+    private final MVMap.Builder<Couple<ShareName, Topic>, QoSSubscriptionId> submapBuilder;
 
     private MVMap<String, Subscription> subscriptions;
     // clientId -> shared subscription map name
@@ -42,7 +43,7 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
     H2SubscriptionsRepository(MVStore mvStore) {
         this.mvStore = mvStore;
 
-        submapBuilder = new MVMap.Builder<Couple<ShareName, Topic>, Integer>()
+        submapBuilder = new MVMap.Builder<Couple<ShareName, Topic>, QoSSubscriptionId>()
             .keyType(new CoupleValueType());
 
         this.subscriptions = mvStore.openMap(SUBSCRIPTIONS_MAP, subscriptionBuilder);
@@ -95,7 +96,7 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
             LOG.info("Removing a non existing shared subscription for client: {}", clientId);
             return;
         }
-        MVMap<Couple<ShareName, Topic>, Integer> subMap = mvStore.openMap(sharedSubsMapName, submapBuilder);
+        MVMap<Couple<ShareName, Topic>, QoSSubscriptionId> subMap = mvStore.openMap(sharedSubsMapName, submapBuilder);
         Couple<ShareName, Topic> sharedSubKey = Couple.of(share, topicFilter);
 
         // remove from submap, null means the key didn't exist
@@ -110,14 +111,41 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
         }
     }
 
+    private static class QoSSubscriptionId implements Serializable {
+        final MqttQoS qos;
+        final Integer subscriptionIdentifier;
+
+        public QoSSubscriptionId(MqttQoS qos, int subscriptionIdentifier) {
+            this.qos = qos;
+            this.subscriptionIdentifier = subscriptionIdentifier;
+        }
+
+        public QoSSubscriptionId(MqttQoS qos) {
+            this.qos = qos;
+            this.subscriptionIdentifier = null;
+        }
+    }
+
     @Override
     public void addNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, MqttQoS requestedQoS) {
+        QoSSubscriptionId qosPart = new QoSSubscriptionId(requestedQoS);
+        storeNewSharedSubscription(clientId, share, topicFilter, qosPart);
+    }
+
+    private void storeNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, QoSSubscriptionId value) {
         String sharedSubsMapName = sharedSubscriptions.computeIfAbsent(clientId,
             H2SubscriptionsRepository::computeShareSubscriptionSubMap);
 
         // maps the couple (share name, topic) to requested qos
-        MVMap<Couple<ShareName, Topic>, Integer> subMap = mvStore.openMap(sharedSubsMapName, submapBuilder);
-        subMap.put(Couple.of(share, topicFilter), requestedQoS.value());
+        MVMap<Couple<ShareName, Topic>, QoSSubscriptionId> subMap = mvStore.openMap(sharedSubsMapName, submapBuilder);
+        subMap.put(Couple.of(share, topicFilter), value);
+    }
+
+    @Override
+    public void addNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, MqttQoS requestedQoS,
+                                         SubscriptionIdentifier subscriptionIdentifier) {
+        QoSSubscriptionId qosAndSubscriptionIdPart = new QoSSubscriptionId(requestedQoS, subscriptionIdentifier.value());
+        storeNewSharedSubscription(clientId, share, topicFilter, qosAndSubscriptionIdPart);
     }
 
     @Override
@@ -128,12 +156,21 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
             String clientId = entry.getKey();
             String sharedSubsMapName = entry.getValue();
 
-            MVMap<Couple<ShareName, Topic>, Integer> subMap = mvStore.openMap(sharedSubsMapName, submapBuilder);
-            for (Map.Entry<Couple<ShareName, Topic>, Integer> subEntry : subMap.entrySet()) {
+            MVMap<Couple<ShareName, Topic>, QoSSubscriptionId> subMap = mvStore.openMap(sharedSubsMapName, submapBuilder);
+            for (Map.Entry<Couple<ShareName, Topic>, QoSSubscriptionId> subEntry : subMap.entrySet()) {
                 final ShareName shareName = subEntry.getKey().v1;
                 final Topic topicFilter = subEntry.getKey().v2;
-                final MqttQoS qos = MqttQoS.valueOf(subEntry.getValue());
-                result.add(new SharedSubscription(shareName, topicFilter, clientId, qos));
+                final MqttQoS qos = subEntry.getValue().qos;
+                SharedSubscription subscription;
+                if (subEntry.getValue().subscriptionIdentifier == null) {
+                    // without subscription identifier
+                    subscription = new SharedSubscription(shareName, topicFilter, clientId, qos);
+                } else {
+                    // with subscription identifier
+                    SubscriptionIdentifier subscriptionId = new SubscriptionIdentifier(subEntry.getValue().subscriptionIdentifier);
+                    subscription = new SharedSubscription(shareName, topicFilter, clientId, qos, subscriptionId);
+                }
+                result.add(subscription);
             }
         }
 

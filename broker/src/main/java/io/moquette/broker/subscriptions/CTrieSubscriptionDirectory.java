@@ -126,9 +126,13 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
     private void addSharedSubscriptionRequest(SubscriptionRequest shareSubRequest) {
         ctrie.addToTree(shareSubRequest);
 
-        subscriptionsRepository.addNewSharedSubscription(shareSubRequest.getClientId(), shareSubRequest.getSharedName(),
-            shareSubRequest.getTopicFilter(), shareSubRequest.getRequestedQoS());
-
+        if (shareSubRequest.hasSubscriptionIdentifier()) {
+            subscriptionsRepository.addNewSharedSubscription(shareSubRequest.getClientId(), shareSubRequest.getSharedName(),
+                shareSubRequest.getTopicFilter(), shareSubRequest.getRequestedQoS(), shareSubRequest.getSubscriptionIdentifier());
+        } else {
+            subscriptionsRepository.addNewSharedSubscription(shareSubRequest.getClientId(), shareSubRequest.getSharedName(),
+                shareSubRequest.getTopicFilter(), shareSubRequest.getRequestedQoS());
+        }
         List<SharedSubscription> sharedSubscriptions = clientSharedSubscriptions.computeIfAbsent(shareSubRequest.getClientId(), unused -> new ArrayList<>());
         sharedSubscriptions.add(shareSubRequest.sharedSubscription());
     }
