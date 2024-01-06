@@ -13,7 +13,6 @@ import io.moquette.broker.security.IAuthorizatorPolicy;
 import io.moquette.broker.subscriptions.Topic;
 import io.moquette.integration.IntegrationUtils;
 import io.moquette.testclient.Client;
-import io.netty.handler.codec.mqtt.MqttConnAckMessage;
 import io.netty.handler.codec.mqtt.MqttMessage;
 import io.netty.handler.codec.mqtt.MqttMessageType;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
@@ -35,7 +34,6 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-import static io.moquette.integration.mqtt5.ConnectTest.assertConnectionAccepted;
 import static io.moquette.integration.mqtt5.ConnectTest.verifyNoPublish;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -62,15 +60,6 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
         verifyOfType(received, MqttMessageType.DISCONNECT);
         MqttReasonCodeAndPropertiesVariableHeader disconnectHeader = (MqttReasonCodeAndPropertiesVariableHeader) received.variableHeader();
         assertEquals(MqttReasonCodes.Disconnect.MALFORMED_PACKET.byteValue(), disconnectHeader.reasonCode());
-    }
-
-    private static void verifyOfType(MqttMessage received, MqttMessageType mqttMessageType) {
-        assertEquals(mqttMessageType, received.fixedHeader().messageType());
-    }
-
-    private void connectLowLevel() {
-        MqttConnAckMessage connAck = lowLevelClient.connectV5();
-        assertConnectionAccepted(connAck, "Connection must be accepted");
     }
 
     @Test

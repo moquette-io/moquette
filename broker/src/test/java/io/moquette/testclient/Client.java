@@ -202,6 +202,21 @@ public class Client {
         return doSubscribeWithAckCasting(subscribeMessage);
     }
 
+    public MqttSubAckMessage subscribeWithIdentifier(String topic, MqttQoS qos, int subscriptionIdentifier) {
+        MqttProperties subProps = new MqttProperties();
+        subProps.add(new MqttProperties.IntegerProperty(
+            MqttProperties.MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value(),
+            subscriptionIdentifier));
+
+        final MqttSubscribeMessage subscribeMessage = MqttMessageBuilders.subscribe()
+            .messageId(1)
+            .addSubscription(qos, topic)
+            .properties(subProps)
+            .build();
+
+        return doSubscribeWithAckCasting(subscribeMessage);
+    }
+
     @NotNull
     private MqttSubAckMessage doSubscribeWithAckCasting(MqttSubscribeMessage subscribeMessage) {
         doSubscribe(subscribeMessage);
