@@ -70,12 +70,15 @@ public class SessionRegistry {
         final MqttQoS publishingQos;
         final ByteBuf payload;
         final boolean retained;
+        final MqttProperties.MqttProperty[] mqttProperties;
 
-        public PublishedMessage(Topic topic, MqttQoS publishingQos, ByteBuf payload, boolean retained) {
+        public PublishedMessage(Topic topic, MqttQoS publishingQos, ByteBuf payload, boolean retained,
+                                MqttProperties.MqttProperty... mqttProperties) {
             this.topic = topic;
             this.publishingQos = publishingQos;
             this.payload = payload;
-            this.retained = false;
+            this.retained = false; // TODO has to store retained param into the field
+            this.mqttProperties = mqttProperties;
         }
 
         public Topic getTopic() {
