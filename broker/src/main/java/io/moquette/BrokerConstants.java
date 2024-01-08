@@ -98,7 +98,7 @@ public final class BrokerConstants {
     public static final String NETTY_TCP_NODELAY_PROPERTY_NAME = "netty.tcp_nodelay";
     public static final String NETTY_SO_KEEPALIVE_PROPERTY_NAME = "netty.so_keepalive";
     public static final String NETTY_CHANNEL_TIMEOUT_SECONDS_PROPERTY_NAME = "netty.channel_timeout.seconds";
-    public static final String NETTY_EPOLL_PROPERTY_NAME = "netty.epoll";
+    public static final String NETTY_NATIVE_PROPERTY_NAME = "netty.native";
     @Deprecated
     public static final String NETTY_MAX_BYTES_PROPERTY_NAME = IConfig.NETTY_MAX_BYTES_PROPERTY_NAME;
     @Deprecated
