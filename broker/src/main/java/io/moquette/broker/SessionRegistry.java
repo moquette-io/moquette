@@ -103,6 +103,9 @@ public class SessionRegistry {
             payload.retain();
         }
 
+        public MqttProperties.MqttProperty[] getMqttProperties() {
+            return mqttProperties;
+        }
     }
 
     public static final class PubRelMarker extends EnqueuedMessage {
