@@ -61,7 +61,7 @@ public final class EnqueuedMessageValueType extends BasicDataType<EnqueuedMessag
             propertiesSize;
     }
 
-    private static boolean hasProperties(SessionRegistry.PublishedMessage casted) {
+    static boolean hasProperties(SessionRegistry.PublishedMessage casted) {
         return casted.getMqttProperties().length > 0;
     }
 
@@ -98,7 +98,7 @@ public final class EnqueuedMessageValueType extends BasicDataType<EnqueuedMessag
             final MqttQoS qos = MqttQoS.valueOf(buff.get());
             final String topicStr = topicDataType.read(buff);
             final ByteBuf payload = payloadDataType.read(buff);
-            if (buff.get() == 1) {
+            if (SerdesUtils.containsProperties(buff)) {
                 MqttProperties.MqttProperty[] mqttProperties = propertiesDataType.read(buff);
                 return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload, false, mqttProperties);
             } else {

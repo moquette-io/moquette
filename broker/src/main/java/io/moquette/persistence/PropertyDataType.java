@@ -10,7 +10,7 @@ import org.h2.mvstore.type.StringDataType;
 import java.nio.ByteBuffer;
 
 class PropertyDataType extends BasicDataType<MqttProperties.MqttProperty> {
-    private enum MqttPropertyEnum {STRING, INTEGER, BINARY}
+    enum MqttPropertyEnum {STRING, INTEGER, BINARY}
 
     private final ByteBufDataType binaryDataType = new ByteBufDataType();
 
@@ -56,25 +56,10 @@ class PropertyDataType extends BasicDataType<MqttProperties.MqttProperty> {
 
     @Override
     public MqttProperties.MqttProperty read(ByteBuffer buff) {
-        byte propTypeValue = buff.get();
-        if (propTypeValue >= MqttPropertyEnum.values().length) {
-            throw new IllegalStateException("Unrecognized property type value: " + propTypeValue);
-        }
-        MqttPropertyEnum type = MqttPropertyEnum.values()[propTypeValue];
-
-        int propertyId = buff.getInt();
-        switch (type) {
-            case STRING:
-                String value = StringDataType.INSTANCE.read(buff);
-                return new MqttProperties.StringProperty(propertyId, value);
-            case INTEGER:
-                return new MqttProperties.IntegerProperty(propertyId, buff.getInt());
-            case BINARY:
-                ByteBuf byteArray = binaryDataType.read(buff);
-                return new MqttProperties.BinaryProperty(propertyId, byteArray.array());
-            default:
-                throw new IllegalStateException("Unrecognized property type value: " + propTypeValue);
-        }
+        return SerdesUtils.readSingleProperty(buff, buffer -> {
+            ByteBuf byteArray = binaryDataType.read(buffer);
+            return byteArray.array();
+        });
     }
 
     @Override

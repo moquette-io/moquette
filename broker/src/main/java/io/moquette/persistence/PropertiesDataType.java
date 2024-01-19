@@ -5,9 +5,7 @@ import org.h2.mvstore.WriteBuffer;
 import org.h2.mvstore.type.BasicDataType;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 final class PropertiesDataType extends BasicDataType<MqttProperties.MqttProperty[]> {
 
@@ -30,13 +28,7 @@ final class PropertiesDataType extends BasicDataType<MqttProperties.MqttProperty
 
     @Override
     public MqttProperties.MqttProperty[] read(ByteBuffer buff) {
-        final int numProperties = buff.getInt();
-        final List<MqttProperties.MqttProperty> properties = new ArrayList<>(numProperties);
-        for (int i = 0; i < numProperties; i++) {
-            MqttProperties.MqttProperty property = propertyDataType.read(buff);
-            properties.add(property);
-        }
-        return properties.toArray(new MqttProperties.MqttProperty[0]);
+        return SerdesUtils.readProperties(buff, buffer -> propertyDataType.read(buff));
     }
 
     @Override
