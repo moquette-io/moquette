@@ -1,5 +1,6 @@
 package io.moquette.integration.mqtt5;
 
+import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import io.netty.handler.codec.mqtt.MqttMessage;
 import io.netty.handler.codec.mqtt.MqttMessageType;
@@ -9,6 +10,7 @@ import io.netty.handler.codec.mqtt.MqttQoS;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
@@ -22,7 +24,6 @@ public class SubscriptionWithIdentifierTest extends AbstractSubscriptionIntegrat
         return "subscriber";
     }
 
-//    This fails while shouldn't because the MQTT properties are spread around (also on peristent layer)
     @Test
     public void givenNonSharedSubscriptionWithIdentifierWhenPublishMatchedThenReceivesTheOriginalIdentifier() throws InterruptedException {
         connectLowLevel();
@@ -35,6 +36,7 @@ public class SubscriptionWithIdentifierTest extends AbstractSubscriptionIntegrat
         Mqtt5BlockingClient publisher = createPublisherClient();
         publisher.publishWith()
             .topic("/metrics/measures/temp")
+            .payload("17C°".getBytes(StandardCharsets.UTF_8))
             .send();
 
         // receive a publish message on the subscribed topic
@@ -52,5 +54,34 @@ public class SubscriptionWithIdentifierTest extends AbstractSubscriptionIntegrat
             .getProperty(MqttProperties.MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value());
         assertNotNull(subscriptionIdentifierProperty, "subscription identifier property must be present");
         assertEquals(expectedSubscriptionIdentifier, subscriptionIdentifierProperty.value());
+    }
+
+    @Test
+    public void givenNonSharedSubscriptionWithIdentifierWhenRetainedMessageMatchedThenReceivesTheOriginalIdentifier() throws InterruptedException {
+        // send a retained publish
+        Mqtt5BlockingClient publisher = createPublisherClient();
+        publisher.publishWith()
+            .topic("/metrics/measures/temp")
+            .payload("17C°".getBytes(StandardCharsets.UTF_8))
+            .retain(true)
+            .qos(MqttQos.AT_LEAST_ONCE) // WARN: only QoS1 and QoS2 are effectively retained
+            .send();
+        publisher.disconnect();
+        Thread.sleep(500); // give time to close the connection and save the message as retained
+
+        connectLowLevel();
+
+        // subscribe with an identifier
+        MqttMessage received = lowLevelClient.subscribeWithIdentifier("/metrics/measures/temp",
+            MqttQoS.AT_LEAST_ONCE, 123);
+        verifyOfType(received, MqttMessageType.SUBACK);
+
+        // receive a publish message on the subscribed topic
+        Awaitility.await()
+            .atMost(2, TimeUnit.SECONDS)
+            .until(lowLevelClient::hasReceivedMessages);
+        MqttMessage mqttMsg = lowLevelClient.receiveNextMessage(Duration.ofSeconds(1));
+        verifyOfType(mqttMsg, MqttMessageType.PUBLISH);
+        verifySubscriptionIdentifier(123, (MqttPublishMessage) mqttMsg);
     }
 }
