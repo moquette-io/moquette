@@ -327,7 +327,11 @@ class PostOffice {
             .filter(sub -> !SharedSubscriptionUtils.isSharedSubscription(sub.topicName()))
             .map(sub -> {
                 final Topic topic = new Topic(sub.topicName());
-                return new Subscription(clientID, topic, sub.qualityOfService());
+                if (subscritionIdOpt.isPresent()) {
+                    return new Subscription(clientID, topic, sub.qualityOfService(), subscritionIdOpt.get());
+                } else {
+                    return new Subscription(clientID, topic, sub.qualityOfService());
+                }
             }).collect(Collectors.toList());
 
         for (Subscription subscription : newSubscriptions) {
@@ -389,15 +393,16 @@ class PostOffice {
             final Collection<RetainedMessage> retainedMsgs = retainedRepository.retainedOnTopic(topicFilter);
 
             if (retainedMsgs.isEmpty()) {
-                // not found
+                LOG.info("No retained messages matching topic filter {}", topicFilter);
                 continue;
             }
+            final MqttProperties.MqttProperty[] properties = prepareSubscriptionProperties(subscription);
             for (RetainedMessage retainedMsg : retainedMsgs) {
                 final MqttQoS retainedQos = retainedMsg.qosLevel();
                 MqttQoS qos = lowerQosToTheSubscriptionDesired(subscription, retainedQos);
 
                 final ByteBuf payloadBuf = Unpooled.wrappedBuffer(retainedMsg.getPayload());
-                targetSession.sendRetainedPublishOnSessionAtQos(retainedMsg.getTopic(), qos, payloadBuf);
+                targetSession.sendRetainedPublishOnSessionAtQos(retainedMsg.getTopic(), qos, payloadBuf, properties);
                 // We made the buffer, we must release it.
                 payloadBuf.release();
             }
@@ -670,13 +675,30 @@ class PostOffice {
         if (isSessionPresent) {
             LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
                       sub.getClientId(), sub.getTopicFilter(), qos);
-            targetSession.sendNotRetainedPublishOnSessionAtQos(topic, qos, payload);
+            final MqttProperties.MqttProperty[] properties = prepareSubscriptionProperties(sub);
+            targetSession.sendNotRetainedPublishOnSessionAtQos(topic, qos, payload, properties);
         } else {
             // If we are, the subscriber disconnected after the subscriptions tree selected that session as a
             // destination.
             LOG.debug("PUBLISH to not yet present session. CId: {}, topicFilter: {}, qos: {}", sub.getClientId(),
                       sub.getTopicFilter(), qos);
         }
+    }
+
+    private MqttProperties.MqttProperty[] prepareSubscriptionProperties(Subscription sub) {
+        MqttProperties.MqttProperty[] properties;
+        if (sub.hasSubscriptionIdentifier()) {
+            MqttProperties.IntegerProperty subscriptionId = createSubscriptionIdProperty(sub);
+            properties = new MqttProperties.MqttProperty[] { subscriptionId };
+        } else {
+            properties = new MqttProperties.MqttProperty[0];
+        }
+        return properties;
+    }
+
+    private MqttProperties.IntegerProperty createSubscriptionIdProperty(Subscription sub) {
+        int subscriptionId = sub.getSubscriptionIdentifier().value();
+        return new MqttProperties.IntegerProperty(MqttProperties.MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value(), subscriptionId);
     }
 
     /**

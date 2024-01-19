@@ -368,7 +368,7 @@ final class MQTTConnection {
             .receiveMaximum(INFLIGHT_WINDOW_SIZE)
             .retainAvailable(true)
             .wildcardSubscriptionAvailable(true)
-            .subscriptionIdentifiersAvailable(false) // TODO make it true
+            .subscriptionIdentifiersAvailable(true)
             .sharedSubscriptionAvailable(true);
         return builder;
     }
@@ -763,41 +763,27 @@ final class MQTTConnection {
         return NettyUtils.userName(channel);
     }
 
-    public void sendPublishWithPacketId(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained) {
-        final int packetId = nextPacketId();
-        MqttPublishMessage publishMsg = createPublishMessage(topic.toString(), qos, payload, packetId, retained);
-        sendPublish(publishMsg);
-    }
-
-    // TODO move this method in Session
-    void sendPublishQos0(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained) {
-        MqttPublishMessage publishMsg = createPublishMessage(topic.toString(), qos, payload, 0, retained);
-        sendPublish(publishMsg);
-    }
-
-    static MqttPublishMessage createRetainedPublishMessage(String topic, MqttQoS qos, ByteBuf message) {
-        return createPublishMessage(topic, qos, message, 0, true);
-    }
-
-    static MqttPublishMessage createNonRetainedPublishMessage(String topic, MqttQoS qos, ByteBuf message) {
-        return createPublishMessage(topic, qos, message, 0, false);
-    }
-
-    static MqttPublishMessage createRetainedPublishMessage(String topic, MqttQoS qos, ByteBuf message,
-                                                           int messageId) {
-        return createPublishMessage(topic, qos, message, messageId, true);
-    }
-
     static MqttPublishMessage createNotRetainedPublishMessage(String topic, MqttQoS qos, ByteBuf message,
-                                                              int messageId) {
-        return createPublishMessage(topic, qos, message, messageId, false);
+                                                              int messageId, MqttProperties.MqttProperty... mqttProperties) {
+        return createPublishMessage(topic, qos, message, messageId, false, false, mqttProperties);
     }
 
-    private static MqttPublishMessage createPublishMessage(String topic, MqttQoS qos, ByteBuf message,
-                                                           int messageId, boolean retained) {
-        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, retained, 0);
-        MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId);
+    static MqttPublishMessage createPublishMessage(String topic, MqttQoS qos, ByteBuf message,
+                                                           int messageId, boolean retained, boolean isDup,
+                                                           MqttProperties.MqttProperty... mqttProperties) {
+        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, isDup, qos, retained, 0);
+        MqttProperties props = new MqttProperties();
+        for (MqttProperties.MqttProperty mqttProperty : mqttProperties) {
+            props.add(mqttProperty);
+        }
+        MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId, props);
         return new MqttPublishMessage(fixedHeader, varHeader, message);
+    }
+
+    static MqttPublishMessage createNotRetainedDuplicatedPublishMessage(int packetId, Topic topic, MqttQoS qos,
+                                                                        ByteBuf payload,
+                                                                        MqttProperties.MqttProperty... mqttProperties) {
+        return createPublishMessage(topic.toString(), qos, payload, packetId, false, true, mqttProperties);
     }
 
     public void resendNotAckedPublishes() {

@@ -51,7 +51,7 @@ class ConnectAckTest extends  AbstractServerIntegrationTest {
         verifyNotSet(MqttPropertyType.MAXIMUM_PACKET_SIZE, ackProps, "Maximum packet size is the one defined by specs");
         verifyProperty(MqttPropertyType.TOPIC_ALIAS_MAXIMUM, ackProps, 0, "No topic alias available");
         verifyProperty(MqttPropertyType.WILDCARD_SUBSCRIPTION_AVAILABLE, ackProps, 1, "Wildcard subscription feature is available");
-        verifyProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER_AVAILABLE, ackProps, 0, "Subscription feature is NOT available");
+        verifyProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER_AVAILABLE, ackProps, 1, "Subscription feature is available");
         verifyProperty(MqttPropertyType.SHARED_SUBSCRIPTION_AVAILABLE, ackProps, 1, "Shared subscription feature is available");
         verifyNotSet(MqttPropertyType.AUTHENTICATION_METHOD, ackProps, "No auth method available");
         verifyNotSet(MqttPropertyType.AUTHENTICATION_DATA, ackProps, "No auth data available");

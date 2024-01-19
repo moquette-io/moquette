@@ -239,38 +239,50 @@ class Session {
 //                m_interceptor.notifyMessageAcknowledged(interceptAckMsg);
     }
 
-    public void sendRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload) {
-        sendPublishOnSessionAtQos(topic, qos, payload, true);
+    public void sendRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload,
+                                                  MqttProperties.MqttProperty... mqttProperties) {
+        sendPublishOnSessionAtQos(topic, qos, payload, true, mqttProperties);
     }
 
-    public void sendNotRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload) {
-        sendPublishOnSessionAtQos(topic, qos, payload, false);
+    public void sendNotRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload,
+                                                     MqttProperties.MqttProperty... mqttProperties) {
+        sendPublishOnSessionAtQos(topic, qos, payload, false, mqttProperties);
     }
 
-    private void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained) {
+    private void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained,
+                                           MqttProperties.MqttProperty... mqttProperties) {
         switch (qos) {
             case AT_MOST_ONCE:
                 if (connected()) {
-                    mqttConnection.sendPublishQos0(topic, qos, payload, retained);
+                    sendPublishQos0(topic, qos, payload, retained, mqttProperties);
                 }
                 break;
             case AT_LEAST_ONCE:
-                sendPublishQos1(topic, qos, payload, retained);
+                sendPublishQos1(topic, qos, payload, retained, mqttProperties);
                 break;
             case EXACTLY_ONCE:
-                sendPublishQos2(topic, qos, payload, retained);
+                sendPublishQos2(topic, qos, payload, retained, mqttProperties);
                 break;
             case FAILURE:
                 LOG.error("Not admissible");
         }
     }
 
-    private void sendPublishQos1(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained) {
+    private void sendPublishQos0(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained,
+                                 MqttProperties.MqttProperty... mqttProperties) {
+        MqttPublishMessage publishMsg = MQTTConnection.createPublishMessage(topic.toString(), qos, payload, 0,
+            retained, false, mqttProperties);
+        mqttConnection.sendPublish(publishMsg);
+    }
+
+    private void sendPublishQos1(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained,
+                                 MqttProperties.MqttProperty... mqttProperties) {
         if (!connected() && isClean()) {
             //pushing messages to disconnected not clean session
             return;
         }
 
+        // TODO From this down is identical to sendPublishQos2
         final MQTTConnection localMqttConnectionRef = mqttConnection;
         if (canSkipQueue(localMqttConnectionRef)) {
             inflightSlots.decrementAndGet();
@@ -278,7 +290,7 @@ class Session {
 
             // Adding to a map, retain.
             payload.retain();
-            EnqueuedMessage old = inflightWindow.put(packetId, new PublishedMessage(topic, qos, payload, retained));
+            EnqueuedMessage old = inflightWindow.put(packetId, new PublishedMessage(topic, qos, payload, retained, mqttProperties));
             // If there already was something, release it.
             if (old != null) {
                 old.release();
@@ -289,7 +301,7 @@ class Session {
             }
 
             MqttPublishMessage publishMsg = MQTTConnection.createNotRetainedPublishMessage(topic.toString(), qos,
-                                                                                           payload, packetId);
+                                                                                           payload, packetId, mqttProperties);
             localMqttConnectionRef.sendPublish(publishMsg);
             LOG.debug("Write direct to the peer, inflight slots: {}", inflightSlots.get());
             if (inflightSlots.get() == 0) {
@@ -298,7 +310,7 @@ class Session {
 
             // TODO drainQueueToConnection();?
         } else {
-            final SessionRegistry.PublishedMessage msg = new SessionRegistry.PublishedMessage(topic, qos, payload, retained);
+            final SessionRegistry.PublishedMessage msg = new SessionRegistry.PublishedMessage(topic, qos, payload, retained, mqttProperties);
             // Adding to a queue, retain.
             msg.retain();
             sessionQueue.enqueue(msg);
@@ -306,7 +318,8 @@ class Session {
         }
     }
 
-    private void sendPublishQos2(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained) {
+    private void sendPublishQos2(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained,
+                                 MqttProperties.MqttProperty... mqttProperties) {
         final MQTTConnection localMqttConnectionRef = mqttConnection;
         if (canSkipQueue(localMqttConnectionRef)) {
             inflightSlots.decrementAndGet();
@@ -314,7 +327,7 @@ class Session {
 
             // Retain before adding to map
             payload.retain();
-            EnqueuedMessage old = inflightWindow.put(packetId, new SessionRegistry.PublishedMessage(topic, qos, payload, retained));
+            EnqueuedMessage old = inflightWindow.put(packetId, new PublishedMessage(topic, qos, payload, retained, mqttProperties));
             // If there already was something, release it.
             if (old != null) {
                 old.release();
@@ -324,12 +337,12 @@ class Session {
                 inflightTimeouts.add(new InFlightPacket(packetId, FLIGHT_BEFORE_RESEND_MS));
             }
             MqttPublishMessage publishMsg = MQTTConnection.createNotRetainedPublishMessage(topic.toString(), qos,
-                                                                                           payload, packetId);
+                                                                                           payload, packetId, mqttProperties);
             localMqttConnectionRef.sendPublish(publishMsg);
 
             drainQueueToConnection();
         } else {
-            final SessionRegistry.PublishedMessage msg = new SessionRegistry.PublishedMessage(topic, qos, payload, retained);
+            final SessionRegistry.PublishedMessage msg = new PublishedMessage(topic, qos, payload, retained, mqttProperties);
             // Adding to a queue, retain.
             msg.retain();
             sessionQueue.enqueue(msg);
@@ -398,8 +411,10 @@ class Session {
                 final Topic topic = pubMsg.topic;
                 final MqttQoS qos = pubMsg.publishingQos;
                 final ByteBuf payload = pubMsg.payload;
+                final MqttProperties.MqttProperty<?>[] mqttProperties = pubMsg.mqttProperties;
                 // message fetched from map, but not removed from map. No need to duplicate or release.
-                MqttPublishMessage publishMsg = publishNotRetainedDuplicated(notAckPacketId, topic, qos, payload);
+                MqttPublishMessage publishMsg = MQTTConnection.createNotRetainedDuplicatedPublishMessage(
+                    notAckPacketId, topic, qos, payload, mqttProperties);
                 if (resendInflightOnTimeout) {
                     inflightTimeouts.add(new InFlightPacket(notAckPacketId, FLIGHT_BEFORE_RESEND_MS));
                 }
@@ -418,13 +433,6 @@ class Session {
             sb.append(packetId).append(", ");
         }
         LOG.debug("Resending {} in flight packets [{}]", packetIds.size(), sb);
-    }
-
-    private MqttPublishMessage publishNotRetainedDuplicated(int packetId, Topic topic, MqttQoS qos,
-                                                            ByteBuf payload) {
-        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, true, qos, false, 0);
-        MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic.toString(), packetId);
-        return new MqttPublishMessage(fixedHeader, varHeader, payload);
     }
 
     private void drainQueueToConnection() {
@@ -451,7 +459,9 @@ class Session {
             MqttPublishMessage publishMsg = MQTTConnection.createNotRetainedPublishMessage(
                 msgPub.topic.toString(),
                 msgPub.publishingQos,
-                msgPub.payload, sendPacketId);
+                msgPub.payload,
+                sendPacketId,
+                msgPub.mqttProperties);
             mqttConnection.sendPublish(publishMsg);
 
             // we fetched msg from a map, but the release is cancelled out by the above retain
