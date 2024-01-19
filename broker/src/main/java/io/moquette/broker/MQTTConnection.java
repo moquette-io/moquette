@@ -368,7 +368,7 @@ final class MQTTConnection {
             .receiveMaximum(INFLIGHT_WINDOW_SIZE)
             .retainAvailable(true)
             .wildcardSubscriptionAvailable(true)
-            .subscriptionIdentifiersAvailable(false) // TODO make it true
+            .subscriptionIdentifiersAvailable(true)
             .sharedSubscriptionAvailable(true);
         return builder;
     }
