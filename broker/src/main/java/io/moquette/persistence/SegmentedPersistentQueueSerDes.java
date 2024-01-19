@@ -11,7 +11,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
-class SegmentedPeristentQueueSerDes {
+class SegmentedPersistentQueueSerDes {
 
     private enum MessageType {PUB_REL_MARKER, PUBLISHED_MESSAGE}
 
@@ -51,9 +51,7 @@ class SegmentedPeristentQueueSerDes {
     private void writePayload(ByteBuffer target, ByteBuf source) {
         final int payloadSize = source.readableBytes();
         byte[] rawBytes = new byte[payloadSize];
-        final int pinPoint = source.readerIndex();
         source.readBytes(rawBytes).release();
-        source.readerIndex(pinPoint);
         target.putInt(payloadSize);
         target.put(rawBytes);
     }
@@ -130,7 +128,7 @@ class SegmentedPeristentQueueSerDes {
 
     private int propertiesMemorySize(MqttProperties.MqttProperty[] properties) {
         return 4 + // integer containing the number of properties
-            Arrays.stream(properties).mapToInt(SegmentedPeristentQueueSerDes::propertyMemorySize).sum();
+            Arrays.stream(properties).mapToInt(SegmentedPersistentQueueSerDes::propertyMemorySize).sum();
     }
 
     private static int propertyMemorySize(MqttProperties.MqttProperty property) {

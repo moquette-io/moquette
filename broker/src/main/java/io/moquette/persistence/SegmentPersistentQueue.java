@@ -11,7 +11,7 @@ import java.util.Optional;
 public class SegmentPersistentQueue extends AbstractSessionMessageQueue<SessionRegistry.EnqueuedMessage> {
 
     private final Queue segmentedQueue;
-    private final SegmentedPeristentQueueSerDes serdes = new SegmentedPeristentQueueSerDes();
+    private final SegmentedPersistentQueueSerDes serdes = new SegmentedPersistentQueueSerDes();
 
     public SegmentPersistentQueue(Queue segmentedQueue) {
         this.segmentedQueue = segmentedQueue;
