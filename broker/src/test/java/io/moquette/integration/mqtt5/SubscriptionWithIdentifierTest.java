@@ -22,6 +22,7 @@ public class SubscriptionWithIdentifierTest extends AbstractSubscriptionIntegrat
         return "subscriber";
     }
 
+//    This fails while shouldn't because the MQTT properties are spread around (also on peristent layer)
     @Test
     public void givenNonSharedSubscriptionWithIdentifierWhenPublishMatchedThenReceivesTheOriginalIdentifier() throws InterruptedException {
         connectLowLevel();

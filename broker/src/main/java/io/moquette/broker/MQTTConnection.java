@@ -772,10 +772,11 @@ final class MQTTConnection {
                                                            int messageId, boolean retained, boolean isDup,
                                                            MqttProperties.MqttProperty... mqttProperties) {
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, isDup, qos, retained, 0);
-        MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId);
+        MqttProperties props = new MqttProperties();
         for (MqttProperties.MqttProperty mqttProperty : mqttProperties) {
-            varHeader.properties().add(mqttProperty);
+            props.add(mqttProperty);
         }
+        MqttPublishVariableHeader varHeader = new MqttPublishVariableHeader(topic, messageId, props);
         return new MqttPublishMessage(fixedHeader, varHeader, message);
     }
 

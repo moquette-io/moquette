@@ -392,6 +392,7 @@ class PostOffice {
                 // not found
                 continue;
             }
+            
             for (RetainedMessage retainedMsg : retainedMsgs) {
                 final MqttQoS retainedQos = retainedMsg.qosLevel();
                 MqttQoS qos = lowerQosToTheSubscriptionDesired(subscription, retainedQos);
@@ -670,13 +671,25 @@ class PostOffice {
         if (isSessionPresent) {
             LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
                       sub.getClientId(), sub.getTopicFilter(), qos);
-            targetSession.sendNotRetainedPublishOnSessionAtQos(topic, qos, payload);
+            MqttProperties.MqttProperty[] properties;
+            if (sub.hasSubscriptionIdentifier()) {
+                MqttProperties.IntegerProperty subscriptionId = createSubscriptionIdProperty(sub);
+                properties = new MqttProperties.MqttProperty[] { subscriptionId };
+            } else {
+                properties = new MqttProperties.MqttProperty[0];
+            }
+            targetSession.sendNotRetainedPublishOnSessionAtQos(topic, qos, payload, properties);
         } else {
             // If we are, the subscriber disconnected after the subscriptions tree selected that session as a
             // destination.
             LOG.debug("PUBLISH to not yet present session. CId: {}, topicFilter: {}, qos: {}", sub.getClientId(),
                       sub.getTopicFilter(), qos);
         }
+    }
+
+    private MqttProperties.IntegerProperty createSubscriptionIdProperty(Subscription sub) {
+        int subscriptionId = sub.getSubscriptionIdentifier().value();
+        return new MqttProperties.IntegerProperty(MqttProperties.MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value(), subscriptionId);
     }
 
     /**

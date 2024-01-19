@@ -239,26 +239,29 @@ class Session {
 //                m_interceptor.notifyMessageAcknowledged(interceptAckMsg);
     }
 
-    public void sendRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload) {
-        sendPublishOnSessionAtQos(topic, qos, payload, true);
+    public void sendRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload,
+                                                  MqttProperties.MqttProperty... mqttProperties) {
+        sendPublishOnSessionAtQos(topic, qos, payload, true, mqttProperties);
     }
 
-    public void sendNotRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload) {
-        sendPublishOnSessionAtQos(topic, qos, payload, false);
+    public void sendNotRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload,
+                                                     MqttProperties.MqttProperty... mqttProperties) {
+        sendPublishOnSessionAtQos(topic, qos, payload, false, mqttProperties);
     }
 
-    private void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained) {
+    private void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained,
+                                           MqttProperties.MqttProperty... mqttProperties) {
         switch (qos) {
             case AT_MOST_ONCE:
                 if (connected()) {
-                    sendPublishQos0(topic, qos, payload, retained);
+                    sendPublishQos0(topic, qos, payload, retained, mqttProperties);
                 }
                 break;
             case AT_LEAST_ONCE:
-                sendPublishQos1(topic, qos, payload, retained);
+                sendPublishQos1(topic, qos, payload, retained, mqttProperties);
                 break;
             case EXACTLY_ONCE:
-                sendPublishQos2(topic, qos, payload, retained);
+                sendPublishQos2(topic, qos, payload, retained, mqttProperties);
                 break;
             case FAILURE:
                 LOG.error("Not admissible");
