@@ -282,45 +282,19 @@ class Session {
             return;
         }
 
-        // TODO From this down is identical to sendPublishQos2
         final MQTTConnection localMqttConnectionRef = mqttConnection;
-        if (canSkipQueue(localMqttConnectionRef)) {
-            inflightSlots.decrementAndGet();
-            int packetId = localMqttConnectionRef.nextPacketId();
-
-            // Adding to a map, retain.
-            payload.retain();
-            EnqueuedMessage old = inflightWindow.put(packetId, new PublishedMessage(topic, qos, payload, retained, mqttProperties));
-            // If there already was something, release it.
-            if (old != null) {
-                old.release();
-                inflightSlots.incrementAndGet();
-            }
-            if (resendInflightOnTimeout) {
-                inflightTimeouts.add(new InFlightPacket(packetId, FLIGHT_BEFORE_RESEND_MS));
-            }
-
-            MqttPublishMessage publishMsg = MQTTConnection.createNotRetainedPublishMessage(topic.toString(), qos,
-                                                                                           payload, packetId, mqttProperties);
-            localMqttConnectionRef.sendPublish(publishMsg);
-            LOG.debug("Write direct to the peer, inflight slots: {}", inflightSlots.get());
-            if (inflightSlots.get() == 0) {
-                localMqttConnectionRef.flush();
-            }
-
-            // TODO drainQueueToConnection();?
-        } else {
-            final SessionRegistry.PublishedMessage msg = new SessionRegistry.PublishedMessage(topic, qos, payload, retained, mqttProperties);
-            // Adding to a queue, retain.
-            msg.retain();
-            sessionQueue.enqueue(msg);
-            LOG.debug("Enqueue to peer session");
-        }
+        sendPublishInFlightWindowOrQueueing(topic, qos, payload, retained, localMqttConnectionRef, mqttProperties);
     }
 
     private void sendPublishQos2(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained,
                                  MqttProperties.MqttProperty... mqttProperties) {
         final MQTTConnection localMqttConnectionRef = mqttConnection;
+        sendPublishInFlightWindowOrQueueing(topic, qos, payload, retained, localMqttConnectionRef, mqttProperties);
+    }
+
+    private void sendPublishInFlightWindowOrQueueing(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained,
+                                                     MQTTConnection localMqttConnectionRef,
+                                                     MqttProperties.MqttProperty... mqttProperties) {
         if (canSkipQueue(localMqttConnectionRef)) {
             inflightSlots.decrementAndGet();
             int packetId = localMqttConnectionRef.nextPacketId();
@@ -337,15 +311,16 @@ class Session {
                 inflightTimeouts.add(new InFlightPacket(packetId, FLIGHT_BEFORE_RESEND_MS));
             }
             MqttPublishMessage publishMsg = MQTTConnection.createNotRetainedPublishMessage(topic.toString(), qos,
-                                                                                           payload, packetId, mqttProperties);
+                payload, packetId, mqttProperties);
             localMqttConnectionRef.sendPublish(publishMsg);
 
             drainQueueToConnection();
         } else {
-            final SessionRegistry.PublishedMessage msg = new PublishedMessage(topic, qos, payload, retained, mqttProperties);
+            final PublishedMessage msg = new PublishedMessage(topic, qos, payload, retained, mqttProperties);
             // Adding to a queue, retain.
             msg.retain();
             sessionQueue.enqueue(msg);
+            LOG.debug("Enqueue to peer session {} at QoS {}", getClientID(), qos);
         }
     }
 
