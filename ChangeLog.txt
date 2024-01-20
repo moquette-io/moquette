@@ -1,6 +1,7 @@
 Version 0.18-SNAPSHOT:
    [feature] subscription option handling: (issue #808)
      - Move from qos to subscription option implementing the persistence of SubscriptionOption to/from storage. (#810)
+     
    [feature] subscription identifiers: (issue #801)
      - Implements the validation of subscription identifier properties in SUBSCRIBE. (#803)
      - Store and retrieve the subscription identifier into the subscriptions directory. (#804)
