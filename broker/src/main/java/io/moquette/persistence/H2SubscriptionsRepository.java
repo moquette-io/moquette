@@ -264,13 +264,27 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
 
         @Override
         public void write(WriteBuffer buff, MqttSubscriptionOption opt) {
-            buff.put((byte) opt.qos().value());
+            // 2 bits for QoS (LSB)
+            // 1 flag for no local
+            // 1 flag for retains as published
+            // 2 bits for retains handling policy (MSB)
+            byte composed = (byte) (opt.qos().value() & 0x03); // qos
+            composed = (byte) (composed | ((byte)(opt.isNoLocal() ? 1 : 0) << 2)); // no local
+            composed = (byte) (composed | ((byte)(opt.isRetainAsPublished() ? 1 : 0) << 3)); // retains as published
+            composed = (byte) (composed | (byte) (opt.retainHandling().value() << 4));
+            buff.put(composed);
         }
 
         @Override
         public MqttSubscriptionOption read(ByteBuffer buff) {
-            MqttQoS requestedQoS = MqttQoS.valueOf(buff.get());
-            return MqttSubscriptionOption.onlyFromQos(requestedQoS);
+            byte fields = buff.get();
+            final MqttQoS qos = MqttQoS.valueOf(fields & 0x03);
+            final boolean noLocal = (fields & 0x04) > 0;
+            final boolean retainAsPublished = (fields & 0x08) > 0;
+            final MqttSubscriptionOption.RetainedHandlingPolicy retainedHandlingPolicy =
+                MqttSubscriptionOption.RetainedHandlingPolicy.valueOf((fields & 0x30) >> 4);
+
+            return new MqttSubscriptionOption(qos, noLocal, retainAsPublished, retainedHandlingPolicy);
         }
 
         @Override
