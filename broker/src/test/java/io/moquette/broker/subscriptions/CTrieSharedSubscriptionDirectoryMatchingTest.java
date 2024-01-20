@@ -16,6 +16,7 @@
 package io.moquette.broker.subscriptions;
 
 import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import static io.moquette.broker.subscriptions.Topic.asTopic;
@@ -27,18 +28,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class CTrieSharedSubscriptionDirectoryMatchingTest extends CTrieSubscriptionDirectMatchingCommon {
 
+    static MqttSubscriptionOption asOption(MqttQoS qos) {
+        return MqttSubscriptionOption.onlyFromQos(qos);
+    }
+
     @Test
     public void whenNotMatchingSharedTopicThenNoSubscriptionShouldBeSelected() {
-        sut.addShared("TempSensor1", new ShareName("temp_sensors"), asTopic("/"), MqttQoS.AT_MOST_ONCE);
+        sut.addShared("TempSensor1", new ShareName("temp_sensors"), asTopic("/"), asOption(MqttQoS.AT_MOST_ONCE));
         assertThat(sut.matchWithoutQosSharpening(asTopic("livingroom"))).isEmpty();
 
-        sut.addShared("TempSensor1", new ShareName("temp_sensors"), asTopic("/livingroom"), MqttQoS.AT_MOST_ONCE);
+        sut.addShared("TempSensor1", new ShareName("temp_sensors"), asTopic("/livingroom"), asOption(MqttQoS.AT_MOST_ONCE));
         assertThat(sut.matchWithoutQosSharpening(asTopic("livingroom"))).isEmpty();
     }
 
     @Test
     public void whenMatchingSharedTopicThenOneSubscriptionShouldBeSelected() {
-        sut.addShared("TempSensor1", new ShareName("temp_sensors"), asTopic("/livingroom"), MqttQoS.AT_MOST_ONCE);
+        sut.addShared("TempSensor1", new ShareName("temp_sensors"), asTopic("/livingroom"), asOption(MqttQoS.AT_MOST_ONCE));
 
         assertThat(sut.matchWithoutQosSharpening(asTopic("/livingroom")))
             .contains(SubscriptionTestUtils.asSubscription("TempSensor1", "/livingroom", "temp_sensors"));
@@ -46,8 +51,8 @@ public class CTrieSharedSubscriptionDirectoryMatchingTest extends CTrieSubscript
 
     @Test
     public void whenManySharedSubscriptionsOfDifferentShareNameMatchATopicThenOneSubscriptionForEachShareNameMustBeSelected() {
-        sut.addShared("TempSensor1", new ShareName("temp_sensors"), asTopic("/livingroom"), MqttQoS.AT_MOST_ONCE);
-        sut.addShared("TempSensor1", new ShareName("livingroom_devices"), asTopic("/livingroom"), MqttQoS.AT_MOST_ONCE);
+        sut.addShared("TempSensor1", new ShareName("temp_sensors"), asTopic("/livingroom"), asOption(MqttQoS.AT_MOST_ONCE));
+        sut.addShared("TempSensor1", new ShareName("livingroom_devices"), asTopic("/livingroom"), asOption(MqttQoS.AT_MOST_ONCE));
 
         List<Subscription> matchingSubscriptions = sut.matchWithoutQosSharpening(asTopic("/livingroom"));
         assertThat(matchingSubscriptions)
@@ -59,8 +64,8 @@ public class CTrieSharedSubscriptionDirectoryMatchingTest extends CTrieSubscript
     @Test
     public void givenSessionHasMultipleSharedSubscriptionWhenTheClientIsRemovedThenNoMatchingShouldHappen() {
         String clientId = "TempSensor1";
-        sut.addShared(clientId, new ShareName("temp_sensors"), asTopic("/livingroom"), MqttQoS.AT_MOST_ONCE);
-        sut.addShared(clientId, new ShareName("livingroom_devices"), asTopic("/livingroom"), MqttQoS.AT_MOST_ONCE);
+        sut.addShared(clientId, new ShareName("temp_sensors"), asTopic("/livingroom"), asOption(MqttQoS.AT_MOST_ONCE));
+        sut.addShared(clientId, new ShareName("livingroom_devices"), asTopic("/livingroom"), asOption(MqttQoS.AT_MOST_ONCE));
 
         // Exercise
         sut.removeSharedSubscriptionsForClient(clientId);
@@ -73,7 +78,7 @@ public class CTrieSharedSubscriptionDirectoryMatchingTest extends CTrieSubscript
     @Test
     public void givenSubscriptionWithSubscriptionIdWhenNewSubscriptionIsProcessedThenSubscriptionIdIsUpdated() {
         // subscribe a client on topic with subscription identifier
-        sut.addShared("client", new ShareName("share_temp"), asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE,
+        sut.addShared("client", new ShareName("share_temp"), asTopic("client/test/b"), asOption(MqttQoS.AT_MOST_ONCE),
             new SubscriptionIdentifier(1));
 
         // verify it contains the subscription identifier
@@ -81,7 +86,7 @@ public class CTrieSharedSubscriptionDirectoryMatchingTest extends CTrieSubscript
         verifySubscriptionIdentifierIsPresent(matchingSubscriptions, new SubscriptionIdentifier(1), "share_temp");
 
         // update the subscription of same clientId on same topic filter but with different subscription identifier
-        sut.addShared("client", new ShareName("share_temp"), asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE,
+        sut.addShared("client", new ShareName("share_temp"), asTopic("client/test/b"), asOption(MqttQoS.AT_MOST_ONCE),
             new SubscriptionIdentifier(123));
 
         // verify the subscription identifier is updated
@@ -101,7 +106,7 @@ public class CTrieSharedSubscriptionDirectoryMatchingTest extends CTrieSubscript
     @Test
     public void givenSubscriptionWithSubscriptionIdWhenNewSubscriptionWithoutSubscriptionIdIsProcessedThenSubscriptionIdIsWiped() {
         // subscribe a client on topic with subscription identifier
-        sut.addShared("client", new ShareName("share_temp"), asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE,
+        sut.addShared("client", new ShareName("share_temp"), asTopic("client/test/b"), asOption(MqttQoS.AT_MOST_ONCE),
             new SubscriptionIdentifier(1));
 
         // verify it contains the subscription identifier
@@ -109,7 +114,7 @@ public class CTrieSharedSubscriptionDirectoryMatchingTest extends CTrieSubscript
         verifySubscriptionIdentifierIsPresent(sut.matchQosSharpening(asTopic("client/test/b")), expectedSubscriptionId, "share_temp");
 
         // update the subscription of same clientId on same topic filter but removing subscription identifier
-        sut.addShared("client", new ShareName("share_temp"), asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE);
+        sut.addShared("client", new ShareName("share_temp"), asTopic("client/test/b"), asOption(MqttQoS.AT_MOST_ONCE));
 
         // verify the subscription identifier is removed
         final List<Subscription> reloadedSubscriptions = sut.matchQosSharpening(asTopic("client/test/b"));

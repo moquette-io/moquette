@@ -143,7 +143,7 @@ public class PostOfficeSubscribeTest {
         assertEquals(desiredQos.value(), (int) subAck.payload().grantedQoSLevels().get(0));
 
         final String clientId = NettyUtils.clientID(channel);
-        Subscription expectedSubscription = new Subscription(clientId, new Topic(topic), desiredQos);
+        Subscription expectedSubscription = new Subscription(clientId, new Topic(topic), MqttSubscriptionOption.onlyFromQos(desiredQos));
 
         final List<Subscription> matchedSubscriptions = subscriptions.matchWithoutQosSharpening(new Topic(topic));
         assertEquals(1, matchedSubscriptions.size());
@@ -163,7 +163,7 @@ public class PostOfficeSubscribeTest {
         assertEquals(desiredQos.value(), (int) subAck.payload().grantedQoSLevels().get(0));
 
         final String clientId = connection.getClientId();
-        Subscription expectedSubscription = new Subscription(clientId, new Topic(topic), desiredQos);
+        Subscription expectedSubscription = new Subscription(clientId, new Topic(topic), MqttSubscriptionOption.onlyFromQos(desiredQos));
 
         final List<Subscription> matchedSubscriptions = subscriptions.matchWithoutQosSharpening(new Topic(topic));
         assertEquals(1, matchedSubscriptions.size());
@@ -337,10 +337,10 @@ public class PostOfficeSubscribeTest {
 
     @Test
     public void testLowerTheQosToTheRequestedBySubscription() {
-        Subscription subQos1 = new Subscription("Sub A", new Topic("a/b"), MqttQoS.AT_LEAST_ONCE);
+        Subscription subQos1 = new Subscription("Sub A", new Topic("a/b"), MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_LEAST_ONCE));
         assertEquals(MqttQoS.AT_LEAST_ONCE, PostOffice.lowerQosToTheSubscriptionDesired(subQos1, EXACTLY_ONCE));
 
-        Subscription subQos2 = new Subscription("Sub B", new Topic("a/+"), EXACTLY_ONCE);
+        Subscription subQos2 = new Subscription("Sub B", new Topic("a/+"), MqttSubscriptionOption.onlyFromQos(EXACTLY_ONCE));
         assertEquals(EXACTLY_ONCE, PostOffice.lowerQosToTheSubscriptionDesired(subQos2, EXACTLY_ONCE));
     }
 

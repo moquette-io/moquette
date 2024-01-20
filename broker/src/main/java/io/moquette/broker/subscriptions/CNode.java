@@ -18,6 +18,7 @@ package io.moquette.broker.subscriptions;
 import io.moquette.broker.subscriptions.CTrie.SubscriptionRequest;
 import io.moquette.broker.subscriptions.CTrie.UnsubscribeRequest;
 import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -161,7 +162,7 @@ class CNode implements Comparable<CNode> {
         ) {
             // if subscription identifier hasn't changed,
             // then check QoS but don't lower the requested QoS level
-            return existing.getRequestedQos().value() < newSubscription.getRequestedQos().value();
+            return existing.option().qos().value() < newSubscription.option().qos().value();
         }
 
         // subscription identifier changed
@@ -201,7 +202,7 @@ class CNode implements Comparable<CNode> {
 
     private static SharedSubscription wrapKey(String clientId) {
         MqttQoS unusedQoS = MqttQoS.AT_MOST_ONCE;
-        return new SharedSubscription(null, Topic.asTopic("unused"), clientId, unusedQoS);
+        return new SharedSubscription(null, Topic.asTopic("unused"), clientId, MqttSubscriptionOption.onlyFromQos(unusedQoS));
     }
 
     //TODO this is equivalent to negate(containsOnly(clientId))

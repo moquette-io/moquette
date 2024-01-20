@@ -260,20 +260,20 @@ class PostOffice {
     private static final class SharedSubscriptionData {
         final ShareName name;
         final Topic topicFilter;
-        final MqttQoS requestedQoS;
+        final MqttSubscriptionOption option;
 
-        private SharedSubscriptionData(ShareName name, Topic topicFilter, MqttQoS requestedQoS) {
+        private SharedSubscriptionData(ShareName name, Topic topicFilter, MqttSubscriptionOption option) {
             Objects.requireNonNull(name);
             Objects.requireNonNull(topicFilter);
-            Objects.requireNonNull(requestedQoS);
+            Objects.requireNonNull(option);
             this.name = name;
             this.topicFilter = topicFilter;
-            this.requestedQoS = requestedQoS;
+            this.option = option;
         }
 
         static SharedSubscriptionData fromMqttSubscription(MqttTopicSubscription sub) {
             return new SharedSubscriptionData(new ShareName(SharedSubscriptionUtils.extractShareName(sub.topicName())),
-                Topic.asTopic(SharedSubscriptionUtils.extractFilterFromShared(sub.topicName())), sub.qualityOfService());
+                Topic.asTopic(SharedSubscriptionUtils.extractFilterFromShared(sub.topicName())), sub.option());
         }
     }
 
@@ -284,7 +284,7 @@ class PostOffice {
         final Session session = sessionRegistry.retrieve(clientID);
 
         final List<SharedSubscriptionData> sharedSubscriptions;
-        final Optional<SubscriptionIdentifier> subscritionIdOpt;
+        final Optional<SubscriptionIdentifier> subscriptionIdOpt;
 
         if (mqttConnection.isProtocolVersion5()) {
             sharedSubscriptions = msg.payload().topicSubscriptions().stream()
@@ -303,14 +303,14 @@ class PostOffice {
             }
 
             try {
-                subscritionIdOpt = verifyAndExtractMessageIdentifier(msg);
+                subscriptionIdOpt = verifyAndExtractMessageIdentifier(msg);
             } catch (IllegalArgumentException ex) {
                 session.disconnectFromBroker();
                 return;
             }
         } else {
             sharedSubscriptions = Collections.emptyList();
-            subscritionIdOpt = Optional.empty();
+            subscriptionIdOpt = Optional.empty();
         }
 
         List<MqttTopicSubscription> ackTopics;
@@ -327,28 +327,29 @@ class PostOffice {
             .filter(sub -> !SharedSubscriptionUtils.isSharedSubscription(sub.topicName()))
             .map(sub -> {
                 final Topic topic = new Topic(sub.topicName());
-                if (subscritionIdOpt.isPresent()) {
-                    return new Subscription(clientID, topic, sub.qualityOfService(), subscritionIdOpt.get());
+                MqttSubscriptionOption option = MqttSubscriptionOption.onlyFromQos(sub.qualityOfService());
+                if (subscriptionIdOpt.isPresent()) {
+                    return new Subscription(clientID, topic, option, subscriptionIdOpt.get());
                 } else {
-                    return new Subscription(clientID, topic, sub.qualityOfService());
+                    return new Subscription(clientID, topic, option);
                 }
             }).collect(Collectors.toList());
 
         for (Subscription subscription : newSubscriptions) {
-            if (subscritionIdOpt.isPresent()) {
-                subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subscription.getRequestedQos(),
-                    subscritionIdOpt.get());
+            if (subscriptionIdOpt.isPresent()) {
+                subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subscription.option(),
+                    subscriptionIdOpt.get());
             } else {
-                subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subscription.getRequestedQos());
+                subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subscription.option());
             }
         }
 
         for (SharedSubscriptionData sharedSubData : sharedSubscriptions) {
-            if (subscritionIdOpt.isPresent()) {
-                subscriptions.addShared(clientID, sharedSubData.name, sharedSubData.topicFilter, sharedSubData.requestedQoS,
-                    subscritionIdOpt.get());
+            if (subscriptionIdOpt.isPresent()) {
+                subscriptions.addShared(clientID, sharedSubData.name, sharedSubData.topicFilter, sharedSubData.option,
+                    subscriptionIdOpt.get());
             } else {
-                subscriptions.addShared(clientID, sharedSubData.name, sharedSubData.topicFilter, sharedSubData.requestedQoS);
+                subscriptions.addShared(clientID, sharedSubData.name, sharedSubData.topicFilter, sharedSubData.option);
             }
         }
 
@@ -745,8 +746,8 @@ class PostOffice {
     }
 
     static MqttQoS lowerQosToTheSubscriptionDesired(Subscription sub, MqttQoS qos) {
-        if (qos.value() > sub.getRequestedQos().value()) {
-            qos = sub.getRequestedQos();
+        if (qos.value() > sub.option().qos().value()) {
+            qos = sub.option().qos();
         }
         return qos;
     }

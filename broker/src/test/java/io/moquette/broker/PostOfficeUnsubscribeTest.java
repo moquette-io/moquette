@@ -33,7 +33,6 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.charset.Charset;
 import java.util.Collections;
-import java.util.Set;
 import java.util.concurrent.*;
 
 import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
@@ -123,7 +122,7 @@ public class PostOfficeUnsubscribeTest {
         assertEquals(desiredQos.value(), (int) subAck.payload().grantedQoSLevels().get(0));
 
         final String clientId = connection.getClientId();
-        Subscription expectedSubscription = new Subscription(clientId, new Topic(topic), desiredQos);
+        Subscription expectedSubscription = new Subscription(clientId, new Topic(topic), MqttSubscriptionOption.onlyFromQos(desiredQos));
 
         final List<Subscription> matchedSubscriptions = subscriptions.matchQosSharpening(new Topic(topic));
         assertEquals(1, matchedSubscriptions.size());

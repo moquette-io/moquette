@@ -7,6 +7,7 @@ import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.SubscriptionIdentifier;
 import io.moquette.broker.subscriptions.Topic;
 import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import org.h2.mvstore.Cursor;
 import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVStore;
@@ -44,7 +45,8 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
         this.mvStore = mvStore;
 
         submapBuilder = new MVMap.Builder<Couple<ShareName, Topic>, QoSSubscriptionId>()
-            .keyType(new CoupleValueType());
+            .keyType(new CoupleValueType())
+            .valueType(new QoSSubscriptionIdValueType());
 
         this.subscriptions = mvStore.openMap(SUBSCRIPTIONS_MAP, subscriptionBuilder);
         sharedSubscriptions = mvStore.openMap(SHARED_SUBSCRIPTIONS_MAP);
@@ -112,23 +114,23 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
     }
 
     private static class QoSSubscriptionId implements Serializable {
-        final MqttQoS qos;
+        final MqttSubscriptionOption option;
         final Integer subscriptionIdentifier;
 
-        public QoSSubscriptionId(MqttQoS qos, int subscriptionIdentifier) {
-            this.qos = qos;
+        public QoSSubscriptionId(MqttSubscriptionOption option, int subscriptionIdentifier) {
+            this.option = option;
             this.subscriptionIdentifier = subscriptionIdentifier;
         }
 
-        public QoSSubscriptionId(MqttQoS qos) {
-            this.qos = qos;
+        public QoSSubscriptionId(MqttSubscriptionOption option) {
+            this.option = option;
             this.subscriptionIdentifier = null;
         }
     }
 
     @Override
-    public void addNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, MqttQoS requestedQoS) {
-        QoSSubscriptionId qosPart = new QoSSubscriptionId(requestedQoS);
+    public void addNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, MqttSubscriptionOption option) {
+        QoSSubscriptionId qosPart = new QoSSubscriptionId(option);
         storeNewSharedSubscription(clientId, share, topicFilter, qosPart);
     }
 
@@ -142,9 +144,9 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
     }
 
     @Override
-    public void addNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, MqttQoS requestedQoS,
+    public void addNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, MqttSubscriptionOption option,
                                          SubscriptionIdentifier subscriptionIdentifier) {
-        QoSSubscriptionId qosAndSubscriptionIdPart = new QoSSubscriptionId(requestedQoS, subscriptionIdentifier.value());
+        QoSSubscriptionId qosAndSubscriptionIdPart = new QoSSubscriptionId(option, subscriptionIdentifier.value());
         storeNewSharedSubscription(clientId, share, topicFilter, qosAndSubscriptionIdPart);
     }
 
@@ -160,15 +162,15 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
             for (Map.Entry<Couple<ShareName, Topic>, QoSSubscriptionId> subEntry : subMap.entrySet()) {
                 final ShareName shareName = subEntry.getKey().v1;
                 final Topic topicFilter = subEntry.getKey().v2;
-                final MqttQoS qos = subEntry.getValue().qos;
+                final MqttSubscriptionOption option = subEntry.getValue().option;
                 SharedSubscription subscription;
                 if (subEntry.getValue().subscriptionIdentifier == null) {
                     // without subscription identifier
-                    subscription = new SharedSubscription(shareName, topicFilter, clientId, qos);
+                    subscription = new SharedSubscription(shareName, topicFilter, clientId, option);
                 } else {
                     // with subscription identifier
                     SubscriptionIdentifier subscriptionId = new SubscriptionIdentifier(subEntry.getValue().subscriptionIdentifier);
-                    subscription = new SharedSubscription(shareName, topicFilter, clientId, qos, subscriptionId);
+                    subscription = new SharedSubscription(shareName, topicFilter, clientId, option, subscriptionId);
                 }
                 result.add(subscription);
             }
@@ -217,6 +219,66 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
         }
     }
 
+    private static final class QoSSubscriptionIdValueType extends BasicDataType<QoSSubscriptionId> {
+
+        @Override
+        public int getMemory(QoSSubscriptionId obj) {
+            return 4 + // integer, subscription identifier
+                SubscriptionOptionValueType.INSTANCE.getMemory(obj.option);
+        }
+
+        @Override
+        public void write(WriteBuffer buff, QoSSubscriptionId obj) {
+            if (obj.subscriptionIdentifier != null) {
+                buff.putInt(obj.subscriptionIdentifier.intValue());
+            } else {
+                buff.putInt(-1);
+            }
+            SubscriptionOptionValueType.INSTANCE.write(buff, obj.option);
+        }
+
+        @Override
+        public QoSSubscriptionId read(ByteBuffer buff) {
+            int subId = buff.getInt();
+            MqttSubscriptionOption option = SubscriptionOptionValueType.INSTANCE.read(buff);
+            if (subId != -1) {
+                return new QoSSubscriptionId(option, subId);
+            } else {
+                return new QoSSubscriptionId(option);
+            }
+        }
+
+        @Override
+        public QoSSubscriptionId[] createStorage(int size) {
+            return new QoSSubscriptionId[size];
+        }
+    }
+
+    private static final class SubscriptionOptionValueType extends BasicDataType<MqttSubscriptionOption> {
+        public static final SubscriptionOptionValueType INSTANCE = new SubscriptionOptionValueType();
+
+        @Override
+        public int getMemory(MqttSubscriptionOption obj) {
+            return 1;
+        }
+
+        @Override
+        public void write(WriteBuffer buff, MqttSubscriptionOption opt) {
+            buff.put((byte) opt.qos().value());
+        }
+
+        @Override
+        public MqttSubscriptionOption read(ByteBuffer buff) {
+            MqttQoS requestedQoS = MqttQoS.valueOf(buff.get());
+            return MqttSubscriptionOption.onlyFromQos(requestedQoS);
+        }
+
+        @Override
+        public MqttSubscriptionOption[] createStorage(int size) {
+            return new MqttSubscriptionOption[size];
+        }
+    }
+
 
     private static final class SubscriptionValueType extends BasicDataType<Subscription> {
 
@@ -224,7 +286,7 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
         public int getMemory(Subscription sub) {
             return StringDataType.INSTANCE.getMemory(sub.getClientId()) +
                 StringDataType.INSTANCE.getMemory(sub.getTopicFilter().toString()) +
-                1 + // qos
+                SubscriptionOptionValueType.INSTANCE.getMemory(sub.option()) +
                 1 + // flag to say if share name is present and/or subscription identifier
                 (sub.hasShareName() ? StringDataType.INSTANCE.getMemory(sub.getShareName()) : 0) +
                 (sub.hasSubscriptionIdentifier() ? 4 : 0);
@@ -234,7 +296,7 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
         public void write(WriteBuffer buff, Subscription sub) {
             StringDataType.INSTANCE.write(buff, sub.getClientId());
             StringDataType.INSTANCE.write(buff, sub.getTopicFilter().toString());
-            buff.put((byte) sub.getRequestedQos().value());
+            SubscriptionOptionValueType.INSTANCE.write(buff, sub.option());
             final byte flag = (byte) ((sub.hasShareName() ? 0x1 : 0x0) |
                               (sub.hasSubscriptionIdentifier() ? 0x2 : 0x0));
             buff.put(flag);
@@ -250,7 +312,7 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
         public Subscription read(ByteBuffer buff) {
             final String clientId = StringDataType.INSTANCE.read(buff);
             final String topicFilter = StringDataType.INSTANCE.read(buff);
-            MqttQoS requestedQoS = MqttQoS.valueOf(buff.get());
+            final MqttSubscriptionOption options = SubscriptionOptionValueType.INSTANCE.read(buff);
             byte flag = buff.get();
             boolean hasShareName = (flag & (byte) 0x1) > 0;
             boolean hasSubscriptionIdentifier = (flag & (byte) 0x2) > 0;
@@ -259,16 +321,16 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
                 String shareName = StringDataType.INSTANCE.read(buff);
                 if (hasSubscriptionIdentifier) {
                     SubscriptionIdentifier subId = new SubscriptionIdentifier(buff.getInt());
-                    return new Subscription(clientId, Topic.asTopic(topicFilter),requestedQoS, shareName, subId);
+                    return new Subscription(clientId, Topic.asTopic(topicFilter), options, shareName, subId);
                 } else {
-                    return new Subscription(clientId, Topic.asTopic(topicFilter),requestedQoS, shareName);
+                    return new Subscription(clientId, Topic.asTopic(topicFilter), options, shareName);
                 }
             } else {
                 if (hasSubscriptionIdentifier) {
                     SubscriptionIdentifier subId = new SubscriptionIdentifier(buff.getInt());
-                    return new Subscription(clientId, Topic.asTopic(topicFilter),requestedQoS, subId);
+                    return new Subscription(clientId, Topic.asTopic(topicFilter), options, subId);
                 } else {
-                    return new Subscription(clientId, Topic.asTopic(topicFilter),requestedQoS);
+                    return new Subscription(clientId, Topic.asTopic(topicFilter), options);
                 }
             }
         }
