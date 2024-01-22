@@ -30,7 +30,6 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.Charset;
 import java.time.Duration;
 import java.util.Optional;
-import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -190,7 +189,7 @@ public class Client {
             .addSubscription(qos2, topic2)
             .build();
 
-        return doSubscribeWithAckCasting(subscribeMessage);
+        return doSubscribeWithAckCasting(subscribeMessage, 200, TimeUnit.MILLISECONDS);
     }
 
     public MqttSubAckMessage subscribe(String topic, MqttQoS qos) {
@@ -199,10 +198,16 @@ public class Client {
             .addSubscription(qos, topic)
             .build();
 
-        return doSubscribeWithAckCasting(subscribeMessage);
+        return doSubscribeWithAckCasting(subscribeMessage, 200, TimeUnit.MILLISECONDS);
     }
 
     public MqttSubAckMessage subscribeWithIdentifier(String topic, MqttQoS qos, int subscriptionIdentifier) {
+        return subscribeWithIdentifier(topic, qos, subscriptionIdentifier, 200, TimeUnit.MILLISECONDS);
+    }
+
+    @NotNull
+    public MqttSubAckMessage subscribeWithIdentifier(String topic, MqttQoS qos, int subscriptionIdentifier,
+                                                      int timeout, TimeUnit timeUnit) {
         MqttProperties subProps = new MqttProperties();
         subProps.add(new MqttProperties.IntegerProperty(
             MqttProperties.MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value(),
@@ -214,12 +219,12 @@ public class Client {
             .properties(subProps)
             .build();
 
-        return doSubscribeWithAckCasting(subscribeMessage);
+        return doSubscribeWithAckCasting(subscribeMessage, timeout, timeUnit);
     }
 
     @NotNull
-    private MqttSubAckMessage doSubscribeWithAckCasting(MqttSubscribeMessage subscribeMessage) {
-        doSubscribe(subscribeMessage);
+    private MqttSubAckMessage doSubscribeWithAckCasting(MqttSubscribeMessage subscribeMessage, int timeout, TimeUnit timeUnit) {
+        doSubscribe(subscribeMessage, timeout, timeUnit);
 
         final MqttMessage subAckMessage = this.receivedMsg.get();
         if (!(subAckMessage instanceof MqttSubAckMessage)) {
@@ -229,7 +234,7 @@ public class Client {
         return (MqttSubAckMessage) subAckMessage;
     }
 
-    private void doSubscribe(MqttSubscribeMessage subscribeMessage) {
+    private void doSubscribe(MqttSubscribeMessage subscribeMessage, int timeout, TimeUnit timeUnit) {
         final CountDownLatch subscribeAckLatch = new CountDownLatch(1);
         this.setCallback(msg -> {
             receivedMsg.getAndSet(msg);
@@ -246,7 +251,7 @@ public class Client {
 
         boolean waitElapsed;
         try {
-            waitElapsed = !subscribeAckLatch.await(200, TimeUnit.MILLISECONDS);
+            waitElapsed = !subscribeAckLatch.await(timeout, timeUnit);
         } catch (InterruptedException e) {
             throw new RuntimeException("Interrupted while waiting", e);
         }
@@ -262,7 +267,7 @@ public class Client {
             .addSubscription(qos, topic)
             .build();
 
-        doSubscribe(subscribeMessage);
+        doSubscribe(subscribeMessage, 200, TimeUnit.MILLISECONDS);
         return this.receivedMsg.get();
     }
 
