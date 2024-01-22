@@ -87,6 +87,11 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
         final List<Subscription> subscriptions = matchWithoutQosSharpening(topicName);
 
         // for each session select the subscription with higher QoS
+        return selectSubscriptionsWithHigherQoSForEachSession(subscriptions);
+    }
+
+    private static List<Subscription> selectSubscriptionsWithHigherQoSForEachSession(List<Subscription> subscriptions) {
+        // for each session select the subscription with higher QoS
         Map<String, Subscription> subsGroupedByClient = new HashMap<>();
         for (Subscription sub : subscriptions) {
             // If same client is subscribed to two different shared subscription that overlaps
