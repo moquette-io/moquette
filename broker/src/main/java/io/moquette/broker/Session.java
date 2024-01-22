@@ -157,7 +157,7 @@ class Session {
     }
 
     public void removeSubscription(Topic topic) {
-        subscriptions.remove(new Subscription(data.clientId(), topic, MqttQoS.EXACTLY_ONCE));
+        subscriptions.remove(new Subscription(data.clientId(), topic, MqttSubscriptionOption.onlyFromQos(MqttQoS.EXACTLY_ONCE)));
     }
 
     public boolean hasWill() {

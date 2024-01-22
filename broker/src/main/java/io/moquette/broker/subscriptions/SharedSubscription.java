@@ -16,6 +16,7 @@
 package io.moquette.broker.subscriptions;
 
 import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -27,25 +28,25 @@ public final class SharedSubscription implements Comparable<SharedSubscription> 
     private final ShareName shareName;
     private final Topic topicFilter;
     private final String clientId;
-    private final MqttQoS requestedQoS;
+    private final MqttSubscriptionOption option;
     private final Optional<SubscriptionIdentifier> subscriptionId;
 
-    public SharedSubscription(ShareName shareName, Topic topicFilter, String clientId, MqttQoS requestedQoS) {
-        Objects.requireNonNull(requestedQoS, "qos parameter can't be null");
+    public SharedSubscription(ShareName shareName, Topic topicFilter, String clientId, MqttSubscriptionOption option) {
+        Objects.requireNonNull(option, "option parameter can't be null");
         this.shareName = shareName;
         this.topicFilter = topicFilter;
         this.clientId = clientId;
-        this.requestedQoS = requestedQoS;
+        this.option = option;
         this.subscriptionId = Optional.empty();
     }
 
-    public SharedSubscription(ShareName shareName, Topic topicFilter, String clientId, MqttQoS requestedQoS,
-                              SubscriptionIdentifier subscriptionId) {
-        Objects.requireNonNull(requestedQoS, "qos parameter can't be null");
+    public SharedSubscription(ShareName shareName, Topic topicFilter, String clientId,
+                              MqttSubscriptionOption option, SubscriptionIdentifier subscriptionId) {
+        Objects.requireNonNull(option, "option parameter can't be null");
         this.shareName = shareName;
         this.topicFilter = topicFilter;
         this.clientId = clientId;
-        this.requestedQoS = requestedQoS;
+        this.option = option;
         this.subscriptionId = Optional.of(subscriptionId);
     }
 
@@ -58,7 +59,11 @@ public final class SharedSubscription implements Comparable<SharedSubscription> 
     }
 
     public MqttQoS requestedQoS() {
-        return requestedQoS;
+        return option.qos();
+    }
+
+    public MqttSubscriptionOption getOption() {
+        return option;
     }
 
     public ShareName getShareName() {
@@ -70,9 +75,9 @@ public final class SharedSubscription implements Comparable<SharedSubscription> 
      * */
     Subscription createSubscription() {
         if (subscriptionId.isPresent()) {
-            return new Subscription(clientId, topicFilter, requestedQoS, shareName.getShareName(), subscriptionId.get());
+            return new Subscription(clientId, topicFilter, option, shareName.getShareName(), subscriptionId.get());
         } else {
-            return new Subscription(clientId, topicFilter, requestedQoS, shareName.getShareName());
+            return new Subscription(clientId, topicFilter, option, shareName.getShareName());
         }
     }
 
@@ -97,11 +102,11 @@ public final class SharedSubscription implements Comparable<SharedSubscription> 
         return Objects.equals(shareName, that.shareName) &&
             Objects.equals(topicFilter, that.topicFilter) &&
             Objects.equals(clientId, that.clientId) &&
-            Objects.equals(requestedQoS, that.requestedQoS);
+            Objects.equals(option, that.option);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(shareName, topicFilter, clientId, requestedQoS);
+        return Objects.hash(shareName, topicFilter, clientId, option);
     }
 }

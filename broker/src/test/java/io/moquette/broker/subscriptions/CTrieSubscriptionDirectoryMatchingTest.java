@@ -19,11 +19,13 @@ package io.moquette.broker.subscriptions;
 import io.moquette.broker.ISubscriptionsRepository;
 import io.moquette.persistence.MemorySubscriptionsRepository;
 import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
 
+import static io.moquette.broker.subscriptions.CTrieSharedSubscriptionDirectoryMatchingTest.asOption;
 import static io.moquette.broker.subscriptions.Topic.asTopic;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
@@ -187,13 +189,13 @@ public class CTrieSubscriptionDirectoryMatchingTest extends CTrieSubscriptionDir
 
     @Test
     public void testOverlappingSubscriptions() {
-        Subscription genericSub = new Subscription("Sensor1", asTopic("a/+"), MqttQoS.AT_MOST_ONCE);
+        Subscription genericSub = new Subscription("Sensor1", asTopic("a/+"), MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE));
         this.sessionsRepository.addNewSubscription(genericSub);
-        sut.add(genericSub.clientId, genericSub.topicFilter, genericSub.getRequestedQos());
+        sut.add(genericSub.clientId, genericSub.topicFilter, genericSub.option());
 
-        Subscription specificSub = new Subscription("Sensor1", asTopic("a/b"), MqttQoS.AT_MOST_ONCE);
+        Subscription specificSub = new Subscription("Sensor1", asTopic("a/b"), MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE));
         this.sessionsRepository.addNewSubscription(specificSub);
-        sut.add(specificSub.clientId, specificSub.topicFilter, specificSub.getRequestedQos());
+        sut.add(specificSub.clientId, specificSub.topicFilter, specificSub.option());
 
         //Exercise
         final List<Subscription> matchingForSpecific = sut.matchQosSharpening(asTopic("a/b"));
@@ -233,13 +235,13 @@ public class CTrieSubscriptionDirectoryMatchingTest extends CTrieSubscriptionDir
      */
     @Test
     public void duplicatedSubscriptionsWithDifferentQos() {
-        Subscription client2Sub = new Subscription("client2", asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE);
-        this.sut.add("client2", asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE);
-        Subscription client1SubQoS0 = new Subscription("client1", asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE);
-        this.sut.add("client1", asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE);
+        Subscription client2Sub = new Subscription("client2", asTopic("client/test/b"), MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE));
+        this.sut.add("client2", asTopic("client/test/b"), asOption(MqttQoS.AT_MOST_ONCE));
+        Subscription client1SubQoS0 = new Subscription("client1", asTopic("client/test/b"), MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE));
+        this.sut.add("client1", asTopic("client/test/b"), asOption(MqttQoS.AT_MOST_ONCE));
 
-        Subscription client1SubQoS2 = new Subscription("client1", asTopic("client/test/b"), MqttQoS.EXACTLY_ONCE);
-        this.sut.add("client1", asTopic("client/test/b"), MqttQoS.EXACTLY_ONCE);
+        Subscription client1SubQoS2 = new Subscription("client1", asTopic("client/test/b"), MqttSubscriptionOption.onlyFromQos(MqttQoS.EXACTLY_ONCE));
+        this.sut.add("client1", asTopic("client/test/b"), asOption(MqttQoS.EXACTLY_ONCE));
 
         // Verify
         List<Subscription> subscriptions = this.sut.matchQosSharpening(asTopic("client/test/b"));
@@ -253,23 +255,23 @@ public class CTrieSubscriptionDirectoryMatchingTest extends CTrieSubscriptionDir
         assertTrue(matchingClient1Sub.isPresent());
         Subscription client1Sub = matchingClient1Sub.get();
 
-        assertThat(client1SubQoS0.getRequestedQos()).isNotEqualTo(client1Sub.getRequestedQos());
+        assertThat(client1SubQoS0.option().qos()).isNotEqualTo(client1Sub.option().qos());
 
         // client1SubQoS2 should override client1SubQoS0
-        assertThat(client1Sub.getRequestedQos()).isEqualTo(client1SubQoS2.getRequestedQos());
+        assertThat(client1Sub.option().qos()).isEqualTo(client1SubQoS2.option().qos());
     }
 
     @Test
     public void givenSubscriptionWithSubscriptionIdWhenNewSubscriptionIsProcessedThenSubscriptionIdIsUpdated() {
         // subscribe a client on topic with subscription identifier
-        sut.add("client", asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE, new SubscriptionIdentifier(1));
+        sut.add("client", asTopic("client/test/b"), asOption(MqttQoS.AT_MOST_ONCE), new SubscriptionIdentifier(1));
 
         // verify it contains the subscription identifier
         final List<Subscription> matchingSubscriptions = sut.matchQosSharpening(asTopic("client/test/b"));
         verifySubscriptionIdentifierIsPresent(matchingSubscriptions, new SubscriptionIdentifier(1));
 
         // update the subscription of same clientId on same topic filter but with different subscription identifier
-        sut.add("client", asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE, new SubscriptionIdentifier(123));
+        sut.add("client", asTopic("client/test/b"), asOption(MqttQoS.AT_MOST_ONCE), new SubscriptionIdentifier(123));
 
         // verify the subscription identifier is updated
         final List<Subscription> reloadedSubscriptions = sut.matchQosSharpening(asTopic("client/test/b"));
@@ -287,14 +289,14 @@ public class CTrieSubscriptionDirectoryMatchingTest extends CTrieSubscriptionDir
     @Test
     public void givenSubscriptionWithSubscriptionIdWhenNewSubscriptionWithoutSubscriptionIdIsProcessedThenSubscriptionIdIsWiped() {
         // subscribe a client on topic with subscription identifier
-        sut.add("client", asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE, new SubscriptionIdentifier(1));
+        sut.add("client", asTopic("client/test/b"), asOption(MqttQoS.AT_MOST_ONCE), new SubscriptionIdentifier(1));
 
         // verify it contains the subscription identifier
         SubscriptionIdentifier expectedSubscriptionId = new SubscriptionIdentifier(1);
         verifySubscriptionIdentifierIsPresent(sut.matchQosSharpening(asTopic("client/test/b")), expectedSubscriptionId);
 
         // update the subscription of same clientId on same topic filter but removing subscription identifier
-        sut.add("client", asTopic("client/test/b"), MqttQoS.AT_MOST_ONCE);
+        sut.add("client", asTopic("client/test/b"), asOption(MqttQoS.AT_MOST_ONCE));
 
         // verify the subscription identifier is removed
         final List<Subscription> reloadedSubscriptions = sut.matchQosSharpening(asTopic("client/test/b"));

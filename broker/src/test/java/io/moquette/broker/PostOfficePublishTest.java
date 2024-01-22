@@ -195,7 +195,7 @@ public class PostOfficePublishTest {
         assertEquals(desiredQos.value(), (int) subAck.payload().grantedQoSLevels().get(0));
 
         final String clientId = connection.getClientId();
-        Subscription expectedSubscription = new Subscription(clientId, new Topic(topic), desiredQos);
+        Subscription expectedSubscription = new Subscription(clientId, new Topic(topic), MqttSubscriptionOption.onlyFromQos(desiredQos));
 
         final List<Subscription> matchedSubscriptions = subscriptions.matchWithoutQosSharpening(new Topic(topic));
         assertEquals(1, matchedSubscriptions.size());

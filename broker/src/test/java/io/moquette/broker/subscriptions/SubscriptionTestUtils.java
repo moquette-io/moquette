@@ -15,6 +15,7 @@
  */
 package io.moquette.broker.subscriptions;
 
+import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import org.jetbrains.annotations.NotNull;
 
 import static io.moquette.broker.subscriptions.Topic.asTopic;
@@ -22,11 +23,11 @@ import static io.moquette.broker.subscriptions.Topic.asTopic;
 public class SubscriptionTestUtils {
     @NotNull
     static Subscription asSubscription(String clientId, String topicFilter) {
-        return new Subscription(clientId, asTopic(topicFilter), null);
+        return new Subscription(clientId, asTopic(topicFilter), MqttSubscriptionOption.onlyFromQos(null));
     }
 
     @NotNull
     static Subscription asSubscription(String clientId, String topicFilter, String shareName) {
-        return new Subscription(clientId, asTopic(topicFilter), null, shareName);
+        return new Subscription(clientId, asTopic(topicFilter), MqttSubscriptionOption.onlyFromQos(null), shareName);
     }
 }

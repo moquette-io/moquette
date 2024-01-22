@@ -22,6 +22,7 @@ import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.SubscriptionIdentifier;
 import io.moquette.broker.subscriptions.Topic;
 import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,8 +79,8 @@ public class MemorySubscriptionsRepository implements ISubscriptionsRepository {
     }
 
     @Override
-    public void addNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, MqttQoS requestedQoS) {
-        SharedSubscription sharedSub = new SharedSubscription(share, topicFilter, clientId, requestedQoS);
+    public void addNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, MqttSubscriptionOption option) {
+        SharedSubscription sharedSub = new SharedSubscription(share, topicFilter, clientId, option);
         storeNewSharedSubscription(clientId, share, topicFilter, sharedSub);
     }
 
@@ -89,9 +90,9 @@ public class MemorySubscriptionsRepository implements ISubscriptionsRepository {
     }
 
     @Override
-    public void addNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, MqttQoS requestedQoS,
+    public void addNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, MqttSubscriptionOption option,
                                          SubscriptionIdentifier subscriptionIdentifier) {
-        SharedSubscription sharedSub = new SharedSubscription(share, topicFilter, clientId, requestedQoS, subscriptionIdentifier);
+        SharedSubscription sharedSub = new SharedSubscription(share, topicFilter, clientId, option, subscriptionIdentifier);
         storeNewSharedSubscription(clientId, share, topicFilter, sharedSub);
     }
 

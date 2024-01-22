@@ -1,6 +1,6 @@
 package io.moquette.broker.subscriptions;
 
-import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -18,50 +18,49 @@ public class CTrie {
 
         private final Topic topicFilter;
         private final String clientId;
-        private final MqttQoS requestedQoS;
-
+        private final MqttSubscriptionOption option;
         private boolean shared = false;
         private ShareName shareName;
         private Optional<SubscriptionIdentifier> subscriptionIdOpt;
 
-        private SubscriptionRequest(String clientId, Topic topicFilter, MqttQoS requestedQoS, SubscriptionIdentifier subscriptionId) {
+        private SubscriptionRequest(String clientId, Topic topicFilter, MqttSubscriptionOption option, SubscriptionIdentifier subscriptionId) {
             this.topicFilter = topicFilter;
             this.clientId = clientId;
-            this.requestedQoS = requestedQoS;
+            this.option = option;
             this.subscriptionIdOpt = Optional.of(subscriptionId);
         }
 
-        private SubscriptionRequest(String clientId, Topic topicFilter, MqttQoS requestedQoS) {
+        private SubscriptionRequest(String clientId, Topic topicFilter, MqttSubscriptionOption option) {
             this.topicFilter = topicFilter;
             this.clientId = clientId;
-            this.requestedQoS = requestedQoS;
+            this.option = option;
             this.subscriptionIdOpt = Optional.empty();
         }
 
         public static SubscriptionRequest buildNonShared(Subscription subscription) {
-            return buildNonShared(subscription.clientId, subscription.topicFilter, subscription.getRequestedQos());
+            return buildNonShared(subscription.clientId, subscription.topicFilter, subscription.option());
         }
 
-        public static SubscriptionRequest buildNonShared(String clientId, Topic topicFilter, MqttQoS requestedQoS) {
-            return new SubscriptionRequest(clientId, topicFilter, requestedQoS);
+        public static SubscriptionRequest buildNonShared(String clientId, Topic topicFilter, MqttSubscriptionOption option) {
+            return new SubscriptionRequest(clientId, topicFilter, option);
         }
 
-        public static SubscriptionRequest buildNonShared(String clientId, Topic topicFilter, MqttQoS requestedQoS,
-                                                         SubscriptionIdentifier subscriptionId) {
+        public static SubscriptionRequest buildNonShared(String clientId, Topic topicFilter,
+                                                         MqttSubscriptionOption option, SubscriptionIdentifier subscriptionId) {
             Objects.requireNonNull(subscriptionId, "SubscriptionId param can't be null");
-            return new SubscriptionRequest(clientId, topicFilter, requestedQoS, subscriptionId);
+            return new SubscriptionRequest(clientId, topicFilter, option, subscriptionId);
         }
 
         public static SubscriptionRequest buildShared(ShareName shareName, Topic topicFilter, String clientId,
-                                                      MqttQoS requestedQoS, SubscriptionIdentifier subscriptionId) {
+                                                      MqttSubscriptionOption option, SubscriptionIdentifier subscriptionId) {
             Objects.requireNonNull(subscriptionId, "SubscriptionId param can't be null");
             return buildSharedHelper(shareName, topicFilter,
-                () -> new SubscriptionRequest(clientId, topicFilter, requestedQoS, subscriptionId));
+                () -> new SubscriptionRequest(clientId, topicFilter, option, subscriptionId));
         }
 
-        public static SubscriptionRequest buildShared(ShareName shareName, Topic topicFilter, String clientId, MqttQoS requestedQoS) {
+        public static SubscriptionRequest buildShared(ShareName shareName, Topic topicFilter, String clientId, MqttSubscriptionOption option) {
             return buildSharedHelper(shareName, topicFilter,
-                () -> new SubscriptionRequest(clientId, topicFilter, requestedQoS));
+                () -> buildNonShared(clientId, topicFilter, option));
         }
 
         private static SubscriptionRequest buildSharedHelper(ShareName shareName, Topic topicFilter, Supplier<SubscriptionRequest> instantiator) {
@@ -78,20 +77,20 @@ public class CTrie {
             return topicFilter;
         }
 
-        public MqttQoS getRequestedQoS() {
-            return requestedQoS;
+        public MqttSubscriptionOption getOption() {
+            return option;
         }
 
         public Subscription subscription() {
             return subscriptionIdOpt
-                .map(subscriptionIdentifier -> new Subscription(clientId, topicFilter, requestedQoS, subscriptionIdentifier))
-                .orElseGet(() -> new Subscription(clientId, topicFilter, requestedQoS));
+                .map(subscriptionIdentifier -> new Subscription(clientId, topicFilter, option, subscriptionIdentifier))
+                .orElseGet(() -> new Subscription(clientId, topicFilter, option));
         }
 
         public SharedSubscription sharedSubscription() {
             return subscriptionIdOpt
-                .map(subId -> new SharedSubscription(shareName, topicFilter, clientId, requestedQoS, subId))
-                .orElseGet(() -> new SharedSubscription(shareName, topicFilter, clientId, requestedQoS));
+                .map(subId -> new SharedSubscription(shareName, topicFilter, clientId, option, subId))
+                .orElseGet(() -> new SharedSubscription(shareName, topicFilter, clientId, option));
         }
 
         public boolean isShared() {

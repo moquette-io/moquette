@@ -29,7 +29,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -337,7 +336,7 @@ public class PostOfficeInternalPublishTest {
         assertEquals(desiredQos.value(), (int) subAck.payload().grantedQoSLevels().get(0));
 
         final String clientId = connection.getClientId();
-        Subscription expectedSubscription = new Subscription(clientId, new Topic(topic), desiredQos);
+        Subscription expectedSubscription = new Subscription(clientId, new Topic(topic), MqttSubscriptionOption.onlyFromQos(desiredQos));
 
         final List<Subscription> matchedSubscriptions = subscriptions.matchWithoutQosSharpening(new Topic(topic));
         assertEquals(1, matchedSubscriptions.size());

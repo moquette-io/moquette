@@ -22,6 +22,8 @@ import io.netty.handler.codec.mqtt.MqttQoS;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+
+import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
@@ -36,7 +38,7 @@ public class CTrieSpeedTest {
     private static final int TOTAL_SUBSCRIPTIONS = 500_000;
 
     static SubscriptionRequest clientSubOnTopic(String clientID, String topicName) {
-        return SubscriptionRequest.buildNonShared(clientID, asTopic(topicName), MqttQoS.AT_MOST_ONCE);
+        return SubscriptionRequest.buildNonShared(clientID, asTopic(topicName), MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE));
     }
 
     @Test
@@ -88,7 +90,7 @@ public class CTrieSpeedTest {
         List<SubscriptionRequest> subscriptionList = new ArrayList<>(TOTAL_SUBSCRIPTIONS);
         for (int i = 0; i < TOTAL_SUBSCRIPTIONS; i++) {
             Topic topic = asTopic("topic/test/" + new Random().nextInt(1 + i % 10) + "/test");
-            subscriptionList.add(SubscriptionRequest.buildNonShared("TestClient-" + i, topic, MqttQoS.AT_LEAST_ONCE));
+            subscriptionList.add(SubscriptionRequest.buildNonShared("TestClient-" + i, topic, MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_LEAST_ONCE)));
         }
         return subscriptionList;
     }
