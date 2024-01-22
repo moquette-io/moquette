@@ -257,7 +257,7 @@ public class Client {
         }
 
         if (waitElapsed) {
-            throw new RuntimeException("Cannot receive SubscribeAck in 200 ms");
+            throw new RuntimeException("Cannot receive SubscribeAck in " + timeout + " " + timeUnit);
         }
     }
 
