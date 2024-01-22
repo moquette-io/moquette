@@ -405,6 +405,9 @@ class PostOffice {
     }
 
     private static MqttQoS minQos(MqttQoS q1, MqttQoS q2) {
+        if (q1 == FAILURE || q2 == FAILURE) {
+            return FAILURE;
+        }
         return q1.value() < q2.value() ? q1 : q2;
     }
 
