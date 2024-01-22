@@ -39,6 +39,7 @@ import io.moquette.broker.subscriptions.CTrieSubscriptionDirectory;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
 import io.moquette.persistence.SegmentQueueRepository;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
+import io.netty.handler.codec.mqtt.MqttQoS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,6 +69,7 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
 import static io.moquette.logging.LoggingUtils.getInterceptorIds;
+import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
 
 public class Server {
 
@@ -256,8 +258,10 @@ public class Server {
         final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(interceptor, sessionQueueSize);
         sessions = new SessionRegistry(subscriptions, sessionsRepository, queueRepository, authorizator, scheduler,
             clock, globalSessionExpiry, loopsGroup);
+
+        final MqttQoS serverGrantedQoS = parseMaxGrantedQoS(config);
         dispatcher = new PostOffice(subscriptions, retainedRepository, sessions, sessionsRepository, interceptor,
-            authorizator, loopsGroup, clock);
+            authorizator, loopsGroup, clock, serverGrantedQoS);
         final BrokerConfiguration brokerConfig = new BrokerConfiguration(config);
         MQTTConnectionFactory connectionFactory = new MQTTConnectionFactory(brokerConfig, authenticator, sessions,
                                                                             dispatcher);
@@ -274,6 +278,31 @@ public class Server {
         }
 
         initialized = true;
+    }
+
+    private static MqttQoS parseMaxGrantedQoS(IConfig config) {
+        final String qosValue = config.getProperty(IConfig.MAX_SERVER_GRANTED_QOS_PROPERTY_NAME, "2");
+        try {
+            int qosIntValue = Integer.parseInt(qosValue);
+            if (qosIntValue < 0 || qosIntValue > 2) {
+                LOG.warn("Error parsing max_server_granted_qos int value, found {} but should be [0..2]", qosIntValue);
+                throw new IllegalArgumentException("QoS must in range [0..2] but was " + qosIntValue);
+            }
+            return MqttQoS.valueOf(qosIntValue);
+        } catch (NumberFormatException ex) {
+            // try to parse the string form
+            if (MqttQoS.AT_MOST_ONCE.toString().equalsIgnoreCase(qosValue)) {
+                return MqttQoS.AT_MOST_ONCE;
+            }
+            if (MqttQoS.AT_LEAST_ONCE.toString().equalsIgnoreCase(qosValue)) {
+                return MqttQoS.AT_LEAST_ONCE;
+            }
+            if (MqttQoS.EXACTLY_ONCE.toString().equalsIgnoreCase(qosValue)) {
+                return MqttQoS.EXACTLY_ONCE;
+            }
+            LOG.warn("Error parsing max_server_granted_qos string value, found {} but should be on of 'at_most_once', 'at_least_once', 'exactly_once'", qosValue);
+            throw new IllegalArgumentException("QoS must be one of 'at_most_once', 'at_least_once', 'exactly_once' but was " + qosValue);
+        }
     }
 
     private static IQueueRepository initQueuesRepository(IConfig config, Path dataPath, H2Builder h2Builder) throws IOException {
