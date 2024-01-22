@@ -16,17 +16,38 @@
 package io.moquette.broker;
 
 import io.moquette.broker.scheduler.ScheduledExpirationService;
-import io.moquette.broker.subscriptions.*;
+import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
+import io.moquette.broker.subscriptions.ShareName;
+import io.moquette.broker.subscriptions.Subscription;
+import io.moquette.broker.subscriptions.SubscriptionIdentifier;
+import io.moquette.broker.subscriptions.Topic;
 import io.moquette.interception.BrokerInterceptor;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.handler.codec.mqtt.*;
+import io.netty.handler.codec.mqtt.MqttConnectMessage;
+import io.netty.handler.codec.mqtt.MqttFixedHeader;
+import io.netty.handler.codec.mqtt.MqttMessageType;
+import io.netty.handler.codec.mqtt.MqttProperties;
+import io.netty.handler.codec.mqtt.MqttPublishMessage;
+import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttSubAckMessage;
+import io.netty.handler.codec.mqtt.MqttSubAckPayload;
+import io.netty.handler.codec.mqtt.MqttSubscribeMessage;
+import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
+import io.netty.handler.codec.mqtt.MqttTopicSubscription;
 import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -182,6 +203,7 @@ class PostOffice {
     private final SessionEventLoopGroup sessionLoops;
     private final Clock clock;
     private final ScheduledExpirationService<ISessionsRepository.Will> willExpirationService;
+    private final MqttQoS maxServerGrantedQos;
 
     /**
      * Used only in tests
@@ -196,6 +218,14 @@ class PostOffice {
                SessionRegistry sessionRegistry, ISessionsRepository sessionRepository, BrokerInterceptor interceptor,
                Authorizator authorizator,
                SessionEventLoopGroup sessionLoops, Clock clock) {
+        this(subscriptions, retainedRepository, sessionRegistry, sessionRepository, interceptor, authorizator,
+            sessionLoops, clock, EXACTLY_ONCE);
+    }
+
+    PostOffice(ISubscriptionsDirectory subscriptions, IRetainedRepository retainedRepository,
+               SessionRegistry sessionRegistry, ISessionsRepository sessionRepository, BrokerInterceptor interceptor,
+               Authorizator authorizator,
+               SessionEventLoopGroup sessionLoops, Clock clock, MqttQoS maxServerGrantedQos) {
         this.authorizator = authorizator;
         this.subscriptions = subscriptions;
         this.retainedRepository = retainedRepository;
@@ -204,6 +234,7 @@ class PostOffice {
         this.interceptor = interceptor;
         this.sessionLoops = sessionLoops;
         this.clock = clock;
+        this.maxServerGrantedQos = maxServerGrantedQos;
 
         this.willExpirationService = new ScheduledExpirationService<>(clock, this::publishWill);
         recreateWillExpires(sessionRepository);
@@ -319,6 +350,7 @@ class PostOffice {
         } else {
             ackTopics = authorizator.verifyTopicsReadAccess(clientID, username, msg);
         }
+        ackTopics = updateWithMaximumSupportedQoS(ackTopics);
         MqttSubAckMessage ackMessage = doAckMessageFromValidateFilters(ackTopics, messageID);
 
         // store topics of non-shared subscriptions in session
@@ -364,6 +396,19 @@ class PostOffice {
         for (Subscription subscription : newSubscriptions) {
             interceptor.notifyTopicSubscribed(subscription, username);
         }
+    }
+
+    private List<MqttTopicSubscription> updateWithMaximumSupportedQoS(List<MqttTopicSubscription> subscriptions) {
+        return subscriptions.stream()
+            .map(s -> new MqttTopicSubscription(s.topicName(), minQos(s.qualityOfService(), maxServerGrantedQos)))
+            .collect(Collectors.toList());
+    }
+
+    private static MqttQoS minQos(MqttQoS q1, MqttQoS q2) {
+        if (q1 == FAILURE || q2 == FAILURE) {
+            return FAILURE;
+        }
+        return q1.value() < q2.value() ? q1 : q2;
     }
 
     private static Optional<SubscriptionIdentifier> verifyAndExtractMessageIdentifier(MqttSubscribeMessage msg) {
