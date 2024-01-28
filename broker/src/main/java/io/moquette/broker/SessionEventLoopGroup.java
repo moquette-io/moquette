@@ -59,7 +59,7 @@ class SessionEventLoopGroup {
     /**
      * Route the command to the owning SessionEventLoop
      */
-    public PostOffice.RouteResult routeCommand(String clientId, String actionDescription, Callable<String> action) {
+    public PostOffice.RouteResult routeCommand(String clientId, String actionDescription, Callable<Void> action) {
         SessionCommand cmd = new SessionCommand(clientId, action);
 
         if (clientId == null) {

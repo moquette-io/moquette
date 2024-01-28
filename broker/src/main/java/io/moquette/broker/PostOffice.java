@@ -853,7 +853,7 @@ class PostOffice {
     /**
      * Route the command to the owning SessionEventLoop
      * */
-    public RouteResult routeCommand(String clientId, String actionDescription, Callable<String> action) {
+    public RouteResult routeCommand(String clientId, String actionDescription, Callable<Void> action) {
         return sessionLoops.routeCommand(clientId, actionDescription, action);
     }
 
