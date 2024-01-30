@@ -191,7 +191,7 @@ class PostOffice {
 
     private static final Logger LOG = LoggerFactory.getLogger(PostOffice.class);
 
-    private static final Set<String> NO_FILTER = new HashSet<>();
+    private static final Set<String> NO_FILTER = Collections.unmodifiableSet(new HashSet<>());
 
     private final Authorizator authorizator;
     private final ISubscriptionsDirectory subscriptions;
@@ -810,12 +810,15 @@ class PostOffice {
      *            the result of the enqueuing operation to session loops.
      */
     public RoutingResults internalPublish(MqttPublishMessage msg) {
+        return internalPublish(msg,NO_FILTER);
+    }
+    public RoutingResults internalPublish(MqttPublishMessage msg,Set<String> clientIds) {
         final MqttQoS qos = msg.fixedHeader().qosLevel();
         final Topic topic = new Topic(msg.variableHeader().topicName());
         final ByteBuf payload = msg.payload();
         LOG.info("Sending internal PUBLISH message Topic={}, qos={}", topic, qos);
 
-        final RoutingResults publishResult = publish2Subscribers(payload, topic, qos);
+        final RoutingResults publishResult = publish2Subscribers(payload, topic, qos,clientIds);
         LOG.trace("after routed publishes: {}", publishResult);
 
         if (!msg.fixedHeader().isRetain()) {
