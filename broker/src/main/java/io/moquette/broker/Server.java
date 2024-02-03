@@ -69,7 +69,6 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
 import static io.moquette.logging.LoggingUtils.getInterceptorIds;
-import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
 
 public class Server {
 

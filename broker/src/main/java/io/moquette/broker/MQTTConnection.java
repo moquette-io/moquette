@@ -132,7 +132,7 @@ final class MQTTConnection {
         this.postOffice.routeCommand(clientID, "PUBCOMP", () -> {
             checkMatchSessionLoop(clientID);
             bindedSession.processPubComp(messageID);
-            return clientID;
+            return null;
         });
     }
 

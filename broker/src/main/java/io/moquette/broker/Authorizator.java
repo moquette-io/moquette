@@ -19,6 +19,7 @@ import io.moquette.broker.subscriptions.Topic;
 import io.moquette.broker.security.IAuthorizatorPolicy;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttSubscribeMessage;
+import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import io.netty.handler.codec.mqtt.MqttTopicSubscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,7 +75,8 @@ final class Authorizator {
             Topic topic = topicExtractor.apply(req.topicName());
             final MqttQoS qos = getQoSCheckingAlsoPermissionsOnTopic(clientID, username, messageId, topic,
                 req.qualityOfService());
-            ackTopics.add(new MqttTopicSubscription(req.topicName(), qos));
+            MqttSubscriptionOption option = PostOffice.optionWithQos(qos, req.option());
+            ackTopics.add(new MqttTopicSubscription(req.topicName(), option));
         }
         return ackTopics;
     }
