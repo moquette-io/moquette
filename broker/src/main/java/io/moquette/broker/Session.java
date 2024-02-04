@@ -244,13 +244,8 @@ class Session {
         sendPublishOnSessionAtQos(topic, qos, payload, true, mqttProperties);
     }
 
-    public void sendNotRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload,
-                                                     MqttProperties.MqttProperty... mqttProperties) {
-        sendPublishOnSessionAtQos(topic, qos, payload, false, mqttProperties);
-    }
-
-    private void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained,
-                                           MqttProperties.MqttProperty... mqttProperties) {
+    void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained,
+                                   MqttProperties.MqttProperty... mqttProperties) {
         switch (qos) {
             case AT_MOST_ONCE:
                 if (connected()) {
@@ -310,8 +305,8 @@ class Session {
             if (resendInflightOnTimeout) {
                 inflightTimeouts.add(new InFlightPacket(packetId, FLIGHT_BEFORE_RESEND_MS));
             }
-            MqttPublishMessage publishMsg = MQTTConnection.createNotRetainedPublishMessage(topic.toString(), qos,
-                payload, packetId, mqttProperties);
+            MqttPublishMessage publishMsg = MQTTConnection.createPublishMessage(topic.toString(), qos,
+                payload, packetId, retained, false, mqttProperties);
             localMqttConnectionRef.sendPublish(publishMsg);
 
             drainQueueToConnection();

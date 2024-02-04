@@ -263,7 +263,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
             .send();
     }
 
-    private static void subscribe(Mqtt5BlockingClient subscriberClient, String topicFilter, MqttQos mqttQos) {
+    static void subscribe(Mqtt5BlockingClient subscriberClient, String topicFilter, MqttQos mqttQos) {
         subscriberClient.subscribeWith()
             .topicFilter(topicFilter)
             .qos(mqttQos)

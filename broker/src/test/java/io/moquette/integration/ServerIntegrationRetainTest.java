@@ -117,12 +117,12 @@ public class ServerIntegrationRetainTest {
         return "Hello world MQTT " + qosPub + " " + qosSub;
     }
 
-    private String createTopic(int qosPub, int qosSub) {
-        return "/topic" + qosPub + qosSub;
+    private String createTopic(String testName, int qosPub, int qosSub) {
+        return "/topic/" + testName + "/" + qosPub + qosSub;
     }
 
-    private void sendRetainedAndSubscribe(int qosPub, int qosSub) throws MqttException {
-        String topic = createTopic(qosPub, qosSub);
+    private void sendRetainedAndSubscribe(String testName, int qosPub, int qosSub) throws MqttException {
+        String topic = createTopic(testName, qosPub, qosSub);
         String messageString = createMessage(qosPub, qosSub);
         clientPublisher.subscribe(topic);
         callbackPublisher.reinit();
@@ -140,13 +140,13 @@ public class ServerIntegrationRetainTest {
         }
     }
 
-    private void unsubscribeSubscriber(int qosPub, int qosSub) throws MqttException {
-        String topic = createTopic(qosPub, qosSub);
+    private void unsubscribeSubscriber(String testName, int qosPub, int qosSub) throws MqttException {
+        String topic = createTopic(testName, qosPub, qosSub);
         clientSubscriber.unsubscribe(topic);
     }
 
-    private void sendEmptyRetainedAndSubscribe(int qosPub, int qosSub) throws MqttException {
-        String topic = createTopic(qosPub, qosSub);
+    private void sendEmptyRetainedAndSubscribe(String testName, int qosPub, int qosSub) throws MqttException {
+        String topic = createTopic(testName, qosPub, qosSub);
         callbackPublisher.reinit();
         clientPublisher.publish(topic, new byte[0], qosPub, true);
         // Wait for the publish to finish
@@ -204,7 +204,7 @@ public class ServerIntegrationRetainTest {
     @MethodSource("notRetainedProvider")
     public void checkShouldNotRetain(int qosPub, int qosSub) throws MqttException {
         LOG.info("*** checkShouldNotRetain: qosPub {}, qosSub {} ***", qosPub, qosSub);
-        sendRetainedAndSubscribe(qosPub, qosSub);
+        sendRetainedAndSubscribe("should_not_retain", qosPub, qosSub);
         validateMustNotReceive(qosPub);
     }
 
@@ -212,10 +212,10 @@ public class ServerIntegrationRetainTest {
     @MethodSource("retainedProvider")
     public void checkShouldRetain(int qosPub, int qosSub) throws MqttException {
         LOG.info("*** checkShouldRetain: qosPub {}, qosSub {} ***", qosPub, qosSub);
-        sendRetainedAndSubscribe(qosPub, qosSub);
+        sendRetainedAndSubscribe("should_retain", qosPub, qosSub);
         validateMustReceive(qosPub, qosSub);
-        unsubscribeSubscriber(qosPub, qosSub);
-        sendEmptyRetainedAndSubscribe(qosPub, qosSub);
+        unsubscribeSubscriber("should_retain", qosPub, qosSub);
+        sendEmptyRetainedAndSubscribe("should_retain", qosPub, qosSub);
         validateMustNotReceive(qosPub);
     }
 
@@ -223,11 +223,11 @@ public class ServerIntegrationRetainTest {
     public void checkQos0CancelsRetain() throws MqttException {
         LOG.info("*** checkQos0CancelsRetain ***");
         // First send a QoS 2 retain, and check it arrives.
-        sendRetainedAndSubscribe(2, 2);
+        sendRetainedAndSubscribe("qos0_cancel_retain", 2, 2);
         validateMustReceive(2, 2);
-        unsubscribeSubscriber(2, 2);
+        unsubscribeSubscriber("qos0_cancel_retain", 2, 2);
         // Then send a QoS 0 retain, and check it cancels the previous retain.
-        sendRetainedAndSubscribe(0, 2);
+        sendRetainedAndSubscribe("qos0_cancel_retain", 0, 2);
         validateMustNotReceive(0);
     }
 }
