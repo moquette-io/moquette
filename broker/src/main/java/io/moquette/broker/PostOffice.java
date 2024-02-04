@@ -274,7 +274,7 @@ class PostOffice {
     }
 
     private void publishWill(ISessionsRepository.Will will) {
-        publish2Subscribers(WILL_PUBLISHER, Unpooled.copiedBuffer(will.payload), new Topic(will.topic), will.qos);
+        publish2Subscribers(WILL_PUBLISHER, Unpooled.copiedBuffer(will.payload), new Topic(will.topic), will.qos, will.retained);
     }
 
     /**
@@ -528,7 +528,7 @@ class PostOffice {
             ReferenceCountUtil.release(msg);
             return CompletableFuture.completedFuture(null);
         }
-        final RoutingResults publishResult = publish2Subscribers(clientID, msg.payload(), topic, AT_MOST_ONCE);
+        final RoutingResults publishResult = publish2Subscribers(clientID, msg.payload(), topic, AT_MOST_ONCE, msg.fixedHeader().isRetain());
         if (publishResult.isAllFailed()) {
             LOG.info("No one publish was successfully enqueued to session loops");
             ReferenceCountUtil.release(msg);
@@ -564,12 +564,13 @@ class PostOffice {
         }
 
         ByteBuf payload = msg.payload();
+        boolean retainPublish = msg.fixedHeader().isRetain();
         final RoutingResults routes;
         if (msg.fixedHeader().isDup()) {
             final Set<String> failedClients = failedPublishes.listFailed(clientId, messageID);
-            routes = publish2Subscribers(clientId, payload, topic, AT_LEAST_ONCE, failedClients);
+            routes = publish2Subscribers(clientId, payload, topic, AT_LEAST_ONCE, failedClients, retainPublish);
         } else {
-            routes = publish2Subscribers(clientId, payload, topic, AT_LEAST_ONCE);
+            routes = publish2Subscribers(clientId, payload, topic, AT_LEAST_ONCE, retainPublish);
         }
         if (LOG.isTraceEnabled()) {
             LOG.trace("subscriber routes: {}", routes);
@@ -602,8 +603,9 @@ class PostOffice {
         }
     }
 
-    private RoutingResults publish2Subscribers(String publisherClientId, ByteBuf payload, Topic topic, MqttQoS publishingQos) {
-        return publish2Subscribers(publisherClientId, payload, topic, publishingQos, NO_FILTER);
+    private RoutingResults publish2Subscribers(String publisherClientId, ByteBuf payload, Topic topic,
+                                               MqttQoS publishingQos, boolean isPublishRetained) {
+        return publish2Subscribers(publisherClientId, payload, topic, publishingQos, NO_FILTER, isPublishRetained);
     }
 
     private class BatchingPublishesCollector {
@@ -670,7 +672,7 @@ class PostOffice {
     }
 
     private RoutingResults publish2Subscribers(String publisherClientId, ByteBuf payload, Topic topic, MqttQoS publishingQos,
-                                               Set<String> filterTargetClients) {
+                                               Set<String> filterTargetClients, boolean retainPublish) {
         List<Subscription> topicMatchingSubscriptions = subscriptions.matchQosSharpening(topic);
         if (topicMatchingSubscriptions.isEmpty()) {
             // no matching subscriptions, clean exit
@@ -704,7 +706,7 @@ class PostOffice {
         payload.retain(subscriptionCount);
 
         List<RouteResult> publishResults = collector.routeBatchedPublishes((batch) -> {
-            publishToSession(payload, topic, batch, publishingQos, false);
+            publishToSession(payload, topic, batch, publishingQos, retainPublish);
             payload.release();
         });
 
@@ -728,10 +730,14 @@ class PostOffice {
     }
 
     private void publishToSession(ByteBuf payload, Topic topic, Collection<Subscription> subscriptions,
-                                  MqttQoS publishingQos, boolean retained) {
+                                  MqttQoS publishingQos, boolean retainPublish) {
         ByteBuf duplicatedPayload = payload.duplicate();
         for (Subscription sub : subscriptions) {
             MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
+            boolean retained = false;
+            if (sub.option().isRetainAsPublished()) {
+                retained = retainPublish;
+            }
             publishToSession(duplicatedPayload, topic, sub, qos, retained);
         }
     }
@@ -788,12 +794,13 @@ class PostOffice {
         }
 
         final int messageID = msg.variableHeader().packetId();
+        boolean retainPublish = msg.fixedHeader().isRetain();
         final RoutingResults publishRoutings;
         if (msg.fixedHeader().isDup()) {
             final Set<String> failedClients = failedPublishes.listFailed(clientId, messageID);
-            publishRoutings = publish2Subscribers(clientId, payload, topic, EXACTLY_ONCE, failedClients);
+            publishRoutings = publish2Subscribers(clientId, payload, topic, EXACTLY_ONCE, failedClients, retainPublish);
         } else {
-            publishRoutings = publish2Subscribers(clientId, payload, topic, EXACTLY_ONCE);
+            publishRoutings = publish2Subscribers(clientId, payload, topic, EXACTLY_ONCE, retainPublish);
         }
         if (publishRoutings.isAllSuccess()) {
             // QoS2 PUB message was enqueued successfully to every event loop
@@ -835,10 +842,11 @@ class PostOffice {
         final ByteBuf payload = msg.payload();
         LOG.info("Sending internal PUBLISH message Topic={}, qos={}", topic, qos);
 
-        final RoutingResults publishResult = publish2Subscribers(INTERNAL_PUBLISHER, payload, topic, qos);
+        boolean retainPublish = msg.fixedHeader().isRetain();
+        final RoutingResults publishResult = publish2Subscribers(INTERNAL_PUBLISHER, payload, topic, qos, retainPublish);
         LOG.trace("after routed publishes: {}", publishResult);
 
-        if (!msg.fixedHeader().isRetain()) {
+        if (!retainPublish) {
             return publishResult;
         }
         if (qos == AT_MOST_ONCE || payload.readableBytes() == 0) {
