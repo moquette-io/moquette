@@ -48,7 +48,7 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
     }
 
     static class PublishCollector implements IMqttMessageListener {
-        private final CountDownLatch latch = new CountDownLatch(1);
+        private CountDownLatch latch = new CountDownLatch(1);
         private String receivedTopic;
         private MqttMessage receivedMessage;
 
@@ -77,6 +77,10 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
             } catch (InterruptedException e) {
                 fail("Wait for message was interrupted");
             }
+        }
+
+        public void reset() {
+            latch = new CountDownLatch(1);
         }
     }
 
@@ -188,6 +192,7 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
         publishCollector.assertReceivedMessageIn(2, TimeUnit.SECONDS);
         verifyTopicPayloadAndQoSAsExpected(publishCollector);
         assertTrue(publishCollector.receivedMessage.isRetained());
+        publishCollector.reset();
 
         // publish a non retained
         publisher.publishWith()
@@ -222,6 +227,7 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
         publishCollector.assertReceivedMessageIn(2, TimeUnit.SECONDS);
         verifyTopicPayloadAndQoSAsExpected(publishCollector);
         assertFalse(publishCollector.receivedMessage.isRetained());
+        publishCollector.reset();
 
         // publish a non retained
         publisher.publishWith()
