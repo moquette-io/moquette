@@ -28,6 +28,7 @@ import org.eclipse.paho.mqttv5.client.persist.MemoryPersistence;
 import org.eclipse.paho.mqttv5.common.MqttException;
 import org.eclipse.paho.mqttv5.common.MqttMessage;
 import org.eclipse.paho.mqttv5.common.MqttSubscription;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -158,9 +159,103 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
 
         // Verify the message is also reflected back to the sender
         publishCollector.assertReceivedMessageIn(2, TimeUnit.SECONDS);
+        verifyTopicPayloadAndQoSAsExpected(publishCollector);
+        assertTrue(publishCollector.receivedMessage.isRetained());
+    }
+
+    private static void verifyTopicPayloadAndQoSAsExpected(PublishCollector publishCollector) {
         assertEquals("metric/temperature/living", publishCollector.receivedTopic);
         assertEquals("18", publishCollector.receivedPayload(), "Payload published on topic should match");
         assertEquals(MqttQos.AT_LEAST_ONCE.getCode(), publishCollector.receivedMessage.getQos());
+    }
+
+    @Test
+    public void givenSubscriptionWithRetainAsPublishedSetThenRespectTheFlagOnForward() throws MqttException {
+        Mqtt5BlockingClient publisher = createPublisherClient();
+
+        PublishCollector publishCollector = new PublishCollector();
+        createSubscriberClientWithRetainAsPublished(publishCollector, "metric/temperature/living");
+
+        // publish a retained
+        publisher.publishWith()
+            .topic("metric/temperature/living")
+            .payload("18".getBytes(StandardCharsets.UTF_8))
+            .retain(true)
+            .qos(MqttQos.AT_LEAST_ONCE)
+            .send();
+
+        // verify retain flag is respected
+        publishCollector.assertReceivedMessageIn(2, TimeUnit.SECONDS);
+        verifyTopicPayloadAndQoSAsExpected(publishCollector);
         assertTrue(publishCollector.receivedMessage.isRetained());
+
+        // publish a non retained
+        publisher.publishWith()
+            .topic("metric/temperature/living")
+            .payload("18".getBytes(StandardCharsets.UTF_8))
+            .retain(false)
+            .qos(MqttQos.AT_LEAST_ONCE)
+            .send();
+
+        // verify retain flag is respected
+        publishCollector.assertReceivedMessageIn(2, TimeUnit.SECONDS);
+        verifyTopicPayloadAndQoSAsExpected(publishCollector);
+        assertFalse(publishCollector.receivedMessage.isRetained());
+    }
+
+    @Test
+    public void givenSubscriptionWithRetainAsPublishedUnsetThenRetainedFlagIsUnsetOnForwardedPublishes() throws MqttException {
+        Mqtt5BlockingClient publisher = createPublisherClient();
+
+        PublishCollector publishCollector = new PublishCollector();
+        createSubscriberClientWithoutRetainAsPublished(publishCollector, "metric/temperature/living");
+
+        // publish a retained
+        publisher.publishWith()
+            .topic("metric/temperature/living")
+            .payload("18".getBytes(StandardCharsets.UTF_8))
+            .retain(true)
+            .qos(MqttQos.AT_LEAST_ONCE)
+            .send();
+
+        // verify retain flag is respected
+        publishCollector.assertReceivedMessageIn(2, TimeUnit.SECONDS);
+        verifyTopicPayloadAndQoSAsExpected(publishCollector);
+        assertFalse(publishCollector.receivedMessage.isRetained());
+
+        // publish a non retained
+        publisher.publishWith()
+            .topic("metric/temperature/living")
+            .payload("18".getBytes(StandardCharsets.UTF_8))
+            .retain(false)
+            .qos(MqttQos.AT_LEAST_ONCE)
+            .send();
+
+        // verify retain flag is respected
+        publishCollector.assertReceivedMessageIn(2, TimeUnit.SECONDS);
+        verifyTopicPayloadAndQoSAsExpected(publishCollector);
+        assertFalse(publishCollector.receivedMessage.isRetained());
+    }
+
+    private static MqttClient createSubscriberClientWithRetainAsPublished(PublishCollector publishCollector, String topic) throws MqttException {
+        return createSubscriberClient(publishCollector, topic, true);
+    }
+
+    private static MqttClient createSubscriberClientWithoutRetainAsPublished(PublishCollector publishCollector, String topic) throws MqttException {
+        return createSubscriberClient(publishCollector, topic, false);
+    }
+
+    @NotNull
+    private static MqttClient createSubscriberClient(PublishCollector publishCollector, String topic, boolean retainAsPublished) throws MqttException {
+        MqttClient subscriber = new MqttClient("tcp://localhost:1883", "subscriber", new MemoryPersistence());
+        subscriber.connect();
+        MqttSubscription subscription = new MqttSubscription(topic, MqttQos.AT_LEAST_ONCE.getCode());
+        subscription.setRetainAsPublished(retainAsPublished);
+
+        IMqttToken subscribeToken = subscriber.subscribe(new MqttSubscription[]{subscription},
+            new IMqttMessageListener[] {publishCollector});
+        verifySubscribedSuccessfully(subscribeToken);
+
+        return subscriber;
     }
 }
