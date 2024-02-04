@@ -704,7 +704,7 @@ class PostOffice {
         payload.retain(subscriptionCount);
 
         List<RouteResult> publishResults = collector.routeBatchedPublishes((batch) -> {
-            publishToSession(payload, topic, batch, publishingQos);
+            publishToSession(payload, topic, batch, publishingQos, false);
             payload.release();
         });
 
@@ -727,15 +727,16 @@ class PostOffice {
         return new RoutingResults(successedRoutings, failedRoutings, publishes);
     }
 
-    private void publishToSession(ByteBuf payload, Topic topic, Collection<Subscription> subscriptions, MqttQoS publishingQos) {
-        ByteBuf duplicate = payload.duplicate();
+    private void publishToSession(ByteBuf payload, Topic topic, Collection<Subscription> subscriptions,
+                                  MqttQoS publishingQos, boolean retained) {
+        ByteBuf duplicatedPayload = payload.duplicate();
         for (Subscription sub : subscriptions) {
             MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
-            publishToSession(duplicate, topic, sub, qos);
+            publishToSession(duplicatedPayload, topic, sub, qos, retained);
         }
     }
 
-    private void publishToSession(ByteBuf payload, Topic topic, Subscription sub, MqttQoS qos) {
+    private void publishToSession(ByteBuf payload, Topic topic, Subscription sub, MqttQoS qos, boolean retained) {
         Session targetSession = this.sessionRegistry.retrieve(sub.getClientId());
 
         boolean isSessionPresent = targetSession != null;
@@ -743,7 +744,7 @@ class PostOffice {
             LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
                       sub.getClientId(), sub.getTopicFilter(), qos);
             final MqttProperties.MqttProperty[] properties = prepareSubscriptionProperties(sub);
-            targetSession.sendNotRetainedPublishOnSessionAtQos(topic, qos, payload, properties);
+            targetSession.sendPublishOnSessionAtQos(topic, qos, payload, retained, properties);
         } else {
             // If we are, the subscriber disconnected after the subscriptions tree selected that session as a
             // destination.

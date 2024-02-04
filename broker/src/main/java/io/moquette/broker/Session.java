@@ -244,13 +244,8 @@ class Session {
         sendPublishOnSessionAtQos(topic, qos, payload, true, mqttProperties);
     }
 
-    public void sendNotRetainedPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload,
-                                                     MqttProperties.MqttProperty... mqttProperties) {
-        sendPublishOnSessionAtQos(topic, qos, payload, false, mqttProperties);
-    }
-
-    private void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained,
-                                           MqttProperties.MqttProperty... mqttProperties) {
+    void sendPublishOnSessionAtQos(Topic topic, MqttQoS qos, ByteBuf payload, boolean retained,
+                                   MqttProperties.MqttProperty... mqttProperties) {
         switch (qos) {
             case AT_MOST_ONCE:
                 if (connected()) {
