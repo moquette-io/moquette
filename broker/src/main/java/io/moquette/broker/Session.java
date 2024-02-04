@@ -310,8 +310,8 @@ class Session {
             if (resendInflightOnTimeout) {
                 inflightTimeouts.add(new InFlightPacket(packetId, FLIGHT_BEFORE_RESEND_MS));
             }
-            MqttPublishMessage publishMsg = MQTTConnection.createNotRetainedPublishMessage(topic.toString(), qos,
-                payload, packetId, mqttProperties);
+            MqttPublishMessage publishMsg = MQTTConnection.createPublishMessage(topic.toString(), qos,
+                payload, packetId, retained, false, mqttProperties);
             localMqttConnectionRef.sendPublish(publishMsg);
 
             drainQueueToConnection();

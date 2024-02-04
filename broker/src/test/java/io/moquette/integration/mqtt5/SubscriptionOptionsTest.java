@@ -19,6 +19,7 @@
 package io.moquette.integration.mqtt5;
 
 import com.hivemq.client.mqtt.datatypes.MqttQos;
+import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAckReasonCode;
 import org.eclipse.paho.mqttv5.client.IMqttMessageListener;
 import org.eclipse.paho.mqttv5.client.IMqttToken;
@@ -122,5 +123,44 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
         assertEquals(1, subscribeToken.getReasonCodes().length);
         assertEquals(Mqtt5SubAckReasonCode.GRANTED_QOS_1.getCode(), subscribeToken.getReasonCodes()[0],
             "Client is subscribed to the topic");
+    }
+
+    @Test
+    public void givenAnExistingRetainedMessageWhenClientSubscribeWithAnyRetainAsPublishedSubscriptionOptionThenPublishedMessageIsAlwaysFlaggedAsRetained() throws Exception {
+        // publish a retained message, must be at qos => AT_LEAST_ONCE,
+        // because AT_MOST_ONCE is not managed in retain (best effort)
+        Mqtt5BlockingClient publisher = createPublisherClient();
+        publisher.publishWith()
+            .topic("metric/temperature/living")
+            .payload("18".getBytes(StandardCharsets.UTF_8))
+            .retain(true)
+            .qos(MqttQos.AT_LEAST_ONCE)
+            .send();
+
+        MqttClient subscriberWithRetain = new MqttClient("tcp://localhost:1883", "subscriber", new MemoryPersistence());
+        subscriberWithRetain.connect();
+        MqttSubscription subscription = new MqttSubscription("metric/temperature/living", MqttQos.AT_LEAST_ONCE.getCode());
+        subscription.setRetainAsPublished(true);
+        subscribeAndVerifyRetainedIsTrue(subscriberWithRetain, subscription);
+
+        MqttClient subscriberWithoutRetain = new MqttClient("tcp://localhost:1883", "subscriber", new MemoryPersistence());
+        subscriberWithoutRetain.connect();
+        subscription = new MqttSubscription("metric/temperature/living", MqttQos.AT_LEAST_ONCE.getCode());
+        subscription.setRetainAsPublished(false);
+        subscribeAndVerifyRetainedIsTrue(subscriberWithoutRetain, subscription);
+    }
+
+    private static void subscribeAndVerifyRetainedIsTrue(MqttClient subscriberWithRetain, MqttSubscription subscription) throws MqttException {
+        PublishCollector publishCollector = new PublishCollector();
+        IMqttToken subscribeToken = subscriberWithRetain.subscribe(new MqttSubscription[]{subscription},
+            new IMqttMessageListener[] {publishCollector});
+        verifySubscribedSuccessfully(subscribeToken);
+
+        // Verify the message is also reflected back to the sender
+        publishCollector.assertReceivedMessageIn(2, TimeUnit.SECONDS);
+        assertEquals("metric/temperature/living", publishCollector.receivedTopic);
+        assertEquals("18", publishCollector.receivedPayload(), "Payload published on topic should match");
+        assertEquals(MqttQos.AT_LEAST_ONCE.getCode(), publishCollector.receivedMessage.getQos());
+        assertTrue(publishCollector.receivedMessage.isRetained());
     }
 }
