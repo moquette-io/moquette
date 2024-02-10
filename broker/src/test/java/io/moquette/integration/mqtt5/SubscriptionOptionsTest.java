@@ -20,6 +20,7 @@ package io.moquette.integration.mqtt5;
 
 import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
+import com.hivemq.client.mqtt.mqtt5.message.subscribe.Mqtt5RetainHandling;
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAckReasonCode;
 import org.eclipse.paho.mqttv5.client.IMqttMessageListener;
 import org.eclipse.paho.mqttv5.client.IMqttToken;
@@ -241,6 +242,70 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
         publishCollector.assertReceivedMessageIn(2, TimeUnit.SECONDS);
         verifyTopicPayloadAndQoSAsExpected(publishCollector);
         assertFalse(publishCollector.receivedMessage.isRetained());
+    }
+
+    @Test
+    public void givenFirstSubscriptionWithRetainPolicyToSendAtSubscribeIfNotYetExistsAndARetainedMessagedExistsThenPublishIsReceived() throws Exception {
+        Mqtt5BlockingClient publisher = createPublisherClient();
+        //publish a retained message
+        publisher.publishWith()
+            .topic("metric/temperature/living")
+            .payload("18".getBytes(StandardCharsets.UTF_8))
+            .retain(true)
+            .qos(MqttQos.AT_LEAST_ONCE)
+            .send();
+
+        // receive retained only if new subscription
+        PublishCollector publishCollector = new PublishCollector();
+        createClientWithRetainPolicy(publishCollector, Mqtt5RetainHandling.SEND_IF_SUBSCRIPTION_DOES_NOT_EXIST.getCode());
+
+        // verify retain flag is respected
+        publishCollector.assertReceivedMessageIn(1, TimeUnit.SECONDS);
+        verifyTopicPayloadAndQoSAsExpected(publishCollector);
+    }
+
+    @Test
+    public void givenNonFirstSubscriptionWithRetainPolicyToSendAtSubscribeIfAlreadyExistsAndARetainedMessagedExistsThenPublishIsNotReceived() throws Exception {
+        Mqtt5BlockingClient publisher = createPublisherClient();
+        //publish a retained message
+        publisher.publishWith()
+            .topic("metric/temperature/living")
+            .payload("18".getBytes(StandardCharsets.UTF_8))
+            .retain(true)
+            .qos(MqttQos.AT_LEAST_ONCE)
+            .send();
+
+        // create first subscriber and subscribe to the topic
+        final PublishCollector unusedCollector = new PublishCollector();
+        createSubscriberClient(unusedCollector, "firstSubscriber");
+
+        // create second subscriber to same topic with RetainPolicy to SendAtSubscribeIfAlreadyExists
+        PublishCollector publishCollector = new PublishCollector();
+        createClientWithRetainPolicy(publishCollector, Mqtt5RetainHandling.SEND_IF_SUBSCRIPTION_DOES_NOT_EXIST.getCode());
+
+        // verify no retained message is received
+        publishCollector.assertNotReceivedMessageIn(2, TimeUnit.SECONDS);
+    }
+
+    private static void createSubscriberClient(PublishCollector publishCollector, String clientId) throws MqttException {
+        MqttClient subscriber = new MqttClient("tcp://localhost:1883", clientId, new MemoryPersistence());
+        subscriber.connect();
+        MqttSubscription subscription = new MqttSubscription("metric/temperature/living", MqttQos.AT_LEAST_ONCE.getCode());
+
+        IMqttToken subscribeToken = subscriber.subscribe(new MqttSubscription[]{subscription},
+            new IMqttMessageListener[] {publishCollector});
+        verifySubscribedSuccessfully(subscribeToken);
+    }
+
+    private static void createClientWithRetainPolicy(PublishCollector publishCollector, int retainPolicy) throws MqttException {
+        MqttClient subscriber = new MqttClient("tcp://localhost:1883", "subscriber", new MemoryPersistence());
+        subscriber.connect();
+        MqttSubscription subscription = new MqttSubscription("metric/temperature/living", MqttQos.AT_LEAST_ONCE.getCode());
+        subscription.setRetainHandling(retainPolicy);
+
+        IMqttToken subscribeToken = subscriber.subscribe(new MqttSubscription[]{subscription},
+            new IMqttMessageListener[] {publishCollector});
+        verifySubscribedSuccessfully(subscribeToken);
     }
 
     private static MqttClient createSubscriberClientWithRetainAsPublished(PublishCollector publishCollector, String topic) throws MqttException {
