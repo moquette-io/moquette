@@ -4,6 +4,7 @@ Version 0.18-SNAPSHOT:
      - Exposed the maximum granted QoS by the server with the config setting 'max_server_granted_qos'. (#811)
      - Implements handling of noLocal subscription option on MQTT5 connections. (#814)
      - Implements subscription options retain as published feature. (#815)
+     - Implements subscription options retains handling policies. (#816)
    [feature] subscription identifiers: (issue #801)
      - Implements the validation of subscription identifier properties in SUBSCRIBE. (#803)
      - Store and retrieve the subscription identifier into the subscriptions directory. (#804)
