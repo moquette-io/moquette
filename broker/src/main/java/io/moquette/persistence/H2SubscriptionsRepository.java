@@ -1,6 +1,7 @@
 package io.moquette.persistence;
 
 import io.moquette.broker.ISubscriptionsRepository;
+import io.moquette.broker.Utils;
 import io.moquette.broker.subscriptions.ShareName;
 import io.moquette.broker.subscriptions.SharedSubscription;
 import io.moquette.broker.subscriptions.Subscription;
@@ -33,7 +34,7 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
     private static final String SUBSCRIPTIONS_MAP = "subscriptions";
     private static final String SHARED_SUBSCRIPTIONS_MAP = "shared_subscriptions";
     private final MVStore mvStore;
-    private final MVMap.Builder<Couple<ShareName, Topic>, SubscriptionOptionAndId> submapBuilder;
+    private final MVMap.Builder<Utils.Couple<ShareName, Topic>, SubscriptionOptionAndId> submapBuilder;
 
     private MVMap<String, Subscription> subscriptions;
     // clientId -> shared subscription map name
@@ -44,7 +45,7 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
     H2SubscriptionsRepository(MVStore mvStore) {
         this.mvStore = mvStore;
 
-        submapBuilder = new MVMap.Builder<Couple<ShareName, Topic>, SubscriptionOptionAndId>()
+        submapBuilder = new MVMap.Builder<Utils.Couple<ShareName, Topic>, SubscriptionOptionAndId>()
             .keyType(new CoupleValueType())
             .valueType(new SubscriptionOptionAndIdValueType());
 
@@ -98,8 +99,8 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
             LOG.info("Removing a non existing shared subscription for client: {}", clientId);
             return;
         }
-        MVMap<Couple<ShareName, Topic>, SubscriptionOptionAndId> subMap = mvStore.openMap(sharedSubsMapName, submapBuilder);
-        Couple<ShareName, Topic> sharedSubKey = Couple.of(share, topicFilter);
+        MVMap<Utils.Couple<ShareName, Topic>, SubscriptionOptionAndId> subMap = mvStore.openMap(sharedSubsMapName, submapBuilder);
+        Utils.Couple<ShareName, Topic> sharedSubKey = Utils.Couple.of(share, topicFilter);
 
         // remove from submap, null means the key didn't exist
         if (subMap.remove(sharedSubKey) == null) {
@@ -139,8 +140,8 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
             H2SubscriptionsRepository::computeShareSubscriptionSubMap);
 
         // maps the couple (share name, topic) to requested qos
-        MVMap<Couple<ShareName, Topic>, SubscriptionOptionAndId> subMap = mvStore.openMap(sharedSubsMapName, submapBuilder);
-        subMap.put(Couple.of(share, topicFilter), value);
+        MVMap<Utils.Couple<ShareName, Topic>, SubscriptionOptionAndId> subMap = mvStore.openMap(sharedSubsMapName, submapBuilder);
+        subMap.put(Utils.Couple.of(share, topicFilter), value);
     }
 
     @Override
@@ -158,8 +159,8 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
             String clientId = entry.getKey();
             String sharedSubsMapName = entry.getValue();
 
-            MVMap<Couple<ShareName, Topic>, SubscriptionOptionAndId> subMap = mvStore.openMap(sharedSubsMapName, submapBuilder);
-            for (Map.Entry<Couple<ShareName, Topic>, SubscriptionOptionAndId> subEntry : subMap.entrySet()) {
+            MVMap<Utils.Couple<ShareName, Topic>, SubscriptionOptionAndId> subMap = mvStore.openMap(sharedSubsMapName, submapBuilder);
+            for (Map.Entry<Utils.Couple<ShareName, Topic>, SubscriptionOptionAndId> subEntry : subMap.entrySet()) {
                 final ShareName shareName = subEntry.getKey().v1;
                 final Topic topicFilter = subEntry.getKey().v2;
                 final MqttSubscriptionOption option = subEntry.getValue().option;
@@ -183,39 +184,39 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
         return SHARED_SUBSCRIPTIONS_MAP + "_" + sessionId;
     }
 
-    static final class CoupleValueType extends BasicDataType<Couple<ShareName, Topic>> {
+    static final class CoupleValueType extends BasicDataType<Utils.Couple<ShareName, Topic>> {
 
-        private final Comparator<Couple<ShareName, Topic>> coupleComparator =
-            Comparator.<Couple<ShareName, Topic>, String>comparing(c -> c.v1.getShareName())
+        private final Comparator<Utils.Couple<ShareName, Topic>> coupleComparator =
+            Comparator.<Utils.Couple<ShareName, Topic>, String>comparing(c -> c.v1.getShareName())
             .thenComparing(c -> c.v2.toString());
 
         @Override
-        public int compare(Couple<ShareName, Topic> var1, Couple<ShareName, Topic> var2) {
+        public int compare(Utils.Couple<ShareName, Topic> var1, Utils.Couple<ShareName, Topic> var2) {
             return coupleComparator.compare(var1, var2);
         }
 
         @Override
-        public int getMemory(Couple<ShareName, Topic> couple) {
+        public int getMemory(Utils.Couple<ShareName, Topic> couple) {
             return StringDataType.INSTANCE.getMemory(couple.v1.getShareName()) +
                    StringDataType.INSTANCE.getMemory(couple.v2.toString());
         }
 
         @Override
-        public void write(WriteBuffer buff, Couple<ShareName, Topic> couple) {
+        public void write(WriteBuffer buff, Utils.Couple<ShareName, Topic> couple) {
             StringDataType.INSTANCE.write(buff, couple.v1.getShareName());
             StringDataType.INSTANCE.write(buff, couple.v2.toString());
         }
 
         @Override
-        public Couple<ShareName, Topic> read(ByteBuffer buffer) {
+        public Utils.Couple<ShareName, Topic> read(ByteBuffer buffer) {
             String shareName = StringDataType.INSTANCE.read(buffer);
             String topicFilter = StringDataType.INSTANCE.read(buffer);
-            return new Couple<>(new ShareName(shareName), Topic.asTopic(topicFilter));
+            return new Utils.Couple<>(new ShareName(shareName), Topic.asTopic(topicFilter));
         }
 
         @Override
-        public Couple<ShareName, Topic>[] createStorage(int i) {
-            return new Couple[i];
+        public Utils.Couple<ShareName, Topic>[] createStorage(int i) {
+            return new Utils.Couple[i];
         }
     }
 

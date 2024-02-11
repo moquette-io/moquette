@@ -16,12 +16,12 @@
 package io.moquette.persistence;
 
 import io.moquette.broker.ISubscriptionsRepository;
+import io.moquette.broker.Utils;
 import io.moquette.broker.subscriptions.ShareName;
 import io.moquette.broker.subscriptions.SharedSubscription;
 import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.SubscriptionIdentifier;
 import io.moquette.broker.subscriptions.Topic;
-import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +39,7 @@ public class MemorySubscriptionsRepository implements ISubscriptionsRepository {
 
     private static final Logger LOG = LoggerFactory.getLogger(MemorySubscriptionsRepository.class);
     private final Set<Subscription> subscriptions = new ConcurrentSkipListSet<>();
-    private final Map<String, Map<Couple<ShareName, Topic>, SharedSubscription>> sharedSubscriptions = new HashMap<>();
+    private final Map<String, Map<Utils.Couple<ShareName, Topic>, SharedSubscription>> sharedSubscriptions = new HashMap<>();
 
     @Override
     public Set<Subscription> listAllSubscriptions() {
@@ -66,12 +66,12 @@ public class MemorySubscriptionsRepository implements ISubscriptionsRepository {
 
     @Override
     public void removeSharedSubscription(String clientId, ShareName share, Topic topicFilter) {
-        Map<Couple<ShareName, Topic>, SharedSubscription> subsMap = sharedSubscriptions.get(clientId);
+        Map<Utils.Couple<ShareName, Topic>, SharedSubscription> subsMap = sharedSubscriptions.get(clientId);
         if (subsMap == null) {
             LOG.info("Removing a non existing shared subscription for client: {}", clientId);
             return;
         }
-        subsMap.remove(Couple.of(share, topicFilter));
+        subsMap.remove(Utils.Couple.of(share, topicFilter));
         if (subsMap.isEmpty()) {
             // clean up an empty sub map
             sharedSubscriptions.remove(clientId);
@@ -85,8 +85,8 @@ public class MemorySubscriptionsRepository implements ISubscriptionsRepository {
     }
 
     private void storeNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, SharedSubscription sharedSub) {
-        Map<Couple<ShareName, Topic>, SharedSubscription> subsMap = sharedSubscriptions.computeIfAbsent(clientId, unused -> new HashMap<>());
-        subsMap.put(Couple.of(share, topicFilter), sharedSub);
+        Map<Utils.Couple<ShareName, Topic>, SharedSubscription> subsMap = sharedSubscriptions.computeIfAbsent(clientId, unused -> new HashMap<>());
+        subsMap.put(Utils.Couple.of(share, topicFilter), sharedSub);
     }
 
     @Override
@@ -99,8 +99,8 @@ public class MemorySubscriptionsRepository implements ISubscriptionsRepository {
     @Override
     public Collection<SharedSubscription> listAllSharedSubscription() {
         final List<SharedSubscription> result = new ArrayList<>();
-        for (Map.Entry<String, Map<Couple<ShareName, Topic>, SharedSubscription>> entry : sharedSubscriptions.entrySet()) {
-            for (Map.Entry<Couple<ShareName, Topic>, SharedSubscription> nestedEntry : entry.getValue().entrySet()) {
+        for (Map.Entry<String, Map<Utils.Couple<ShareName, Topic>, SharedSubscription>> entry : sharedSubscriptions.entrySet()) {
+            for (Map.Entry<Utils.Couple<ShareName, Topic>, SharedSubscription> nestedEntry : entry.getValue().entrySet()) {
                 result.add(nestedEntry.getValue());
             }
         }
