@@ -107,20 +107,21 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
     }
 
     @Override
-    public void add(String clientId, Topic filter, MqttSubscriptionOption option) {
+    public boolean add(String clientId, Topic filter, MqttSubscriptionOption option) {
         SubscriptionRequest subRequest = SubscriptionRequest.buildNonShared(clientId, filter, option);
-        addNonSharedSubscriptionRequest(subRequest);
+        return addNonSharedSubscriptionRequest(subRequest);
     }
 
     @Override
-    public void add(String clientId, Topic filter, MqttSubscriptionOption option, SubscriptionIdentifier subscriptionId) {
+    public boolean add(String clientId, Topic filter, MqttSubscriptionOption option, SubscriptionIdentifier subscriptionId) {
         SubscriptionRequest subRequest = SubscriptionRequest.buildNonShared(clientId, filter, option, subscriptionId);
-        addNonSharedSubscriptionRequest(subRequest);
+        return addNonSharedSubscriptionRequest(subRequest);
     }
 
-    private void addNonSharedSubscriptionRequest(SubscriptionRequest subRequest) {
-        ctrie.addToTree(subRequest);
+    private boolean addNonSharedSubscriptionRequest(SubscriptionRequest subRequest) {
+        boolean notExistingSubscription = ctrie.addToTree(subRequest);
         subscriptionsRepository.addNewSubscription(subRequest.subscription());
+        return notExistingSubscription;
     }
 
     @Override

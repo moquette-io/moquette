@@ -171,7 +171,8 @@ public class CTrie {
     private static final INode NO_PARENT = null;
 
     private enum Action {
-        OK, REPEAT
+        OK, REPEAT,
+        OK_NEW // used to indicate that the action was successful and the subscription created a new branch
     }
 
     INode root;
@@ -270,11 +271,15 @@ public class CTrie {
         return subscriptions;
     }
 
-    public void addToTree(SubscriptionRequest request) {
+    /**
+     * @return true if the subscription didn't exist.
+     * */
+    public boolean addToTree(SubscriptionRequest request) {
         Action res;
         do {
             res = insert(request.getTopicFilter(), this.root, request);
         } while (res == Action.REPEAT);
+        return res == Action.OK_NEW;
     }
 
     private Action insert(Topic topic, final INode inode, SubscriptionRequest request) {
@@ -315,7 +320,7 @@ public class CTrie {
         }
         updatedCnode.add(newInode);
 
-        return inode.compareAndSet(cnode, updatedCnode) ? Action.OK : Action.REPEAT;
+        return inode.compareAndSet(cnode, updatedCnode) ? Action.OK_NEW : Action.REPEAT;
     }
 
     private INode createPathRec(Topic topic, SubscriptionRequest request) {

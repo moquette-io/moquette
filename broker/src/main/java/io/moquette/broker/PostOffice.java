@@ -34,6 +34,7 @@ import io.netty.handler.codec.mqtt.MqttSubAckMessage;
 import io.netty.handler.codec.mqtt.MqttSubAckPayload;
 import io.netty.handler.codec.mqtt.MqttSubscribeMessage;
 import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
+import io.netty.handler.codec.mqtt.MqttSubscriptionOption.RetainedHandlingPolicy;
 import io.netty.handler.codec.mqtt.MqttTopicSubscription;
 import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
@@ -370,12 +371,26 @@ class PostOffice {
                 }
             }).collect(Collectors.toList());
 
+        final Set<Subscription> subscriptionToSendRetained = new HashSet<>();
         for (Subscription subscription : newSubscriptions) {
+            boolean newlyAdded;
+            MqttSubscriptionOption subOptions = subscription.option();
             if (subscriptionIdOpt.isPresent()) {
-                subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subscription.option(),
+                newlyAdded = subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subOptions,
                     subscriptionIdOpt.get());
             } else {
-                subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subscription.option());
+                newlyAdded = subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subOptions);
+            }
+            
+            switch (subOptions.retainHandling()) {
+                case SEND_AT_SUBSCRIBE:
+                    subscriptionToSendRetained.add(subscription);
+                    break;
+                case SEND_AT_SUBSCRIBE_IF_NOT_YET_EXISTS:
+                    if (newlyAdded) {
+                        subscriptionToSendRetained.add(subscription);
+                    }
+                    break;
             }
         }
 
@@ -394,7 +409,8 @@ class PostOffice {
         // send ack message
         mqttConnection.sendSubAckMessage(messageID, ackMessage);
 
-        publishRetainedMessagesForSubscriptions(clientID, newSubscriptions);
+        // shared subscriptions doesn't receive retained messages
+        publishRetainedMessagesForSubscriptions(clientID, subscriptionToSendRetained);
 
         for (Subscription subscription : newSubscriptions) {
             interceptor.notifyTopicSubscribed(subscription, username);
@@ -445,7 +461,7 @@ class PostOffice {
         }
     }
 
-    private void publishRetainedMessagesForSubscriptions(String clientID, List<Subscription> newSubscriptions) {
+    private void publishRetainedMessagesForSubscriptions(String clientID, Collection<Subscription> newSubscriptions) {
         Session targetSession = this.sessionRegistry.retrieve(clientID);
         for (Subscription subscription : newSubscriptions) {
             final String topicFilter = subscription.getTopicFilter().toString();
