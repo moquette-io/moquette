@@ -16,11 +16,9 @@
 package io.moquette.broker.subscriptions;
 
 import io.moquette.broker.ISubscriptionsRepository;
-import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 
 import java.util.List;
-import java.util.Set;
 
 /**
  * Contains all topic filters that are used to  match against topic names.
@@ -33,9 +31,9 @@ public interface ISubscriptionsDirectory {
 
     List<Subscription> matchQosSharpening(Topic topic);
 
-    void add(String clientId, Topic filter, MqttSubscriptionOption option);
+    boolean add(String clientId, Topic filter, MqttSubscriptionOption option);
 
-    void add(String clientId, Topic filter, MqttSubscriptionOption option, SubscriptionIdentifier subscriptionId);
+    boolean add(String clientId, Topic filter, MqttSubscriptionOption option, SubscriptionIdentifier subscriptionId);
 
     void addShared(String clientId, ShareName name, Topic topicFilter, MqttSubscriptionOption option);
 

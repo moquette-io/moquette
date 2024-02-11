@@ -90,11 +90,11 @@ public class CTrieTest {
     @Test
     public void testAddNewSubscriptionOnExistingNode() {
         final SubscriptionRequest existingSubscription = clientSubOnTopic("TempSensor1", "/temp");
-        sut.addToTree(existingSubscription);
+        assertTrue(sut.addToTree(existingSubscription), "First created subscription on topic filter MUST return true");
 
         //Exercise
         final SubscriptionRequest newSubscription = clientSubOnTopic("TempSensor2", "/temp");
-        sut.addToTree(newSubscription);
+        assertFalse(sut.addToTree(newSubscription), "Not new created subscription on topic filter MUST return false");
 
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/temp"));
