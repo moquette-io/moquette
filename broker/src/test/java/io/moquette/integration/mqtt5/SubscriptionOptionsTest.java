@@ -287,6 +287,25 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
         publishCollector.assertNotReceivedMessageIn(2, TimeUnit.SECONDS);
     }
 
+    @Test
+    public void givenSubscriptionWithRetainPolicyToDoNotSendAndARetainedMessagedExistsThenPublishIsNotReceived() throws Exception {
+        Mqtt5BlockingClient publisher = createPublisherClient();
+        //publish a retained message
+        publisher.publishWith()
+            .topic("metric/temperature/living")
+            .payload("18".getBytes(StandardCharsets.UTF_8))
+            .retain(true)
+            .qos(MqttQos.AT_LEAST_ONCE)
+            .send();
+
+        // subscriber subscribe to same topic matching the retained but with DO_NOT_SEND policy
+        PublishCollector publishCollector = new PublishCollector();
+        createClientWithRetainPolicy(publishCollector, Mqtt5RetainHandling.DO_NOT_SEND.getCode());
+
+        // verify no retained message is received
+        publishCollector.assertNotReceivedMessageIn(1, TimeUnit.SECONDS);
+    }
+
     private static void createSubscriberClient(PublishCollector publishCollector, String clientId) throws MqttException {
         MqttClient subscriber = new MqttClient("tcp://localhost:1883", clientId, new MemoryPersistence());
         subscriber.connect();
