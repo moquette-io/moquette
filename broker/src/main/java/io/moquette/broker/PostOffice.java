@@ -34,7 +34,6 @@ import io.netty.handler.codec.mqtt.MqttSubAckMessage;
 import io.netty.handler.codec.mqtt.MqttSubAckPayload;
 import io.netty.handler.codec.mqtt.MqttSubscribeMessage;
 import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
-import io.netty.handler.codec.mqtt.MqttSubscriptionOption.RetainedHandlingPolicy;
 import io.netty.handler.codec.mqtt.MqttTopicSubscription;
 import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
@@ -371,28 +370,11 @@ class PostOffice {
                 }
             }).collect(Collectors.toList());
 
-        final Set<Subscription> subscriptionToSendRetained = new HashSet<>();
-        for (Subscription subscription : newSubscriptions) {
-            boolean newlyAdded;
-            MqttSubscriptionOption subOptions = subscription.option();
-            if (subscriptionIdOpt.isPresent()) {
-                newlyAdded = subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subOptions,
-                    subscriptionIdOpt.get());
-            } else {
-                newlyAdded = subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subOptions);
-            }
-            
-            switch (subOptions.retainHandling()) {
-                case SEND_AT_SUBSCRIBE:
-                    subscriptionToSendRetained.add(subscription);
-                    break;
-                case SEND_AT_SUBSCRIBE_IF_NOT_YET_EXISTS:
-                    if (newlyAdded) {
-                        subscriptionToSendRetained.add(subscription);
-                    }
-                    break;
-            }
-        }
+        final Set<Subscription> subscriptionToSendRetained = newSubscriptions.stream()
+            .map(this::addSubscriptionReportingNewStatus) // mutating operation of SubscriptionDirectory
+            .filter(PostOffice::needToReceiveRetained)
+            .map(couple -> couple.v2)
+            .collect(Collectors.toSet());
 
         for (SharedSubscriptionData sharedSubData : sharedSubscriptions) {
             if (subscriptionIdOpt.isPresent()) {
@@ -415,6 +397,32 @@ class PostOffice {
         for (Subscription subscription : newSubscriptions) {
             interceptor.notifyTopicSubscribed(subscription, username);
         }
+    }
+
+    private static boolean needToReceiveRetained(Utils.Couple<Boolean, Subscription> addedAndSub) {
+        MqttSubscriptionOption subOptions = addedAndSub.v2.option();
+        switch (subOptions.retainHandling()) {
+            case SEND_AT_SUBSCRIBE:
+                return true;
+            case SEND_AT_SUBSCRIBE_IF_NOT_YET_EXISTS:
+                if (addedAndSub.v1) {
+                    return true;
+                }
+            default:
+                return false;
+        }
+    }
+
+    private Utils.Couple<Boolean, Subscription> addSubscriptionReportingNewStatus(Subscription subscription) {
+        final boolean newlyAdded;
+        if (subscription.hasSubscriptionIdentifier()) {
+            SubscriptionIdentifier subscriptionId = subscription.getSubscriptionIdentifier();
+            newlyAdded = subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(),
+                subscription.option(), subscriptionId);
+        } else {
+            newlyAdded = subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subscription.option());
+        }
+        return new Utils.Couple<>(newlyAdded, subscription);
     }
 
     private List<MqttTopicSubscription> updateWithMaximumSupportedQoS(List<MqttTopicSubscription> subscriptions) {
