@@ -15,6 +15,7 @@
  */
 package io.moquette.broker;
 
+import io.moquette.broker.scheduler.Expirable;
 import io.moquette.broker.scheduler.ScheduledExpirationService;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
 import io.moquette.broker.subscriptions.ShareName;
@@ -28,6 +29,7 @@ import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttFixedHeader;
 import io.netty.handler.codec.mqtt.MqttMessageType;
 import io.netty.handler.codec.mqtt.MqttProperties;
+import io.netty.handler.codec.mqtt.MqttProperties.MqttPropertyType;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttSubAckMessage;
@@ -40,6 +42,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -206,7 +210,24 @@ class PostOffice {
     private final SessionEventLoopGroup sessionLoops;
     private final Clock clock;
     private final ScheduledExpirationService<ISessionsRepository.Will> willExpirationService;
+    private final ScheduledExpirationService<ExpirableTopic> retainedMessagesExpirationService;
     private final MqttQoS maxServerGrantedQos;
+
+    static class ExpirableTopic implements Expirable {
+
+        private final Topic topic;
+        private Instant expireAt;
+
+        public ExpirableTopic(Topic topic, Instant expireAt) {
+            this.topic = topic;
+            this.expireAt = expireAt;
+        }
+
+        @Override
+        public Optional<Instant> expireAt() {
+            return Optional.of(expireAt);
+        }
+    }
 
     /**
      * Used only in tests
@@ -241,6 +262,22 @@ class PostOffice {
 
         this.willExpirationService = new ScheduledExpirationService<>(clock, this::publishWill);
         recreateWillExpires(sessionRepository);
+
+        this.retainedMessagesExpirationService = new ScheduledExpirationService<>(clock, this::cleanRetainedExpired);
+        recreateRetainedExpires(retainedRepository);
+    }
+
+    private void cleanRetainedExpired(ExpirableTopic expirable) {
+        retainedRepository.cleanRetained(expirable.topic);
+    }
+
+    private void recreateRetainedExpires(IRetainedRepository retainedRepository) {
+        retainedRepository.listExpirable().forEach(this::trackRetainedForExpiry);
+    }
+
+    private void trackRetainedForExpiry(RetainedMessage m) {
+        ExpirableTopic expirable = new ExpirableTopic(m.getTopic(), m.getExpiryTime());
+        retainedMessagesExpirationService.track(m.getTopic().toString(), expirable);
     }
 
     private void recreateWillExpires(ISessionsRepository sessionRepository) {
@@ -451,7 +488,7 @@ class PostOffice {
     private static Optional<SubscriptionIdentifier> verifyAndExtractMessageIdentifier(MqttSubscribeMessage msg) {
         final List<MqttProperties.MqttProperty<Integer>> subscriptionIdentifierProperties =
             (List<MqttProperties.MqttProperty<Integer>>) msg.idAndPropertiesVariableHeader().properties()
-                .getProperties(MqttProperties.MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value());
+                .getProperties(MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value());
         if (subscriptionIdentifierProperties.size() > 1) {
             // more than 1 SUBSCRIPTION_IDENTIFIER property during subscribe is a protocol error
             LOG.warn("Received a Subscribe with more than one subscription identifier property ({})", subscriptionIdentifierProperties.size());
@@ -479,17 +516,36 @@ class PostOffice {
                 LOG.info("No retained messages matching topic filter {}", topicFilter);
                 continue;
             }
-            final MqttProperties.MqttProperty[] properties = prepareSubscriptionProperties(subscription);
+            MqttProperties.MqttProperty[] properties = prepareSubscriptionProperties(subscription);
             for (RetainedMessage retainedMsg : retainedMsgs) {
                 final MqttQoS retainedQos = retainedMsg.qosLevel();
                 MqttQoS qos = lowerQosToTheSubscriptionDesired(subscription, retainedQos);
 
                 final ByteBuf payloadBuf = Unpooled.wrappedBuffer(retainedMsg.getPayload());
+                properties = appendMessageExpiry(properties, retainedMsg);
                 targetSession.sendRetainedPublishOnSessionAtQos(retainedMsg.getTopic(), qos, payloadBuf, properties);
                 // We made the buffer, we must release it.
                 payloadBuf.release();
             }
         }
+    }
+
+    private MqttProperties.MqttProperty[] appendMessageExpiry(MqttProperties.MqttProperty[] properties,
+                                                              RetainedMessage retainedMsg) {
+        if (retainedMsg.getExpiryTime() == null) {
+            return properties;
+        }
+
+        // if expiration is present, compute the remaining expire seconds
+        Duration remaining = Duration.between(retainedMsg.getExpiryTime(), Instant.now());
+        int remainingSeconds = (int) remaining.toMillis() / 1000;
+        MqttProperties.IntegerProperty expiryRemainProp = new MqttProperties.IntegerProperty(MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL.value(),
+            remainingSeconds);
+
+        MqttProperties.MqttProperty[] newProperties = new MqttProperties.MqttProperty[properties.length + 1];
+        System.arraycopy(properties, 0, newProperties, 0, properties.length);
+        newProperties[properties.length] = expiryRemainProp;
+        return newProperties;
     }
 
     /**
@@ -620,11 +676,32 @@ class PostOffice {
         if (msg.fixedHeader().isRetain()) {
             if (!msg.payload().isReadable()) {
                 retainedRepository.cleanRetained(topic);
+                // clean also the tracker
+                retainedMessagesExpirationService.untrack(topic.toString());
             } else {
                 // before wasn't stored
-                retainedRepository.retain(topic, msg);
+                MqttProperties publishProperties = msg.variableHeader().properties();
+                if (hasProperty(publishProperties, MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL)) {
+                    Duration messageExpiry = Duration.ofSeconds(getIntProperty(publishProperties,
+                        MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL));
+                    Instant expiryTime = Instant.now().plus(messageExpiry);
+                    retainedRepository.retain(topic, msg, expiryTime);
+                    // track the topic to be wiped
+                    retainedMessagesExpirationService.track(topic.toString(), new ExpirableTopic(topic, expiryTime));
+                } else {
+                    retainedRepository.retain(topic, msg);
+                }
             }
         }
+    }
+
+    private static boolean hasProperty(MqttProperties props, MqttPropertyType prop) {
+        return props.getProperty(prop.value()) != null;
+    }
+
+    private static int getIntProperty(MqttProperties props, MqttPropertyType prop) {
+        MqttProperties.MqttProperty<Integer> mqttProperty = props.getProperty(prop.value());
+        return mqttProperty.value();
     }
 
     private RoutingResults publish2Subscribers(String publisherClientId, ByteBuf payload, Topic topic,
@@ -796,7 +873,7 @@ class PostOffice {
 
     private MqttProperties.IntegerProperty createSubscriptionIdProperty(Subscription sub) {
         int subscriptionId = sub.getSubscriptionIdentifier().value();
-        return new MqttProperties.IntegerProperty(MqttProperties.MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value(), subscriptionId);
+        return new MqttProperties.IntegerProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value(), subscriptionId);
     }
 
     /**
