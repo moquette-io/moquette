@@ -18,14 +18,16 @@ package io.moquette.broker;
 import io.moquette.broker.subscriptions.Topic;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 
+import java.time.Instant;
 import java.util.Collection;
-import java.util.List;
 
 public interface IRetainedRepository {
 
     void cleanRetained(Topic topic);
 
     void retain(Topic topic, MqttPublishMessage msg);
+
+    void retain(Topic topic, MqttPublishMessage msg, Instant expiryTime);
 
     boolean isEmpty();
 
@@ -36,4 +38,9 @@ public interface IRetainedRepository {
      * @return the unordered collection of retained messages on the topic.
      * */
     Collection<RetainedMessage> retainedOnTopic(String topic);
+
+    /**
+     * @return collection of RetainedMessage with a message expiry time configured.
+     * */
+    Collection<RetainedMessage> listExpirable();
 }
