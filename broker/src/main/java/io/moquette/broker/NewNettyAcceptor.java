@@ -22,8 +22,12 @@ import io.moquette.broker.metrics.*;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
+import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerSocketChannel;
+import io.netty.channel.kqueue.KQueue;
+import io.netty.channel.kqueue.KQueueEventLoopGroup;
+import io.netty.channel.kqueue.KQueueServerSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
@@ -120,6 +124,9 @@ class NewNettyAcceptor {
 
     private static final Logger LOG = LoggerFactory.getLogger(NewNettyAcceptor.class);
 
+    private static final String EPOLL_TRANSPORT = "io.netty.channel.epoll.Epoll";
+    private static final String KQUEUE_TRANSPORT = "io.netty.channel.kqueue.KQueue";
+
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private final Map<String, Integer> ports = new HashMap<>();
@@ -148,12 +155,17 @@ class NewNettyAcceptor {
         maxBytesInMessage = props.intProp(BrokerConstants.NETTY_MAX_BYTES_PROPERTY_NAME,
                 BrokerConstants.DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE);
 
-        boolean epoll = props.boolProp(BrokerConstants.NETTY_EPOLL_PROPERTY_NAME, false);
-        if (epoll) {
+        boolean nativeTransport = props.boolProp(BrokerConstants.NETTY_NATIVE_PROPERTY_NAME, false);
+        if (nativeTransport && classAvaliable(EPOLL_TRANSPORT) && Epoll.isAvailable()) {
             LOG.info("Netty is using Epoll");
             bossGroup = new EpollEventLoopGroup();
             workerGroup = new EpollEventLoopGroup();
             channelClass = EpollServerSocketChannel.class;
+        } else if (nativeTransport && classAvaliable(KQUEUE_TRANSPORT) && KQueue.isAvailable()) {
+            LOG.info("Netty is using KQueue");
+            bossGroup = new KQueueEventLoopGroup();
+            workerGroup = new KQueueEventLoopGroup();
+            channelClass = KQueueServerSocketChannel.class;
         } else {
             LOG.info("Netty is using NIO");
             bossGroup = new NioEventLoopGroup();
@@ -188,6 +200,15 @@ class NewNettyAcceptor {
             }
             initializeSSLTCPTransport(mqttHandler, props, sslContext, brokerConfiguration);
             initializeWSSTransport(mqttHandler, props, sslContext, brokerConfiguration);
+        }
+    }
+
+    private boolean classAvaliable(String clazz) {
+        try {
+            Class.forName(clazz, false, getClass().getClassLoader());
+            return true;
+        } catch (Exception e) {
+            return false;
         }
     }
 

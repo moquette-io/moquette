@@ -1,4 +1,5 @@
 Version 0.18-SNAPSHOT:
+   [feature] Add Netty native trsansport support on MacOS. Bundle all the native transport module by default (#806)
    [feature] message expiry interval: (issue #818)
      - Implements the management of message expiry for retained part. (#819)
    [feature] subscription option handling: (issue #808)
