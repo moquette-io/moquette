@@ -5,6 +5,8 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.mqtt.MqttProperties;
+import io.netty.handler.codec.mqtt.MqttProperties.MqttProperty;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import io.netty.handler.codec.mqtt.MqttVersion;
@@ -67,7 +69,8 @@ public class SessionTest {
 
     private void sendQoS1To(Session client, Topic destinationTopic, String message) {
         final ByteBuf payload = ByteBufUtil.writeUtf8(UnpooledByteBufAllocator.DEFAULT, message);
-        client.sendPublishOnSessionAtQos(destinationTopic, MqttQoS.AT_LEAST_ONCE, payload, false);
+        final SessionRegistry.PublishedMessage publishedMessage = new SessionRegistry.PublishedMessage(destinationTopic, MqttQoS.AT_LEAST_ONCE, payload, false);
+        client.sendPublishOnSessionAtQos(publishedMessage);
     }
 
     @Test

@@ -851,7 +851,8 @@ class PostOffice {
             LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
                       sub.getClientId(), sub.getTopicFilter(), qos);
             final MqttProperties.MqttProperty[] properties = prepareSubscriptionProperties(sub);
-            targetSession.sendPublishOnSessionAtQos(topic, qos, payload, retained, properties);
+            final SessionRegistry.PublishedMessage publishedMessage = new SessionRegistry.PublishedMessage(topic, qos, payload, retained, properties);
+            targetSession.sendPublishOnSessionAtQos(publishedMessage);
         } else {
             // If we are, the subscriber disconnected after the subscriptions tree selected that session as a
             // destination.

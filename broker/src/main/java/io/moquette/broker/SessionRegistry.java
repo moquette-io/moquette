@@ -77,7 +77,7 @@ public class SessionRegistry {
             this.topic = topic;
             this.publishingQos = publishingQos;
             this.payload = payload;
-            this.retained = false; // TODO has to store retained param into the field
+            this.retained = retained; // TODO has to store retained param into the field
             this.mqttProperties = mqttProperties;
         }
 
