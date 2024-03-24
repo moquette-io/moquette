@@ -1,4 +1,5 @@
 Version 0.18-SNAPSHOT:
+   [feature] Avoid to publish messages that has elapsed its expire property. (#822)
    [feature] Add Netty native trsansport support on MacOS. Bundle all the native transport module by default (#806)
    [feature] message expiry interval: (issue #818)
      - Implements the management of message expiry for retained part. (#819)
