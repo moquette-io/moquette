@@ -230,7 +230,7 @@ public class SessionRegistryTest {
 
         final ByteBuf payload = Unpooled.wrappedBuffer("Hello World!".getBytes(StandardCharsets.UTF_8));
         SessionRegistry.PublishedMessage msg = new SessionRegistry.PublishedMessage(Topic.asTopic("/say"),
-            MqttQoS.AT_LEAST_ONCE, payload, false);
+            MqttQoS.AT_LEAST_ONCE, payload, false, Instant.MAX);
         try {
             // store a message in the MVStore
             final String mapName = "test_map";

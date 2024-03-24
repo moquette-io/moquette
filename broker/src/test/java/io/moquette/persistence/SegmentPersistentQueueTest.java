@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterAll;
@@ -205,7 +206,7 @@ public class SegmentPersistentQueueTest {
         // 4 totalSize + 1 msgType + 1 qos + 4 topicSize + 4 bodySize = 14
         int bodySize = totalMessageSize - 14 - topic.getBytes(UTF_8).length;
         final ByteBuf payload = Unpooled.wrappedBuffer(getBody(bodySize).getBytes(StandardCharsets.UTF_8));
-        return new PublishedMessage(Topic.asTopic(topic), MqttQoS.AT_LEAST_ONCE, payload, false);
+        return new PublishedMessage(Topic.asTopic(topic), MqttQoS.AT_LEAST_ONCE, payload, false, Instant.MAX);
     }
 
     @Test
