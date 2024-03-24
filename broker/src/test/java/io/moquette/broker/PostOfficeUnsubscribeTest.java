@@ -32,6 +32,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.Charset;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.concurrent.*;
 
@@ -156,7 +157,7 @@ public class PostOfficeUnsubscribeTest {
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(false)
-                .topicName(NEWS_TOPIC).build()).get(5, TimeUnit.SECONDS);
+                .topicName(NEWS_TOPIC).build(), Instant.MAX).get(5, TimeUnit.SECONDS);
 
         ConnectionTestUtils.verifyPublishIsReceived(channel, AT_MOST_ONCE, "Hello world!");
 
@@ -169,7 +170,7 @@ public class PostOfficeUnsubscribeTest {
                 .payload(payload2)
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(false)
-                .topicName(NEWS_TOPIC).build());
+                .topicName(NEWS_TOPIC).build(), Instant.MAX);
 
         ConnectionTestUtils.verifyNoPublishIsReceived(channel);
     }
@@ -194,7 +195,7 @@ public class PostOfficeUnsubscribeTest {
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(false)
-                .topicName(NEWS_TOPIC).build()).get(5, TimeUnit.SECONDS);
+                .topicName(NEWS_TOPIC).build(), Instant.MAX).get(5, TimeUnit.SECONDS);
 
         ConnectionTestUtils.verifyPublishIsReceived(channel, AT_MOST_ONCE, "Hello world!");
 
@@ -214,7 +215,7 @@ public class PostOfficeUnsubscribeTest {
                 .payload(payload2)
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(false)
-                .topicName(NEWS_TOPIC).build());
+                .topicName(NEWS_TOPIC).build(), Instant.MAX);
 
         ConnectionTestUtils.verifyNoPublishIsReceived(anotherChannel);
     }
@@ -261,7 +262,7 @@ public class PostOfficeUnsubscribeTest {
                 .payload(anyPayload)
                 .qos(MqttQoS.AT_LEAST_ONCE)
                 .retained(false)
-                .topicName(topic).build());
+                .topicName(topic).build(), Instant.MAX);
 
         // disconnect the other channel
         anotherConnection.processDisconnect(null);
@@ -292,7 +293,7 @@ public class PostOfficeUnsubscribeTest {
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(false)
-                .topicName(NEWS_TOPIC).build()).get(5, TimeUnit.SECONDS);
+                .topicName(NEWS_TOPIC).build(), Instant.MAX).get(5, TimeUnit.SECONDS);
 
         ConnectionTestUtils.verifyPublishIsReceived((EmbeddedChannel) connection.channel, AT_MOST_ONCE, "Hello world!");
 
@@ -312,7 +313,7 @@ public class PostOfficeUnsubscribeTest {
                 .payload(payload2.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(false)
-                .topicName(NEWS_TOPIC).build()).get(5, TimeUnit.SECONDS);
+                .topicName(NEWS_TOPIC).build(), Instant.MAX).get(5, TimeUnit.SECONDS);
 
         ConnectionTestUtils.verifyPublishIsReceived(subscriberChannel, AT_MOST_ONCE, "Hello world2!");
 
@@ -350,7 +351,7 @@ public class PostOfficeUnsubscribeTest {
                     .payload(bytePayload)
                     .qos(MqttQoS.AT_LEAST_ONCE)
                     .retained(false)
-                    .topicName(NEWS_TOPIC).build()).completableFuture().get(5, TimeUnit.SECONDS);
+                    .topicName(NEWS_TOPIC).build(), Instant.MAX).completableFuture().get(5, TimeUnit.SECONDS);
         } catch (InterruptedException | ExecutionException | TimeoutException e) {
             throw new RuntimeException(e);
         }
@@ -363,7 +364,7 @@ public class PostOfficeUnsubscribeTest {
             .qos(MqttQoS.EXACTLY_ONCE)
             .retained(true)
             .messageId(1)
-            .topicName(topic).build(), "username");
+            .topicName(topic).build(), "username", Instant.MAX);
     }
 
     /**

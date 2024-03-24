@@ -33,6 +33,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.Charset;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -128,7 +129,7 @@ public class PostOfficePublishTest {
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(false)
-                .topicName(NEWS_TOPIC).build()).get(5, TimeUnit.SECONDS);
+                .topicName(NEWS_TOPIC).build(), Instant.MAX).get(5, TimeUnit.SECONDS);
 
         // Verify
         ConnectionTestUtils.verifyReceivePublish(channel, NEWS_TOPIC, "Hello world!");
@@ -146,7 +147,7 @@ public class PostOfficePublishTest {
             .qos(MqttQoS.EXACTLY_ONCE)
             .retained(false)
             .messageId(1)
-            .topicName(NEWS_TOPIC).build(), "username");
+            .topicName(NEWS_TOPIC).build(), "username", Instant.MAX);
 
         final MQTTConnection clientYA = connectAs("subscriber");
         subscribe(clientYA, NEWS_TOPIC, AT_MOST_ONCE);
@@ -158,7 +159,7 @@ public class PostOfficePublishTest {
             .qos(MqttQoS.EXACTLY_ONCE)
             .retained(true)
             .messageId(2)
-            .topicName(NEWS_TOPIC).build(), "username").completableFuture().get(5, TimeUnit.SECONDS);
+            .topicName(NEWS_TOPIC).build(), "username", Instant.MAX).completableFuture().get(5, TimeUnit.SECONDS);
 
         // Verify
         assertFalse(clientXA.channel.isOpen(), "First 'subscriber' channel MUST be closed by the broker");
@@ -230,7 +231,7 @@ public class PostOfficePublishTest {
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(false)
-                .topicName(NEWS_TOPIC).build()).get(5, TimeUnit.SECONDS);
+                .topicName(NEWS_TOPIC).build(), Instant.MAX).get(5, TimeUnit.SECONDS);
 
         // Verify
         ConnectionTestUtils.verifyReceivePublish(channel1, NEWS_TOPIC, "Hello world!");
@@ -257,7 +258,7 @@ public class PostOfficePublishTest {
                 .payload(anyPayload)
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(true)
-                .topicName(NEWS_TOPIC).build());
+                .topicName(NEWS_TOPIC).build(), Instant.MAX);
         // receivedPublishQos0 does not release payload.
         anyPayload.release();
 
@@ -282,7 +283,7 @@ public class PostOfficePublishTest {
                 .payload(anyPayload)
                 .qos(MqttQoS.AT_LEAST_ONCE)
                 .retained(true)
-                .topicName(NEWS_TOPIC).build()).completableFuture().get(5, TimeUnit.SECONDS);
+                .topicName(NEWS_TOPIC).build(), Instant.MAX).completableFuture().get(5, TimeUnit.SECONDS);
 
         // Verify
         ConnectionTestUtils.verifyPublishIsReceived(channel, AT_LEAST_ONCE, "Any payload");
@@ -305,7 +306,7 @@ public class PostOfficePublishTest {
                 .qos(MqttQoS.EXACTLY_ONCE)
                 .retained(true)
                 .messageId(2)
-                .topicName(NEWS_TOPIC).build(), "username").completableFuture().get(5000, TimeUnit.SECONDS);
+                .topicName(NEWS_TOPIC).build(), "username", Instant.MAX).completableFuture().get(5000, TimeUnit.SECONDS);
 
         // Verify
         ConnectionTestUtils.verifyPublishIsReceived(channel, EXACTLY_ONCE, "Any payload");
@@ -330,7 +331,7 @@ public class PostOfficePublishTest {
             MqttMessageBuilders.publish()
                 .payload(anyPayload.retainedDuplicate())
                 .qos(MqttQoS.AT_LEAST_ONCE)
-                .topicName(NEWS_TOPIC).build());
+                .topicName(NEWS_TOPIC).build(), Instant.MAX);
 
         // simulate a reconnection from the other client
         connection = createMQTTConnection(ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID);
@@ -370,7 +371,7 @@ public class PostOfficePublishTest {
                 .payload(anyPayload.retainedDuplicate())
                 .qos(MqttQoS.AT_LEAST_ONCE)
                 .retained(true)
-                .topicName(NEWS_TOPIC).build()).completableFuture().get(5, TimeUnit.SECONDS);
+                .topicName(NEWS_TOPIC).build(), Instant.MAX).completableFuture().get(5, TimeUnit.SECONDS);
 
         // Verify that after a reconnection the client receive the message
         ConnectionTestUtils.verifyPublishIsReceived(secondChannel, AT_LEAST_ONCE, "Any payload");
@@ -396,7 +397,7 @@ public class PostOfficePublishTest {
                 .payload(anyPayload)
                 .qos(MqttQoS.AT_LEAST_ONCE)
                 .retained(true)
-                .topicName(NEWS_TOPIC).build());
+                .topicName(NEWS_TOPIC).build(), Instant.MAX);
 
         verifyNoPublishIsReceived(channel);
     }
@@ -424,7 +425,7 @@ public class PostOfficePublishTest {
             .topicName(NEWS_TOPIC)
             .build();
         sut.receivedPublishQos1(senderConnection, new Topic(NEWS_TOPIC), TEST_USER, 1,
-                                publishMsg);
+                                publishMsg, Instant.MAX);
 
         assertMessageIsRetained(NEWS_TOPIC, anyPayload);
 
@@ -436,7 +437,7 @@ public class PostOfficePublishTest {
                 .payload(qos0Payload)
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(true)
-                .topicName(NEWS_TOPIC).build());
+                .topicName(NEWS_TOPIC).build(), Instant.MAX);
 
         // Verify
         assertTrue(retainedRepository.isEmpty(), "Retained message for topic /news must be cleared");

@@ -25,6 +25,7 @@ import org.h2.mvstore.WriteBuffer;
 import org.h2.mvstore.type.StringDataType;
 
 import java.nio.ByteBuffer;
+import java.time.Instant;
 
 import org.h2.mvstore.DataUtils;
 import org.h2.mvstore.type.BasicDataType;
@@ -100,9 +101,9 @@ public final class EnqueuedMessageValueType extends BasicDataType<EnqueuedMessag
             final ByteBuf payload = payloadDataType.read(buff);
             if (SerdesUtils.containsProperties(buff)) {
                 MqttProperties.MqttProperty[] mqttProperties = propertiesDataType.read(buff);
-                return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload, false, mqttProperties);
+                return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload, false, Instant.MAX, mqttProperties);
             } else {
-                return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload, false);
+                return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload, false, Instant.MAX);
             }
         } else {
             throw new IllegalArgumentException("Can't recognize record of type: " + messageType);

@@ -35,6 +35,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.Charset;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.*;
 
@@ -259,7 +260,7 @@ public class PostOfficeSubscribeTest {
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(false)
-                .topicName(NEWS_TOPIC).build()).get(5, TimeUnit.SECONDS);
+                .topicName(NEWS_TOPIC).build(), Instant.MAX).get(5, TimeUnit.SECONDS);
 
         ConnectionTestUtils.verifyPublishIsReceived(anotherChannel, AT_MOST_ONCE, "Hello world!");
     }
@@ -304,7 +305,7 @@ public class PostOfficeSubscribeTest {
                 .payload(payload)
                 .qos(MqttQoS.AT_MOST_ONCE)
                 .retained(false)
-                .topicName(NEWS_TOPIC).build());
+                .topicName(NEWS_TOPIC).build(), Instant.MAX);
 
         // verify no publish is fired
         ConnectionTestUtils.verifyNoPublishIsReceived(channel);
@@ -322,7 +323,7 @@ public class PostOfficeSubscribeTest {
             .retained(true)
             .topicName(NEWS_TOPIC).build();
         sut.receivedPublishQos1(connection, new Topic(NEWS_TOPIC), TEST_USER, 1,
-            retainedPubQoS1Msg);
+            retainedPubQoS1Msg, Instant.MAX);
 
         // subscriber connects subscribe to topic /news and receive the last retained message
         EmbeddedChannel subChannel = new EmbeddedChannel();

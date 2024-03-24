@@ -70,14 +70,16 @@ public class SessionRegistry {
         final MqttQoS publishingQos;
         final ByteBuf payload;
         final boolean retained;
+        final Instant messageExpiry;
         final MqttProperties.MqttProperty[] mqttProperties;
 
         public PublishedMessage(Topic topic, MqttQoS publishingQos, ByteBuf payload, boolean retained,
-                                MqttProperties.MqttProperty... mqttProperties) {
+                                Instant messageExpiry, MqttProperties.MqttProperty... mqttProperties) {
             this.topic = topic;
             this.publishingQos = publishingQos;
             this.payload = payload;
-            this.retained = false; // TODO has to store retained param into the field
+            this.retained = retained; // TODO has to store retained param into the field
+            this.messageExpiry = messageExpiry;
             this.mqttProperties = mqttProperties;
         }
 
@@ -105,6 +107,10 @@ public class SessionRegistry {
 
         public MqttProperties.MqttProperty[] getMqttProperties() {
             return mqttProperties;
+        }
+
+        public boolean isExpired() {
+            return messageExpiry != Instant.MAX && Instant.now().isAfter(messageExpiry);
         }
     }
 

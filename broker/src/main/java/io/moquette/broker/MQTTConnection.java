@@ -40,6 +40,7 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.charset.StandardCharsets;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -624,6 +625,8 @@ final class MQTTConnection {
             return PostOffice.RouteResult.failed(clientId);
         }
 
+        final Instant expiry = extractExpiryFromPropery(msg);
+
         // retain else msg is cleaned by the NewNettyMQTTHandler and is not available
         // in execution by SessionEventLoop
         msg.retain();
@@ -634,7 +637,7 @@ final class MQTTConnection {
                     if (!isBoundToSession()) {
                         return null;
                     }
-                    postOffice.receivedPublishQos0(topic, username, clientId, msg);
+                    postOffice.receivedPublishQos0(topic, username, clientId, msg, expiry);
                     return null;
                 }).ifFailed(msg::release);
             case AT_LEAST_ONCE:
@@ -642,7 +645,7 @@ final class MQTTConnection {
                     checkMatchSessionLoop(clientId);
                     if (!isBoundToSession())
                         return null;
-                    postOffice.receivedPublishQos1(this, topic, username, messageID, msg);
+                    postOffice.receivedPublishQos1(this, topic, username, messageID, msg, expiry);
                     return null;
                 }).ifFailed(msg::release);
             case EXACTLY_ONCE: {
@@ -655,11 +658,11 @@ final class MQTTConnection {
                 });
                 if (!firstStepResult.isSuccess()) {
                     msg.release();
-                    LOG.trace("Failed to enqueue PUB QoS2 to session loop for  {}", clientId);
+                    LOG.trace("Failed to enqueue PUB QoS2 to session loop for {}", clientId);
                     return firstStepResult;
                 }
                 firstStepResult.completableFuture().thenRun(() ->
-                    postOffice.receivedPublishQos2(this, msg, username).completableFuture()
+                    postOffice.receivedPublishQos2(this, msg, username, expiry).completableFuture()
                 );
                 return firstStepResult;
             }
@@ -667,6 +670,19 @@ final class MQTTConnection {
                 LOG.error("Unknown QoS-Type:{}", qos);
                 return PostOffice.RouteResult.failed(clientId, "Unknown QoS-");
         }
+    }
+
+    private Instant extractExpiryFromPropery(MqttPublishMessage msg) {
+        MqttProperties.MqttProperty expiryProp = msg.variableHeader()
+            .properties()
+            .getProperty(MqttProperties.MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL.value());
+        if (expiryProp == null) {
+            // publish message doesn't contain the expiry property, leave it as it is.
+            return Instant.MAX;
+        }
+        Integer expirySeconds = ((MqttProperties.IntegerProperty) expiryProp).value();
+
+        return Instant.now().plusSeconds(expirySeconds);
     }
 
     void sendPubRec(int messageID) {

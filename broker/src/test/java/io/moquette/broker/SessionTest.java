@@ -15,6 +15,7 @@ import static io.moquette.BrokerConstants.FLIGHT_BEFORE_RESEND_MS;
 import io.moquette.broker.subscriptions.Subscription;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Arrays;
 import org.assertj.core.api.Assertions;
 
@@ -67,7 +68,8 @@ public class SessionTest {
 
     private void sendQoS1To(Session client, Topic destinationTopic, String message) {
         final ByteBuf payload = ByteBufUtil.writeUtf8(UnpooledByteBufAllocator.DEFAULT, message);
-        client.sendPublishOnSessionAtQos(destinationTopic, MqttQoS.AT_LEAST_ONCE, payload, false);
+        final SessionRegistry.PublishedMessage publishedMessage = new SessionRegistry.PublishedMessage(destinationTopic, MqttQoS.AT_LEAST_ONCE, payload, false, Instant.MAX);
+        client.sendPublishOnSessionAtQos(publishedMessage);
     }
 
     @Test

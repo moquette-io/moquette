@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Optional;
 
@@ -25,7 +26,7 @@ class SegmentedPersistentQueueSerDesTest {
         final Topic topic = Topic.asTopic("/metering/temperature");
         ByteBuf payload = Unpooled.wrappedBuffer("Some fancy things".getBytes(StandardCharsets.UTF_8));
         SessionRegistry.EnqueuedMessage messageToSerialize = new SessionRegistry.PublishedMessage(
-            topic, MqttQoS.AT_MOST_ONCE, payload, true);
+            topic, MqttQoS.AT_MOST_ONCE, payload, true, Instant.MAX);
 
         ByteBuffer serialized = sut.toBytes(messageToSerialize);
 
@@ -45,7 +46,7 @@ class SegmentedPersistentQueueSerDesTest {
         MqttProperties.IntegerProperty intProperty = new MqttProperties.IntegerProperty(
             MqttProperties.MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value(), subscriptionId);
         SessionRegistry.EnqueuedMessage messageToSerialize = new SessionRegistry.PublishedMessage(
-            topic, MqttQoS.AT_MOST_ONCE, payload, true, intProperty);
+            topic, MqttQoS.AT_MOST_ONCE, payload, true, Instant.MAX, intProperty);
 
         ByteBuffer serialized = sut.toBytes(messageToSerialize);
 

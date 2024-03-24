@@ -9,6 +9,7 @@ import io.netty.handler.codec.mqtt.MqttQoS;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Arrays;
 
 class SegmentedPersistentQueueSerDes {
@@ -166,9 +167,9 @@ class SegmentedPersistentQueueSerDes {
             final ByteBuf payload = readPayload(buff);
             if (SerdesUtils.containsProperties(buff)) {
                 MqttProperties.MqttProperty[] mqttProperties = readProperties(buff);
-                return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload, false, mqttProperties);
+                return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload, false, Instant.MAX, mqttProperties);
             } else {
-                return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload, false);
+                return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload, false, Instant.MAX);
             }
         } else {
             throw new IllegalArgumentException("Can't recognize record of type: " + messageType);
