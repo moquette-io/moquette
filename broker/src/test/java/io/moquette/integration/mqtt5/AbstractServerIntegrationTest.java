@@ -139,4 +139,9 @@ public abstract class AbstractServerIntegrationTest {
         MqttConnAckMessage connAck = lowLevelClient.connectV5();
         assertConnectionAccepted(connAck, "Connection must be accepted");
     }
+
+    void connectLowLevel(int keepAliveSecs) {
+        MqttConnAckMessage connAck = lowLevelClient.connectV5(keepAliveSecs);
+        assertConnectionAccepted(connAck, "Connection must be accepted");
+    }
 }
