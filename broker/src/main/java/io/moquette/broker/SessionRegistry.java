@@ -117,7 +117,7 @@ public class SessionRegistry {
             if (messageExpiry == Instant.MAX) {
                 return mqttProperties;
             }
-            long remainingSeconds = Duration.between(messageExpiry, Instant.now())
+            long remainingSeconds = Duration.between(Instant.now(), messageExpiry)
                 .getSeconds();
             final int indexOfExpiry = findPublicationExpiryProperty(mqttProperties);
             MqttProperties.IntegerProperty updatedProperty = new MqttProperties.IntegerProperty(MqttProperties.MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL.value(), (int) remainingSeconds);
@@ -152,9 +152,29 @@ public class SessionRegistry {
             return property instanceof MqttProperties.IntegerProperty &&
                 property.propertyId() == MqttProperties.MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL.value();
         }
+
+        public Instant getMessageExpiry() {
+            return messageExpiry;
+        }
+
+        @Override
+        public String toString() {
+            return "PublishedMessage{" +
+                "topic=" + topic +
+                ", publishingQos=" + publishingQos +
+                ", payload=" + payload +
+                ", retained=" + retained +
+                ", messageExpiry=" + messageExpiry +
+                ", mqttProperties=" + Arrays.toString(mqttProperties) +
+                '}';
+        }
     }
 
     public static final class PubRelMarker extends EnqueuedMessage {
+        @Override
+        public String toString() {
+            return "PubRelMarker{}";
+        }
     }
 
     public enum CreationModeEnum {

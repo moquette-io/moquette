@@ -4,11 +4,15 @@ import io.moquette.broker.AbstractSessionMessageQueue;
 import io.moquette.broker.SessionRegistry;
 import io.moquette.broker.unsafequeues.Queue;
 import io.moquette.broker.unsafequeues.QueueException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.util.Optional;
 
 public class SegmentPersistentQueue extends AbstractSessionMessageQueue<SessionRegistry.EnqueuedMessage> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(SegmentPersistentQueue.class);
 
     private final Queue segmentedQueue;
     private final SegmentedPersistentQueueSerDes serdes = new SegmentedPersistentQueueSerDes();
@@ -19,6 +23,7 @@ public class SegmentPersistentQueue extends AbstractSessionMessageQueue<SessionR
 
     @Override
     public void enqueue(SessionRegistry.EnqueuedMessage message) {
+        LOG.debug("Adding message {}", message);
         checkEnqueuePreconditions(message);
 
         final ByteBuffer payload = serdes.toBytes(message);
@@ -40,11 +45,14 @@ public class SegmentPersistentQueue extends AbstractSessionMessageQueue<SessionR
             throw new RuntimeException(e);
         }
         if (!dequeue.isPresent()) {
+            LOG.debug("No data pulled out from the queue");
             return null;
         }
 
         final ByteBuffer content = dequeue.get();
-        return serdes.fromBytes(content);
+        SessionRegistry.EnqueuedMessage message = serdes.fromBytes(content);
+        LOG.debug("Retrieved message {}", message);
+        return message;
     }
 
     @Override
