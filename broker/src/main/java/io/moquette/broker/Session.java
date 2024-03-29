@@ -29,14 +29,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
@@ -281,7 +274,7 @@ class Session {
             return;
         }
         if (publishRequest.isExpired()) {
-            LOG.debug("Sending publish at QoS1 already expired, drop it");
+            LOG.debug("Sending publish at QoS1 already expired, expected to happen before {}, drop it", publishRequest.messageExpiry);
             return;
         }
 
@@ -306,6 +299,8 @@ class Session {
         if (canSkipQueue(localMqttConnectionRef)) {
             inflightSlots.decrementAndGet();
             int packetId = localMqttConnectionRef.nextPacketId();
+
+            LOG.debug("Adding into inflight for session {} at QoS {}", getClientID(), publishRequest.getPublishingQos());
 
             EnqueuedMessage old = inflightWindow.put(packetId, publishRequest);
             // If there already was something, release it.
@@ -352,6 +347,7 @@ class Session {
         removed.release();
 
         inflightSlots.incrementAndGet();
+        LOG.debug("Received PUBACK {} for session {}", ackPacketId, getClientID());
         drainQueueToConnection();
     }
 
@@ -440,12 +436,15 @@ class Session {
             if (resendInflightOnTimeout) {
                 inflightTimeouts.add(new InFlightPacket(sendPacketId, FLIGHT_BEFORE_RESEND_MS));
             }
+
+            MqttProperties.MqttProperty[] mqttProperties = msgPub.updatePublicationExpiryIfPresentOrAdd();
+
             MqttPublishMessage publishMsg = MQTTConnection.createNotRetainedPublishMessage(
                 msgPub.topic.toString(),
                 msgPub.publishingQos,
                 msgPub.payload,
                 sendPacketId,
-                msgPub.mqttProperties);
+                mqttProperties);
             mqttConnection.sendPublish(publishMsg);
 
             // we fetched msg from a map, but the release is cancelled out by the above retain

@@ -625,7 +625,7 @@ final class MQTTConnection {
             return PostOffice.RouteResult.failed(clientId);
         }
 
-        final Instant expiry = extractExpiryFromPropery(msg);
+        final Instant expiry = extractExpiryFromProperty(msg);
 
         // retain else msg is cleaned by the NewNettyMQTTHandler and is not available
         // in execution by SessionEventLoop
@@ -672,7 +672,7 @@ final class MQTTConnection {
         }
     }
 
-    private Instant extractExpiryFromPropery(MqttPublishMessage msg) {
+    private Instant extractExpiryFromProperty(MqttPublishMessage msg) {
         MqttProperties.MqttProperty expiryProp = msg.variableHeader()
             .properties()
             .getProperty(MqttProperties.MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL.value());
