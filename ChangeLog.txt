@@ -3,6 +3,7 @@ Version 0.18-SNAPSHOT:
    [feature] message expiry interval: (issue #818)
      - Implements the management of message expiry for retained part. (#819)
      - Avoid to publish messages that has elapsed its expire property. (#822)
+     - Update the message expiry property remaining seconds when a publish is forwarded. (#823)
    [feature] subscription option handling: (issue #808)
      - Move from qos to subscription option implementing the persistence of SubscriptionOption to/from storage. (#810)
      - Exposed the maximum granted QoS by the server with the config setting 'max_server_granted_qos'. (#811)
