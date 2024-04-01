@@ -31,6 +31,12 @@ import io.netty.handler.codec.mqtt.MqttPubAckMessage;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import org.awaitility.Awaitility;
+import org.eclipse.paho.mqttv5.client.IMqttMessageListener;
+import org.eclipse.paho.mqttv5.client.IMqttToken;
+import org.eclipse.paho.mqttv5.client.MqttClient;
+import org.eclipse.paho.mqttv5.client.persist.MemoryPersistence;
+import org.eclipse.paho.mqttv5.common.MqttException;
+import org.eclipse.paho.mqttv5.common.MqttSubscription;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -107,6 +113,36 @@ public class MessageExpirationTest extends AbstractServerIntegrationTest {
             .getProperty(MqttProperties.MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL.value());
         assertNotNull(messageExpiryProperty, "message expiry property must be present");
         assertTrue(messageExpiryProperty.value() < messageExpiryInterval, "Forwarded message expiry should be lowered");
+    }
+
+    @Test
+    public void givenPublishMessageWithExpiryWhenForwarderToSubscriberStillContainsTheMessageExpiryHeader() throws MqttException {
+        // Use Paho client to avoid default subscriptionIdentifier (1) set by default by HiveMQ client.
+        MqttClient client = new MqttClient("tcp://localhost:1883", "subscriber", new MemoryPersistence());
+        client.connect();
+        MqttSubscription subscription = new MqttSubscription("temperature/living", 1);
+        SubscriptionOptionsTest.PublishCollector publishCollector = new SubscriptionOptionsTest.PublishCollector();
+        IMqttToken subscribeToken = client.subscribe(new MqttSubscription[]{subscription},
+            new IMqttMessageListener[] {publishCollector});
+        TestUtils.verifySubscribedSuccessfully(subscribeToken);
+
+        // publish a message on same topic the client subscribed
+        Mqtt5BlockingClient publisher = createPublisherClient();
+        long messageExpiryInterval = 3;
+        publisher.publishWith()
+            .topic("temperature/living")
+            .payload("18".getBytes(StandardCharsets.UTF_8))
+            .qos(MqttQos.AT_LEAST_ONCE) // Broker retains only QoS1 and QoS2
+            .messageExpiryInterval(messageExpiryInterval) // 3 seconds
+            .send();
+
+        // Verify the message is also reflected back to the sender
+        publishCollector.assertReceivedMessageIn(2, TimeUnit.SECONDS);
+        assertEquals("temperature/living", publishCollector.receivedTopic());
+        assertEquals("18", publishCollector.receivedPayload(), "Payload published on topic should match");
+        org.eclipse.paho.mqttv5.common.MqttMessage receivedMessage = publishCollector.receivedMessage();
+        assertEquals(MqttQos.AT_LEAST_ONCE.getCode(), receivedMessage.getQos());
+        assertEquals(messageExpiryInterval, receivedMessage.getProperties().getMessageExpiryInterval());
     }
 
     @Test

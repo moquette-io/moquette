@@ -117,8 +117,10 @@ public class SessionRegistry {
             if (messageExpiry == Instant.MAX) {
                 return mqttProperties;
             }
-            long remainingSeconds = Duration.between(Instant.now(), messageExpiry)
-                .getSeconds();
+
+            Duration duration = Duration.between(Instant.now(), messageExpiry);
+            // do some math rounding so that 2.9999 seconds remains 3 seconds
+            long remainingSeconds = Math.round(duration.toMillis() / 1_000.0);
             final int indexOfExpiry = findPublicationExpiryProperty(mqttProperties);
             MqttProperties.IntegerProperty updatedProperty = new MqttProperties.IntegerProperty(MqttProperties.MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL.value(), (int) remainingSeconds);
 

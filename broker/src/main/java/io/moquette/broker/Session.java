@@ -262,9 +262,11 @@ class Session {
             LOG.debug("Sending publish at QoS0 already expired, drop it");
             return;
         }
+
+        MqttProperties.MqttProperty[] mqttProperties = publishRequest.updatePublicationExpiryIfPresentOrAdd();
         MqttPublishMessage publishMsg = MQTTConnection.createPublishMessage(publishRequest.getTopic().toString(),
             publishRequest.getPublishingQos(), publishRequest.getPayload(), 0,
-            publishRequest.retained, false, publishRequest.mqttProperties);
+            publishRequest.retained, false, mqttProperties);
         mqttConnection.sendPublish(publishMsg);
     }
 
@@ -311,9 +313,11 @@ class Session {
             if (resendInflightOnTimeout) {
                 inflightTimeouts.add(new InFlightPacket(packetId, FLIGHT_BEFORE_RESEND_MS));
             }
+
+            MqttProperties.MqttProperty[] mqttProperties = publishRequest.updatePublicationExpiryIfPresentOrAdd();
             MqttPublishMessage publishMsg = MQTTConnection.createPublishMessage(
                 publishRequest.topic.toString(), publishRequest.getPublishingQos(),
-                publishRequest.payload, packetId, publishRequest.retained, false, publishRequest.mqttProperties);
+                publishRequest.payload, packetId, publishRequest.retained, false, mqttProperties);
             localMqttConnectionRef.sendPublish(publishMsg);
 
             drainQueueToConnection();

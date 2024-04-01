@@ -21,7 +21,6 @@ package io.moquette.integration.mqtt5;
 import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.Mqtt5RetainHandling;
-import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAckReasonCode;
 import org.eclipse.paho.mqttv5.client.IMqttMessageListener;
 import org.eclipse.paho.mqttv5.client.IMqttToken;
 import org.eclipse.paho.mqttv5.client.MqttClient;
@@ -64,6 +63,14 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
             return new String(receivedMessage.getPayload(), StandardCharsets.UTF_8);
         }
 
+        public String receivedTopic() {
+            return receivedTopic;
+        }
+
+        public MqttMessage receivedMessage() {
+            return receivedMessage;
+        }
+
         public void assertReceivedMessageIn(int time, TimeUnit unit) {
             try {
                 assertTrue(latch.await(time, unit), "Publish is received");
@@ -95,7 +102,7 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
         PublishCollector publishCollector = new PublishCollector();
         IMqttToken subscribeToken = client.subscribe(new MqttSubscription[]{subscription},
             new IMqttMessageListener[] {publishCollector});
-        verifySubscribedSuccessfully(subscribeToken);
+        TestUtils.verifySubscribedSuccessfully(subscribeToken);
 
         // publish a message on same topic the client subscribed
         client.publish("/metering/temp", new MqttMessage("18".getBytes(StandardCharsets.UTF_8), 1, false, null));
@@ -113,7 +120,7 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
         PublishCollector publishCollector = new PublishCollector();
         IMqttToken subscribeToken = client.subscribe(new MqttSubscription[]{subscription},
             new IMqttMessageListener[] {publishCollector});
-        verifySubscribedSuccessfully(subscribeToken);
+        TestUtils.verifySubscribedSuccessfully(subscribeToken);
 
         // publish a message on same topic the client subscribed
         client.publish("/metering/temp", new MqttMessage("18".getBytes(StandardCharsets.UTF_8), 1, false, null));
@@ -123,12 +130,6 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
         assertEquals("/metering/temp", publishCollector.receivedTopic);
         assertEquals("18", publishCollector.receivedPayload(), "Payload published on topic should match");
         assertEquals(MqttQos.AT_LEAST_ONCE.getCode(), publishCollector.receivedMessage.getQos());
-    }
-
-    private static void verifySubscribedSuccessfully(IMqttToken subscribeToken) {
-        assertEquals(1, subscribeToken.getReasonCodes().length);
-        assertEquals(Mqtt5SubAckReasonCode.GRANTED_QOS_1.getCode(), subscribeToken.getReasonCodes()[0],
-            "Client is subscribed to the topic");
     }
 
     @Test
@@ -160,7 +161,7 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
         PublishCollector publishCollector = new PublishCollector();
         IMqttToken subscribeToken = subscriberWithRetain.subscribe(new MqttSubscription[]{subscription},
             new IMqttMessageListener[] {publishCollector});
-        verifySubscribedSuccessfully(subscribeToken);
+        TestUtils.verifySubscribedSuccessfully(subscribeToken);
 
         // Verify the message is also reflected back to the sender
         publishCollector.assertReceivedMessageIn(2, TimeUnit.SECONDS);
@@ -313,7 +314,7 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
 
         IMqttToken subscribeToken = subscriber.subscribe(new MqttSubscription[]{subscription},
             new IMqttMessageListener[] {publishCollector});
-        verifySubscribedSuccessfully(subscribeToken);
+        TestUtils.verifySubscribedSuccessfully(subscribeToken);
     }
 
     private static void createClientWithRetainPolicy(PublishCollector publishCollector, int retainPolicy) throws MqttException {
@@ -324,7 +325,7 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
 
         IMqttToken subscribeToken = subscriber.subscribe(new MqttSubscription[]{subscription},
             new IMqttMessageListener[] {publishCollector});
-        verifySubscribedSuccessfully(subscribeToken);
+        TestUtils.verifySubscribedSuccessfully(subscribeToken);
     }
 
     private static MqttClient createSubscriberClientWithRetainAsPublished(PublishCollector publishCollector, String topic) throws MqttException {
@@ -344,7 +345,7 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
 
         IMqttToken subscribeToken = subscriber.subscribe(new MqttSubscription[]{subscription},
             new IMqttMessageListener[] {publishCollector});
-        verifySubscribedSuccessfully(subscribeToken);
+        TestUtils.verifySubscribedSuccessfully(subscribeToken);
 
         return subscriber;
     }
