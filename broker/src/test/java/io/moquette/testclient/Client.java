@@ -137,12 +137,17 @@ public class Client {
     }
 
     public MqttConnAckMessage connectV5() {
+        return connectV5(2);
+    }
+
+    @NotNull
+    public MqttConnAckMessage connectV5(int keepAliveSecs) {
         final MqttMessageBuilders.ConnectBuilder builder = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_5);
         if (clientId != null) {
             builder.clientId(clientId);
         }
         MqttConnectMessage connectMessage = builder
-            .keepAlive(2) // secs
+            .keepAlive(keepAliveSecs) // secs
             .willFlag(false)
             .willQoS(MqttQoS.AT_MOST_ONCE)
             .build();

@@ -204,7 +204,14 @@ public class SegmentPersistentQueueTest {
 
     private static PublishedMessage createMessage(String topic, int totalMessageSize) {
         // 4 totalSize + 1 msgType + 1 qos + 4 topicSize + 4 bodySize = 14
-        int bodySize = totalMessageSize - 14 - topic.getBytes(UTF_8).length;
+        int publishedMessageSerializedHeaderSize =
+            4 + // totalSize
+            1 + // msgType
+            1 + // qos
+            4 + // topicSize
+            4 + // bodySize
+            + 4 + Instant.MAX.toString().getBytes(StandardCharsets.UTF_8).length; // message expiry
+        int bodySize = totalMessageSize - publishedMessageSerializedHeaderSize - topic.getBytes(UTF_8).length;
         final ByteBuf payload = Unpooled.wrappedBuffer(getBody(bodySize).getBytes(StandardCharsets.UTF_8));
         return new PublishedMessage(Topic.asTopic(topic), MqttQoS.AT_LEAST_ONCE, payload, false, Instant.MAX);
     }

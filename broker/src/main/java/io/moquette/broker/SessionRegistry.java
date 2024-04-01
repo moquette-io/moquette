@@ -112,9 +112,71 @@ public class SessionRegistry {
         public boolean isExpired() {
             return messageExpiry != Instant.MAX && Instant.now().isAfter(messageExpiry);
         }
+
+        public MqttProperties.MqttProperty[] updatePublicationExpiryIfPresentOrAdd() {
+            if (messageExpiry == Instant.MAX) {
+                return mqttProperties;
+            }
+
+            Duration duration = Duration.between(Instant.now(), messageExpiry);
+            // do some math rounding so that 2.9999 seconds remains 3 seconds
+            long remainingSeconds = Math.round(duration.toMillis() / 1_000.0);
+            final int indexOfExpiry = findPublicationExpiryProperty(mqttProperties);
+            MqttProperties.IntegerProperty updatedProperty = new MqttProperties.IntegerProperty(MqttProperties.MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL.value(), (int) remainingSeconds);
+
+            // update existing property
+            if (indexOfExpiry != -1) {
+                mqttProperties[indexOfExpiry] = updatedProperty;
+                return mqttProperties;
+            }
+
+            // insert a new property
+            MqttProperties.MqttProperty[] newProperties = Arrays.copyOf(mqttProperties, mqttProperties.length + 1);
+            newProperties[newProperties.length - 1] = updatedProperty;
+            return newProperties;
+        }
+
+        /**
+         * Linear search of PUBLICATION_EXPIRY_INTERVAL.
+         * @param properties the array of properties.
+         * @return the index of matched property or -1.
+         * */
+        private static int findPublicationExpiryProperty(MqttProperties.MqttProperty[] properties) {
+            for (int i = 0; i < properties.length; i++) {
+                if (isPublicationExpiryProperty(properties[i])) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        private static boolean isPublicationExpiryProperty(MqttProperties.MqttProperty property) {
+            return property instanceof MqttProperties.IntegerProperty &&
+                property.propertyId() == MqttProperties.MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL.value();
+        }
+
+        public Instant getMessageExpiry() {
+            return messageExpiry;
+        }
+
+        @Override
+        public String toString() {
+            return "PublishedMessage{" +
+                "topic=" + topic +
+                ", publishingQos=" + publishingQos +
+                ", payload=" + payload +
+                ", retained=" + retained +
+                ", messageExpiry=" + messageExpiry +
+                ", mqttProperties=" + Arrays.toString(mqttProperties) +
+                '}';
+        }
     }
 
     public static final class PubRelMarker extends EnqueuedMessage {
+        @Override
+        public String toString() {
+            return "PubRelMarker{}";
+        }
     }
 
     public enum CreationModeEnum {

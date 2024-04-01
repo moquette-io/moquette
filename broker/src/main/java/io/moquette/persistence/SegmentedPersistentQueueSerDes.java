@@ -35,6 +35,7 @@ class SegmentedPersistentQueueSerDes {
             final String topic = casted.getTopic().toString();
 
             writeTopic(buff, topic);
+            writeMessageExpiry(buff, casted.getMessageExpiry());
             writePayload(buff, casted.getPayload());
             if (EnqueuedMessageValueType.hasProperties(casted)) {
                 buff.put((byte) 1); // there are properties
@@ -47,6 +48,10 @@ class SegmentedPersistentQueueSerDes {
         } else {
             throw new IllegalArgumentException("Unrecognized message class " + obj.getClass());
         }
+    }
+
+    private void writeMessageExpiry(ByteBuffer buff, Instant messageExpiry) {
+        writeString(buff, messageExpiry.toString());
     }
 
     private void writePayload(ByteBuffer target, ByteBuf source) {
@@ -112,6 +117,7 @@ class SegmentedPersistentQueueSerDes {
         return 1 + // message type
             1 + // qos
             topicMemorySize(casted.getTopic()) +
+            messageExpirySize(casted.getMessageExpiry()) +
             payloadMemorySize(casted.getPayload()) +
             1 +  // flag to indicate if there are MQttProperties or not
             propertiesSize;
@@ -125,6 +131,11 @@ class SegmentedPersistentQueueSerDes {
     private int topicMemorySize(Topic topic) {
         return 4 + // size
             topic.toString().getBytes(StandardCharsets.UTF_8).length;
+    }
+
+    private int messageExpirySize(Instant messageExpiry) {
+        return 4 + // size
+            messageExpiry.toString().getBytes(StandardCharsets.UTF_8).length;
     }
 
     private int propertiesMemorySize(MqttProperties.MqttProperty[] properties) {
@@ -164,12 +175,13 @@ class SegmentedPersistentQueueSerDes {
         } else if (messageType == MessageType.PUBLISHED_MESSAGE.ordinal()) {
             final MqttQoS qos = MqttQoS.valueOf(buff.get());
             final String topicStr = readTopic(buff);
+            final Instant messageExpiry = readExpiry(buff);
             final ByteBuf payload = readPayload(buff);
             if (SerdesUtils.containsProperties(buff)) {
                 MqttProperties.MqttProperty[] mqttProperties = readProperties(buff);
-                return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload, false, Instant.MAX, mqttProperties);
+                return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload, false, messageExpiry, mqttProperties);
             } else {
-                return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload, false, Instant.MAX);
+                return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload, false, messageExpiry);
             }
         } else {
             throw new IllegalArgumentException("Can't recognize record of type: " + messageType);
@@ -185,10 +197,22 @@ class SegmentedPersistentQueueSerDes {
     }
 
     private String readTopic(ByteBuffer buff) {
+        return readString(buff);
+    }
+
+    private static String readString(ByteBuffer buff) {
         final int stringLen = buff.getInt();
         final byte[] rawString = new byte[stringLen];
         buff.get(rawString);
         return new String(rawString, StandardCharsets.UTF_8);
+    }
+
+    private Instant readExpiry(ByteBuffer buff) {
+        final String expiryText = readString(buff);
+        if (Instant.MAX.toString().equals(expiryText)) {
+            return Instant.MAX;
+        }
+        return Instant.parse(expiryText);
     }
 
     private ByteBuf readPayload(ByteBuffer buff) {
