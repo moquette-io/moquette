@@ -188,7 +188,7 @@ public class MessageExpirationTest extends AbstractServerIntegrationTest {
 
         // subscribe with an identifier
         MqttMessage received = lowLevelClient.subscribeWithIdentifier("temperature/living",
-            MqttQoS.AT_LEAST_ONCE, 123);
+            MqttQoS.AT_LEAST_ONCE, 123, 500, TimeUnit.MILLISECONDS);
         verifyOfType(received, MqttMessageType.SUBACK);
 
         //lowlevel client doesn't ACK any pub, so the in flight window fills up
