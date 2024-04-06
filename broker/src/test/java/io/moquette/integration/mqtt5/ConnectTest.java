@@ -12,6 +12,7 @@ import com.hivemq.client.mqtt.mqtt5.message.disconnect.Mqtt5Disconnect;
 import com.hivemq.client.mqtt.mqtt5.message.disconnect.Mqtt5DisconnectReasonCode;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5PublishResult;
+import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5WillPublishBuilder;
 import io.moquette.testclient.Client;
 import io.netty.handler.codec.mqtt.MqttConnAckMessage;
 import io.netty.handler.codec.mqtt.MqttConnectReturnCode;
@@ -33,6 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -142,6 +144,27 @@ class ConnectTest extends AbstractServerIntegrationTest {
         scheduleDisconnectWithErrorCode(clientWithWill, Duration.ofMillis(500));
 
         verifyPublishedMessage(testamentSubscriber, 10, "Will message must be received");
+    }
+
+    @Test
+    public void fireWillAfterTheDelaySpecifiedInConnectPropertiesAndMessageExpiry() throws InterruptedException {
+        int messageExpiry = 5;
+        final Mqtt5BlockingClient clientWithWill =
+            createAndConnectClientWithWillTestamentAndMessageExpiry("simple_client", 1, messageExpiry);
+
+        final Mqtt5BlockingClient testamentSubscriber = createAndConnectClientListeningToTestament();
+
+        // schedule a bad disconnect
+        scheduleDisconnectWithErrorCode(clientWithWill, Duration.ofMillis(500));
+
+        TestUtils.verifyPublishedMessage(testamentSubscriber, 10,
+            (Mqtt5Publish message) -> {
+                final String payload = new String(message.getPayloadAsBytes(), StandardCharsets.UTF_8);
+                assertEquals("Goodbye", payload, "Will message must be received");
+
+                long expiry = message.getMessageExpiryInterval().orElse(-1L);
+                assertEquals(messageExpiry, expiry);
+            });
     }
 
     private static void verifyPublishedMessage(Mqtt5BlockingClient subscriber, int timeout, String message) throws InterruptedException {
@@ -287,7 +310,16 @@ class ConnectTest extends AbstractServerIntegrationTest {
 
     @NotNull
     private static Mqtt5BlockingClient createAndConnectClientWithWillTestament(String clientId, int delayInSeconds) {
-        Mqtt5ConnectBuilder connectBuilder = Mqtt5Connect.builder()
+        Mqtt5WillPublishBuilder.Nested.Complete<? extends Mqtt5ConnectBuilder> willPublishBuilder = deafaultWillBuilder(delayInSeconds);
+
+        Mqtt5ConnectBuilder connectBuilder = willPublishBuilder.applyWillPublish();
+
+        return createAndConnectWithBuilder(clientId, connectBuilder);
+    }
+
+    @NotNull
+    private static Mqtt5WillPublishBuilder.Nested.Complete<? extends Mqtt5ConnectBuilder> deafaultWillBuilder(int delayInSeconds) {
+        Mqtt5WillPublishBuilder.Nested.Complete<? extends Mqtt5ConnectBuilder> willPublishBuilder = Mqtt5Connect.builder()
             .keepAlive(10)
             .willPublish()
                 .topic("/will_testament")
@@ -296,8 +328,19 @@ class ConnectTest extends AbstractServerIntegrationTest {
                 .contentType("something content type here")
                 .userProperties()
                     .add("test_property", "value of a property")
-                .applyUserProperties()
-            .applyWillPublish();
+                .applyUserProperties();
+        return willPublishBuilder;
+    }
+
+    @NotNull
+    private static Mqtt5BlockingClient createAndConnectClientWithWillTestamentAndMessageExpiry(String clientId,
+                                                                                               int delayInSeconds,
+                                                                                               int messageExpirySeconds) {
+        Mqtt5WillPublishBuilder.Nested.Complete<? extends Mqtt5ConnectBuilder> willPublishBuilder = deafaultWillBuilder(delayInSeconds);
+
+        willPublishBuilder.messageExpiryInterval(messageExpirySeconds);
+
+        Mqtt5ConnectBuilder connectBuilder = willPublishBuilder.applyWillPublish();
 
         return createAndConnectWithBuilder(clientId, connectBuilder);
     }

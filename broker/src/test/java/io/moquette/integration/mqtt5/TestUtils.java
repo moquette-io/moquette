@@ -32,11 +32,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 public class TestUtils {
-    static void verifyPublishedMessage(Mqtt5BlockingClient client, Consumer<Mqtt5Publish> verifier, int timeoutSeconds) throws Exception {
+    static void verifyPublishedMessage(Mqtt5BlockingClient client, int timeoutSeconds, Consumer<Mqtt5Publish> verifier) throws InterruptedException {
         try (Mqtt5BlockingClient.Mqtt5Publishes publishes = client.publishes(MqttGlobalPublishFilter.ALL)) {
             Optional<Mqtt5Publish> publishMessage = publishes.receive(timeoutSeconds, TimeUnit.SECONDS);
             if (!publishMessage.isPresent()) {
-                fail("Expected to receive a publish message");
+                fail("Expected to receive a publish in " + timeoutSeconds + " seconds");
                 return;
             }
             verifier.accept(publishMessage.get());
