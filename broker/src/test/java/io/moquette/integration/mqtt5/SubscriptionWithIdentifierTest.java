@@ -14,8 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class SubscriptionWithIdentifierTest extends AbstractSubscriptionIntegrationTest {
 
@@ -45,7 +44,9 @@ public class SubscriptionWithIdentifierTest extends AbstractSubscriptionIntegrat
             .until(lowLevelClient::hasReceivedMessages);
         MqttMessage mqttMsg = lowLevelClient.receiveNextMessage(Duration.ofSeconds(1));
         verifyOfType(mqttMsg, MqttMessageType.PUBLISH);
-        verifySubscriptionIdentifier(123, (MqttPublishMessage) mqttMsg);
+        MqttPublishMessage mqttPublish = (MqttPublishMessage) mqttMsg;
+        verifySubscriptionIdentifier(123, mqttPublish);
+        assertTrue(mqttPublish.release(), "Reference of publish should be released");
     }
 
     private static void verifySubscriptionIdentifier(int expectedSubscriptionIdentifier, MqttPublishMessage publish) {
@@ -82,6 +83,8 @@ public class SubscriptionWithIdentifierTest extends AbstractSubscriptionIntegrat
             .until(lowLevelClient::hasReceivedMessages);
         MqttMessage mqttMsg = lowLevelClient.receiveNextMessage(Duration.ofSeconds(1));
         verifyOfType(mqttMsg, MqttMessageType.PUBLISH);
-        verifySubscriptionIdentifier(123, (MqttPublishMessage) mqttMsg);
+        MqttPublishMessage mqttPublish = (MqttPublishMessage) mqttMsg;
+        verifySubscriptionIdentifier(123, mqttPublish);
+        assertTrue(mqttPublish.release(), "Reference of publish should be released");
     }
 }

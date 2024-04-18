@@ -18,6 +18,7 @@ package io.moquette.testclient;
 
 import io.moquette.BrokerConstants;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
@@ -78,9 +79,9 @@ public class Client {
                 @Override
                 public void initChannel(SocketChannel ch) throws Exception {
                     ChannelPipeline pipeline = ch.pipeline();
-                    pipeline.addLast("decoder", new MqttDecoder());
-                    pipeline.addLast("encoder", MqttEncoder.INSTANCE);
-                    pipeline.addLast("handler", handler);
+                    pipeline.addLast("rawcli_decoder", new MqttDecoder());
+                    pipeline.addLast("rawcli_encoder", MqttEncoder.INSTANCE);
+                    pipeline.addLast("rawcli_handler", handler);
                 }
             });
 

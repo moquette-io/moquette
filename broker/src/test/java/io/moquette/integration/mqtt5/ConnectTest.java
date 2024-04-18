@@ -14,10 +14,7 @@ import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5PublishResult;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5WillPublishBuilder;
 import io.moquette.testclient.Client;
-import io.netty.handler.codec.mqtt.MqttConnAckMessage;
-import io.netty.handler.codec.mqtt.MqttConnectReturnCode;
-import io.netty.handler.codec.mqtt.MqttPublishMessage;
-import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.*;
 import org.awaitility.Awaitility;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
@@ -120,11 +117,16 @@ class ConnectTest extends AbstractServerIntegrationTest {
             .atMost(2, TimeUnit.SECONDS)
             .until(reconnectingSubscriber::hasReceivedMessages);
 
-        final String publishPayload = reconnectingSubscriber.nextQueuedMessage()
+        Optional<MqttPublishMessage> opt = reconnectingSubscriber.nextQueuedMessage()
             .filter(m -> m instanceof MqttPublishMessage)
-            .map(m -> (MqttPublishMessage) m)
-            .map(m -> m.payload().toString(StandardCharsets.UTF_8))
-            .orElse("Fake Payload");
+            .map(m -> (MqttPublishMessage) m);
+        final String publishPayload;
+        if (opt.isPresent()) {
+            publishPayload = opt.get().payload().toString(StandardCharsets.UTF_8);
+            opt.get().release();
+        } else {
+            publishPayload = "Fake Payload";
+        }
         assertEquals("Hello", publishPayload, "The inflight payload from previous subscription MUST be received");
 
         reconnectingSubscriber.disconnect();
