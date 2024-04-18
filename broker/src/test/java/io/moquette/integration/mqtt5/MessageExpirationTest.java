@@ -53,7 +53,7 @@ public class MessageExpirationTest extends AbstractServerIntegrationTest {
     }
 
     @Test
-    public void givenPublishWithRetainedAndMessageExpiryWhenTimePassedThenRetainedIsNotForwardedOnSubscription() throws InterruptedException {
+    public void givenPublishWithRetainedAndMessageExpiryWhenTimePassedThenRetainedIsNotForwardedOnSubscription() throws InterruptedException, MqttException {
         Mqtt5BlockingClient publisher = createPublisherClient();
         int messageExpiryInterval = 3; //seconds
         publisher.publishWith()
@@ -113,6 +113,7 @@ public class MessageExpirationTest extends AbstractServerIntegrationTest {
             .getProperty(MqttProperties.MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL.value());
         assertNotNull(messageExpiryProperty, "message expiry property must be present");
         assertTrue(messageExpiryProperty.value() < messageExpiryInterval, "Forwarded message expiry should be lowered");
+        assertTrue(publish.release(), "Last reference of publish should be released");
     }
 
     @Test
@@ -184,11 +185,11 @@ public class MessageExpirationTest extends AbstractServerIntegrationTest {
     public void givenPublishWithMessageExpiryPropertyWhenItsForwardedToSubscriberThenExpiryValueHasToBeDeducedByTheTimeSpentInBroker() throws InterruptedException {
         int messageExpiryInterval = 10; // seconds
         // avoid the keep alive period could disconnect
-        connectLowLevel((int)(messageExpiryInterval * 1.5));
+        connectLowLevel((int) (messageExpiryInterval * 1.5));
 
         // subscribe with an identifier
         MqttMessage received = lowLevelClient.subscribeWithIdentifier("temperature/living",
-            MqttQoS.AT_LEAST_ONCE, 123);
+            MqttQoS.AT_LEAST_ONCE, 123, 500, TimeUnit.MILLISECONDS);
         verifyOfType(received, MqttMessageType.SUBACK);
 
         //lowlevel client doesn't ACK any pub, so the in flight window fills up
@@ -225,6 +226,7 @@ public class MessageExpirationTest extends AbstractServerIntegrationTest {
         Integer expirySeconds = ((MqttProperties.IntegerProperty) expiryProp).value();
 
         assertTrue(expirySeconds < messageExpiryInterval, "Publish's expiry has to be updated");
+        assertTrue(publishMessage.release(), "Last reference of publish should be released");
     }
 
     private void consumesPublishesInflightWindow(int inflightWindowSize) throws InterruptedException {
@@ -236,6 +238,7 @@ public class MessageExpirationTest extends AbstractServerIntegrationTest {
             MqttPublishMessage publish = (MqttPublishMessage) mqttMessage;
             assertEquals(Integer.toString(i), publish.payload().toString(StandardCharsets.UTF_8));
             int packetId = publish.variableHeader().packetId();
+            assertTrue(publish.release(), "Reference of publish should be released");
 
             MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBACK, false, AT_MOST_ONCE,
                 false, 0);
@@ -255,7 +258,7 @@ public class MessageExpirationTest extends AbstractServerIntegrationTest {
                     .messageExpiryInterval(messageExpiryInterval);
             }
 
-           builder.send();
+            builder.send();
         }
     }
 }

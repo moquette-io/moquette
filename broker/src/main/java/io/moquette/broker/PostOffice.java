@@ -311,7 +311,17 @@ class PostOffice {
     }
 
     private void publishWill(ISessionsRepository.Will will) {
-        publish2Subscribers(WILL_PUBLISHER, Unpooled.copiedBuffer(will.payload), new Topic(will.topic), will.qos, will.retained, Instant.MAX);
+        final Instant messageExpiryInstant = willMessageExpiry(will);
+        publish2Subscribers(WILL_PUBLISHER, Unpooled.copiedBuffer(will.payload), new Topic(will.topic),
+            will.qos, will.retained, messageExpiryInstant);
+    }
+
+    private static Instant willMessageExpiry(ISessionsRepository.Will will) {
+        Optional<Duration> messageExpiryOpt = will.properties.messageExpiry();
+        if (messageExpiryOpt.isPresent()) {
+            return Instant.now().plus(messageExpiryOpt.get());
+        }
+        return Instant.MAX;
     }
 
     /**

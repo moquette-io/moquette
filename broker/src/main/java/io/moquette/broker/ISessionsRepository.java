@@ -256,10 +256,10 @@ public interface ISessionsRepository {
          }
 
          /**
-          * Used only when update with an expire instant.
+          * Copy constructor used only when update with an expire instant.
           * */
          public Will(Will orig, Instant expireAt) {
-            this(orig.topic, orig.payload, orig.qos, orig.retained, orig.delayInterval);
+            this(orig.topic, orig.payload, orig.qos, orig.retained, orig.delayInterval, orig.properties);
             this.expireAt = expireAt;
          }
 
@@ -273,6 +273,16 @@ public interface ISessionsRepository {
              this.retained = orig.retained;
              this.delayInterval = orig.delayInterval;
              this.expireAt = orig.expireAt;
+             this.properties = properties;
+         }
+
+         private Will(String topic, byte[] payload, MqttQoS qos, boolean retained, int delayInterval,
+                      WillOptions properties) {
+             this.topic = topic;
+             this.payload = payload;
+             this.qos = qos;
+             this.retained = retained;
+             this.delayInterval = delayInterval;
              this.properties = properties;
          }
 
