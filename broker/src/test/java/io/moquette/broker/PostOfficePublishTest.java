@@ -124,7 +124,7 @@ public class PostOfficePublishTest {
 
         // Exercise
         final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, FAKE_CLIENT_ID,
+        sut.receivedPublishQos0(TEST_USER, FAKE_CLIENT_ID,
             MqttMessageBuilders.publish()
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
@@ -226,7 +226,7 @@ public class PostOfficePublishTest {
 
         // Exercise
         final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, FAKE_CLIENT_ID,
+        sut.receivedPublishQos0(TEST_USER, FAKE_CLIENT_ID,
             MqttMessageBuilders.publish()
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
@@ -253,7 +253,7 @@ public class PostOfficePublishTest {
 
         // Exercise
         final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, FAKE_CLIENT_ID,
+        sut.receivedPublishQos0(TEST_USER, FAKE_CLIENT_ID,
             MqttMessageBuilders.publish()
                 .payload(anyPayload)
                 .qos(MqttQoS.AT_MOST_ONCE)
@@ -278,7 +278,7 @@ public class PostOfficePublishTest {
 
         // Exercise
         final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
-        sut.receivedPublishQos1(senderConnection, new Topic(NEWS_TOPIC), TEST_USER, 1,
+        sut.receivedPublishQos1(senderConnection, TEST_USER, 1,
             MqttMessageBuilders.publish()
                 .payload(anyPayload)
                 .qos(MqttQoS.AT_LEAST_ONCE)
@@ -327,7 +327,7 @@ public class PostOfficePublishTest {
         ConnectionTestUtils.assertConnectAccepted(pubChannel);
 
         final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
-        sut.receivedPublishQos1(pubConn, new Topic(NEWS_TOPIC), TEST_USER, 1,
+        sut.receivedPublishQos1(pubConn, TEST_USER, 1,
             MqttMessageBuilders.publish()
                 .payload(anyPayload.retainedDuplicate())
                 .qos(MqttQoS.AT_LEAST_ONCE)
@@ -366,7 +366,7 @@ public class PostOfficePublishTest {
         ConnectionTestUtils.assertConnectAccepted(pubChannel);
 
         final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
-        sut.receivedPublishQos1(pubConn, new Topic(NEWS_TOPIC), TEST_USER, 1,
+        sut.receivedPublishQos1(pubConn, TEST_USER, 1,
             MqttMessageBuilders.publish()
                 .payload(anyPayload.retainedDuplicate())
                 .qos(MqttQoS.AT_LEAST_ONCE)
@@ -392,7 +392,7 @@ public class PostOfficePublishTest {
         ConnectionTestUtils.assertConnectAccepted(pubChannel);
 
         final ByteBuf anyPayload = Unpooled.copiedBuffer("Any payload", Charset.defaultCharset());
-        sut.receivedPublishQos1(pubConn, new Topic(NEWS_TOPIC), TEST_USER, 1,
+        sut.receivedPublishQos1(pubConn, TEST_USER, 1,
             MqttMessageBuilders.publish()
                 .payload(anyPayload)
                 .qos(MqttQoS.AT_LEAST_ONCE)
@@ -424,7 +424,7 @@ public class PostOfficePublishTest {
             .retained(true)
             .topicName(NEWS_TOPIC)
             .build();
-        sut.receivedPublishQos1(senderConnection, new Topic(NEWS_TOPIC), TEST_USER, 1,
+        sut.receivedPublishQos1(senderConnection, TEST_USER, 1,
                                 publishMsg, Instant.MAX);
 
         assertMessageIsRetained(NEWS_TOPIC, anyPayload);
@@ -432,7 +432,7 @@ public class PostOfficePublishTest {
         // publish a QoS0 retained message
         // Exercise
         final ByteBuf qos0Payload = Unpooled.copiedBuffer("QoS0 payload", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, connection.getClientId(),
+        sut.receivedPublishQos0(TEST_USER, connection.getClientId(),
             MqttMessageBuilders.publish()
                 .payload(qos0Payload)
                 .qos(MqttQoS.AT_MOST_ONCE)

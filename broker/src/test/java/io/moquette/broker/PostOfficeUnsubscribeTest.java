@@ -152,7 +152,7 @@ public class PostOfficeUnsubscribeTest {
 
         // publish on /news
         final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD,
+        sut.receivedPublishQos0(TEST_USER, TEST_PWD,
             MqttMessageBuilders.publish()
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
@@ -165,7 +165,7 @@ public class PostOfficeUnsubscribeTest {
 
         // publish on /news
         final ByteBuf payload2 = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD,
+        sut.receivedPublishQos0(TEST_USER, TEST_PWD,
             MqttMessageBuilders.publish()
                 .payload(payload2)
                 .qos(MqttQoS.AT_MOST_ONCE)
@@ -190,7 +190,7 @@ public class PostOfficeUnsubscribeTest {
         subscribe(connection, NEWS_TOPIC, AT_MOST_ONCE);
         // publish on /news
         final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD,
+        sut.receivedPublishQos0(TEST_USER, TEST_PWD,
             MqttMessageBuilders.publish()
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
@@ -210,7 +210,7 @@ public class PostOfficeUnsubscribeTest {
 
         // publish on /news
         final ByteBuf payload2 = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD,
+        sut.receivedPublishQos0(TEST_USER, TEST_PWD,
             MqttMessageBuilders.publish()
                 .payload(payload2)
                 .qos(MqttQoS.AT_MOST_ONCE)
@@ -257,7 +257,7 @@ public class PostOfficeUnsubscribeTest {
 
         // publish from another channel
         final ByteBuf anyPayload = Unpooled.copiedBuffer(firstPayload, Charset.defaultCharset());
-        sut.receivedPublishQos1(anotherConnection, new Topic(topic), TEST_USER, 1,
+        sut.receivedPublishQos1(anotherConnection, TEST_USER, 1,
             MqttMessageBuilders.publish()
                 .payload(anyPayload)
                 .qos(MqttQoS.AT_LEAST_ONCE)
@@ -288,7 +288,7 @@ public class PostOfficeUnsubscribeTest {
         subscribe(connection, NEWS_TOPIC, AT_MOST_ONCE);
         // publish on /news
         final ByteBuf payload = Unpooled.copiedBuffer("Hello world!", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD,
+        sut.receivedPublishQos0(TEST_USER, TEST_PWD,
             MqttMessageBuilders.publish()
                 .payload(payload.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
@@ -308,7 +308,7 @@ public class PostOfficeUnsubscribeTest {
         subscribe(subscriberConnection, NEWS_TOPIC, AT_MOST_ONCE);
         // publish on /news
         final ByteBuf payload2 = Unpooled.copiedBuffer("Hello world2!", Charset.defaultCharset());
-        sut.receivedPublishQos0(new Topic(NEWS_TOPIC), TEST_USER, TEST_PWD,
+        sut.receivedPublishQos0(TEST_USER, TEST_PWD,
             MqttMessageBuilders.publish()
                 .payload(payload2.retainedDuplicate())
                 .qos(MqttQoS.AT_MOST_ONCE)
@@ -346,12 +346,12 @@ public class PostOfficeUnsubscribeTest {
     private void publishQos1(MQTTConnection publisher, String topic, String payload, int messageID) {
         final ByteBuf bytePayload = Unpooled.copiedBuffer(payload, Charset.defaultCharset());
         try {
-            sut.receivedPublishQos1(publisher, new Topic(topic), TEST_USER, messageID,
+            sut.receivedPublishQos1(publisher, TEST_USER, messageID,
                 MqttMessageBuilders.publish()
                     .payload(bytePayload)
                     .qos(MqttQoS.AT_LEAST_ONCE)
                     .retained(false)
-                    .topicName(NEWS_TOPIC).build(), Instant.MAX).completableFuture().get(5, TimeUnit.SECONDS);
+                    .topicName(topic).build(), Instant.MAX).completableFuture().get(5, TimeUnit.SECONDS);
         } catch (InterruptedException | ExecutionException | TimeoutException e) {
             throw new RuntimeException(e);
         }

@@ -637,7 +637,7 @@ final class MQTTConnection {
                     if (!isBoundToSession()) {
                         return null;
                     }
-                    postOffice.receivedPublishQos0(topic, username, clientId, msg, expiry);
+                    postOffice.receivedPublishQos0(username, clientId, msg, expiry);
                     return null;
                 }).ifFailed(msg::release);
             case AT_LEAST_ONCE:
@@ -645,7 +645,7 @@ final class MQTTConnection {
                     checkMatchSessionLoop(clientId);
                     if (!isBoundToSession())
                         return null;
-                    postOffice.receivedPublishQos1(this, topic, username, messageID, msg, expiry);
+                    postOffice.receivedPublishQos1(this, username, messageID, msg, expiry);
                     return null;
                 }).ifFailed(msg::release);
             case EXACTLY_ONCE: {
