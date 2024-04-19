@@ -62,7 +62,6 @@ import java.util.stream.Collectors;
 
 import static io.moquette.broker.Utils.messageId;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
-import static io.netty.handler.codec.mqtt.MqttQoS.AT_LEAST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.FAILURE;
@@ -320,8 +319,7 @@ class PostOffice {
             .payload(Unpooled.copiedBuffer(will.payload))
             .build();
 
-        publish2Subscribers(WILL_PUBLISHER,
-            will.qos, messageExpiryInstant, willPublishMessage);
+        publish2Subscribers(WILL_PUBLISHER, messageExpiryInstant, willPublishMessage);
     }
 
     private static Instant willMessageExpiry(ISessionsRepository.Will will) {
@@ -628,7 +626,7 @@ class PostOffice {
             ReferenceCountUtil.release(msg);
             return CompletableFuture.completedFuture(null);
         }
-        final RoutingResults publishResult = publish2Subscribers(clientID, AT_MOST_ONCE, messageExpiry, msg);
+        final RoutingResults publishResult = publish2Subscribers(clientID, messageExpiry, msg);
         if (publishResult.isAllFailed()) {
             LOG.info("No one publish was successfully enqueued to session loops");
             ReferenceCountUtil.release(msg);
@@ -667,9 +665,9 @@ class PostOffice {
         final RoutingResults routes;
         if (msg.fixedHeader().isDup()) {
             final Set<String> failedClients = failedPublishes.listFailed(clientId, messageID);
-            routes = publish2Subscribers(clientId, AT_LEAST_ONCE, failedClients, messageExpiry, msg);
+            routes = publish2Subscribers(clientId, failedClients, messageExpiry, msg);
         } else {
-            routes = publish2Subscribers(clientId, AT_LEAST_ONCE, messageExpiry, msg);
+            routes = publish2Subscribers(clientId, messageExpiry, msg);
         }
         if (LOG.isTraceEnabled()) {
             LOG.trace("subscriber routes: {}", routes);
@@ -724,9 +722,9 @@ class PostOffice {
     }
 
     private RoutingResults publish2Subscribers(String publisherClientId,
-                                               MqttQoS publishingQos, Instant messageExpiry,
+                                               Instant messageExpiry,
                                                MqttPublishMessage msg) {
-        return publish2Subscribers(publisherClientId, publishingQos, NO_FILTER, messageExpiry, msg);
+        return publish2Subscribers(publisherClientId, NO_FILTER, messageExpiry, msg);
     }
 
     private class BatchingPublishesCollector {
@@ -792,11 +790,12 @@ class PostOffice {
         }
     }
 
-    private RoutingResults publish2Subscribers(String publisherClientId, MqttQoS publishingQos,
+    private RoutingResults publish2Subscribers(String publisherClientId,
                                                Set<String> filterTargetClients, Instant messageExpiry,
                                                MqttPublishMessage msg) {
         final boolean retainPublish = msg.fixedHeader().isRetain();
         final Topic topic = new Topic(msg.variableHeader().topicName());
+        final MqttQoS publishingQos = msg.fixedHeader().qosLevel();
         List<Subscription> topicMatchingSubscriptions = subscriptions.matchQosSharpening(topic);
         if (topicMatchingSubscriptions.isEmpty()) {
             // no matching subscriptions, clean exit
@@ -934,9 +933,9 @@ class PostOffice {
         final RoutingResults publishRoutings;
         if (msg.fixedHeader().isDup()) {
             final Set<String> failedClients = failedPublishes.listFailed(clientId, messageID);
-            publishRoutings = publish2Subscribers(clientId, EXACTLY_ONCE, failedClients, messageExpiry, msg);
+            publishRoutings = publish2Subscribers(clientId, failedClients, messageExpiry, msg);
         } else {
-            publishRoutings = publish2Subscribers(clientId, EXACTLY_ONCE, messageExpiry, msg);
+            publishRoutings = publish2Subscribers(clientId, messageExpiry, msg);
         }
         if (publishRoutings.isAllSuccess()) {
             // QoS2 PUB message was enqueued successfully to every event loop
@@ -978,7 +977,7 @@ class PostOffice {
         final ByteBuf payload = msg.payload();
         LOG.info("Sending internal PUBLISH message Topic={}, qos={}", topic, qos);
 
-        final RoutingResults publishResult = publish2Subscribers(INTERNAL_PUBLISHER, qos, Instant.MAX, msg);
+        final RoutingResults publishResult = publish2Subscribers(INTERNAL_PUBLISHER, Instant.MAX, msg);
         LOG.trace("after routed publishes: {}", publishResult);
 
         if (!isRetained(msg)) {
