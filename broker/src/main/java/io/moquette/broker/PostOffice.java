@@ -27,6 +27,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttFixedHeader;
+import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttMessageType;
 import io.netty.handler.codec.mqtt.MqttProperties;
 import io.netty.handler.codec.mqtt.MqttProperties.MqttPropertyType;
@@ -61,7 +62,6 @@ import java.util.stream.Collectors;
 
 import static io.moquette.broker.Utils.messageId;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
-import static io.netty.handler.codec.mqtt.MqttQoS.AT_LEAST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.FAILURE;
@@ -312,8 +312,14 @@ class PostOffice {
 
     private void publishWill(ISessionsRepository.Will will) {
         final Instant messageExpiryInstant = willMessageExpiry(will);
-        publish2Subscribers(WILL_PUBLISHER, Unpooled.copiedBuffer(will.payload), new Topic(will.topic),
-            will.qos, will.retained, messageExpiryInstant);
+        MqttPublishMessage willPublishMessage = MqttMessageBuilders.publish()
+            .topicName(will.topic)
+            .retained(will.retained)
+            .qos(will.qos)
+            .payload(Unpooled.copiedBuffer(will.payload))
+            .build();
+
+        publish2Subscribers(WILL_PUBLISHER, messageExpiryInstant, willPublishMessage);
     }
 
     private static Instant willMessageExpiry(ISessionsRepository.Will will) {
@@ -526,7 +532,7 @@ class PostOffice {
                 LOG.info("No retained messages matching topic filter {}", topicFilter);
                 continue;
             }
-            MqttProperties.MqttProperty[] properties = prepareSubscriptionProperties(subscription);
+            MqttProperties.MqttProperty[] properties = prepareSubscriptionProperties(subscription, Collections.emptyList());
             for (RetainedMessage retainedMsg : retainedMsgs) {
                 final MqttQoS retainedQos = retainedMsg.qosLevel();
                 MqttQoS qos = lowerQosToTheSubscriptionDesired(subscription, retainedQos);
@@ -612,14 +618,15 @@ class PostOffice {
         mqttConnection.sendUnsubAckMessage(topics, clientID, messageId);
     }
 
-    CompletableFuture<Void> receivedPublishQos0(Topic topic, String username, String clientID, MqttPublishMessage msg,
+    CompletableFuture<Void> receivedPublishQos0(String username, String clientID, MqttPublishMessage msg,
                                                 Instant messageExpiry) {
+        final Topic topic = new Topic(msg.variableHeader().topicName());
         if (!authorizator.canWrite(topic, username, clientID)) {
             LOG.error("client is not authorized to publish on topic: {}", topic);
             ReferenceCountUtil.release(msg);
             return CompletableFuture.completedFuture(null);
         }
-        final RoutingResults publishResult = publish2Subscribers(clientID, msg.payload(), topic, AT_MOST_ONCE, msg.fixedHeader().isRetain(), Instant.MAX);
+        final RoutingResults publishResult = publish2Subscribers(clientID, messageExpiry, msg);
         if (publishResult.isAllFailed()) {
             LOG.info("No one publish was successfully enqueued to session loops");
             ReferenceCountUtil.release(msg);
@@ -637,9 +644,10 @@ class PostOffice {
         });
     }
 
-    RoutingResults receivedPublishQos1(MQTTConnection connection, Topic topic, String username, int messageID,
+    RoutingResults receivedPublishQos1(MQTTConnection connection, String username, int messageID,
                                        MqttPublishMessage msg, Instant messageExpiry) {
         // verify if topic can be written
+        final Topic topic = new Topic(msg.variableHeader().topicName());
         topic.getTokens();
         if (!topic.isValid()) {
             LOG.warn("Invalid topic format, force close the connection");
@@ -654,14 +662,12 @@ class PostOffice {
             return RoutingResults.preroutingError();
         }
 
-        ByteBuf payload = msg.payload();
-        boolean retainPublish = msg.fixedHeader().isRetain();
         final RoutingResults routes;
         if (msg.fixedHeader().isDup()) {
             final Set<String> failedClients = failedPublishes.listFailed(clientId, messageID);
-            routes = publish2Subscribers(clientId, payload, topic, AT_LEAST_ONCE, failedClients, retainPublish, messageExpiry);
+            routes = publish2Subscribers(clientId, failedClients, messageExpiry, msg);
         } else {
-            routes = publish2Subscribers(clientId, payload, topic, AT_LEAST_ONCE, retainPublish, messageExpiry);
+            routes = publish2Subscribers(clientId, messageExpiry, msg);
         }
         if (LOG.isTraceEnabled()) {
             LOG.trace("subscriber routes: {}", routes);
@@ -684,7 +690,7 @@ class PostOffice {
     }
 
     private void manageRetain(Topic topic, MqttPublishMessage msg) {
-        if (msg.fixedHeader().isRetain()) {
+        if (isRetained(msg)) {
             if (!msg.payload().isReadable()) {
                 retainedRepository.cleanRetained(topic);
                 // clean also the tracker
@@ -715,9 +721,10 @@ class PostOffice {
         return mqttProperty.value();
     }
 
-    private RoutingResults publish2Subscribers(String publisherClientId, ByteBuf payload, Topic topic,
-                                               MqttQoS publishingQos, boolean isPublishRetained, Instant messageExpiry) {
-        return publish2Subscribers(publisherClientId, payload, topic, publishingQos, NO_FILTER, isPublishRetained, messageExpiry);
+    private RoutingResults publish2Subscribers(String publisherClientId,
+                                               Instant messageExpiry,
+                                               MqttPublishMessage msg) {
+        return publish2Subscribers(publisherClientId, NO_FILTER, messageExpiry, msg);
     }
 
     private class BatchingPublishesCollector {
@@ -783,8 +790,12 @@ class PostOffice {
         }
     }
 
-    private RoutingResults publish2Subscribers(String publisherClientId, ByteBuf payload, Topic topic, MqttQoS publishingQos,
-                                               Set<String> filterTargetClients, boolean retainPublish, Instant messageExpiry) {
+    private RoutingResults publish2Subscribers(String publisherClientId,
+                                               Set<String> filterTargetClients, Instant messageExpiry,
+                                               MqttPublishMessage msg) {
+        final boolean retainPublish = msg.fixedHeader().isRetain();
+        final Topic topic = new Topic(msg.variableHeader().topicName());
+        final MqttQoS publishingQos = msg.fixedHeader().qosLevel();
         List<Subscription> topicMatchingSubscriptions = subscriptions.matchQosSharpening(topic);
         if (topicMatchingSubscriptions.isEmpty()) {
             // no matching subscriptions, clean exit
@@ -815,11 +826,11 @@ class PostOffice {
             return new RoutingResults(Collections.emptyList(), Collections.emptyList(), CompletableFuture.completedFuture(null));
         }
 
-        payload.retain(subscriptionCount);
+        msg.retain(subscriptionCount);
 
         List<RouteResult> publishResults = collector.routeBatchedPublishes((batch) -> {
-            publishToSession(payload, topic, batch, publishingQos, retainPublish, messageExpiry);
-            payload.release();
+            publishToSession(topic, batch, publishingQos, retainPublish, messageExpiry, msg);
+            msg.release();
         });
 
         final CompletableFuture[] publishFutures = publishResults.stream()
@@ -833,7 +844,7 @@ class PostOffice {
             Collection<String> subscibersIds = collector.subscriberIdsByEventLoop(rr.clientId);
             if (rr.status == RouteResult.Status.FAIL) {
                 failedRoutings.addAll(subscibersIds);
-                payload.release();
+                msg.release();
             } else {
                 successedRoutings.addAll(subscibersIds);
             }
@@ -841,28 +852,30 @@ class PostOffice {
         return new RoutingResults(successedRoutings, failedRoutings, publishes);
     }
 
-    private void publishToSession(ByteBuf payload, Topic topic, Collection<Subscription> subscriptions,
-                                  MqttQoS publishingQos, boolean retainPublish, Instant messageExpiry) {
-        ByteBuf duplicatedPayload = payload.duplicate();
+    private void publishToSession(Topic topic, Collection<Subscription> subscriptions,
+                                  MqttQoS publishingQos, boolean retainPublish, Instant messageExpiry, MqttPublishMessage msg) {
+        ByteBuf duplicatedPayload = msg.payload().duplicate();
         for (Subscription sub : subscriptions) {
             MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
             boolean retained = false;
             if (sub.option().isRetainAsPublished()) {
                 retained = retainPublish;
             }
-            publishToSession(duplicatedPayload, topic, sub, qos, retained, messageExpiry);
+            publishToSession(duplicatedPayload, topic, sub, qos, retained, messageExpiry, msg);
         }
     }
 
     private void publishToSession(ByteBuf payload, Topic topic, Subscription sub, MqttQoS qos, boolean retained,
-                                  Instant messageExpiry) {
+                                  Instant messageExpiry, MqttPublishMessage msg) {
         Session targetSession = this.sessionRegistry.retrieve(sub.getClientId());
 
         boolean isSessionPresent = targetSession != null;
         if (isSessionPresent) {
             LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
                       sub.getClientId(), sub.getTopicFilter(), qos);
-            final MqttProperties.MqttProperty[] properties = prepareSubscriptionProperties(sub);
+
+            Collection<? extends MqttProperties.MqttProperty> existingProperties = msg.variableHeader().properties().listAll();
+            final MqttProperties.MqttProperty[] properties = prepareSubscriptionProperties(sub, existingProperties);
             final SessionRegistry.PublishedMessage publishedMessage =
                 new SessionRegistry.PublishedMessage(topic, qos, payload, retained, messageExpiry, properties);
             targetSession.sendPublishOnSessionAtQos(publishedMessage);
@@ -874,15 +887,23 @@ class PostOffice {
         }
     }
 
-    private MqttProperties.MqttProperty[] prepareSubscriptionProperties(Subscription sub) {
-        MqttProperties.MqttProperty[] properties;
+    private MqttProperties.MqttProperty[] prepareSubscriptionProperties(Subscription sub,
+                                        Collection<? extends MqttProperties.MqttProperty> existingProperties) {
+
+        // copy all properties except SubscriptionId
+        Collection<MqttProperties.MqttProperty> properties = new ArrayList<>(existingProperties.size() + 1);
+        for (MqttProperties.MqttProperty property : existingProperties) {
+            // skip SUBSCRIPTION_IDENTIFIER because could be added by the subscription
+            if (property.propertyId() != MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value()) {
+                properties.add(property);
+            }
+        }
         if (sub.hasSubscriptionIdentifier()) {
             MqttProperties.IntegerProperty subscriptionId = createSubscriptionIdProperty(sub);
-            properties = new MqttProperties.MqttProperty[] { subscriptionId };
-        } else {
-            properties = new MqttProperties.MqttProperty[0];
+            properties.add(subscriptionId);
         }
-        return properties;
+
+        return properties.toArray(new MqttProperties.MqttProperty[0]);
     }
 
     private MqttProperties.IntegerProperty createSubscriptionIdProperty(Subscription sub) {
@@ -899,7 +920,6 @@ class PostOffice {
                                        Instant messageExpiry) {
         LOG.trace("Processing PUB QoS2 message on connection: {}", connection);
         final Topic topic = new Topic(msg.variableHeader().topicName());
-        final ByteBuf payload = msg.payload();
 
         final String clientId = connection.getClientId();
         if (!authorizator.canWrite(topic, username, clientId)) {
@@ -910,13 +930,12 @@ class PostOffice {
         }
 
         final int messageID = msg.variableHeader().packetId();
-        boolean retainPublish = msg.fixedHeader().isRetain();
         final RoutingResults publishRoutings;
         if (msg.fixedHeader().isDup()) {
             final Set<String> failedClients = failedPublishes.listFailed(clientId, messageID);
-            publishRoutings = publish2Subscribers(clientId, payload, topic, EXACTLY_ONCE, failedClients, retainPublish, messageExpiry);
+            publishRoutings = publish2Subscribers(clientId, failedClients, messageExpiry, msg);
         } else {
-            publishRoutings = publish2Subscribers(clientId, payload, topic, EXACTLY_ONCE, retainPublish, messageExpiry);
+            publishRoutings = publish2Subscribers(clientId, messageExpiry, msg);
         }
         if (publishRoutings.isAllSuccess()) {
             // QoS2 PUB message was enqueued successfully to every event loop
@@ -958,11 +977,10 @@ class PostOffice {
         final ByteBuf payload = msg.payload();
         LOG.info("Sending internal PUBLISH message Topic={}, qos={}", topic, qos);
 
-        boolean retainPublish = msg.fixedHeader().isRetain();
-        final RoutingResults publishResult = publish2Subscribers(INTERNAL_PUBLISHER, payload, topic, qos, retainPublish, Instant.MAX);
+        final RoutingResults publishResult = publish2Subscribers(INTERNAL_PUBLISHER, Instant.MAX, msg);
         LOG.trace("after routed publishes: {}", publishResult);
 
-        if (!retainPublish) {
+        if (!isRetained(msg)) {
             return publishResult;
         }
         if (qos == AT_MOST_ONCE || payload.readableBytes() == 0) {
@@ -972,6 +990,10 @@ class PostOffice {
         }
         retainedRepository.retain(topic, msg);
         return publishResult;
+    }
+
+    private static boolean isRetained(MqttPublishMessage msg) {
+        return msg.fixedHeader().isRetain();
     }
 
     /**
