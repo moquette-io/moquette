@@ -17,6 +17,7 @@ package io.moquette.broker;
 
 import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
+import io.netty.handler.codec.mqtt.MqttProperties;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 
 import java.time.Instant;
@@ -44,15 +45,20 @@ final class MemoryRetainedRepository implements IRetainedRepository {
     @Override
     public void retain(Topic topic, MqttPublishMessage msg) {
         byte[] rawPayload = payloadToByteArray(msg);
-        final RetainedMessage toStore = new RetainedMessage(topic, msg.fixedHeader().qosLevel(), rawPayload);
+        final RetainedMessage toStore = new RetainedMessage(topic, msg.fixedHeader().qosLevel(), rawPayload, extractPropertiesArray(msg));
         storage.put(topic, toStore);
     }
 
     @Override
     public void retain(Topic topic, MqttPublishMessage msg, Instant expiryTime) {
         byte[] rawPayload = payloadToByteArray(msg);
-        final RetainedMessage toStore = new RetainedMessage(topic, msg.fixedHeader().qosLevel(), rawPayload, expiryTime);
+        final RetainedMessage toStore = new RetainedMessage(topic, msg.fixedHeader().qosLevel(), rawPayload, extractPropertiesArray(msg), expiryTime);
         storageExpire.put(topic, toStore);
+    }
+
+    private static MqttProperties.MqttProperty[] extractPropertiesArray(MqttPublishMessage msg) {
+        MqttProperties properties = msg.variableHeader().properties();
+        return properties.listAll().toArray(new MqttProperties.MqttProperty[0]);
     }
 
     private static byte[] payloadToByteArray(MqttPublishMessage msg) {

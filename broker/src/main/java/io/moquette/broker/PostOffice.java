@@ -45,14 +45,7 @@ import org.slf4j.LoggerFactory;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -532,8 +525,9 @@ class PostOffice {
                 LOG.info("No retained messages matching topic filter {}", topicFilter);
                 continue;
             }
-            MqttProperties.MqttProperty[] properties = prepareSubscriptionProperties(subscription, Collections.emptyList());
+
             for (RetainedMessage retainedMsg : retainedMsgs) {
+                MqttProperties.MqttProperty[] properties = prepareSubscriptionProperties(subscription, Arrays.asList(retainedMsg.getMqttProperties()));
                 final MqttQoS retainedQos = retainedMsg.qosLevel();
                 MqttQoS qos = lowerQosToTheSubscriptionDesired(subscription, retainedQos);
 
