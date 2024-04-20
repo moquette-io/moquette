@@ -91,6 +91,18 @@ public abstract class AbstractServerIntegrationTest {
         assertEquals(mqttMessageType, received.fixedHeader().messageType());
     }
 
+    static void verifyPublishMessage(Mqtt5BlockingClient subscriber, Consumer<Mqtt5Publish> assertion) throws InterruptedException {
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriber.publishes(MqttGlobalPublishFilter.ALL)) {
+            Optional<Mqtt5Publish> publishMessage = publishes.receive(1, TimeUnit.SECONDS);
+            if (!publishMessage.isPresent()) {
+                fail("Expected to receive a publish message");
+                return;
+            }
+            Mqtt5Publish msgPub = publishMessage.get();
+            assertion.accept(msgPub);
+        }
+    }
+
     @NotNull
     Mqtt5BlockingClient createSubscriberClient() {
         String clientId = clientName();
