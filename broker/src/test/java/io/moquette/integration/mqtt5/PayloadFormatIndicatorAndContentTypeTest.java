@@ -55,4 +55,26 @@ public class PayloadFormatIndicatorAndContentTypeTest extends AbstractServerInte
             assertTrue(msgPub.getPayloadFormatIndicator().isPresent());
         });
     }
+
+    @Test
+    public void givenAPublishWithPayloadFormatIndicatorRetainedWhenForwardedToSubscriberThenIsPresent() throws InterruptedException {
+        Mqtt5BlockingClient publisher = createPublisherClient();
+        publisher.publishWith()
+            .topic("temperature/living")
+            .payload("18".getBytes(StandardCharsets.UTF_8))
+            .retain(true)
+            .payloadFormatIndicator(Mqtt5PayloadFormatIndicator.UTF_8)
+            .qos(MqttQos.AT_MOST_ONCE)
+            .send();
+
+        Mqtt5BlockingClient subscriber = createSubscriberClient();
+        subscriber.subscribeWith()
+            .topicFilter("temperature/living")
+            .qos(MqttQos.AT_MOST_ONCE)
+            .send();
+
+        verifyPublishMessage(subscriber, msgPub -> {
+            assertTrue(msgPub.getPayloadFormatIndicator().isPresent());
+        });
+    }
 }
