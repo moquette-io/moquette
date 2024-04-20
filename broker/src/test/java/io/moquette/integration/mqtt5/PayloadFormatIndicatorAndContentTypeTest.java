@@ -64,13 +64,13 @@ public class PayloadFormatIndicatorAndContentTypeTest extends AbstractServerInte
             .payload("18".getBytes(StandardCharsets.UTF_8))
             .retain(true)
             .payloadFormatIndicator(Mqtt5PayloadFormatIndicator.UTF_8)
-            .qos(MqttQos.AT_MOST_ONCE)
+            .qos(MqttQos.AT_LEAST_ONCE) // retained works for QoS > 0
             .send();
 
         Mqtt5BlockingClient subscriber = createSubscriberClient();
         subscriber.subscribeWith()
             .topicFilter("temperature/living")
-            .qos(MqttQos.AT_MOST_ONCE)
+            .qos(MqttQos.AT_LEAST_ONCE)
             .send();
 
         verifyPublishMessage(subscriber, msgPub -> {
