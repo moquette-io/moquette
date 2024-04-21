@@ -693,6 +693,17 @@ final class MQTTConnection {
         sendIfWritableElseDrop(pubRecMessage);
     }
 
+    void sendPubRec(int messageID, MqttReasonCodes.PubRec reasonCode) {
+        LOG.trace("sendPubRec for messageID: {}, reason code: {}", messageID, reasonCode);
+        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBREC, false, AT_MOST_ONCE,
+            false, 0);
+        MqttPubReplyMessageVariableHeader variableHeader = new MqttPubReplyMessageVariableHeader(messageID,
+            reasonCode.byteValue(), MqttProperties.NO_PROPERTIES);
+        MqttPubAckMessage pubRecMessage = new MqttPubAckMessage(fixedHeader, variableHeader);
+
+        sendIfWritableElseDrop(pubRecMessage);
+    }
+
     private void processPubRel(MqttMessage msg) {
         final int messageID = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
         final String clientID = bindedSession.getClientID();
@@ -764,12 +775,12 @@ final class MQTTConnection {
         sendIfWritableElseDrop(pubAckMessage);
     }
 
-    void sendPubAck(int messageID, byte reasonCode) {
+    void sendPubAck(int messageID, MqttReasonCodes.PubAck reasonCode) {
         LOG.trace("sendPubAck for messageID: {}, reason code: {}", messageID, reasonCode);
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBACK, false, AT_MOST_ONCE,
             false, 0);
         MqttPubReplyMessageVariableHeader variableHeader = new MqttPubReplyMessageVariableHeader(messageID,
-            MqttReasonCodes.PubAck.PAYLOAD_FORMAT_INVALID.byteValue(), MqttProperties.NO_PROPERTIES);
+            reasonCode.byteValue(), MqttProperties.NO_PROPERTIES);
         MqttPubAckMessage pubAckMessage = new MqttPubAckMessage(fixedHeader, variableHeader);
 
         sendIfWritableElseDrop(pubAckMessage);

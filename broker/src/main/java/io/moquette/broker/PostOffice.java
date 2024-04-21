@@ -45,8 +45,6 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
@@ -664,8 +662,8 @@ class PostOffice {
 
         if (isPayloadFormatToValidate(msg)) {
             if (!validatePayloadAsUTF8(msg)) {
-                LOG.warn("Received not valid UTF-8 payload when payload format indicator was enabled");
-                connection.sendPubAck(messageID, MqttReasonCodes.PubAck.PAYLOAD_FORMAT_INVALID.byteValue());
+                LOG.warn("Received not valid UTF-8 payload when payload format indicator was enabled (QoS1)");
+                connection.sendPubAck(messageID, MqttReasonCodes.PubAck.PAYLOAD_FORMAT_INVALID);
 
                 ReferenceCountUtil.release(msg);
                 return RoutingResults.preroutingError();
@@ -955,6 +953,16 @@ class PostOffice {
         }
 
         final int messageID = msg.variableHeader().packetId();
+        if (isPayloadFormatToValidate(msg)) {
+            if (!validatePayloadAsUTF8(msg)) {
+                LOG.warn("Received not valid UTF-8 payload when payload format indicator was enabled (QoS2)");
+                connection.sendPubRec(messageID, MqttReasonCodes.PubRec.PAYLOAD_FORMAT_INVALID);
+
+                ReferenceCountUtil.release(msg);
+                return RoutingResults.preroutingError();
+            }
+        }
+
         final RoutingResults publishRoutings;
         if (msg.fixedHeader().isDup()) {
             final Set<String> failedClients = failedPublishes.listFailed(clientId, messageID);

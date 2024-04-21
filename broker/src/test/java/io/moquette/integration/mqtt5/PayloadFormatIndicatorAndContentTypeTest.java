@@ -18,14 +18,13 @@
 
 package io.moquette.integration.mqtt5;
 
-import com.hivemq.client.internal.mqtt.message.publish.MqttPublishResult;
 import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import com.hivemq.client.mqtt.mqtt5.exceptions.Mqtt5PubAckException;
+import com.hivemq.client.mqtt.mqtt5.exceptions.Mqtt5PubRecException;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5PayloadFormatIndicator;
-import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
-import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5PublishResult;
 import com.hivemq.client.mqtt.mqtt5.message.publish.puback.Mqtt5PubAckReasonCode;
+import com.hivemq.client.mqtt.mqtt5.message.publish.pubrec.Mqtt5PubRecReasonCode;
 import org.eclipse.paho.mqttv5.client.IMqttMessageListener;
 import org.eclipse.paho.mqttv5.client.IMqttToken;
 import org.eclipse.paho.mqttv5.client.MqttClient;
@@ -36,7 +35,6 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -96,7 +94,7 @@ public class PayloadFormatIndicatorAndContentTypeTest extends AbstractServerInte
     }
 
     @Test
-    public void givenNotValidUTF8StringInPublishWhenPayloadFormatIndicatorIsSetThenShouldReturnBadPublishResponse() {
+    public void givenNotValidUTF8StringInPublishQoS1WhenPayloadFormatIndicatorIsSetThenShouldReturnBadPublishResponse() {
         final byte[] invalidUTF8Bytes = new byte[] {(byte) 0xC3, 0x28}; // second octet is invalid
 
         Mqtt5BlockingClient subscriber = createSubscriberClient();
@@ -116,6 +114,30 @@ public class PayloadFormatIndicatorAndContentTypeTest extends AbstractServerInte
             fail("Publish with an invalid UTF8 payload and payload format indicator set to UTF8 MUST throw an error");
         } catch (Mqtt5PubAckException pubAckEx) {
             assertEquals(Mqtt5PubAckReasonCode.PAYLOAD_FORMAT_INVALID, pubAckEx.getMqttMessage().getReasonCode());
+        }
+    }
+
+    @Test
+    public void givenNotValidUTF8StringInPublishQoS2WhenPayloadFormatIndicatorIsSetThenShouldReturnBadPublishResponse() {
+        final byte[] invalidUTF8Bytes = new byte[] {(byte) 0xC3, 0x28}; // second octet is invalid
+
+        Mqtt5BlockingClient subscriber = createSubscriberClient();
+        subscriber.subscribeWith()
+            .topicFilter("temperature/living")
+            .qos(MqttQos.EXACTLY_ONCE)
+            .send();
+
+        Mqtt5BlockingClient publisher = createPublisherClient();
+        try {
+            publisher.publishWith()
+                .topic("temperature/living")
+                .payload(invalidUTF8Bytes)
+                .payloadFormatIndicator(Mqtt5PayloadFormatIndicator.UTF_8)
+                .qos(MqttQos.EXACTLY_ONCE)
+                .send();
+            fail("Publish with an invalid UTF8 payload and payload format indicator set to UTF8 MUST throw an error");
+        } catch (Mqtt5PubRecException pubRecEx) {
+            assertEquals(Mqtt5PubRecReasonCode.PAYLOAD_FORMAT_INVALID, pubRecEx.getMqttMessage().getReasonCode());
         }
     }
 }
