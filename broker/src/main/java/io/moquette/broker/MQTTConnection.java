@@ -764,6 +764,17 @@ final class MQTTConnection {
         sendIfWritableElseDrop(pubAckMessage);
     }
 
+    void sendPubAck(int messageID, byte reasonCode) {
+        LOG.trace("sendPubAck for messageID: {}, reason code: {}", messageID, reasonCode);
+        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBACK, false, AT_MOST_ONCE,
+            false, 0);
+        MqttPubReplyMessageVariableHeader variableHeader = new MqttPubReplyMessageVariableHeader(messageID,
+            MqttReasonCodes.PubAck.PAYLOAD_FORMAT_INVALID.byteValue(), MqttProperties.NO_PROPERTIES);
+        MqttPubAckMessage pubAckMessage = new MqttPubAckMessage(fixedHeader, variableHeader);
+
+        sendIfWritableElseDrop(pubAckMessage);
+    }
+
     private void sendPubCompMessage(int messageID) {
         LOG.trace("Sending PUBCOMP message messageId: {}", messageID);
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBCOMP, false, AT_MOST_ONCE, false, 0);
@@ -866,5 +877,9 @@ final class MQTTConnection {
             .build();
         channel.writeAndFlush(disconnectMsg)
             .addListener(ChannelFutureListener.CLOSE);
+    }
+
+    public void sendPubAck(int messageID, MqttReasonCodes.PubAck pubAck) {
+
     }
 }

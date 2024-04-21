@@ -25,23 +25,17 @@ import io.moquette.broker.subscriptions.Topic;
 import io.moquette.interception.BrokerInterceptor;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.handler.codec.mqtt.MqttConnectMessage;
-import io.netty.handler.codec.mqtt.MqttFixedHeader;
-import io.netty.handler.codec.mqtt.MqttMessageBuilders;
-import io.netty.handler.codec.mqtt.MqttMessageType;
-import io.netty.handler.codec.mqtt.MqttProperties;
+import io.netty.handler.codec.mqtt.*;
 import io.netty.handler.codec.mqtt.MqttProperties.MqttPropertyType;
-import io.netty.handler.codec.mqtt.MqttPublishMessage;
-import io.netty.handler.codec.mqtt.MqttQoS;
-import io.netty.handler.codec.mqtt.MqttSubAckMessage;
-import io.netty.handler.codec.mqtt.MqttSubAckPayload;
-import io.netty.handler.codec.mqtt.MqttSubscribeMessage;
-import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
-import io.netty.handler.codec.mqtt.MqttTopicSubscription;
 import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -656,6 +650,16 @@ class PostOffice {
             return RoutingResults.preroutingError();
         }
 
+        if (isPayloadFormatToValidate(msg)) {
+            if (!validatePayloadAsUTF8(msg)) {
+                LOG.warn("Received not valid UTF-8 payload when payload format indicator was enabled");
+                connection.sendPubAck(messageID, MqttReasonCodes.PubAck.PAYLOAD_FORMAT_INVALID.byteValue());
+
+                ReferenceCountUtil.release(msg);
+                return RoutingResults.preroutingError();
+            }
+        }
+
         final RoutingResults routes;
         if (msg.fixedHeader().isDup()) {
             final Set<String> failedClients = failedPublishes.listFailed(clientId, messageID);
@@ -681,6 +685,21 @@ class PostOffice {
         failedPublishes.removeAll(messageID, clientId, routes.successedRoutings);
 
         return routes;
+    }
+
+    private static boolean validatePayloadAsUTF8(MqttPublishMessage msg) {
+        byte[] rawPayload = Utils.readBytesAndRewind(msg.payload());
+
+        boolean isValid = true;
+        try {
+            // Decoder instance is stateful  so shouldn't be invoked concurrently, hence one instance per call.
+            // Possible optimization is to use one instance per thread.
+            StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(rawPayload));
+        } catch (CharacterCodingException ex) {
+            //Logger.getLogger(MyTester.class.getName()).log(Level.SEVERE, null, ex);
+            isValid = false;
+        }
+        return isValid;
     }
 
     private void manageRetain(Topic topic, MqttPublishMessage msg) {
@@ -988,6 +1007,19 @@ class PostOffice {
 
     private static boolean isRetained(MqttPublishMessage msg) {
         return msg.fixedHeader().isRetain();
+    }
+
+    private static boolean isPayloadFormatToValidate(MqttPublishMessage msg) {
+        MqttProperties.MqttProperty payloadFormatProperty = msg.variableHeader().properties()
+            .getProperty(MqttPropertyType.PAYLOAD_FORMAT_INDICATOR.value());
+        if (payloadFormatProperty == null) {
+            return false;
+        }
+
+        if (payloadFormatProperty instanceof MqttProperties.IntegerProperty) {
+            return ((MqttProperties.IntegerProperty) payloadFormatProperty).value() == 1;
+        }
+        return false;
     }
 
     /**
