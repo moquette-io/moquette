@@ -878,8 +878,4 @@ final class MQTTConnection {
         channel.writeAndFlush(disconnectMsg)
             .addListener(ChannelFutureListener.CLOSE);
     }
-
-    public void sendPubAck(int messageID, MqttReasonCodes.PubAck pubAck) {
-
-    }
 }
