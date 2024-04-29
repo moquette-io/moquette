@@ -19,21 +19,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SegmentedPersistentQueueSerDesTest {
 
+    private static final String TEST_STRING = "Some fancy things";
+
     @Test
     public void givenEnqueuedMessageWithoutMqttPropertyThenItCanBeProperlySerialized() {
         SegmentedPersistentQueueSerDes sut = new SegmentedPersistentQueueSerDes();
 
         final Topic topic = Topic.asTopic("/metering/temperature");
-        ByteBuf payload = Unpooled.wrappedBuffer("Some fancy things".getBytes(StandardCharsets.UTF_8));
+        ByteBuf payload = Unpooled.wrappedBuffer(TEST_STRING.getBytes(StandardCharsets.UTF_8));
+        payload.retain();
         SessionRegistry.EnqueuedMessage messageToSerialize = new SessionRegistry.PublishedMessage(
             topic, MqttQoS.AT_MOST_ONCE, payload, true, Instant.MAX);
 
         ByteBuffer serialized = sut.toBytes(messageToSerialize);
+        assertEquals(TEST_STRING, payload.toString(StandardCharsets.UTF_8), "Buffer should not have changed.");
+        payload.release();
 
         final SessionRegistry.EnqueuedMessage decoded = sut.fromBytes(serialized);
         assertTrue(decoded instanceof SessionRegistry.PublishedMessage);
         final SessionRegistry.PublishedMessage casted = (SessionRegistry.PublishedMessage) decoded;
         assertEquals(topic, casted.getTopic());
+        assertEquals(TEST_STRING, casted.getPayload().toString(StandardCharsets.UTF_8), "Decoded message not the same.");
     }
 
     @Test
@@ -41,7 +47,7 @@ class SegmentedPersistentQueueSerDesTest {
         SegmentedPersistentQueueSerDes sut = new SegmentedPersistentQueueSerDes();
 
         final Topic topic = Topic.asTopic("/metering/temperature");
-        ByteBuf payload = Unpooled.wrappedBuffer("Some fancy things".getBytes(StandardCharsets.UTF_8));
+        ByteBuf payload = Unpooled.wrappedBuffer(TEST_STRING.getBytes(StandardCharsets.UTF_8));
         int subscriptionId = 123;
         MqttProperties.IntegerProperty intProperty = new MqttProperties.IntegerProperty(
             MqttProperties.MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value(), subscriptionId);
