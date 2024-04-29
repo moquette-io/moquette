@@ -238,7 +238,6 @@ public class SessionRegistry {
         LOG.debug("Removing session {}, expired on {}", expiredSession.clientId(), expiredAt);
         remove(expiredSession.clientId());
         sessionsRepository.delete(expiredSession);
-
         subscriptionsDirectory.removeSharedSubscriptionsForClient(expiredSession.clientId());
     }
 
@@ -483,15 +482,15 @@ public class SessionRegistry {
             throw new SessionCorruptedException("Session has already changed state: " + session);
         }
 
-        unsubscribe(session);
         remove(session.getClientID());
-
+        sessionsRepository.delete(session.getSessionData());
         subscriptionsDirectory.removeSharedSubscriptionsForClient(session.getClientID());
     }
 
     void remove(String clientID) {
         final Session old = pool.remove(clientID);
         if (old != null) {
+            unsubscribe(old);
             // remove from expired tracker if present
             sessionExpirationService.untrack(clientID);
             loopsGroup.routeCommand(clientID, "Clean up removed session", () -> {
