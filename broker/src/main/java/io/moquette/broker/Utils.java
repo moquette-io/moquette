@@ -13,7 +13,6 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
-
 package io.moquette.broker;
 
 import io.netty.buffer.ByteBuf;
@@ -40,14 +39,6 @@ public final class Utils {
 
     public static int messageId(MqttMessage msg) {
         return ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-    }
-
-    public static byte[] readBytesAndRewind(ByteBuf payload) {
-        byte[] payloadContent = new byte[payload.readableBytes()];
-        int mark = payload.readerIndex();
-        payload.readBytes(payloadContent);
-        payload.readerIndex(mark);
-        return payloadContent;
     }
 
     public static MqttVersion versionFromConnect(MqttConnectMessage msg) {

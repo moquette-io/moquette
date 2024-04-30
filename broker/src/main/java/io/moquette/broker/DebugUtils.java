@@ -23,10 +23,7 @@ import java.nio.charset.StandardCharsets;
 public final class DebugUtils {
 
     public static String payload2Str(ByteBuf content) {
-        final int readerPin = content.readableBytes();
-        final String result = content.toString(StandardCharsets.UTF_8);
-        content.readerIndex(readerPin);
-        return result;
+        return content.toString(StandardCharsets.UTF_8);
     }
 
     private DebugUtils() {

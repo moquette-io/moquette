@@ -57,7 +57,7 @@ class SegmentedPersistentQueueSerDes {
     private void writePayload(ByteBuffer target, ByteBuf source) {
         final int payloadSize = source.readableBytes();
         byte[] rawBytes = new byte[payloadSize];
-        source.readBytes(rawBytes).release();
+        source.getBytes(source.readerIndex(), rawBytes).release();
         target.putInt(payloadSize);
         target.put(rawBytes);
     }
