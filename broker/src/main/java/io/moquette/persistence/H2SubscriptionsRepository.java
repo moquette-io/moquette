@@ -81,7 +81,7 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
     public void removeAllSharedSubscriptions(String clientId) {
         final String sharedSubsMapName = sharedSubscriptions.get(clientId);
         if (sharedSubsMapName == null) {
-            LOG.info("Removing all shared subscription of a non existing client: {}", clientId);
+            LOG.debug("Removing all shared subscription of a non existing client: {}", clientId);
             return;
         }
         wipeAllSharedSubscripptions(clientId, sharedSubsMapName);

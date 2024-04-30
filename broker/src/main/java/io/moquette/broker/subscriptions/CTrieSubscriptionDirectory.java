@@ -192,13 +192,13 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
 
     @Override
     public void removeSharedSubscriptionsForClient(String clientId) {
-        List<SharedSubscription> sessionSharedSubscriptions = clientSharedSubscriptions
-            .computeIfAbsent(clientId, s -> Collections.emptyList());
-
-        // remove the client from all shared subscriptions
-        for (SharedSubscription subscription : sessionSharedSubscriptions) {
-            UnsubscribeRequest request = UnsubscribeRequest.buildShared(subscription.getShareName(), subscription.topicFilter(), clientId);
-            ctrie.removeFromTree(request);
+        List<SharedSubscription> sessionSharedSubscriptions = clientSharedSubscriptions.remove(clientId);
+        if (sessionSharedSubscriptions != null) {
+            // remove the client from all shared subscriptions
+            for (SharedSubscription subscription : sessionSharedSubscriptions) {
+                UnsubscribeRequest request = UnsubscribeRequest.buildShared(subscription.getShareName(), subscription.topicFilter(), clientId);
+                ctrie.removeFromTree(request);
+            }
         }
 
         subscriptionsRepository.removeAllSharedSubscriptions(clientId);
