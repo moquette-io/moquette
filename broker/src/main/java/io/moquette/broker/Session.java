@@ -192,6 +192,7 @@ class Session {
 
     public void processPubRec(int pubRecPacketId) {
         // Message discarded, make sure any buffers in it are released
+        cleanFromInflight(pubRecPacketId);
         SessionRegistry.EnqueuedMessage removed = inflightWindow.remove(pubRecPacketId);
         if (removed == null) {
             LOG.warn("Received a PUBREC with not matching packetId");
@@ -218,6 +219,7 @@ class Session {
 
     public void processPubComp(int messageID) {
         // Message discarded, make sure any buffers in it are released
+        cleanFromInflight(messageID);
         SessionRegistry.EnqueuedMessage removed = inflightWindow.remove(messageID);
         if (removed == null) {
             LOG.warn("Received a PUBCOMP with not matching packetId");
@@ -343,6 +345,7 @@ class Session {
 
     void pubAckReceived(int ackPacketId) {
         // TODO remain to invoke in somehow m_interceptor.notifyMessageAcknowledged
+        cleanFromInflight(ackPacketId);
         SessionRegistry.EnqueuedMessage removed = inflightWindow.remove(ackPacketId);
         if (removed == null) {
             LOG.warn("Received a PUBACK with not matching packetId");
@@ -353,6 +356,10 @@ class Session {
         inflightSlots.incrementAndGet();
         LOG.debug("Received PUBACK {} for session {}", ackPacketId, getClientID());
         drainQueueToConnection();
+    }
+
+    private void cleanFromInflight(int ackPacketId) {
+        inflightTimeouts.removeIf(d -> d.packetId == ackPacketId);
     }
 
     public void flushAllQueuedMessages() {
@@ -495,6 +502,7 @@ class Session {
         // in case of in memory session queues all contained messages
         // has to be released.
         sessionQueue.closeAndPurge();
+        inflightTimeouts.clear();
         for (EnqueuedMessage msg : inflightWindow.values()) {
             msg.release();
         }
