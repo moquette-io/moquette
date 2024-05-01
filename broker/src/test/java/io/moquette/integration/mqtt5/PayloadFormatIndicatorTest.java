@@ -52,7 +52,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-public class PayloadFormatIndicatorAndContentTypeTest extends AbstractServerIntegrationTest {
+public class PayloadFormatIndicatorTest extends AbstractServerIntegrationTest {
 
     // second octet is invalid
     public static final byte[] INVALID_UTF_8_BYTES = new byte[]{(byte) 0xC3, 0x28};
