@@ -25,6 +25,17 @@ import com.hivemq.client.mqtt.mqtt5.exceptions.Mqtt5PubRecException;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5PayloadFormatIndicator;
 import com.hivemq.client.mqtt.mqtt5.message.publish.puback.Mqtt5PubAckReasonCode;
 import com.hivemq.client.mqtt.mqtt5.message.publish.pubrec.Mqtt5PubRecReasonCode;
+import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.mqtt.MqttFixedHeader;
+import io.netty.handler.codec.mqtt.MqttMessage;
+import io.netty.handler.codec.mqtt.MqttMessageType;
+import io.netty.handler.codec.mqtt.MqttProperties;
+import io.netty.handler.codec.mqtt.MqttProperties.IntegerProperty;
+import io.netty.handler.codec.mqtt.MqttProperties.MqttPropertyType;
+import io.netty.handler.codec.mqtt.MqttPublishMessage;
+import io.netty.handler.codec.mqtt.MqttPublishVariableHeader;
+import io.netty.handler.codec.mqtt.MqttReasonCodeAndPropertiesVariableHeader;
+import io.netty.handler.codec.mqtt.MqttReasonCodes;
 import org.eclipse.paho.mqttv5.client.IMqttMessageListener;
 import org.eclipse.paho.mqttv5.client.IMqttToken;
 import org.eclipse.paho.mqttv5.client.MqttClient;
@@ -34,9 +45,13 @@ import org.eclipse.paho.mqttv5.common.MqttSubscription;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 public class PayloadFormatIndicatorAndContentTypeTest extends AbstractServerIntegrationTest {
     @Override
@@ -139,5 +154,32 @@ public class PayloadFormatIndicatorAndContentTypeTest extends AbstractServerInte
         } catch (Mqtt5PubRecException pubRecEx) {
             assertEquals(Mqtt5PubRecReasonCode.PAYLOAD_FORMAT_INVALID, pubRecEx.getMqttMessage().getReasonCode());
         }
+    }
+
+    @Test
+    public void givenNotValidUTF8StringInPublishQoS0WhenPayloadFormatIndicatorIsSetThenShouldReturnDisconnectWithBadPublishResponse() throws InterruptedException {
+        final byte[] invalidUTF8Bytes = new byte[] {(byte) 0xC3, 0x28}; // second octet is invalid
+        connectLowLevel();
+
+        MqttProperties props = new MqttProperties();
+        IntegerProperty payloadFormatProperty = new IntegerProperty(MqttPropertyType.PAYLOAD_FORMAT_INDICATOR.value(), 1);
+        props.add(payloadFormatProperty);
+
+        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, AT_MOST_ONCE,
+            false, 0);
+        MqttPublishVariableHeader variableHeader = new MqttPublishVariableHeader("temperature/living", 1, props);
+        MqttPublishMessage publishQoS0 = new MqttPublishMessage(fixedHeader, variableHeader, Unpooled.wrappedBuffer(invalidUTF8Bytes));
+        // in a reasonable amount of time (say 500 ms) it should receive a DISCONNECT
+        lowLevelClient.publish(publishQoS0, 500, TimeUnit.MILLISECONDS);
+
+        // Verify a DISCONNECT is received with PAYLOAD_FORMAT_INVALID reason code and connection is closed
+        final MqttMessage receivedMessage = lowLevelClient.lastReceivedMessage();
+        assertEquals(MqttMessageType.DISCONNECT, receivedMessage.fixedHeader().messageType());
+        MqttReasonCodeAndPropertiesVariableHeader disconnectHeader = (MqttReasonCodeAndPropertiesVariableHeader) receivedMessage.variableHeader();
+        assertEquals(MqttReasonCodes.Disconnect.PAYLOAD_FORMAT_INVALID.byteValue(), disconnectHeader.reasonCode(),
+            "Expected Disconnect to contain PAYLOAD_FORMAT_INVALID as reason code");
+        // Ugly hack, but give the Netty channel some instants to receive the disconnection of the socket
+        Thread.sleep(100);
+        assertTrue(lowLevelClient.isConnectionLost(),"After the disconnect message the connection MUST be closed");
     }
 }

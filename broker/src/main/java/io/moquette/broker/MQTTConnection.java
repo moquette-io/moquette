@@ -637,7 +637,7 @@ final class MQTTConnection {
                     if (!isBoundToSession()) {
                         return null;
                     }
-                    postOffice.receivedPublishQos0(username, clientId, msg, expiry);
+                    postOffice.receivedPublishQos0(this, username, clientId, msg, expiry);
                     return null;
                 }).ifFailed(msg::release);
             case AT_LEAST_ONCE:
@@ -888,5 +888,9 @@ final class MQTTConnection {
             .build();
         channel.writeAndFlush(disconnectMsg)
             .addListener(ChannelFutureListener.CLOSE);
+    }
+
+    void disconnectSession() {
+        bindedSession.disconnect();
     }
 }

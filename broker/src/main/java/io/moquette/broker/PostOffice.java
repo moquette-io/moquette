@@ -616,7 +616,7 @@ class PostOffice {
         mqttConnection.sendUnsubAckMessage(topics, clientID, messageId);
     }
 
-    CompletableFuture<Void> receivedPublishQos0(String username, String clientID, MqttPublishMessage msg,
+    CompletableFuture<Void> receivedPublishQos0(MQTTConnection connection, String username, String clientID, MqttPublishMessage msg,
                                                 Instant messageExpiry) {
         final Topic topic = new Topic(msg.variableHeader().topicName());
         if (!authorizator.canWrite(topic, username, clientID)) {
@@ -624,6 +624,18 @@ class PostOffice {
             ReferenceCountUtil.release(msg);
             return CompletableFuture.completedFuture(null);
         }
+
+        if (isPayloadFormatToValidate(msg)) {
+            if (!validatePayloadAsUTF8(msg)) {
+                LOG.warn("Received not valid UTF-8 payload when payload format indicator was enabled (QoS0)");
+                ReferenceCountUtil.release(msg);
+                connection.brokerDisconnect(MqttReasonCodes.Disconnect.PAYLOAD_FORMAT_INVALID);
+                connection.disconnectSession();
+                connection.dropConnection();
+                return CompletableFuture.completedFuture(null);
+            }
+        }
+
         final RoutingResults publishResult = publish2Subscribers(clientID, messageExpiry, msg);
         if (publishResult.isAllFailed()) {
             LOG.info("No one publish was successfully enqueued to session loops");

@@ -267,6 +267,33 @@ public class Client {
         }
     }
 
+    public void publish(MqttPublishMessage publishMessage, int timeout, TimeUnit timeUnit) {
+        final CountDownLatch publishResponseLatch = new CountDownLatch(1);
+        this.setCallback(msg -> {
+            receivedMsg.getAndSet(msg);
+            LOG.debug("Publish callback invocation, received message {}", msg.fixedHeader().messageType());
+            publishResponseLatch.countDown();
+
+            // clear the callback
+            setCallback(null);
+        });
+
+        LOG.debug("Sending PUBLISH message");
+        sendMessage(publishMessage);
+        LOG.debug("Sent PUBLISH message");
+
+        boolean notExpired;
+        try {
+            notExpired = publishResponseLatch.await(timeout, timeUnit);
+        } catch (InterruptedException e) {
+            throw new RuntimeException("Interrupted while waiting", e);
+        }
+
+        if (! notExpired) {
+            throw new RuntimeException("Cannot receive any message after PUBLISH in " + timeout + " " + timeUnit);
+        }
+    }
+
     public MqttMessage subscribeWithError(String topic, MqttQoS qos) {
         final MqttSubscribeMessage subscribeMessage = MqttMessageBuilders.subscribe()
             .messageId(1)
