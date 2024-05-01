@@ -45,7 +45,6 @@ import org.eclipse.paho.mqttv5.common.MqttSubscription;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
@@ -54,6 +53,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 public class PayloadFormatIndicatorAndContentTypeTest extends AbstractServerIntegrationTest {
+
+    // second octet is invalid
+    public static final byte[] INVALID_UTF_8_BYTES = new byte[]{(byte) 0xC3, 0x28};
+
     @Override
     public String clientName() {
         return "subscriber";
@@ -110,8 +113,6 @@ public class PayloadFormatIndicatorAndContentTypeTest extends AbstractServerInte
 
     @Test
     public void givenNotValidUTF8StringInPublishQoS1WhenPayloadFormatIndicatorIsSetThenShouldReturnBadPublishResponse() {
-        final byte[] invalidUTF8Bytes = new byte[] {(byte) 0xC3, 0x28}; // second octet is invalid
-
         Mqtt5BlockingClient subscriber = createSubscriberClient();
         subscriber.subscribeWith()
             .topicFilter("temperature/living")
@@ -122,7 +123,7 @@ public class PayloadFormatIndicatorAndContentTypeTest extends AbstractServerInte
         try {
             publisher.publishWith()
                 .topic("temperature/living")
-                .payload(invalidUTF8Bytes)
+                .payload(INVALID_UTF_8_BYTES)
                 .payloadFormatIndicator(Mqtt5PayloadFormatIndicator.UTF_8)
                 .qos(MqttQos.AT_LEAST_ONCE)
                 .send();
@@ -134,8 +135,6 @@ public class PayloadFormatIndicatorAndContentTypeTest extends AbstractServerInte
 
     @Test
     public void givenNotValidUTF8StringInPublishQoS2WhenPayloadFormatIndicatorIsSetThenShouldReturnBadPublishResponse() {
-        final byte[] invalidUTF8Bytes = new byte[] {(byte) 0xC3, 0x28}; // second octet is invalid
-
         Mqtt5BlockingClient subscriber = createSubscriberClient();
         subscriber.subscribeWith()
             .topicFilter("temperature/living")
@@ -146,7 +145,7 @@ public class PayloadFormatIndicatorAndContentTypeTest extends AbstractServerInte
         try {
             publisher.publishWith()
                 .topic("temperature/living")
-                .payload(invalidUTF8Bytes)
+                .payload(INVALID_UTF_8_BYTES)
                 .payloadFormatIndicator(Mqtt5PayloadFormatIndicator.UTF_8)
                 .qos(MqttQos.EXACTLY_ONCE)
                 .send();
@@ -158,7 +157,6 @@ public class PayloadFormatIndicatorAndContentTypeTest extends AbstractServerInte
 
     @Test
     public void givenNotValidUTF8StringInPublishQoS0WhenPayloadFormatIndicatorIsSetThenShouldReturnDisconnectWithBadPublishResponse() throws InterruptedException {
-        final byte[] invalidUTF8Bytes = new byte[] {(byte) 0xC3, 0x28}; // second octet is invalid
         connectLowLevel();
 
         MqttProperties props = new MqttProperties();
@@ -168,7 +166,7 @@ public class PayloadFormatIndicatorAndContentTypeTest extends AbstractServerInte
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, AT_MOST_ONCE,
             false, 0);
         MqttPublishVariableHeader variableHeader = new MqttPublishVariableHeader("temperature/living", 1, props);
-        MqttPublishMessage publishQoS0 = new MqttPublishMessage(fixedHeader, variableHeader, Unpooled.wrappedBuffer(invalidUTF8Bytes));
+        MqttPublishMessage publishQoS0 = new MqttPublishMessage(fixedHeader, variableHeader, Unpooled.wrappedBuffer(INVALID_UTF_8_BYTES));
         // in a reasonable amount of time (say 500 ms) it should receive a DISCONNECT
         lowLevelClient.publish(publishQoS0, 500, TimeUnit.MILLISECONDS);
 
