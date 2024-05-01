@@ -1019,6 +1019,7 @@ class PostOffice {
 
     public void terminate() {
         willExpirationService.shutdown();
+        retainedMessagesExpirationService.shutdown();
         sessionLoops.terminate();
     }
 

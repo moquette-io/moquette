@@ -25,13 +25,14 @@ public class ScheduledExpirationService<T extends Expirable> {
     private final ScheduledFuture<?> expiredEntityTask;
     private final Clock clock;
     private final Consumer<T> action;
+    private final ScheduledExecutorService actionsExecutor;
 
     private final Map<String, ExpirableTracker<T>> expiringEntitiesCache = new HashMap<>();
 
     public ScheduledExpirationService(Clock clock, Consumer<T> action) {
         this.clock = clock;
         this.action = action;
-        ScheduledExecutorService actionsExecutor = Executors.newSingleThreadScheduledExecutor();
+        this.actionsExecutor = Executors.newSingleThreadScheduledExecutor();
         this.expiredEntityTask = actionsExecutor.scheduleWithFixedDelay(this::checkExpiredEntities,
             FIRER_TASK_INTERVAL.getSeconds(), FIRER_TASK_INTERVAL.getSeconds(),
             TimeUnit.SECONDS);
@@ -71,5 +72,6 @@ public class ScheduledExpirationService<T extends Expirable> {
             LOG.warn("Can't cancel the execution of expired entities task, was already cancelled? {}, was done? {}",
                 expiredEntityTask.isCancelled(), expiredEntityTask.isDone());
         }
+        actionsExecutor.shutdownNow();
     }
 }
