@@ -718,7 +718,6 @@ class PostOffice {
             // Possible optimization is to use one instance per thread.
             StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(rawPayload));
         } catch (CharacterCodingException ex) {
-            //Logger.getLogger(MyTester.class.getName()).log(Level.SEVERE, null, ex);
             isValid = false;
         }
         return isValid;
