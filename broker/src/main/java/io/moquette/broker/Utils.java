@@ -41,6 +41,12 @@ public final class Utils {
         return ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
     }
 
+    public static byte[] readBytesAndRewind(ByteBuf payload) {
+        byte[] payloadContent = new byte[payload.readableBytes()];
+        payload.getBytes(payload.readerIndex(), payloadContent, 0, payload.readableBytes());
+        return payloadContent;
+    }
+
     public static MqttVersion versionFromConnect(MqttConnectMessage msg) {
         return MqttVersion.fromProtocolNameAndLevel(msg.variableHeader().name(), (byte) msg.variableHeader().version());
     }

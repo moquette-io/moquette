@@ -637,7 +637,7 @@ final class MQTTConnection {
                     if (!isBoundToSession()) {
                         return null;
                     }
-                    postOffice.receivedPublishQos0(username, clientId, msg, expiry);
+                    postOffice.receivedPublishQos0(this, username, clientId, msg, expiry);
                     return null;
                 }).ifFailed(msg::release);
             case AT_LEAST_ONCE:
@@ -690,6 +690,17 @@ final class MQTTConnection {
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBREC, false, AT_MOST_ONCE,
             false, 0);
         MqttPubAckMessage pubRecMessage = new MqttPubAckMessage(fixedHeader, from(messageID));
+        sendIfWritableElseDrop(pubRecMessage);
+    }
+
+    void sendPubRec(int messageID, MqttReasonCodes.PubRec reasonCode) {
+        LOG.trace("sendPubRec for messageID: {}, reason code: {}", messageID, reasonCode);
+        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBREC, false, AT_MOST_ONCE,
+            false, 0);
+        MqttPubReplyMessageVariableHeader variableHeader = new MqttPubReplyMessageVariableHeader(messageID,
+            reasonCode.byteValue(), MqttProperties.NO_PROPERTIES);
+        MqttPubAckMessage pubRecMessage = new MqttPubAckMessage(fixedHeader, variableHeader);
+
         sendIfWritableElseDrop(pubRecMessage);
     }
 
@@ -761,6 +772,17 @@ final class MQTTConnection {
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBACK, false, AT_MOST_ONCE,
                                                   false, 0);
         MqttPubAckMessage pubAckMessage = new MqttPubAckMessage(fixedHeader, from(messageID));
+        sendIfWritableElseDrop(pubAckMessage);
+    }
+
+    void sendPubAck(int messageID, MqttReasonCodes.PubAck reasonCode) {
+        LOG.trace("sendPubAck for messageID: {}, reason code: {}", messageID, reasonCode);
+        MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBACK, false, AT_MOST_ONCE,
+            false, 0);
+        MqttPubReplyMessageVariableHeader variableHeader = new MqttPubReplyMessageVariableHeader(messageID,
+            reasonCode.byteValue(), MqttProperties.NO_PROPERTIES);
+        MqttPubAckMessage pubAckMessage = new MqttPubAckMessage(fixedHeader, variableHeader);
+
         sendIfWritableElseDrop(pubAckMessage);
     }
 
@@ -866,5 +888,9 @@ final class MQTTConnection {
             .build();
         channel.writeAndFlush(disconnectMsg)
             .addListener(ChannelFutureListener.CLOSE);
+    }
+
+    void disconnectSession() {
+        bindedSession.disconnect();
     }
 }

@@ -33,6 +33,7 @@ import io.netty.handler.codec.mqtt.MqttProperties;
 import io.netty.handler.codec.mqtt.MqttProperties.MqttPropertyType;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttReasonCodes;
 import io.netty.handler.codec.mqtt.MqttSubAckMessage;
 import io.netty.handler.codec.mqtt.MqttSubAckPayload;
 import io.netty.handler.codec.mqtt.MqttSubscribeMessage;
@@ -42,6 +43,9 @@ import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -612,7 +616,7 @@ class PostOffice {
         mqttConnection.sendUnsubAckMessage(topics, clientID, messageId);
     }
 
-    CompletableFuture<Void> receivedPublishQos0(String username, String clientID, MqttPublishMessage msg,
+    CompletableFuture<Void> receivedPublishQos0(MQTTConnection connection, String username, String clientID, MqttPublishMessage msg,
                                                 Instant messageExpiry) {
         final Topic topic = new Topic(msg.variableHeader().topicName());
         if (!authorizator.canWrite(topic, username, clientID)) {
@@ -620,6 +624,18 @@ class PostOffice {
             ReferenceCountUtil.release(msg);
             return CompletableFuture.completedFuture(null);
         }
+
+        if (isPayloadFormatToValidate(msg)) {
+            if (!validatePayloadAsUTF8(msg)) {
+                LOG.warn("Received not valid UTF-8 payload when payload format indicator was enabled (QoS0)");
+                ReferenceCountUtil.release(msg);
+                connection.brokerDisconnect(MqttReasonCodes.Disconnect.PAYLOAD_FORMAT_INVALID);
+                connection.disconnectSession();
+                connection.dropConnection();
+                return CompletableFuture.completedFuture(null);
+            }
+        }
+
         final RoutingResults publishResult = publish2Subscribers(clientID, messageExpiry, msg);
         if (publishResult.isAllFailed()) {
             LOG.info("No one publish was successfully enqueued to session loops");
@@ -656,6 +672,28 @@ class PostOffice {
             return RoutingResults.preroutingError();
         }
 
+        if (isPayloadFormatToValidate(msg)) {
+            if (!validatePayloadAsUTF8(msg)) {
+                LOG.warn("Received not valid UTF-8 payload when payload format indicator was enabled (QoS1)");
+                connection.sendPubAck(messageID, MqttReasonCodes.PubAck.PAYLOAD_FORMAT_INVALID);
+
+                ReferenceCountUtil.release(msg);
+                return RoutingResults.preroutingError();
+            }
+        }
+
+        if (isContentTypeToValidate(msg)) {
+            if (!validateContentTypeAsUTF8(msg)) {
+                LOG.warn("Received not valid UTF-8 content type (QoS1)");
+                ReferenceCountUtil.release(msg);
+                connection.brokerDisconnect(MqttReasonCodes.Disconnect.PROTOCOL_ERROR);
+                connection.disconnectSession();
+                connection.dropConnection();
+
+                return RoutingResults.preroutingError();
+            }
+        }
+
         final RoutingResults routes;
         if (msg.fixedHeader().isDup()) {
             final Set<String> failedClients = failedPublishes.listFailed(clientId, messageID);
@@ -681,6 +719,20 @@ class PostOffice {
         failedPublishes.removeAll(messageID, clientId, routes.successedRoutings);
 
         return routes;
+    }
+
+    private static boolean validatePayloadAsUTF8(MqttPublishMessage msg) {
+        byte[] rawPayload = Utils.readBytesAndRewind(msg.payload());
+
+        boolean isValid = true;
+        try {
+            // Decoder instance is stateful  so shouldn't be invoked concurrently, hence one instance per call.
+            // Possible optimization is to use one instance per thread.
+            StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(rawPayload));
+        } catch (CharacterCodingException ex) {
+            isValid = false;
+        }
+        return isValid;
     }
 
     private void manageRetain(Topic topic, MqttPublishMessage msg) {
@@ -924,6 +976,16 @@ class PostOffice {
         }
 
         final int messageID = msg.variableHeader().packetId();
+        if (isPayloadFormatToValidate(msg)) {
+            if (!validatePayloadAsUTF8(msg)) {
+                LOG.warn("Received not valid UTF-8 payload when payload format indicator was enabled (QoS2)");
+                connection.sendPubRec(messageID, MqttReasonCodes.PubRec.PAYLOAD_FORMAT_INVALID);
+
+                ReferenceCountUtil.release(msg);
+                return RoutingResults.preroutingError();
+            }
+        }
+
         final RoutingResults publishRoutings;
         if (msg.fixedHeader().isDup()) {
             final Set<String> failedClients = failedPublishes.listFailed(clientId, messageID);
@@ -988,6 +1050,42 @@ class PostOffice {
 
     private static boolean isRetained(MqttPublishMessage msg) {
         return msg.fixedHeader().isRetain();
+    }
+
+    private static boolean isPayloadFormatToValidate(MqttPublishMessage msg) {
+        MqttProperties.MqttProperty payloadFormatProperty = msg.variableHeader().properties()
+            .getProperty(MqttPropertyType.PAYLOAD_FORMAT_INDICATOR.value());
+        if (payloadFormatProperty == null) {
+            return false;
+        }
+
+        if (payloadFormatProperty instanceof MqttProperties.IntegerProperty) {
+            return ((MqttProperties.IntegerProperty) payloadFormatProperty).value() == 1;
+        }
+        return false;
+    }
+
+    private static boolean isContentTypeToValidate(MqttPublishMessage msg) {
+        MqttProperties.MqttProperty contentTypeProperty = msg.variableHeader().properties()
+            .getProperty(MqttPropertyType.CONTENT_TYPE.value());
+        return contentTypeProperty != null;
+    }
+
+    private static boolean validateContentTypeAsUTF8(MqttPublishMessage msg) {
+        MqttProperties.StringProperty contentTypeProperty = (MqttProperties.StringProperty) msg.variableHeader().properties()
+            .getProperty(MqttPropertyType.CONTENT_TYPE.value());
+
+        byte[] rawPayload = contentTypeProperty.value().getBytes();
+
+        boolean isValid = true;
+        try {
+            // Decoder instance is stateful  so shouldn't be invoked concurrently, hence one instance per call.
+            // Possible optimization is to use one instance per thread.
+            StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(rawPayload));
+        } catch (CharacterCodingException ex) {
+            isValid = false;
+        }
+        return isValid;
     }
 
     /**

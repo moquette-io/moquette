@@ -1,4 +1,5 @@
 Version 0.18-SNAPSHOT:
+   [feature] Manage payload format indicator property, when set verify payload format. (#826)
    [refactoring] Refactory of PostOffice to pass publish message in hits entirety avoiding decomposition into single parameters. (#827)
    [feature] Add Netty native transport support on MacOS. Bundle all the native transport module by default (#806)
    [feature] message expiry interval: (issue #818)
