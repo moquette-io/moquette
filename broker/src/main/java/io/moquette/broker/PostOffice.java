@@ -682,6 +682,18 @@ class PostOffice {
             }
         }
 
+        if (isContentTypeToValidate(msg)) {
+            if (!validateContentTypeAsUTF8(msg)) {
+                LOG.warn("Received not valid UTF-8 content type (QoS1)");
+                ReferenceCountUtil.release(msg);
+                connection.brokerDisconnect(MqttReasonCodes.Disconnect.PROTOCOL_ERROR);
+                connection.disconnectSession();
+                connection.dropConnection();
+
+                return RoutingResults.preroutingError();
+            }
+        }
+
         final RoutingResults routes;
         if (msg.fixedHeader().isDup()) {
             final Set<String> failedClients = failedPublishes.listFailed(clientId, messageID);
@@ -1051,6 +1063,29 @@ class PostOffice {
             return ((MqttProperties.IntegerProperty) payloadFormatProperty).value() == 1;
         }
         return false;
+    }
+
+    private static boolean isContentTypeToValidate(MqttPublishMessage msg) {
+        MqttProperties.MqttProperty contentTypeProperty = msg.variableHeader().properties()
+            .getProperty(MqttPropertyType.CONTENT_TYPE.value());
+        return contentTypeProperty != null;
+    }
+
+    private static boolean validateContentTypeAsUTF8(MqttPublishMessage msg) {
+        MqttProperties.StringProperty contentTypeProperty = (MqttProperties.StringProperty) msg.variableHeader().properties()
+            .getProperty(MqttPropertyType.CONTENT_TYPE.value());
+
+        byte[] rawPayload = contentTypeProperty.value().getBytes();
+
+        boolean isValid = true;
+        try {
+            // Decoder instance is stateful  so shouldn't be invoked concurrently, hence one instance per call.
+            // Possible optimization is to use one instance per thread.
+            StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(rawPayload));
+        } catch (CharacterCodingException ex) {
+            isValid = false;
+        }
+        return isValid;
     }
 
     /**
