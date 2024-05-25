@@ -522,7 +522,7 @@ class PostOffice {
             final Collection<RetainedMessage> retainedMsgs = retainedRepository.retainedOnTopic(topicFilter);
 
             if (retainedMsgs.isEmpty()) {
-                LOG.info("No retained messages matching topic filter {}", topicFilter);
+                LOG.debug("No retained messages matching topic filter {}", topicFilter);
                 continue;
             }
 
