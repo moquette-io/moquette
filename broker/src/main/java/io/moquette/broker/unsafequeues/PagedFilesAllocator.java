@@ -1,12 +1,17 @@
 package io.moquette.broker.unsafequeues;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Default implementation of SegmentAllocator. It uses a series of files (named pages) and split them in segments.
@@ -15,7 +20,10 @@ import java.util.Properties;
  * */
 class PagedFilesAllocator implements SegmentAllocator {
 
+    private static final Logger LOG = LoggerFactory.getLogger(PagedFilesAllocator.class);
+
     interface AllocationListener {
+
         void segmentedCreated(String name, Segment segment);
     }
 
@@ -27,6 +35,8 @@ class PagedFilesAllocator implements SegmentAllocator {
     private MappedByteBuffer currentPage;
     private FileChannel currentPageFile;
 
+    private final Map<Integer, WeakReference<MappedByteBuffer>> pageCache = new HashMap<>();
+
     PagedFilesAllocator(Path pagesFolder, int pageSize, int segmentSize, int lastPage, int lastSegmentAllocated) throws QueueException {
         if (pageSize % segmentSize != 0) {
             throw new IllegalArgumentException("The pageSize must be an exact multiple of the segmentSize");
@@ -36,11 +46,30 @@ class PagedFilesAllocator implements SegmentAllocator {
         this.segmentSize = segmentSize;
         this.lastPage = lastPage;
         this.lastSegmentAllocated = lastSegmentAllocated;
-        this.currentPage = openRWPageFile(this.pagesFolder, this.lastPage);
+        this.currentPage = openOrRetrievePageFile(this.lastPage);
     }
 
-    private MappedByteBuffer openRWPageFile(Path pagesFolder, int pageId) throws QueueException {
+    private MappedByteBuffer openOrRetrievePageFile(int pageId) throws QueueException {
+        MappedByteBuffer pageBuffer = null;
+        WeakReference<MappedByteBuffer> pageBufferRef = pageCache.get(pageId);
+        if (pageBufferRef != null) {
+            pageBuffer = pageBufferRef.get();
+        }
+        if (pageBuffer == null) {
+            pageBuffer = openRWPageFile(pageId);
+            pageBufferRef = new WeakReference<>(pageBuffer);
+            WeakReference<MappedByteBuffer> old = pageCache.put(pageId, pageBufferRef);
+            //Sanity check, should not happen...
+            if (old != null && old.get() != null) {
+                LOG.warn("Page file {} opened even though it already is open!", pageId);
+            }
+        }
+        return pageBuffer;
+    }
+
+    private MappedByteBuffer openRWPageFile(int pageId) throws QueueException {
         final Path pageFile = pagesFolder.resolve(String.format("%d.page", pageId));
+        LOG.debug("Opening page {} from file {}", pageId, pageFile);
         boolean createNew = false;
         if (!Files.exists(pageFile)) {
             try {
@@ -71,7 +100,7 @@ class PagedFilesAllocator implements SegmentAllocator {
     public Segment nextFreeSegment() throws QueueException {
         if (currentPageIsExhausted()) {
             lastPage++;
-            currentPage = openRWPageFile(pagesFolder, lastPage);
+            currentPage = openOrRetrievePageFile(lastPage);
             lastSegmentAllocated = 0;
         }
 
@@ -84,7 +113,7 @@ class PagedFilesAllocator implements SegmentAllocator {
 
     @Override
     public Segment reopenSegment(int pageId, int beginOffset) throws QueueException {
-        final MappedByteBuffer page = openRWPageFile(pagesFolder, pageId);
+        final MappedByteBuffer page = openOrRetrievePageFile(pageId);
         final SegmentPointer begin = new SegmentPointer(pageId, beginOffset);
         final SegmentPointer end = new SegmentPointer(pageId, beginOffset + segmentSize - 1);
         return new Segment(page, begin, end);
