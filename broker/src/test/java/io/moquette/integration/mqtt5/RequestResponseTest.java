@@ -28,11 +28,11 @@ import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAck;
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAckReasonCode;
 import org.junit.jupiter.api.Test;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class RequestResponseTest extends AbstractServerIntegrationWithoutClientFixture {
 
@@ -82,4 +82,56 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
             .send();
         assertThat(subAck.getReasonCodes()).contains(Mqtt5SubAckReasonCode.GRANTED_QOS_1);
     }
+
+    @Test
+    public void givenRequestResponseProtocolWhenRequestIsIssueThenTheResponderReplyWithCorrelationData() throws InterruptedException {
+        final Mqtt5BlockingClient requester = createHiveBlockingClient("requester");
+        final String responseTopic = "requester/door/open/result";
+        subscribeToResponseTopic(requester, responseTopic);
+
+        final Mqtt5BlockingClient responder = createHiveBlockingClient("responder");
+
+        Mqtt5Subscribe subscribeToRequest = Mqtt5Subscribe.builder()
+            .topicFilter("requester/door/open")
+            .qos(MqttQos.AT_LEAST_ONCE)
+            .build();
+        responder.toAsync().subscribe(subscribeToRequest,
+            (Mqtt5Publish pub) -> {
+                assertTrue(pub.getResponseTopic().isPresent(), "Response topic MUST defined in request publish");
+                assertTrue(pub.getCorrelationData().isPresent(), "Correlation data MUST defined in request publish");
+                Mqtt5PublishResult responseResult = responder.publishWith()
+                    .topic(pub.getResponseTopic().get())
+                    .correlationData(pub.getCorrelationData().get())
+                    .payload("OK".getBytes(StandardCharsets.UTF_8))
+                    .send();
+                assertFalse(responseResult.getError().isPresent(), "Open door response cannot be published ");
+            });
+
+        Mqtt5PublishResult.Mqtt5Qos1Result requestResult = (Mqtt5PublishResult.Mqtt5Qos1Result) requester.publishWith()
+            .topic("requester/door/open")
+            .responseTopic(responseTopic)
+            .correlationData("req-open-door".getBytes(StandardCharsets.UTF_8))
+            .payload("Please open the door".getBytes(StandardCharsets.UTF_8))
+            .qos(MqttQos.AT_LEAST_ONCE)
+            .send();
+        assertEquals(Mqtt5PubAckReasonCode.SUCCESS, requestResult.getPubAck().getReasonCode(),
+            "Open door request cannot be published ");
+
+        verifyPublishMessage(requester, msgPub -> {
+            assertTrue(msgPub.getPayload().isPresent(), "Response payload MUST be present");
+            String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
+            assertEquals("OK", payload);
+            assertTrue(msgPub.getCorrelationData().isPresent(), "Request correlation data MUST defined in response publish");
+            final byte[] correlationData = asByteArray(msgPub.getCorrelationData().get());
+            assertEquals("req-open-door", new String(correlationData, StandardCharsets.UTF_8));
+        });
+    }
+
+    private byte[] asByteArray(ByteBuffer byteBuffer) {
+        byte[] arr = new byte[byteBuffer.remaining()];
+        byteBuffer.get(arr);
+        return arr;
+    }
+
+    // TODO test with request response information in connect
 }
