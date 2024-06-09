@@ -32,7 +32,9 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class RequestResponseTest extends AbstractServerIntegrationWithoutClientFixture {
 
@@ -44,6 +46,16 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
 
         final Mqtt5BlockingClient responder = createHiveBlockingClient("responder");
 
+        responderRepliesToRequesterPublish(responder, requester, responseTopic);
+
+        verifyPublishMessage(requester, msgPub -> {
+            assertTrue(msgPub.getPayload().isPresent(), "Response payload MUST be present");
+            String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
+            assertEquals("OK", payload);
+        });
+    }
+
+    private static void responderRepliesToRequesterPublish(Mqtt5BlockingClient responder, Mqtt5BlockingClient requester, String responseTopic) {
         Mqtt5Subscribe subscribeToRequest = Mqtt5Subscribe.builder()
             .topicFilter("requester/door/open")
             .qos(MqttQos.AT_LEAST_ONCE)
@@ -51,11 +63,14 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
         responder.toAsync().subscribe(subscribeToRequest,
             (Mqtt5Publish pub) -> {
                 assertTrue(pub.getResponseTopic().isPresent(), "Response topic MUST defined in request publish");
-                Mqtt5PublishResult.Mqtt5Qos1Result responseResult = (Mqtt5PublishResult.Mqtt5Qos1Result)responder.publishWith()
+                Mqtt5PublishResult responseResult = responder.publishWith()
                     .topic(pub.getResponseTopic().get())
                     .payload("OK".getBytes(StandardCharsets.UTF_8))
+                    .qos(MqttQos.AT_LEAST_ONCE)
                     .send();
-                assertEquals(Mqtt5PubAckReasonCode.SUCCESS, responseResult.getPubAck().getReasonCode(),
+                assertTrue(responseResult instanceof Mqtt5PublishResult.Mqtt5Qos1Result, "QoS1 Response must be present");
+                Mqtt5PublishResult.Mqtt5Qos1Result qos1Result = (Mqtt5PublishResult.Mqtt5Qos1Result) responseResult;
+                assertEquals(Mqtt5PubAckReasonCode.SUCCESS, qos1Result.getPubAck().getReasonCode(),
                     "Open door response cannot be published ");
             });
 
@@ -67,12 +82,6 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
             .send();
         assertEquals(Mqtt5PubAckReasonCode.SUCCESS, requestResult.getPubAck().getReasonCode(),
             "Open door request cannot be published ");
-
-        verifyPublishMessage(requester, msgPub -> {
-            assertTrue(msgPub.getPayload().isPresent(), "Response payload MUST be present");
-            String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
-            assertEquals("OK", payload);
-        });
     }
 
     private static void subscribeToResponseTopic(Mqtt5BlockingClient requester, String responseTopic) {
@@ -132,6 +141,4 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
         byteBuffer.get(arr);
         return arr;
     }
-
-    // TODO test with request response information in connect
 }
