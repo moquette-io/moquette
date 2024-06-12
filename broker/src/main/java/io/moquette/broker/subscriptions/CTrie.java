@@ -360,10 +360,7 @@ public class CTrie {
             }
         }
         if (cnode instanceof TNode) {
-            // this inode is a tomb, has no clients and should be cleaned up
-            // Because we implemented cleanTomb below, this should be rare, but possible
-            // Consider calling cleanTomb here too
-            return Action.OK;
+            return cleanTomb(inode, iParent);
         }
         if (cnode.containsOnly(clientId) && topic.isEmpty() && cnode.allChildren().isEmpty()) {
             // last client to leave this node, AND there are no downstream children, remove via TNode tomb
@@ -393,9 +390,10 @@ public class CTrie {
      * @return REPEAT if this method wasn't successful or OK.
      */
     private Action cleanTomb(INode inode, INode iParent) {
-        CNode updatedCnode = iParent.mainNode().copy();
+        CNode origCnode = iParent.mainNode();
+        CNode updatedCnode = origCnode.copy();
         updatedCnode.remove(inode);
-        return iParent.compareAndSet(iParent.mainNode(), updatedCnode) ? Action.OK : Action.REPEAT;
+        return iParent.compareAndSet(origCnode, updatedCnode) ? Action.OK : Action.REPEAT;
     }
 
     public int size() {
