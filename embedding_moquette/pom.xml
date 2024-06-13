@@ -18,6 +18,13 @@
             <artifactId>moquette-broker</artifactId>
             <version>${project.version}</version>
         </dependency>
+
+        <dependency>
+            <!-- This is used to use log4j12 implementation -->
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-reload4j</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -28,6 +35,15 @@
                 <version>2.8.2</version>
                 <configuration>
                     <skip>true</skip>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <mainClass>io.moquette.testembedded.EmbeddedLauncher</mainClass>
                 </configuration>
             </plugin>
 <!--            <plugin>-->
