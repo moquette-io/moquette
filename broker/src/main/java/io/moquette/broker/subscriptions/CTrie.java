@@ -392,8 +392,15 @@ public class CTrie {
     private Action cleanTomb(INode inode, INode iParent) {
         CNode origCnode = iParent.mainNode();
         CNode updatedCnode = origCnode.copy();
-        updatedCnode.remove(inode);
-        return iParent.compareAndSet(origCnode, updatedCnode) ? Action.OK : Action.REPEAT;
+        INode removed = updatedCnode.remove(inode);
+        if (removed == inode) {
+            return iParent.compareAndSet(origCnode, updatedCnode) ? Action.OK : Action.REPEAT;
+        } else {
+            // The node removed (from the copy!) was not the node we expected to remove.
+            // Probably because another thread replaced the TNode with a live node, so
+            // we don't need to clean it and can return success.
+            return Action.OK;
+        }
     }
 
     public int size() {
