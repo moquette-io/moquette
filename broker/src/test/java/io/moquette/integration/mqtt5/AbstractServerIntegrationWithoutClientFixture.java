@@ -22,6 +22,9 @@ import com.hivemq.client.mqtt.MqttClient;
 import com.hivemq.client.mqtt.MqttGlobalPublishFilter;
 import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
+import com.hivemq.client.mqtt.mqtt5.message.connect.Mqtt5Connect;
+import com.hivemq.client.mqtt.mqtt5.message.connect.Mqtt5ConnectBuilder;
+import com.hivemq.client.mqtt.mqtt5.message.connect.connack.Mqtt5ConnAck;
 import com.hivemq.client.mqtt.mqtt5.message.connect.connack.Mqtt5ConnAckReasonCode;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
 import io.moquette.broker.Server;
@@ -47,9 +50,8 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class AbstractServerIntegrationWithoutClientFixture {
 
@@ -101,6 +103,29 @@ public class AbstractServerIntegrationWithoutClientFixture {
             .serverPort(1883)
             .buildBlocking();
         assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, client.connect().getReasonCode(), clientId + " connected");
+        return client;
+    }
+
+    @NotNull
+    static Mqtt5BlockingClient createHiveBlockingClientWithResponseProtocol(String clientId) {
+        Mqtt5Connect connectRequest = Mqtt5Connect.builder()
+            .keepAlive(10)
+            .restrictions()
+            .requestResponseInformation(true)
+            .applyRestrictions()
+            .build();
+
+        final Mqtt5BlockingClient client = MqttClient.builder()
+            .useMqttVersion5()
+            .identifier(clientId)
+            .serverHost("localhost")
+            .serverPort(1883)
+            .buildBlocking();
+        Mqtt5ConnAck connAck = client.connect(connectRequest);
+        assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, connAck.getReasonCode(), clientId + " connected");
+        assertTrue(connAck.getResponseInformation().isPresent(), "ConnACK must contain response topic assigned by the broker");
+        String responseTopic = connAck.getResponseInformation().get().toString();
+        assertEquals(responseTopic, "/reqresp/response/" + clientId, "Response topic pattern MUST we respected");
         return client;
     }
 
