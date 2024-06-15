@@ -141,4 +141,21 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
         byteBuffer.get(arr);
         return arr;
     }
+
+    @Test
+    public void givenRequestResponseProtocolAndClientIsConnectedWhenRequestIsIssueThenTheResponderReply() throws InterruptedException {
+        final Mqtt5BlockingClient requester = createHiveBlockingClientWithResponseProtocol("requester");
+        final String responseTopic = "/reqresp/response/requester";
+        subscribeToResponseTopic(requester, responseTopic);
+
+        final Mqtt5BlockingClient responder = createHiveBlockingClient("responder");
+
+        responderRepliesToRequesterPublish(responder, requester, responseTopic);
+
+        verifyPublishMessage(requester, msgPub -> {
+            assertTrue(msgPub.getPayload().isPresent(), "Response payload MUST be present");
+            String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
+            assertEquals("OK", payload);
+        });
+    }
 }
