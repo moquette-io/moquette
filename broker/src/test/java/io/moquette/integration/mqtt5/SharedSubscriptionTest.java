@@ -253,11 +253,11 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
         String fullSharedSubscriptionTopicFilter = "$share/collectors/metric/temperature/living";
 
         // subscribe first client to shared subscription
-        final Mqtt5BlockingClient subscriber1 = createSubscriberClient("subscriber1");
+        final Mqtt5BlockingClient subscriber1 = createHiveBlockingClient("subscriber1");
         subscribe(subscriber1, fullSharedSubscriptionTopicFilter, MqttQos.AT_LEAST_ONCE);
 
         // subscribe second client to shared subscription
-        final Mqtt5BlockingClient subscriber2 = createSubscriberClient("subscriber2");
+        final Mqtt5BlockingClient subscriber2 = createHiveBlockingClient("subscriber2");
         subscribe(subscriber2, fullSharedSubscriptionTopicFilter, MqttQos.AT_LEAST_ONCE);
 
         // unsubscribe successfully the first subscriber
@@ -286,7 +286,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
         String fullSharedSubscriptionTopicFilter = "$share/collectors/metric/temperature/living";
 
         // subscribe client to shared subscription
-        final Mqtt5BlockingClient subscriber = createSubscriberClient("subscriber1");
+        final Mqtt5BlockingClient subscriber = createHiveBlockingClient("subscriber1");
         subscribe(subscriber, fullSharedSubscriptionTopicFilter, MqttQos.AT_LEAST_ONCE);
 
         // verify subscribed to the shared receives a message
