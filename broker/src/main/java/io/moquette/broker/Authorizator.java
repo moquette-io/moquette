@@ -26,6 +26,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
 
 import static io.moquette.broker.Utils.messageId;
@@ -36,6 +38,11 @@ final class Authorizator {
     private static final Logger LOG = LoggerFactory.getLogger(Authorizator.class);
 
     private final IAuthorizatorPolicy policy;
+
+    // Contains the list of topic-client that has read access forced on reply topic.
+    private ConcurrentMap<Utils.Couple<Topic, String>, Boolean> responseTopicForcedReads = new ConcurrentHashMap<>();
+    // Contains the list of requesters' reply topics that need write access by all the other (responders).
+    private ConcurrentMap<Topic, Boolean> responseTopicForcedWrites = new ConcurrentHashMap<>();
 
     Authorizator(IAuthorizatorPolicy policy) {
         this.policy = policy;
@@ -113,10 +120,30 @@ final class Authorizator {
      * @return true if the user from client can publish data on topic.
      */
     boolean canWrite(Topic topic, String user, String client) {
-        return policy.canWrite(topic, user, client);
+        boolean policyResult = policy.canWrite(topic, user, client);
+        if (!policyResult && responseTopicForcedWrites.containsKey(topic)) {
+            LOG.warn("Found write discord by policy and response information topic configured. The policy prohibit " +
+                "while the response topic should be accessible for all to write. topic: {}", topic);
+            return true;
+        }
+        return policyResult;
     }
 
     boolean canRead(Topic topic, String user, String client) {
-        return policy.canRead(topic, user, client);
+        boolean policyResult = policy.canRead(topic, user, client);
+        if (!policyResult && responseTopicForcedReads.containsKey(Utils.Couple.of(topic, client))) {
+            LOG.warn("Found read discord by policy and response information topic configured. The policy prohibit " +
+                "while the response topic should be accessible by read from client{}. topic: {}", client, topic);
+            return true;
+        }
+        return policyResult;
+    }
+
+    void forceReadAccess(Topic topic, String client) {
+        responseTopicForcedReads.putIfAbsent(Utils.Couple.of(topic, client), true);
+    }
+
+    public void forceWriteToAll(Topic topic) {
+        responseTopicForcedWrites.putIfAbsent(topic, true);
     }
 }

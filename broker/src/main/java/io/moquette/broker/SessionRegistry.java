@@ -395,6 +395,12 @@ public class SessionRegistry {
         newSession = new Session(sessionData, clean, queue);
         newSession.markConnecting();
         sessionsRepository.saveSession(sessionData);
+        if (MQTTConnection.isNeedResponseInformation(msg)) {
+            // the responder client must have write access to this topic
+            // the requester client must have read access on this topic
+            authorizator.forceReadAccess(Topic.asTopic("/reqresp/response/" + clientId), clientId);
+            authorizator.forceWriteToAll(Topic.asTopic("/reqresp/response/" + clientId));
+        }
         return newSession;
     }
 
