@@ -13,12 +13,10 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
-
 package io.moquette.testclient;
 
 import io.moquette.BrokerConstants;
 import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
@@ -52,6 +50,9 @@ public class Client {
     }
 
     private static final Logger LOG = LoggerFactory.getLogger(Client.class);
+
+    private static final Duration TIMEOUT_DURATION = Duration.ofMillis(300);
+
     final ClientNettyMQTTHandler handler = new ClientNettyMQTTHandler();
     EventLoopGroup workerGroup;
     Channel m_channel;
@@ -195,7 +196,7 @@ public class Client {
             .addSubscription(qos2, topic2)
             .build();
 
-        return doSubscribeWithAckCasting(subscribeMessage, 200, TimeUnit.MILLISECONDS);
+        return doSubscribeWithAckCasting(subscribeMessage, TIMEOUT_DURATION.toMillis(), TimeUnit.MILLISECONDS);
     }
 
     public MqttSubAckMessage subscribe(String topic, MqttQoS qos) {
@@ -204,16 +205,16 @@ public class Client {
             .addSubscription(qos, topic)
             .build();
 
-        return doSubscribeWithAckCasting(subscribeMessage, 200, TimeUnit.MILLISECONDS);
+        return doSubscribeWithAckCasting(subscribeMessage, TIMEOUT_DURATION.toMillis(), TimeUnit.MILLISECONDS);
     }
 
     public MqttSubAckMessage subscribeWithIdentifier(String topic, MqttQoS qos, int subscriptionIdentifier) {
-        return subscribeWithIdentifier(topic, qos, subscriptionIdentifier, 200, TimeUnit.MILLISECONDS);
+        return subscribeWithIdentifier(topic, qos, subscriptionIdentifier, TIMEOUT_DURATION.toMillis(), TimeUnit.MILLISECONDS);
     }
 
     @NotNull
     public MqttSubAckMessage subscribeWithIdentifier(String topic, MqttQoS qos, int subscriptionIdentifier,
-                                                      int timeout, TimeUnit timeUnit) {
+                                                      long timeout, TimeUnit timeUnit) {
         MqttProperties subProps = new MqttProperties();
         subProps.add(new MqttProperties.IntegerProperty(
             MqttProperties.MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value(),
@@ -229,7 +230,7 @@ public class Client {
     }
 
     @NotNull
-    private MqttSubAckMessage doSubscribeWithAckCasting(MqttSubscribeMessage subscribeMessage, int timeout, TimeUnit timeUnit) {
+    private MqttSubAckMessage doSubscribeWithAckCasting(MqttSubscribeMessage subscribeMessage, long timeout, TimeUnit timeUnit) {
         doSubscribe(subscribeMessage, timeout, timeUnit);
 
         final MqttMessage subAckMessage = this.receivedMsg.get();
@@ -240,7 +241,7 @@ public class Client {
         return (MqttSubAckMessage) subAckMessage;
     }
 
-    private void doSubscribe(MqttSubscribeMessage subscribeMessage, int timeout, TimeUnit timeUnit) {
+    private void doSubscribe(MqttSubscribeMessage subscribeMessage, long timeout, TimeUnit timeUnit) {
         final CountDownLatch subscribeAckLatch = new CountDownLatch(1);
         this.setCallback(msg -> {
             receivedMsg.getAndSet(msg);
@@ -300,7 +301,7 @@ public class Client {
             .addSubscription(qos, topic)
             .build();
 
-        doSubscribe(subscribeMessage, 200, TimeUnit.MILLISECONDS);
+        doSubscribe(subscribeMessage, TIMEOUT_DURATION.toMillis(), TimeUnit.MILLISECONDS);
         return this.receivedMsg.get();
     }
 
