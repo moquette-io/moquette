@@ -99,9 +99,9 @@ class CNode implements Comparable<CNode> {
         }
     }
 
-    public void remove(INode node) {
+    public INode remove(INode node) {
         int idx = findIndexForToken(node.mainNode().token);
-        this.children.remove(idx);
+        return this.children.remove(idx);
     }
 
     private List<Subscription> sharedSubscriptions() {
