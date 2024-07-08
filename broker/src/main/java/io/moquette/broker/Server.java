@@ -272,7 +272,7 @@ public class Server {
         final long startTime = System.currentTimeMillis() - start;
         LOG.info("Moquette integration has been started successfully in {} ms", startTime);
 
-        if (config.boolProp(IConfig.ENABLE_TELEMETRY_NAME, true)) {
+        if (config.boolProp(IConfig.ENABLE_TELEMETRY_NAME, false)) {
             collectAndSendTelemetryDataAsynch(config);
         }
 
