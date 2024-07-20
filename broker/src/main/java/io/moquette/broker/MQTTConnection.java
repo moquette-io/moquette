@@ -281,7 +281,13 @@ final class MQTTConnection {
             .sessionPresent(isSessionAlreadyPresent);
         if (isProtocolVersion(msg, MqttVersion.MQTT_5)) {
             // set properties for MQTT 5
-            final MqttProperties ackProperties = prepareConnAckProperties(serverGeneratedClientId, clientId);
+            ConnAckPropertiesBuilder connAckPropertiesBuilder = prepareConnAckPropertiesBuilder(serverGeneratedClientId, clientId);
+            if (isNeedResponseInformation(msg)) {
+                // the responder and requested access to the topic are already configured during session creation
+                // in SessionRegistry
+                connAckPropertiesBuilder.responseInformation("/reqresp/response/" + clientId);
+            }
+            final MqttProperties ackProperties = connAckPropertiesBuilder.build();
             connAckBuilder.properties(ackProperties);
         }
         final MqttConnAckMessage ackMessage = connAckBuilder.build();
@@ -329,6 +335,16 @@ final class MQTTConnection {
     }
 
     /**
+     * @return true iff message contains property REQUEST_RESPONSE_INFORMATION and is positive.
+     * */
+    static boolean isNeedResponseInformation(MqttConnectMessage msg) {
+        MqttProperties.IntegerProperty requestRespInfo = (MqttProperties.IntegerProperty) msg.variableHeader()
+            .properties()
+            .getProperty(MqttProperties.MqttPropertyType.REQUEST_RESPONSE_INFORMATION.value());
+        return requestRespInfo != null && requestRespInfo.value() >= 1;
+    }
+
+    /**
      * @return the value of the Payload Format Indicator property from Will specification.
      * */
     private static boolean extractWillPayloadFormatIndicator(MqttProperties mqttProperties) {
@@ -350,10 +366,6 @@ final class MQTTConnection {
             return false;
         }
         return true;
-    }
-
-    private MqttProperties prepareConnAckProperties(boolean serverGeneratedClientId, String clientId) {
-        return prepareConnAckPropertiesBuilder(serverGeneratedClientId, clientId).build();
     }
 
     private ConnAckPropertiesBuilder prepareConnAckPropertiesBuilder(boolean serverGeneratedClientId, String clientId) {
