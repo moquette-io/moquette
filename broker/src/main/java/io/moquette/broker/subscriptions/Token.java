@@ -25,13 +25,27 @@ public class Token implements Comparable<Token> {
     static final Token MULTI = new Token("#");
     static final Token SINGLE = new Token("+");
     final String name;
+    boolean lastSubToken;
 
     protected Token(String s) {
+        this(s, true);
+    }
+
+    protected Token(String s, boolean isLastSub) {
         name = s;
+        lastSubToken = isLastSub;
     }
 
     protected String name() {
         return name;
+    }
+
+    protected void setLastSubToken(boolean lastSubToken) {
+        this.lastSubToken = lastSubToken;
+    }
+
+    protected boolean isLastSubToken() {
+        return lastSubToken;
     }
 
     @Override

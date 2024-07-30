@@ -44,21 +44,34 @@ public class CTrieSpeedTest {
     @Test
     @Timeout(value = MAX_DURATION_S)
     public void testManyClientsFewTopics() {
-        List<SubscriptionRequest> subscriptionList = prepareSubscriptionsManyClientsFewTopic();
+
+        List<SubscriptionRequest> subscriptionList = prepareSubscriptionsManyClientsFewTopic(50_000);
         createSubscriptions(subscriptionList);
     }
 
     @Test
     @Timeout(value = MAX_DURATION_S)
     public void testFlat() {
-        List<SubscriptionRequest> results = prepareSubscriptionsFlat();
-        createSubscriptions(results);
+        Topic.MAX_TOKEN_LENGTH = 1;
+        createSubscriptions(prepareSubscriptionsFlat(TOTAL_SUBSCRIPTIONS));
+        Topic.MAX_TOKEN_LENGTH = 2;
+        createSubscriptions(prepareSubscriptionsFlat(TOTAL_SUBSCRIPTIONS));
+        Topic.MAX_TOKEN_LENGTH = 3;
+        createSubscriptions(prepareSubscriptionsFlat(TOTAL_SUBSCRIPTIONS));
+        Topic.MAX_TOKEN_LENGTH = 4;
+        createSubscriptions(prepareSubscriptionsFlat(TOTAL_SUBSCRIPTIONS));
+        Topic.MAX_TOKEN_LENGTH = 5;
+        createSubscriptions(prepareSubscriptionsFlat(TOTAL_SUBSCRIPTIONS));
+        Topic.MAX_TOKEN_LENGTH = 6;
+        createSubscriptions(prepareSubscriptionsFlat(TOTAL_SUBSCRIPTIONS));
+        Topic.MAX_TOKEN_LENGTH = 7;
+        createSubscriptions(prepareSubscriptionsFlat(TOTAL_SUBSCRIPTIONS));
     }
 
     @Test
     @Timeout(value = MAX_DURATION_S)
     public void testDeep() {
-        List<SubscriptionRequest> results = prepareSubscriptionsDeep();
+        List<SubscriptionRequest> results = prepareSubscriptionsDeep(TOTAL_SUBSCRIPTIONS);
         createSubscriptions(results);
     }
 
@@ -83,38 +96,45 @@ public class CTrieSpeedTest {
         }
         long end = System.currentTimeMillis();
         long duration = end - start;
-        LOGGER.info("Added " + count + " subscriptions in " + duration + " ms (" + Math.round(1000.0 * count / duration) + "/s)");
+        final long speed = Math.round(1000.0 * count / duration);
+        LOGGER.info("{}: Added {} subscriptions in {} ms ({}/s)", Topic.MAX_TOKEN_LENGTH, count, duration, speed);
     }
 
-    public List<SubscriptionRequest> prepareSubscriptionsManyClientsFewTopic() {
-        List<SubscriptionRequest> subscriptionList = new ArrayList<>(TOTAL_SUBSCRIPTIONS);
-        for (int i = 0; i < TOTAL_SUBSCRIPTIONS; i++) {
-            Topic topic = asTopic("topic/test/" + new Random().nextInt(1 + i % 10) + "/test");
+    public List<SubscriptionRequest> prepareSubscriptionsManyClientsFewTopic(int subCount) {
+        List<SubscriptionRequest> subscriptionList = new ArrayList<>(subCount);
+        long start = System.currentTimeMillis();
+        for (int i = 0; i < subCount; i++) {
+            Topic topic = asTopic("topic/test/" + new Random().nextInt(10) + "/test");
             subscriptionList.add(SubscriptionRequest.buildNonShared("TestClient-" + i, topic, MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_LEAST_ONCE)));
         }
+        long end = System.currentTimeMillis();
+        long duration = end - start;
+        LOGGER.debug("Prepared {} subscriptions in {} ms on 10 topics", subCount, duration);
         return subscriptionList;
     }
 
-    public List<SubscriptionRequest> prepareSubscriptionsFlat() {
-        List<SubscriptionRequest> results = new ArrayList<>(TOTAL_SUBSCRIPTIONS);
+    public List<SubscriptionRequest> prepareSubscriptionsFlat(int subCount) {
+        List<SubscriptionRequest> results = new ArrayList<>(subCount);
         int count = 0;
         long start = System.currentTimeMillis();
-        for (int topicNr = 0; topicNr < TOTAL_SUBSCRIPTIONS / 10; topicNr++) {
-            for (int clientNr = 0; clientNr < 10; clientNr++) {
+        final int clientCount = 1;
+        final int topicCount = subCount / clientCount;
+        for (int clientNr = 0; clientNr < clientCount; clientNr++) {
+            for (int topicNr = 0; topicNr < topicCount; topicNr++) {
                 count++;
-                results.add(clientSubOnTopic("Client-" + clientNr, "mainTopic-" + topicNr));
+                results.add(clientSubOnTopic("Client-" + clientNr, topicNr + "-mainTopic"));
             }
         }
         long end = System.currentTimeMillis();
         long duration = end - start;
-        LOGGER.info("Prepared {} subscriptions in {} ms", count, duration);
+        LOGGER.debug("Prepared {} subscriptions for {} topics in {} ms", count, topicCount, duration);
         return results;
     }
 
-    public List<SubscriptionRequest> prepareSubscriptionsDeep() {
-        List<SubscriptionRequest> results = new ArrayList<>(TOTAL_SUBSCRIPTIONS);
-        long countPerLevel = Math.round(Math.pow(TOTAL_SUBSCRIPTIONS, 0.25));
-        LOGGER.info("Preparing {} subscriptions, 4 deep with {} per level", TOTAL_SUBSCRIPTIONS, countPerLevel);
+    public List<SubscriptionRequest> prepareSubscriptionsDeep(int subCount) {
+        List<SubscriptionRequest> results = new ArrayList<>(subCount);
+        long countPerLevel = Math.round(Math.pow(subCount, 0.25));
+        LOGGER.info("Preparing {} subscriptions, 4 deep with {} per level", subCount, countPerLevel);
         int count = 0;
         long start = System.currentTimeMillis();
         outerloop:
@@ -125,7 +145,7 @@ public class CTrieSpeedTest {
                         count++;
                         results.add(clientSubOnTopic("Client-" + clientNr, "mainTopic-" + firstLevelNr + "/subTopic-" + secondLevelNr + "/subSubTopic" + thirdLevelNr));
                         // Due to the 4th-power-root we don't get exactly the required number of subs.
-                        if (count >= TOTAL_SUBSCRIPTIONS) {
+                        if (count >= subCount) {
                             break outerloop;
                         }
                     }

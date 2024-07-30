@@ -254,6 +254,7 @@ public class CTrie {
         // type #, + or exact match
         Optional<INode> subInode = cnode.childOf(Token.MULTI);
         if (subInode.isPresent()) {
+            Topic remainingRealTopic = (ROOT.equals(cnode.getToken())) ? topicName : topicName.exceptFullHeadToken();
             subscriptions.addAll(recursiveMatch(remainingTopic, subInode.get(), depth + 1));
         }
         subInode = cnode.childOf(Token.SINGLE);
