@@ -1,0 +1,10 @@
+Bundle-Version: 0.18.0.${tstamp}
+Export-Package: io.moquette.*
+
+Import-Package: \
+    com.bugsnag;'resolution:'=optional, \
+    com.codahale.metrics;'resolution:'=optional, \
+    com.librato.metrics.*;'resolution:'=optional, \
+    com.zaxxer.hikari.*;'resolution:'=optional, \
+    org.apache.commons.codec.*;'resolution:'=optional, \
+    *

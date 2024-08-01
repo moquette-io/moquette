@@ -159,8 +159,27 @@
                     </execution>
                   </executions>
                 </plugin>
+                <plugin>
+                    <groupId>biz.aQute.bnd</groupId>
+                    <artifactId>bnd-maven-plugin</artifactId>
+                    <version>6.4.0</version>
+                    <extensions>true</extensions>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>jar</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
             </plugins>
         </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>biz.aQute.bnd</groupId>
+                <artifactId>bnd-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
     </build>
 
     <profiles>
