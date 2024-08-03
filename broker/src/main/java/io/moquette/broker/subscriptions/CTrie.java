@@ -247,14 +247,21 @@ public class CTrie {
         if (action == NavigationAction.STOP) {
             return Collections.emptyList();
         }
-        Topic remainingTopic = (ROOT.equals(cnode.getToken())) ? topicName : topicName.exceptHeadToken();
+        final boolean isRoot = ROOT.equals(cnode.getToken());
+        final boolean isSingle = Token.SINGLE.equals(cnode.getToken());
+        final boolean isMulti = Token.MULTI.equals(cnode.getToken());
+
+        Topic remainingTopic = isRoot
+            ? topicName
+            : (isSingle || isMulti)
+                ? topicName.exceptFullHeadToken()
+                : topicName.exceptHeadToken();
         List<Subscription> subscriptions = new ArrayList<>();
 
         // We should only consider the maximum three children children of
         // type #, + or exact match
         Optional<INode> subInode = cnode.childOf(Token.MULTI);
         if (subInode.isPresent()) {
-            Topic remainingRealTopic = (ROOT.equals(cnode.getToken())) ? topicName : topicName.exceptFullHeadToken();
             subscriptions.addAll(recursiveMatch(remainingTopic, subInode.get(), depth + 1));
         }
         subInode = cnode.childOf(Token.SINGLE);
