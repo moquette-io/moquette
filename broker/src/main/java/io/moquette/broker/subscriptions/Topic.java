@@ -31,6 +31,8 @@ public class Topic implements Serializable, Comparable<Topic> {
 
     private static final Logger LOG = LoggerFactory.getLogger(Topic.class);
 
+    public static int MAX_TOKEN_LENGTH = 4;
+
     private static final long serialVersionUID = 2438799283749822L;
 
     private final String topic;
@@ -55,7 +57,7 @@ public class Topic implements Serializable, Comparable<Topic> {
 
     Topic(List<Token> tokens) {
         this.tokens = tokens;
-        List<String> strTokens = tokens.stream().map(Token::toString).collect(Collectors.toList());
+        List<String> strTokens = fullTokens().stream().map(Token::toString).collect(Collectors.toList());
         this.topic = String.join("/", strTokens);
         this.valid = true;
     }
@@ -74,7 +76,24 @@ public class Topic implements Serializable, Comparable<Topic> {
         return tokens;
     }
 
-    private List<Token> parseTopic(String topic) throws ParseException {
+    public List<Token> fullTokens() {
+        List<Token> fullTokens = new ArrayList<>();
+        String currentToken = null;
+        for (Token token : getTokens()) {
+            if (currentToken == null) {
+                currentToken = token.name;
+            } else {
+                currentToken += token.name;
+            }
+            if (token.isLastSubToken()) {
+                fullTokens.add(new Token(currentToken, true));
+                currentToken = null;
+            }
+        }
+        return fullTokens;
+    }
+
+    private static List<Token> parseTopic(String topic) throws ParseException {
         if (topic.length() == 0) {
             throw new ParseException("Bad format of topic, topic MUST be at least 1 character [MQTT-4.7.3-1] and " +
                                      "this was empty", 0);
@@ -117,7 +136,18 @@ public class Topic implements Serializable, Comparable<Topic> {
             } else if (s.contains("+")) {
                 throw new ParseException("Bad format of topic, invalid subtopic name: " + s, i);
             } else {
-                res.add(new Token(s));
+                final int l = s.length();
+                int start = 0;
+                Token token = null;
+                while (start < l) {
+                    int end = Math.min(start + MAX_TOKEN_LENGTH, l);
+                    final String subToken = s.substring(start, end);
+                    token = new Token(subToken, false);
+                    res.add(token);
+                    start = end;
+                }
+                // Can't be null because s can't be empty.
+                token.setLastSubToken(true);
             }
         }
 
@@ -151,6 +181,22 @@ public class Topic implements Serializable, Comparable<Topic> {
         return new Topic(tokensCopy);
     }
 
+    /**
+     * @return a new Topic corresponding to this less than the full head token, skipping any sub-tokens.
+     */
+    public Topic exceptFullHeadToken() {
+        List<Token> tokens = getTokens();
+        if (tokens.isEmpty()) {
+            return new Topic(Collections.emptyList());
+        }
+        List<Token> tokensCopy = new ArrayList<>(tokens);
+        Token removed;
+        do {
+            removed = tokensCopy.remove(0);
+        } while (!removed.isLastSubToken() && !tokensCopy.isEmpty());
+        return new Topic(tokensCopy);
+    }
+
     public boolean isValid() {
         if (tokens == null)
             getTokens();
@@ -169,14 +215,16 @@ public class Topic implements Serializable, Comparable<Topic> {
     public boolean match(Topic subscriptionTopic) {
         List<Token> msgTokens = getTokens();
         List<Token> subscriptionTokens = subscriptionTopic.getTokens();
+        // Due to sub-tokens and the + wildcard, indexes may differ.
         int i = 0;
-        for (; i < subscriptionTokens.size(); i++) {
+        int m = 0;
+        for (; i < subscriptionTokens.size(); i++, m++) {
             Token subToken = subscriptionTokens.get(i);
             if (!Token.MULTI.equals(subToken) && !Token.SINGLE.equals(subToken)) {
-                if (i >= msgTokens.size()) {
+                if (m >= msgTokens.size()) {
                     return false;
                 }
-                Token msgToken = msgTokens.get(i);
+                Token msgToken = msgTokens.get(m);
                 if (!msgToken.equals(subToken)) {
                     return false;
                 }
@@ -184,12 +232,20 @@ public class Topic implements Serializable, Comparable<Topic> {
                 if (Token.MULTI.equals(subToken)) {
                     return true;
                 }
-//                if (Token.SINGLE.equals(subToken)) {
-//                    // skip a step forward
-//                }
+                if (m >= msgTokens.size()) {
+                    return false;
+                }
+                if (Token.SINGLE.equals(subToken)) {
+                    // skip to the next full token in the message topic
+                    Token msgToken = msgTokens.get(m);
+                    while (!msgToken.isLastSubToken()) {
+                        m++;
+                        msgToken = msgTokens.get(m);
+                    }
+                }
             }
         }
-        return i == msgTokens.size();
+        return m == msgTokens.size();
     }
 
     @Override

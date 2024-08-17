@@ -145,7 +145,7 @@ public class TopicTest {
         }
 
         public TopicAssert containsToken(Object... tokens) {
-            Assertions.assertThat(actual.getTokens()).containsExactly(asArray(tokens));
+            Assertions.assertThat(actual.fullTokens()).containsExactly(asArray(tokens));
 
             return myself;
         }
