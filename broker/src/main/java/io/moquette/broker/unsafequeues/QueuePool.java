@@ -389,9 +389,10 @@ public class QueuePool {
         final LinkedList<SegmentRef> segmentRefs = queueSegments.remove(queueName);
         SegmentRef segmentRef = segmentRefs.pollLast();
         segmentsAllocationLock.lock();
+        LOG.debug("Purging segments for queue {}", queueName);
         try {
             while (segmentRef != null) {
-                LOG.debug("Consumed tail segment {} from queue {}", segmentRef, queueName);
+                LOG.debug("Purging segment {} from queue {}", segmentRef, queueName);
                 recycledSegments.add(segmentRef);
                 segmentRef = segmentRefs.pollLast();
             }
