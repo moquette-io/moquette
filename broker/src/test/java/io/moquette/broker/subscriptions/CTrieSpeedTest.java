@@ -27,9 +27,9 @@ import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,20 +39,49 @@ public class CTrieSpeedTest {
 
     private static final int MAX_DURATION_S = 50 * 60;
     private static final int CHECK_INTERVAL = 5000_000;
-    private static final int TOTAL_SUBSCRIPTIONS = 500_000;
+    private static final int TOTAL_SUBSCRIPTIONS = 1_000_000;
 
-    private static final Map<Integer, Map<Integer, List<TestResult>>> TEST_RESULTS = new TreeMap<>();
+    private static final Map<Integer, Map<Integer, List<TestResult>>> TEST_RESULTS_ADD = new TreeMap<>();
+    private static final Map<Integer, Map<Integer, List<TestResult>>> TEST_RESULTS_READ = new TreeMap<>();
+    private static final Map<Integer, Map<Integer, List<TestResult>>> TEST_RESULTS_REMOVE = new TreeMap<>();
 
-    private static void addResult(TestResult result) {
-        TEST_RESULTS.computeIfAbsent(result.threads, t -> new TreeMap<>())
+    private static void addAddResult(TestResult result) {
+        addResult(TEST_RESULTS_ADD, result);
+    }
+
+    private static void addReadResult(TestResult result) {
+        addResult(TEST_RESULTS_READ, result);
+    }
+
+    private static void addRemoveResult(TestResult result) {
+        addResult(TEST_RESULTS_REMOVE, result);
+    }
+
+    private static void addResult(Map<Integer, Map<Integer, List<TestResult>>> set, TestResult result) {
+        set.computeIfAbsent(result.threads, t -> new TreeMap<>())
             .computeIfAbsent(result.maxLength, t -> new ArrayList<>())
             .add(result);
     }
 
     private static void logResults() {
+        LOGGER.info("Results for Adding:");
+        logResults(TEST_RESULTS_ADD);
+        LOGGER.info("Results for Reading:");
+        logResults(TEST_RESULTS_READ);
+        LOGGER.info("Results for Removing:");
+        logResults(TEST_RESULTS_REMOVE);
+    }
+
+    private static void clearResults() {
+        TEST_RESULTS_ADD.clear();
+        TEST_RESULTS_READ.clear();
+        TEST_RESULTS_REMOVE.clear();
+    }
+
+    private static void logResults(Map<Integer, Map<Integer, List<TestResult>>> set) {
         StringBuilder header = new StringBuilder();
         TreeMap<Integer, StringBuilder> rowPerLength = new TreeMap<>();
-        for (Map.Entry<Integer, Map<Integer, List<TestResult>>> entry : TEST_RESULTS.entrySet()) {
+        for (Map.Entry<Integer, Map<Integer, List<TestResult>>> entry : set.entrySet()) {
             Integer threads = entry.getKey();
             Map<Integer, List<TestResult>> lengthMap = entry.getValue();
             header.append(',').append(threads);
@@ -64,7 +93,7 @@ public class CTrieSpeedTest {
                 for (TestResult result : results) {
                     durationAvg += 1.0 * result.durationMs / count;
                 }
-                rowPerLength.computeIfAbsent(length, t -> new StringBuilder("" + t)).append(',').append(durationAvg);
+                rowPerLength.computeIfAbsent(length, t -> new StringBuilder("" + t)).append(',').append(Math.round(durationAvg));
             }
         }
         LOGGER.info(header.toString());
@@ -77,22 +106,38 @@ public class CTrieSpeedTest {
         return SubscriptionRequest.buildNonShared(clientID, asTopic(topicName), MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE));
     }
 
+    @Disabled
     @Test
-    @Timeout(value = MAX_DURATION_S)
-    public void testManyClientsFewTopics() throws InterruptedException {
+    public void testManyClientsFewTopics() throws InterruptedException, Exception {
         LOGGER.info("testManyClientsFewTopics");
-        List<SubscriptionRequest> subscriptionList = prepareSubscriptionsManyClientsFewTopic(50_000);
-        createSubscriptions(subscriptionList, 1);
+        clearResults();
+        Callable<List<SubscriptionRequest>> subCreate = () -> prepareSubscriptionsManyClientsFewTopic(20_000);
+        test(subCreate);
     }
 
-    @Test
     @Disabled
+    @Test
     public void testFlat() throws Exception {
         LOGGER.info("TestFlat");
-        TEST_RESULTS.clear();
+        clearResults();
         Callable<List<SubscriptionRequest>> subCreate = () -> prepareSubscriptionsFlat(TOTAL_SUBSCRIPTIONS);
-        for (int length : new int[]{1, 2, 3, 4, 5, 6}) {
+        test(subCreate);
+    }
+
+    @Disabled
+    @Test
+    public void testDeep() throws InterruptedException, Exception {
+        LOGGER.info("TestDeep");
+        clearResults();
+        Callable<List<SubscriptionRequest>> subCreate = () -> prepareSubscriptionsDeep(TOTAL_SUBSCRIPTIONS);
+        test(subCreate);
+    }
+
+    private void test(Callable<List<SubscriptionRequest>> subCreate) throws Exception {
+        for (int length : new int[]{1, 2, 3, 4, 5, 6, 7, 8, 99}) {
             for (int threads : new int[]{1, 2, 4, 6, 8, 12, 16}) {
+                test(subCreate, threads, length);
+                test(subCreate, threads, length);
                 test(subCreate, threads, length);
                 logResults();
             }
@@ -102,31 +147,25 @@ public class CTrieSpeedTest {
 
     private void test(Callable<List<SubscriptionRequest>> subCreate, int threadCount, int maxLength) throws Exception {
         Topic.MAX_TOKEN_LENGTH = maxLength;
-        createSubscriptions(subCreate.call(), threadCount);
-        createSubscriptions(subCreate.call(), threadCount);
+        final List<SubscriptionRequest> subRequests = subCreate.call();
+        CTrie tree = createSubscriptions(subRequests, threadCount);
+        readSubscriptions(tree, subRequests, threadCount);
+        removeSubscriptions(tree, subRequests, threadCount);
     }
 
-    @Test
-    @Timeout(value = MAX_DURATION_S)
-    public void testDeep() throws InterruptedException {
-        LOGGER.info("TestDeep");
-        List<SubscriptionRequest> results = prepareSubscriptionsDeep(TOTAL_SUBSCRIPTIONS);
-        createSubscriptions(results, 1);
-    }
-
-    public void createSubscriptions(List<SubscriptionRequest> results, int threadCount) throws InterruptedException {
+    public CTrie createSubscriptions(List<SubscriptionRequest> subsToAdd, int threadCount) throws InterruptedException {
         long start = System.currentTimeMillis();
         CTrie tree = new CTrie();
         List<List<SubscriptionRequest>> subLists = new ArrayList<>();
-        final int total = results.size();
+        final int total = subsToAdd.size();
         int perList = total / threadCount;
         int startIdx = 0;
         for (int idx = 0; idx < threadCount - 1; idx++) {
             int endIdx = startIdx + perList;
-            subLists.add(results.subList(startIdx, endIdx));
+            subLists.add(subsToAdd.subList(startIdx, endIdx));
             startIdx = endIdx;
         }
-        subLists.add(results.subList(startIdx, total - 1));
+        subLists.add(subsToAdd.subList(startIdx, total));
 
         List<Thread> threads = new ArrayList<>();
         for (int idx = 0; idx < threadCount; idx++) {
@@ -161,19 +200,132 @@ public class CTrieSpeedTest {
         long duration = end - start;
         final long speed = Math.round(1000.0 * total / duration);
         LOGGER.info("{}, {}, {}, {}, {}", threadCount, Topic.MAX_TOKEN_LENGTH, total, duration, speed);
-        addResult(new TestResult(threadCount, Topic.MAX_TOKEN_LENGTH, total, duration));
+        addAddResult(new TestResult(threadCount, Topic.MAX_TOKEN_LENGTH, total, duration));
+        return tree;
+    }
+
+    public CTrie removeSubscriptions(CTrie tree, List<SubscriptionRequest> subsToAdd, int threadCount) throws InterruptedException {
+        long start = System.currentTimeMillis();
+
+        List<List<SubscriptionRequest>> subLists = new ArrayList<>();
+        final int total = subsToAdd.size();
+        int perList = total / threadCount;
+        int startIdx = 0;
+        for (int idx = 0; idx < threadCount - 1; idx++) {
+            int endIdx = startIdx + perList;
+            subLists.add(subsToAdd.subList(startIdx, endIdx));
+            startIdx = endIdx;
+        }
+        subLists.add(subsToAdd.subList(startIdx, total));
+
+        List<Thread> threads = new ArrayList<>();
+        for (int idx = 0; idx < threadCount; idx++) {
+            final List<SubscriptionRequest> workList = subLists.get(idx);
+            threads.add(new Thread(() -> {
+                int log = CHECK_INTERVAL;
+                int count = 0;
+                for (SubscriptionRequest subReq : workList) {
+                    tree.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared(subReq.getClientId(), subReq.getTopicFilter()));
+                    count++;
+                    log--;
+                    if (log <= 0) {
+                        log = CHECK_INTERVAL;
+                        long end = System.currentTimeMillis();
+                        long duration = end - start;
+                        LOGGER.info("Threads {}, Subs {}, time(ms) {}, perMs {}", threadCount, count, duration, Math.round(1.0 * count / duration));
+                    }
+                    if (Thread.currentThread().isInterrupted()) {
+                        return;
+                    }
+                }
+            }));
+        }
+        for (Thread thread : threads) {
+            thread.start();
+        }
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        long end = System.currentTimeMillis();
+        long duration = end - start;
+        final long speed = Math.round(1000.0 * total / duration);
+        LOGGER.info("{}, {}, {}, {}, {}", threadCount, Topic.MAX_TOKEN_LENGTH, total, duration, speed);
+        addRemoveResult(new TestResult(threadCount, Topic.MAX_TOKEN_LENGTH, total, duration));
+        return tree;
+    }
+
+    public void readSubscriptions(CTrie tree, List<SubscriptionRequest> subsToRead, int threadCount) throws InterruptedException {
+        final long start1 = System.currentTimeMillis();
+        List<List<SubscriptionRequest>> subLists = new ArrayList<>();
+        final int total = subsToRead.size();
+        int perList = total / threadCount;
+        int startIdx = 0;
+        for (int idx = 0; idx < threadCount - 1; idx++) {
+            int endIdx = startIdx + perList;
+            subLists.add(subsToRead.subList(startIdx, endIdx));
+            startIdx = endIdx;
+        }
+        subLists.add(subsToRead.subList(startIdx, total));
+
+        List<Thread> threads = new ArrayList<>();
+        for (int idx = 0; idx < threadCount; idx++) {
+            final List<SubscriptionRequest> workList = subLists.get(idx);
+            threads.add(new Thread(() -> {
+                int log = CHECK_INTERVAL;
+                int count = 0;
+                for (SubscriptionRequest subReq : workList) {
+
+                    final Subscription subscription = subReq.subscription();
+                    final Topic topic = subReq.getTopicFilter();
+                    final List<Subscription> recursiveMatch = tree.recursiveMatch(topic);
+                    final boolean contains = recursiveMatch.contains(subscription);
+                    Assertions.assertTrue(contains, () -> "Failed to find " + subscription + " on " + topic + " found " + recursiveMatch.size() + " matches.");
+
+                    count++;
+                    log--;
+                    if (log <= 0) {
+                        log = CHECK_INTERVAL;
+                        long end = System.currentTimeMillis();
+                        long duration = end - start1;
+                        LOGGER.info("Threads {}, Subs {}, time(ms) {}, perMs {}", threadCount, count, duration, Math.round(1.0 * count / duration));
+                    }
+                    if (Thread.currentThread().isInterrupted()) {
+                        return;
+                    }
+                }
+            }));
+        }
+        for (Thread thread : threads) {
+            thread.start();
+        }
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        long end = System.currentTimeMillis();
+        long duration = end - start1;
+        final long speed = Math.round(1000.0 * total / duration);
+        addReadResult(new TestResult(threadCount, Topic.MAX_TOKEN_LENGTH, total, duration));
+        LOGGER.info("{}, {}, {}, {}, {}", threadCount, Topic.MAX_TOKEN_LENGTH, total, duration, speed);
     }
 
     public List<SubscriptionRequest> prepareSubscriptionsManyClientsFewTopic(int subCount) {
         List<SubscriptionRequest> subscriptionList = new ArrayList<>(subCount);
+        int total = 0;
         long start = System.currentTimeMillis();
-        for (int i = 0; i < subCount; i++) {
-            Topic topic = asTopic("topic/test/" + new Random().nextInt(10) + "/test");
-            subscriptionList.add(SubscriptionRequest.buildNonShared("TestClient-" + i, topic, MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_LEAST_ONCE)));
+        int groupSize = subCount / 10;
+        for (int i = 0; i < groupSize; i++) {
+            for (int group = 0; group < 10; group++) {
+                int idx = group * groupSize + i;
+                Topic topic = asTopic("topic/test");
+                subscriptionList.add(SubscriptionRequest.buildNonShared("TestClient-" + idx, topic, MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_LEAST_ONCE)));
+                total++;
+            }
         }
         long end = System.currentTimeMillis();
         long duration = end - start;
-        LOGGER.debug("Prepared {} subscriptions in {} ms on 10 topics", subCount, duration);
+        LOGGER.info("Prepared {} subscriptions in {} ms on 10 topics", total, duration);
         return subscriptionList;
     }
 
