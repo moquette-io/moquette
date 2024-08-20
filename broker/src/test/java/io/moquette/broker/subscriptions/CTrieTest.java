@@ -27,6 +27,7 @@ import java.util.Optional;
 import static io.moquette.broker.subscriptions.SubscriptionTestUtils.asSubscription;
 import static io.moquette.broker.subscriptions.Topic.asTopic;
 import java.util.List;
+import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -54,11 +55,11 @@ public class CTrieTest {
         assertThat(this.sut.root.mainNode().subscriptions()).isEmpty();
         assertThat(this.sut.root.mainNode().allChildren()).isNotEmpty();
 
-        INode firstLayer = this.sut.root.mainNode().allChildren().get(0);
+        INode firstLayer = this.sut.root.mainNode().allChildren().stream().findFirst().get();
         assertThat(firstLayer.mainNode().subscriptions()).isEmpty();
         assertThat(firstLayer.mainNode().allChildren()).isNotEmpty();
 
-        INode secondLayer = firstLayer.mainNode().allChildren().get(0);
+        INode secondLayer = firstLayer.mainNode().allChildren().stream().findFirst().get();
         assertThat(secondLayer.mainNode().subscriptions()).isNotEmpty();
         assertThat(secondLayer.mainNode().allChildren()).isEmpty();
     }
@@ -99,7 +100,7 @@ public class CTrieTest {
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/temp"));
         assertTrue(matchedNode.isPresent(), "Node on path /temp must be present");
-        final List<Subscription> subscriptions = matchedNode.get().subscriptions();
+        final Set<Subscription> subscriptions = matchedNode.get().subscriptions();
         assertTrue(subscriptions.contains(asSubscription("TempSensor2", "/temp")));
     }
 
@@ -117,7 +118,7 @@ public class CTrieTest {
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/italy/happiness"));
         assertTrue(matchedNode.isPresent(), "Node on path /italy/happiness must be present");
-        final List<Subscription> subscriptions = matchedNode.get().subscriptions();
+        final Set<Subscription> subscriptions = matchedNode.get().subscriptions();
         assertTrue(subscriptions.contains(asSubscription("HappinessSensor", "/italy/happiness")));
     }
 
