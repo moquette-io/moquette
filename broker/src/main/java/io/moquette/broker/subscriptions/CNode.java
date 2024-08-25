@@ -42,8 +42,8 @@ class CNode implements Comparable<CNode> {
     public static final Random SECURE_RANDOM = new SecureRandom();
     private final Token token;
     private PMap<String, INode> children;
-    // Map of subscriptions. Not a Set, because Set doesn't have a Get method and we may need to update.
-    private PMap<Subscription, Subscription> subscriptions;
+    // Map of subscriptions per clientId.
+    private PMap<String, Subscription> subscriptions;
     // the list of SharedSubscription is sorted. The sort is necessary for fast access, instead of linear scan.
     private Map<ShareName, List<SharedSubscription>> sharedSubscriptions;
 
@@ -55,7 +55,7 @@ class CNode implements Comparable<CNode> {
     }
 
     //Copy constructor
-    private CNode(Token token, PMap<String, INode> children, PMap<Subscription, Subscription> subscriptions, Map<ShareName, List<SharedSubscription>> sharedSubscriptions) {
+    private CNode(Token token, PMap<String, INode> children, PMap<String, Subscription> subscriptions, Map<ShareName, List<SharedSubscription>> sharedSubscriptions) {
         this.token = token; // keep reference, root comparison in directory logic relies on it for now.
         this.subscriptions = subscriptions;
         this.sharedSubscriptions = new HashMap<>(sharedSubscriptions);
@@ -113,8 +113,8 @@ class CNode implements Comparable<CNode> {
         return selectedSubscriptions;
     }
 
-    Set<Subscription> subscriptions() {
-        return subscriptions.keySet();
+    Collection<Subscription> subscriptions() {
+        return subscriptions.values();
     }
 
     // Mutating operation
@@ -136,15 +136,15 @@ class CNode implements Comparable<CNode> {
             final Subscription newSubscription = request.subscription();
 
             // if already contains one with same topic and same client, keep that with higher QoS
-            final Subscription existing = subscriptions.get(newSubscription);
+            final Subscription existing = subscriptions.get(newSubscription.clientId);
             if (existing != null) {
                 // Subscription already exists
                 if (needsToUpdateExistingSubscription(newSubscription, existing)) {
-                    subscriptions = subscriptions.plus(newSubscription, newSubscription);
+                    subscriptions = subscriptions.plus(newSubscription.clientId, newSubscription);
                 }
             } else {
                 // insert into the expected index so that the sorting is maintained
-                subscriptions = subscriptions.plus(newSubscription, newSubscription);
+                subscriptions = subscriptions.plus(newSubscription.clientId, newSubscription);
             }
         }
         return this;
@@ -170,8 +170,8 @@ class CNode implements Comparable<CNode> {
      *   AND at least one subscription is actually present for that clientId
      * */
     boolean containsOnly(String clientId) {
-        for (Subscription sub : this.subscriptions.values()) {
-            if (!sub.clientId.equals(clientId)) {
+        for (String sub : this.subscriptions.keySet()) {
+            if (!sub.equals(clientId)) {
                 return false;
             }
         }
@@ -200,12 +200,7 @@ class CNode implements Comparable<CNode> {
 
     //TODO this is equivalent to negate(containsOnly(clientId))
     private boolean containsSubscriptionsForClient(String clientId) {
-        for (Subscription sub : this.subscriptions.values()) {
-            if (sub.clientId.equals(clientId)) {
-                return true;
-            }
-        }
-        return false;
+        return subscriptions.containsKey(clientId);
     }
 
     void removeSubscriptionsFor(UnsubscribeRequest request) {
@@ -224,15 +219,7 @@ class CNode implements Comparable<CNode> {
                 this.sharedSubscriptions.replace(request.getSharedName(), subscriptionsForName);
             }
         } else {
-            // collect Subscription instances to remove
-            Set<Subscription> toRemove = new HashSet<>();
-            for (Subscription sub : this.subscriptions.values()) {
-                if (sub.clientId.equals(clientId)) {
-                    toRemove.add(sub);
-                }
-            }
-            // effectively remove the instances
-            subscriptions = subscriptions.minusAll(toRemove);
+            subscriptions = subscriptions.minus(clientId);
         }
     }
 
