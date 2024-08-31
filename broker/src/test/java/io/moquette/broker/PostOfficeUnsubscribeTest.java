@@ -39,6 +39,7 @@ import java.util.concurrent.*;
 import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static io.moquette.broker.PostOfficePublishTest.PUBLISHER_ID;
+import io.moquette.broker.subscriptions.SubscriptionCollection;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
 import static java.util.Collections.*;
 import java.util.List;
@@ -125,7 +126,7 @@ public class PostOfficeUnsubscribeTest {
         final String clientId = connection.getClientId();
         Subscription expectedSubscription = new Subscription(clientId, new Topic(topic), MqttSubscriptionOption.onlyFromQos(desiredQos));
 
-        final List<Subscription> matchedSubscriptions = subscriptions.matchQosSharpening(new Topic(topic));
+        final SubscriptionCollection matchedSubscriptions = subscriptions.matchWithoutQosSharpening(new Topic(topic));
         assertEquals(1, matchedSubscriptions.size());
         //assertTrue(matchedSubscriptions.size() >=1);
         final Subscription onlyMatchedSubscription = matchedSubscriptions.iterator().next();

@@ -31,22 +31,21 @@ class DumpTreeVisitor implements CTrie.IVisitor<String> {
         if (node instanceof TNode) {
             return "TNode";
         }
-        if (node.subscriptions().isEmpty()) {
+        if (node.getSubscriptions().isEmpty()) {
             return StringUtil.EMPTY_STRING;
         }
         StringBuilder subScriptionsStr = new StringBuilder(" ~~[");
         int counter = 0;
-        for (Subscription couple : node.subscriptions()) {
+        for (Subscription couple : node.getSubscriptions().values()) {
             subScriptionsStr
                 .append("{filter=").append(couple.topicFilter).append(", ")
                 .append("option=").append(couple.option()).append(", ")
                 .append("client='").append(couple.clientId).append("'}");
             counter++;
-            if (counter < node.subscriptions().size()) {
-                subScriptionsStr.append(";");
-            }
+            subScriptionsStr.append(";");
         }
-        return subScriptionsStr.append("]").toString();
+        final int length = subScriptionsStr.length();
+        return subScriptionsStr.replace(length - 1, length, "]").toString();
     }
 
     private String indentTabs(int deep) {
