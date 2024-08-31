@@ -118,6 +118,7 @@ public class CTrie {
      * Models a request to unsubscribe a client, it's carrier for the Subscription
      * */
     public final static class UnsubscribeRequest {
+
         private final Topic topicFilter;
         private final String clientId;
         private boolean shared = false;
@@ -231,21 +232,25 @@ public class CTrie {
         return NavigationAction.STOP;
     }
 
-    public List<Subscription> recursiveMatch(Topic topicName) {
-        return recursiveMatch(topicName, this.root, 0);
+    public SubscriptionCollection recursiveMatch(Topic topicName) {
+        SubscriptionCollection subscriptions = new SubscriptionCollection();
+        recursiveMatch(topicName, this.root, 0, subscriptions);
+        return subscriptions;
     }
 
-    private List<Subscription> recursiveMatch(Topic topicName, INode inode, int depth) {
+    private void recursiveMatch(Topic topicName, INode inode, int depth, SubscriptionCollection target) {
         CNode cnode = inode.mainNode();
         if (cnode instanceof TNode) {
-            return Collections.emptyList();
+            return;
         }
         NavigationAction action = evaluate(topicName, cnode, depth);
         if (action == NavigationAction.MATCH) {
-            return cnode.sharedAndNonSharedSubscriptions();
+            target.addNormalSubscriptions(cnode.getSubscriptions());
+            target.addSharedSubscriptions(cnode.getSharedSubscriptions());
+            return;
         }
         if (action == NavigationAction.STOP) {
-            return Collections.emptyList();
+            return;
         }
         final boolean isRoot = ROOT.equals(cnode.getToken());
         final boolean isSingle = Token.SINGLE.equals(cnode.getToken());
@@ -256,27 +261,27 @@ public class CTrie {
             : (isSingle || isMulti)
                 ? topicName.exceptFullHeadToken()
                 : topicName.exceptHeadToken();
-        List<Subscription> subscriptions = new ArrayList<>();
+        SubscriptionCollection subscriptions = new SubscriptionCollection();
 
         // We should only consider the maximum three children children of
         // type #, + or exact match
         Optional<INode> subInode = cnode.childOf(Token.MULTI);
         if (subInode.isPresent()) {
-            subscriptions.addAll(recursiveMatch(remainingTopic, subInode.get(), depth + 1));
+            recursiveMatch(remainingTopic, subInode.get(), depth + 1, target);
         }
         subInode = cnode.childOf(Token.SINGLE);
         if (subInode.isPresent()) {
-            subscriptions.addAll(recursiveMatch(remainingTopic, subInode.get(), depth + 1));
+            recursiveMatch(remainingTopic, subInode.get(), depth + 1, target);
         }
         if (remainingTopic.isEmpty()) {
-            subscriptions.addAll(cnode.sharedAndNonSharedSubscriptions());
+            target.addNormalSubscriptions(cnode.getSubscriptions());
+            target.addSharedSubscriptions(cnode.getSharedSubscriptions());
         } else {
             subInode = cnode.childOf(remainingTopic.headToken());
             if (subInode.isPresent()) {
-                subscriptions.addAll(recursiveMatch(remainingTopic, subInode.get(), depth + 1));
+                recursiveMatch(remainingTopic, subInode.get(), depth + 1, target);
             }
         }
-        return subscriptions;
     }
 
     /**

@@ -45,20 +45,20 @@ class CNode implements Comparable<CNode> {
     // Map of subscriptions per clientId.
     private PMap<String, Subscription> subscriptions;
     // the list of SharedSubscription is sorted. The sort is necessary for fast access, instead of linear scan.
-    private Map<ShareName, List<SharedSubscription>> sharedSubscriptions;
+    private PMap<ShareName, List<SharedSubscription>> sharedSubscriptions;
 
     CNode(Token token) {
         this.children = TreePMap.empty();
         this.subscriptions = TreePMap.empty();
-        this.sharedSubscriptions = new HashMap<>();
+        this.sharedSubscriptions = TreePMap.empty();
         this.token = token;
     }
 
     //Copy constructor
-    private CNode(Token token, PMap<String, INode> children, PMap<String, Subscription> subscriptions, Map<ShareName, List<SharedSubscription>> sharedSubscriptions) {
+    private CNode(Token token, PMap<String, INode> children, PMap<String, Subscription> subscriptions, PMap<ShareName, List<SharedSubscription>> sharedSubscriptions) {
         this.token = token; // keep reference, root comparison in directory logic relies on it for now.
         this.subscriptions = subscriptions;
-        this.sharedSubscriptions = new HashMap<>(sharedSubscriptions);
+        this.sharedSubscriptions = sharedSubscriptions;
         this.children = children;
     }
 
@@ -99,22 +99,12 @@ class CNode implements Comparable<CNode> {
         return toRemove;
     }
 
-    private List<Subscription> sharedSubscriptions() {
-        List<Subscription> selectedSubscriptions = new ArrayList<>(sharedSubscriptions.size());
-        // for each sharedSubscription related to a ShareName, select one subscription
-        for (Map.Entry<ShareName, List<SharedSubscription>> subsForName : sharedSubscriptions.entrySet()) {
-            List<SharedSubscription> list = subsForName.getValue();
-            final String shareName = subsForName.getKey().getShareName();
-            // select a subscription randomly
-            int randIdx = SECURE_RANDOM.nextInt(list.size());
-            SharedSubscription sub = list.get(randIdx);
-            selectedSubscriptions.add(sub.createSubscription());
-        }
-        return selectedSubscriptions;
+    public PMap<String, Subscription> getSubscriptions() {
+        return subscriptions;
     }
 
-    Collection<Subscription> subscriptions() {
-        return subscriptions.values();
+    public PMap<ShareName, List<SharedSubscription>> getSharedSubscriptions() {
+        return sharedSubscriptions;
     }
 
     // Mutating operation
@@ -214,9 +204,9 @@ class CNode implements Comparable<CNode> {
             subscriptionsForName.removeAll(toRemove);
 
             if (subscriptionsForName.isEmpty()) {
-                this.sharedSubscriptions.remove(request.getSharedName());
+                sharedSubscriptions = sharedSubscriptions.minus(request.getSharedName());
             } else {
-                this.sharedSubscriptions.replace(request.getSharedName(), subscriptionsForName);
+                sharedSubscriptions = sharedSubscriptions.plus(request.getSharedName(), subscriptionsForName);
             }
         } else {
             subscriptions = subscriptions.minus(clientId);
@@ -228,11 +218,4 @@ class CNode implements Comparable<CNode> {
         return token.compareTo(o.token);
     }
 
-    public List<Subscription> sharedAndNonSharedSubscriptions() {
-        List<Subscription> shared = sharedSubscriptions();
-        List<Subscription> returnedSubscriptions = new ArrayList<>(subscriptions.size() + shared.size());
-        returnedSubscriptions.addAll(subscriptions.values());
-        returnedSubscriptions.addAll(shared);
-        return returnedSubscriptions;
-    }
 }

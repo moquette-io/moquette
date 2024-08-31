@@ -35,8 +35,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RequestResponseTest extends AbstractServerIntegrationWithoutClientFixture {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(RequestResponseTest.class.getName());
 
     @Test
     public void givenRequestResponseProtocolWhenRequestIsIssueThenTheResponderReply() throws InterruptedException {
@@ -60,9 +64,11 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
             .topicFilter("requester/door/open")
             .qos(MqttQos.AT_LEAST_ONCE)
             .build();
+        LOGGER.info("Subscribing to on requester/door/open");
         responder.toAsync().subscribe(subscribeToRequest,
             (Mqtt5Publish pub) -> {
                 assertTrue(pub.getResponseTopic().isPresent(), "Response topic MUST defined in request publish");
+                LOGGER.info("Responding on {}", pub.getResponseTopic().get());
                 Mqtt5PublishResult responseResult = responder.publishWith()
                     .topic(pub.getResponseTopic().get())
                     .payload("OK".getBytes(StandardCharsets.UTF_8))

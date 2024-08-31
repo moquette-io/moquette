@@ -58,6 +58,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static io.moquette.broker.Utils.messageId;
+import io.moquette.broker.subscriptions.SubscriptionCollection;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
@@ -842,7 +843,7 @@ class PostOffice {
         final boolean retainPublish = msg.fixedHeader().isRetain();
         final Topic topic = new Topic(msg.variableHeader().topicName());
         final MqttQoS publishingQos = msg.fixedHeader().qosLevel();
-        List<Subscription> topicMatchingSubscriptions = subscriptions.matchQosSharpening(topic);
+        SubscriptionCollection topicMatchingSubscriptions = subscriptions.matchWithoutQosSharpening(topic);
         if (topicMatchingSubscriptions.isEmpty()) {
             // no matching subscriptions, clean exit
             LOG.trace("No matching subscriptions for topic: {}", topic);

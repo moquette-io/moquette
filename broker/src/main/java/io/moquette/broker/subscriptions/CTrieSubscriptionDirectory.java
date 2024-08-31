@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,32 +78,8 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
      * @return the list of matching subscriptions, or empty if not matching.
      */
     @Override
-    public List<Subscription> matchWithoutQosSharpening(Topic topicName) {
+    public SubscriptionCollection matchWithoutQosSharpening(Topic topicName) {
         return ctrie.recursiveMatch(topicName);
-    }
-
-    @Override
-    public List<Subscription> matchQosSharpening(Topic topicName) {
-        final List<Subscription> subscriptions = matchWithoutQosSharpening(topicName);
-
-        // for each session select the subscription with higher QoS
-        return selectSubscriptionsWithHigherQoSForEachSession(subscriptions);
-    }
-
-    private static List<Subscription> selectSubscriptionsWithHigherQoSForEachSession(List<Subscription> subscriptions) {
-        // for each session select the subscription with higher QoS
-        Map<String, Subscription> subsGroupedByClient = new HashMap<>();
-        for (Subscription sub : subscriptions) {
-            // If same client is subscribed to two different shared subscription that overlaps
-            // then it has to return both subscriptions, because the share name made them independent.
-            final String key = sub.clientAndShareName();
-            Subscription existingSub = subsGroupedByClient.get(key);
-            // update the selected subscriptions if not present or if it has a greater qos
-            if (existingSub == null || existingSub.qosLessThan(sub)) {
-                subsGroupedByClient.put(key, sub);
-            }
-        }
-        return new ArrayList<>(subsGroupedByClient.values());
     }
 
     @Override
