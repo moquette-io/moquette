@@ -51,6 +51,7 @@ public abstract class IConfig {
     public static final String PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME = "persistent_client_expiration";
     public static final String SESSION_QUEUE_SIZE = "session_queue_size";
     public static final String ENABLE_TELEMETRY_NAME = "telemetry_enabled";
+    public static final String RECEIVE_MAXIMUM = "receive_maximum";
     /**
      * Defines the SSL implementation to use, default to "JDK".
      * @see io.netty.handler.ssl.SslProvider#name()
