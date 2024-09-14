@@ -27,6 +27,8 @@ class BrokerConfiguration {
     private final boolean allowZeroByteClientId;
     private final boolean reauthorizeSubscriptionsOnConnect;
     private final int bufferFlushMillis;
+    // integer max value means that the property is unset
+    private int receiveMaximum;
 
     BrokerConfiguration(IConfig props) {
         allowAnonymous = props.boolProp(BrokerConstants.ALLOW_ANONYMOUS_PROPERTY_NAME, true);
@@ -63,6 +65,8 @@ class BrokerConfiguration {
                 bufferFlushMillis = BrokerConstants.NO_BUFFER_FLUSH;
             }
         }
+
+        receiveMaximum = props.intProp(IConfig.RECEIVE_MAXIMUM, Integer.MAX_VALUE);
     }
 
     public BrokerConfiguration(boolean allowAnonymous, boolean allowZeroByteClientId,
@@ -98,5 +102,9 @@ class BrokerConfiguration {
 
     public int getBufferFlushMillis() {
         return bufferFlushMillis;
+    }
+
+    public int receiveMaximum() {
+        return receiveMaximum;
     }
 }

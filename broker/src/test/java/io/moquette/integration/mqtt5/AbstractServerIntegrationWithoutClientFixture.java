@@ -23,7 +23,6 @@ import com.hivemq.client.mqtt.MqttGlobalPublishFilter;
 import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import com.hivemq.client.mqtt.mqtt5.message.connect.Mqtt5Connect;
-import com.hivemq.client.mqtt.mqtt5.message.connect.Mqtt5ConnectBuilder;
 import com.hivemq.client.mqtt.mqtt5.message.connect.connack.Mqtt5ConnAck;
 import com.hivemq.client.mqtt.mqtt5.message.connect.connack.Mqtt5ConnAckReasonCode;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
@@ -81,6 +80,11 @@ public class AbstractServerIntegrationWithoutClientFixture {
         broker = new Server();
         final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
         config = new MemoryConfig(configProps);
+        broker.startServer(config);
+    }
+
+    protected void startServer(IConfig config) throws IOException {
+        broker = new Server();
         broker.startServer(config);
     }
 
