@@ -7,7 +7,7 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
-import static io.moquette.integration.mqtt5.ConnectTest.assertConnectionAccepted;
+import static io.moquette.integration.mqtt5.TestUtils.assertConnectionAccepted;
 
 public abstract class AbstractServerIntegrationTest extends AbstractServerIntegrationWithoutClientFixture {
 

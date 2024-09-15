@@ -27,6 +27,8 @@ class BrokerConfiguration {
     private final boolean allowZeroByteClientId;
     private final boolean reauthorizeSubscriptionsOnConnect;
     private final int bufferFlushMillis;
+    // integer max value means that the property is unset
+    private int receiveMaximum;
 
     BrokerConfiguration(IConfig props) {
         allowAnonymous = props.boolProp(BrokerConstants.ALLOW_ANONYMOUS_PROPERTY_NAME, true);
@@ -63,21 +65,33 @@ class BrokerConfiguration {
                 bufferFlushMillis = BrokerConstants.NO_BUFFER_FLUSH;
             }
         }
+
+        receiveMaximum = props.intProp(IConfig.RECEIVE_MAXIMUM, Integer.MAX_VALUE);
     }
 
+    // test method
     public BrokerConfiguration(boolean allowAnonymous, boolean allowZeroByteClientId,
                                boolean reauthorizeSubscriptionsOnConnect, int bufferFlushMillis) {
         this(allowAnonymous, false, allowZeroByteClientId,
             reauthorizeSubscriptionsOnConnect, bufferFlushMillis);
     }
 
+    // test method
     public BrokerConfiguration(boolean allowAnonymous, boolean peerCertificateAsUsername, boolean allowZeroByteClientId,
                                boolean reauthorizeSubscriptionsOnConnect, int bufferFlushMillis) {
+        this(allowAnonymous, peerCertificateAsUsername, allowZeroByteClientId, reauthorizeSubscriptionsOnConnect,
+            bufferFlushMillis, BrokerConstants.INFLIGHT_WINDOW_SIZE);
+    }
+
+    // test method
+    public BrokerConfiguration(boolean allowAnonymous, boolean peerCertificateAsUsername, boolean allowZeroByteClientId,
+                               boolean reauthorizeSubscriptionsOnConnect, int bufferFlushMillis, int receiveMaximum) {
         this.allowAnonymous = allowAnonymous;
         this.peerCertificateAsUsername = peerCertificateAsUsername;
         this.allowZeroByteClientId = allowZeroByteClientId;
         this.reauthorizeSubscriptionsOnConnect = reauthorizeSubscriptionsOnConnect;
         this.bufferFlushMillis = bufferFlushMillis;
+        this.receiveMaximum = receiveMaximum;
     }
 
     public boolean isAllowAnonymous() {
@@ -98,5 +112,9 @@ class BrokerConfiguration {
 
     public int getBufferFlushMillis() {
         return bufferFlushMillis;
+    }
+
+    public int receiveMaximum() {
+        return receiveMaximum;
     }
 }

@@ -72,6 +72,7 @@ final class MQTTConnection {
     private final AtomicInteger lastPacketId = new AtomicInteger(0);
     private Session bindedSession;
     private int protocolVersion;
+    private Quota receivedQuota;
 
     MQTTConnection(Channel channel, BrokerConfiguration brokerConfig, IAuthenticator authenticator,
                    SessionRegistry sessionRegistry, PostOffice postOffice) {
@@ -162,6 +163,17 @@ final class MQTTConnection {
         });
     }
 
+    /**
+     * Factory method
+     * */
+    public static Quota createQuota(int receiveMaximum) {
+        if (receiveMaximum == Integer.MAX_VALUE) {
+            return new UnlimitedQuota();
+        } else {
+            return new LimitedQuota(receiveMaximum);
+        }
+    }
+
     PostOffice.RouteResult processConnect(MqttConnectMessage msg) {
         MqttConnectPayload payload = msg.payload();
         String clientId = payload.clientIdentifier();
@@ -213,6 +225,7 @@ final class MQTTConnection {
             channel.close().addListener(CLOSE_ON_FAILURE);
             return PostOffice.RouteResult.failed(clientId);
         }
+        receivedQuota = createQuota(brokerConfig.receiveMaximum());
 
         final String sessionId = clientId;
         protocolVersion = msg.variableHeader().version();
@@ -286,6 +299,10 @@ final class MQTTConnection {
                 // the responder and requested access to the topic are already configured during session creation
                 // in SessionRegistry
                 connAckPropertiesBuilder.responseInformation("/reqresp/response/" + clientId);
+            }
+
+            if (receivedQuota.hasLimit()) {
+                connAckPropertiesBuilder.receiveMaximum(receivedQuota.getMaximum());
             }
             final MqttProperties ackProperties = connAckPropertiesBuilder.build();
             connAckBuilder.properties(ackProperties);
@@ -653,19 +670,40 @@ final class MQTTConnection {
                     return null;
                 }).ifFailed(msg::release);
             case AT_LEAST_ONCE:
+                if (receivedQuota.isConsumed()) {
+                    LOG.info("Client {} exceeded the quota {} processing QoS1, disconnecting it", clientId, receivedQuota);
+                    brokerDisconnect(MqttReasonCodes.Disconnect.RECEIVE_MAXIMUM_EXCEEDED);
+                    disconnectSession();
+                    dropConnection();
+                    return null;
+                }
+
                 return postOffice.routeCommand(clientId, "PUB QoS1", () -> {
                     checkMatchSessionLoop(clientId);
                     if (!isBoundToSession())
                         return null;
-                    postOffice.receivedPublishQos1(this, username, messageID, msg, expiry);
+                    receivedQuota.decrement();
+                    postOffice.receivedPublishQos1(this, username, messageID, msg, expiry)
+                        .completableFuture().thenRun(() -> {
+                            receivedQuota.increment();
+                        });
                     return null;
                 }).ifFailed(msg::release);
             case EXACTLY_ONCE: {
+                if (receivedQuota.isConsumed()) {
+                    LOG.info("Client {} exceeded the quota {} processing QoS2, disconnecting it", clientId, receivedQuota);
+                    brokerDisconnect(MqttReasonCodes.Disconnect.RECEIVE_MAXIMUM_EXCEEDED);
+                    disconnectSession();
+                    dropConnection();
+                    return null;
+                }
+
                 final PostOffice.RouteResult firstStepResult = postOffice.routeCommand(clientId, "PUB QoS2", () -> {
                     checkMatchSessionLoop(clientId);
                     if (!isBoundToSession())
                         return null;
                     bindedSession.receivedPublishQos2(messageID, msg);
+                    receivedQuota.decrement();
                     return null;
                 });
                 if (!firstStepResult.isSuccess()) {
@@ -722,6 +760,8 @@ final class MQTTConnection {
         postOffice.routeCommand(clientID, "PUBREL", () -> {
             checkMatchSessionLoop(clientID);
             executePubRel(messageID);
+            // increment send quota after send PUBCOMP to the client
+            receivedQuota.increment();
             return null;
         });
     }
