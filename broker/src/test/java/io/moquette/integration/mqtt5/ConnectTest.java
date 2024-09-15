@@ -266,7 +266,7 @@ class ConnectTest extends AbstractServerIntegrationTest {
             .build();
         clientWithWill.disconnect(malformedPacketReason);
 
-            restartServerWithSuspension(Duration.ofSeconds(5));
+        restartServerWithSuspension(Duration.ofSeconds(5));
 
         final Mqtt5BlockingClient testamentSubscriber = createAndConnectClientListeningToTestament();
 

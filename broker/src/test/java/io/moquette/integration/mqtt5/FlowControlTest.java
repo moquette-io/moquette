@@ -66,7 +66,6 @@ public class FlowControlTest extends AbstractServerIntegrationTest {
             verifyReceived(MqttMessageType.PUBREC);
         }
 
-        System.out.println("Sending 6th message");
         // sixth should exceed quota and the client should get a disconnect
         sendQoS2Publish();
 
