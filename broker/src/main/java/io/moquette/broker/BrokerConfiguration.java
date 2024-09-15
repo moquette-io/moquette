@@ -69,19 +69,29 @@ class BrokerConfiguration {
         receiveMaximum = props.intProp(IConfig.RECEIVE_MAXIMUM, Integer.MAX_VALUE);
     }
 
+    // test method
     public BrokerConfiguration(boolean allowAnonymous, boolean allowZeroByteClientId,
                                boolean reauthorizeSubscriptionsOnConnect, int bufferFlushMillis) {
         this(allowAnonymous, false, allowZeroByteClientId,
             reauthorizeSubscriptionsOnConnect, bufferFlushMillis);
     }
 
+    // test method
     public BrokerConfiguration(boolean allowAnonymous, boolean peerCertificateAsUsername, boolean allowZeroByteClientId,
                                boolean reauthorizeSubscriptionsOnConnect, int bufferFlushMillis) {
+        this(allowAnonymous, peerCertificateAsUsername, allowZeroByteClientId, reauthorizeSubscriptionsOnConnect,
+            bufferFlushMillis, BrokerConstants.INFLIGHT_WINDOW_SIZE);
+    }
+
+    // test method
+    public BrokerConfiguration(boolean allowAnonymous, boolean peerCertificateAsUsername, boolean allowZeroByteClientId,
+                               boolean reauthorizeSubscriptionsOnConnect, int bufferFlushMillis, int receiveMaximum) {
         this.allowAnonymous = allowAnonymous;
         this.peerCertificateAsUsername = peerCertificateAsUsername;
         this.allowZeroByteClientId = allowZeroByteClientId;
         this.reauthorizeSubscriptionsOnConnect = reauthorizeSubscriptionsOnConnect;
         this.bufferFlushMillis = bufferFlushMillis;
+        this.receiveMaximum = receiveMaximum;
     }
 
     public boolean isAllowAnonymous() {
