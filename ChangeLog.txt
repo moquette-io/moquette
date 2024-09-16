@@ -1,5 +1,7 @@
 Version 0.18-SNAPSHOT:
-   [feature] Generate correct MANIFEST.MF with bnd-maven-plugin.
+   [feature] Generate correct MANIFEST.MF with bnd-maven-plugin. (#848)
+   [feature] Flow-control: implemented publish's quota management on the server side. (#852)
+   [fix] Incorrect reference used in compareAndSet in CTrie.cleanTomb. (#841)
    [feature] Implement response-information property for request-response flow. (#840)
    [fix] Optimised page file opening for disk-based queues. (#837)
    [feature] Manage payload format indicator property, when set verify payload format. (#826)

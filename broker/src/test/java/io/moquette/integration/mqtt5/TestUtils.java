@@ -22,6 +22,8 @@ import com.hivemq.client.mqtt.MqttGlobalPublishFilter;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAckReasonCode;
+import io.netty.handler.codec.mqtt.MqttConnAckMessage;
+import io.netty.handler.codec.mqtt.MqttConnectReturnCode;
 import org.eclipse.paho.mqttv5.client.IMqttToken;
 
 import java.util.Optional;
@@ -47,5 +49,9 @@ public class TestUtils {
         assertEquals(1, subscribeToken.getReasonCodes().length);
         assertEquals(Mqtt5SubAckReasonCode.GRANTED_QOS_1.getCode(), subscribeToken.getReasonCodes()[0],
             "Client is subscribed to the topic");
+    }
+
+    public static void assertConnectionAccepted(MqttConnAckMessage connAck, String message) {
+        assertEquals(MqttConnectReturnCode.CONNECTION_ACCEPTED, connAck.variableHeader().connectReturnCode(), message);
     }
 }

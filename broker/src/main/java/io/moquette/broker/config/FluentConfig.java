@@ -28,6 +28,7 @@ import static io.moquette.broker.config.IConfig.PASSWORD_FILE_PROPERTY_NAME;
 import static io.moquette.broker.config.IConfig.PERSISTENCE_ENABLED_PROPERTY_NAME;
 import static io.moquette.broker.config.IConfig.PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME;
 import static io.moquette.broker.config.IConfig.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME;
+import static io.moquette.broker.config.IConfig.RECEIVE_MAXIMUM;
 import static io.moquette.broker.config.IConfig.HOST_PROPERTY_NAME;
 import static io.moquette.broker.config.IConfig.SESSION_QUEUE_SIZE;
 import static io.moquette.broker.config.IConfig.SSL_PORT_PROPERTY_NAME;
@@ -200,6 +201,11 @@ public class FluentConfig {
 
     public FluentConfig enableTelemetry() {
         configAccumulator.put(ENABLE_TELEMETRY_NAME, "true");
+        return this;
+    }
+
+    public FluentConfig receiveMaximum(int receiveMaximum) {
+        configAccumulator.put(RECEIVE_MAXIMUM, Integer.valueOf(receiveMaximum).toString());
         return this;
     }
 

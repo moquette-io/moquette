@@ -31,7 +31,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.function.LongSupplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -74,7 +73,7 @@ class ConnectTest extends AbstractServerIntegrationTest {
     @Test
     public void sendConnectOnDisconnectedConnection() {
         MqttConnAckMessage connAck = lowLevelClient.connectV5();
-        assertConnectionAccepted(connAck, "Connection must be accepted");
+        TestUtils.assertConnectionAccepted(connAck, "Connection must be accepted");
         lowLevelClient.disconnect();
 
         try {
@@ -97,7 +96,7 @@ class ConnectTest extends AbstractServerIntegrationTest {
         assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, connectAck.getReasonCode(), "Publisher connected");
 
         final MqttConnAckMessage connAck = lowLevelClient.connectV5();
-        assertConnectionAccepted(connAck, "Connection must be accepted");
+        TestUtils.assertConnectionAccepted(connAck, "Connection must be accepted");
         lowLevelClient.subscribe("/test", MqttQoS.AT_LEAST_ONCE);
 
         final Mqtt5PublishResult pubResult = publisher.publishWith()
@@ -111,7 +110,7 @@ class ConnectTest extends AbstractServerIntegrationTest {
 
         // reconnect the raw subscriber
         final Client reconnectingSubscriber = new Client("localhost").clientId("subscriber");
-        assertConnectionAccepted(reconnectingSubscriber.connectV5(), "Connection must be accepted");
+        TestUtils.assertConnectionAccepted(reconnectingSubscriber.connectV5(), "Connection must be accepted");
 
         Awaitility.await()
             .atMost(2, TimeUnit.SECONDS)
@@ -130,10 +129,6 @@ class ConnectTest extends AbstractServerIntegrationTest {
         assertEquals("Hello", publishPayload, "The inflight payload from previous subscription MUST be received");
 
         reconnectingSubscriber.disconnect();
-    }
-
-    public static void assertConnectionAccepted(MqttConnAckMessage connAck, String message) {
-        assertEquals(MqttConnectReturnCode.CONNECTION_ACCEPTED, connAck.variableHeader().connectReturnCode(), message);
     }
 
     @Test
