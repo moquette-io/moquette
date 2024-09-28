@@ -66,7 +66,7 @@ class BrokerConfiguration {
             }
         }
 
-        receiveMaximum = props.intProp(IConfig.RECEIVE_MAXIMUM, Integer.MAX_VALUE);
+        receiveMaximum = props.intProp(IConfig.RECEIVE_MAXIMUM, BrokerConstants.RECEIVE_MAXIMUM);
     }
 
     // test method

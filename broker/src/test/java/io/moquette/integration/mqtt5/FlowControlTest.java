@@ -18,6 +18,9 @@
 
 package io.moquette.integration.mqtt5;
 
+import com.hivemq.client.mqtt.datatypes.MqttQos;
+import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
+import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5PublishResult;
 import io.moquette.broker.config.FluentConfig;
 import io.moquette.broker.config.IConfig;
 import io.moquette.testclient.Client;
@@ -28,12 +31,13 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 import static io.moquette.integration.mqtt5.TestUtils.assertConnectionAccepted;
 import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class FlowControlTest extends AbstractServerIntegrationTest {
 
@@ -96,5 +100,53 @@ public class FlowControlTest extends AbstractServerIntegrationTest {
     @Override
     public String clientName() {
         return "sender";
+    }
+
+
+    @Test
+    public void givenClientConnectedWithCertainReceiveMaximumWhenInFlightSizeIsSurpassedThenTheServerEnqueueAndDontFloodTheClient() throws InterruptedException {
+        connectLowLevel();
+
+        // subscribe with an identifier
+        MqttMessage received = lowLevelClient.subscribeWithIdentifier("temperature/living",
+            MqttQoS.AT_LEAST_ONCE, 123);
+        verifyOfType(received, MqttMessageType.SUBACK);
+
+        //lowlevel client doesn't ACK any pub, so the in flight window fills up
+        Mqtt5BlockingClient publisher = createPublisherClient();
+        int inflightWindowSize = 10;
+        // fill the in flight window so that messages starts to be enqueued
+        fillInFlightWindow(inflightWindowSize, publisher);
+
+        // send another message, which is enqueued and has an expiry of messageExpiryInterval seconds
+        publisher.publishWith()
+            .topic("temperature/living")
+            .payload(("Enqueued").getBytes(StandardCharsets.UTF_8))
+            .qos(MqttQos.AT_LEAST_ONCE) // Broker enqueues only QoS1 and QoS2001
+            .send();
+
+        // after sending more publish the receive maximum limit is not passed and the connection remain open
+        assertTrue(lowLevelClient.isConnected());
+
+        // now subscriber consumes messages, shouldn't receive any message in the form "Enqueued-"
+        consumesPublishesInflightWindow(inflightWindowSize);
+
+        MqttMessage mqttMessage = lowLevelClient.receiveNextMessage(Duration.ofMillis(100));
+        assertNotNull(mqttMessage, "A message MUST be received");
+
+        assertEquals(MqttMessageType.PUBLISH, mqttMessage.fixedHeader().messageType(), "Message received should MqttPublishMessage");
+        MqttPublishMessage publish = (MqttPublishMessage) mqttMessage;
+        assertEquals("Enqueued", publish.payload().toString(StandardCharsets.UTF_8));
+        assertTrue(publish.release(), "Reference of publish should be released");
+    }
+
+    private static void fillInFlightWindow(int inflightWindowSize, Mqtt5BlockingClient publisher) {
+        for (int i = 0; i < inflightWindowSize; i++) {
+            publisher.publishWith()
+                .topic("temperature/living")
+                .payload(Integer.toString(i).getBytes(StandardCharsets.UTF_8))
+                .qos(MqttQos.AT_LEAST_ONCE)
+                .send();
+        }
     }
 }
