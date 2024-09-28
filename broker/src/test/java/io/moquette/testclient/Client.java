@@ -148,10 +148,18 @@ public class Client {
         if (clientId != null) {
             builder.clientId(clientId);
         }
+
+        final MqttProperties connectProperties = new MqttProperties();
+        MqttProperties.IntegerProperty receiveMaximum = new MqttProperties.IntegerProperty(
+            MqttProperties.MqttPropertyType.RECEIVE_MAXIMUM.value(),
+            BrokerConstants.INFLIGHT_WINDOW_SIZE);
+        connectProperties.add(receiveMaximum);
+
         MqttConnectMessage connectMessage = builder
             .keepAlive(keepAliveSecs) // secs
             .willFlag(false)
             .willQoS(MqttQoS.AT_MOST_ONCE)
+            .properties(connectProperties)
             .build();
 
         return doConnect(connectMessage);
@@ -366,5 +374,9 @@ public class Client {
             throw new IllegalStateException("Invoked close on an Acceptor that wasn't initialized");
         }
         workerGroup.shutdownGracefully();
+    }
+
+    public boolean isConnected() {
+        return m_channel.isActive();
     }
 }

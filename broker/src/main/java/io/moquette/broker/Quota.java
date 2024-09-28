@@ -22,11 +22,13 @@ interface Quota {
 
     boolean hasLimit();
 
-    void decrement();
+    void consumeSlot();
 
-    void increment();
+    void releaseSlot();
 
-    boolean isConsumed();
+    boolean hasFreeSlots();
 
     int getMaximum();
+
+    int availableSlots();
 }

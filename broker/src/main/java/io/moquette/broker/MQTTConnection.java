@@ -48,7 +48,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.net.ssl.SSLPeerUnverifiedException;
 
-import static io.moquette.BrokerConstants.INFLIGHT_WINDOW_SIZE;
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 import static io.netty.channel.ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
@@ -73,6 +72,7 @@ final class MQTTConnection {
     private Session bindedSession;
     private int protocolVersion;
     private Quota receivedQuota;
+    private Quota sendQuota;
 
     MQTTConnection(Channel channel, BrokerConfiguration brokerConfig, IAuthenticator authenticator,
                    SessionRegistry sessionRegistry, PostOffice postOffice) {
@@ -167,11 +167,11 @@ final class MQTTConnection {
      * Factory method
      * */
     public static Quota createQuota(int receiveMaximum) {
-        if (receiveMaximum == Integer.MAX_VALUE) {
-            return new UnlimitedQuota();
-        } else {
-            return new LimitedQuota(receiveMaximum);
-        }
+        return new LimitedQuota(receiveMaximum);
+    }
+
+    Quota sendQuota() {
+        return sendQuota;
     }
 
     PostOffice.RouteResult processConnect(MqttConnectMessage msg) {
@@ -190,7 +190,7 @@ final class MQTTConnection {
         }
         final boolean cleanSession = msg.variableHeader().isCleanSession();
         final boolean serverGeneratedClientId;
-        if (clientId == null || clientId.length() == 0) {
+        if (clientId == null || clientId.isEmpty()) {
             if (isNotProtocolVersion(msg, MqttVersion.MQTT_5)) {
                 if (!brokerConfig.isAllowZeroByteClientId()) {
                     LOG.info("Broker doesn't permit MQTT empty client ID. Username: {}", username);
@@ -227,6 +227,8 @@ final class MQTTConnection {
         }
         receivedQuota = createQuota(brokerConfig.receiveMaximum());
 
+        sendQuota = retrieveSendQuota(msg);
+
         final String sessionId = clientId;
         protocolVersion = msg.variableHeader().version();
         return postOffice.routeCommand(clientId, "CONN", () -> {
@@ -234,6 +236,24 @@ final class MQTTConnection {
             executeConnect(msg, sessionId, serverGeneratedClientId);
             return null;
         });
+    }
+
+    private Quota retrieveSendQuota(MqttConnectMessage msg) {
+        if (!isProtocolVersion(msg, MqttVersion.MQTT_5)) {
+            return createQuota(BrokerConstants.INFLIGHT_WINDOW_SIZE);
+        }
+        MqttProperties.IntegerProperty receiveMaximumProperty = (MqttProperties.IntegerProperty) msg.variableHeader()
+            .properties()
+            .getProperty(MqttProperties.MqttPropertyType.RECEIVE_MAXIMUM.value());
+        if (receiveMaximumProperty == null) {
+            return createQuota(BrokerConstants.RECEIVE_MAXIMUM);
+        }
+        return createQuota(receiveMaximumProperty.value());
+    }
+
+    // only for test
+    protected void assignSendQuota(Quota quota) {
+        this.sendQuota = quota;
     }
 
     private void checkMatchSessionLoop(String clientId) {
@@ -395,7 +415,6 @@ final class MQTTConnection {
 
         builder
             .sessionExpiryInterval(BrokerConstants.INFINITE_SESSION_EXPIRY)
-            .receiveMaximum(INFLIGHT_WINDOW_SIZE)
             .retainAvailable(true)
             .wildcardSubscriptionAvailable(true)
             .subscriptionIdentifiersAvailable(true)
@@ -670,7 +689,7 @@ final class MQTTConnection {
                     return null;
                 }).ifFailed(msg::release);
             case AT_LEAST_ONCE:
-                if (receivedQuota.isConsumed()) {
+                if (!receivedQuota.hasFreeSlots()) {
                     LOG.info("Client {} exceeded the quota {} processing QoS1, disconnecting it", clientId, receivedQuota);
                     brokerDisconnect(MqttReasonCodes.Disconnect.RECEIVE_MAXIMUM_EXCEEDED);
                     disconnectSession();
@@ -682,15 +701,15 @@ final class MQTTConnection {
                     checkMatchSessionLoop(clientId);
                     if (!isBoundToSession())
                         return null;
-                    receivedQuota.decrement();
+                    receivedQuota.consumeSlot();
                     postOffice.receivedPublishQos1(this, username, messageID, msg, expiry)
                         .completableFuture().thenRun(() -> {
-                            receivedQuota.increment();
+                            receivedQuota.releaseSlot();
                         });
                     return null;
                 }).ifFailed(msg::release);
             case EXACTLY_ONCE: {
-                if (receivedQuota.isConsumed()) {
+                if (receivedQuota.hasFreeSlots()) {
                     LOG.info("Client {} exceeded the quota {} processing QoS2, disconnecting it", clientId, receivedQuota);
                     brokerDisconnect(MqttReasonCodes.Disconnect.RECEIVE_MAXIMUM_EXCEEDED);
                     disconnectSession();
@@ -703,7 +722,7 @@ final class MQTTConnection {
                     if (!isBoundToSession())
                         return null;
                     bindedSession.receivedPublishQos2(messageID, msg);
-                    receivedQuota.decrement();
+                    receivedQuota.consumeSlot();
                     return null;
                 });
                 if (!firstStepResult.isSuccess()) {
@@ -761,7 +780,7 @@ final class MQTTConnection {
             checkMatchSessionLoop(clientID);
             executePubRel(messageID);
             // increment send quota after send PUBCOMP to the client
-            receivedQuota.increment();
+            receivedQuota.releaseSlot();
             return null;
         });
     }
