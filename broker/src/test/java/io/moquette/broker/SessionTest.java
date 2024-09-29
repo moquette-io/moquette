@@ -11,7 +11,6 @@ import io.netty.handler.codec.mqtt.MqttVersion;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static io.moquette.BrokerConstants.FLIGHT_BEFORE_RESEND_MS;
 import io.moquette.broker.subscriptions.Subscription;
 
 import java.time.Clock;
@@ -19,10 +18,10 @@ import java.time.Instant;
 import java.util.Arrays;
 import org.assertj.core.api.Assertions;
 
+import static io.moquette.BrokerConstants.*;
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 
 public class SessionTest {
 
@@ -128,6 +127,7 @@ public class SessionTest {
     private void createConnection(Session client) {
         BrokerConfiguration brokerConfiguration = new BrokerConfiguration(true, false, false, NO_BUFFER_FLUSH);
         MQTTConnection mqttConnection = new MQTTConnection(testChannel, brokerConfiguration, null, null, null);
+        mqttConnection.assignSendQuota(new LimitedQuota(INFLIGHT_WINDOW_SIZE));
         client.markConnecting();
         client.bind(mqttConnection);
         client.completeConnection();

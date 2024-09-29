@@ -16,7 +16,7 @@
 package io.moquette.broker;
 
 import static io.moquette.BrokerConstants.FLIGHT_BEFORE_RESEND_MS;
-import static io.moquette.BrokerConstants.INFLIGHT_WINDOW_SIZE;
+
 import io.moquette.broker.SessionRegistry.EnqueuedMessage;
 import io.moquette.broker.SessionRegistry.PublishedMessage;
 import io.moquette.broker.subscriptions.Subscription;
@@ -33,7 +33,6 @@ import java.util.*;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -87,7 +86,7 @@ class Session {
     // used only in MQTT3 where resends are done on timeout of ACKs.
     private final DelayQueue<InFlightPacket> inflightTimeouts = new DelayQueue<>();
     private final Map<Integer, MqttPublishMessage> qos2Receiving = new HashMap<>();
-    private final AtomicInteger inflightSlots = new AtomicInteger(INFLIGHT_WINDOW_SIZE); // this should be configurable
+//    private final AtomicInteger inflightSlots;
     private ISessionsRepository.SessionData data;
 
     Session(ISessionsRepository.SessionData data, boolean clean, SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue) {
@@ -222,11 +221,11 @@ class Session {
         cleanFromInflight(messageID);
         SessionRegistry.EnqueuedMessage removed = inflightWindow.remove(messageID);
         if (removed == null) {
-            LOG.warn("Received a PUBCOMP with not matching packetId");
+            LOG.warn("Received a PUBCOMP with not matching packetId in the inflight cache");
             return;
         }
         removed.release();
-        inflightSlots.incrementAndGet();
+        mqttConnection.sendQuota().releaseSlot();
         drainQueueToConnection();
 
         // TODO notify the interceptor
@@ -301,7 +300,7 @@ class Session {
         publishRequest.retain();
 
         if (canSkipQueue(localMqttConnectionRef)) {
-            inflightSlots.decrementAndGet();
+            mqttConnection.sendQuota().consumeSlot();
             int packetId = localMqttConnectionRef.nextPacketId();
 
             LOG.debug("Adding into inflight for session {} at QoS {}", getClientID(), publishRequest.getPublishingQos());
@@ -310,7 +309,7 @@ class Session {
             // If there already was something, release it.
             if (old != null) {
                 old.release();
-                inflightSlots.incrementAndGet();
+                mqttConnection.sendQuota().releaseSlot();
             }
             if (resendInflightOnTimeout) {
                 inflightTimeouts.add(new InFlightPacket(packetId, FLIGHT_BEFORE_RESEND_MS));
@@ -332,13 +331,13 @@ class Session {
     private boolean canSkipQueue(MQTTConnection localMqttConnectionRef) {
         return localMqttConnectionRef != null &&
             sessionQueue.isEmpty() &&
-            inflightSlots.get() > 0 &&
+            mqttConnection.sendQuota().hasFreeSlots() &&
             connected() &&
             localMqttConnectionRef.channel.isWritable();
     }
 
     private boolean inflightHasSlotsAndConnectionIsUp() {
-        return inflightSlots.get() > 0 &&
+        return mqttConnection.sendQuota().hasFreeSlots() &&
             connected() &&
             mqttConnection.channel.isWritable();
     }
@@ -348,12 +347,12 @@ class Session {
         cleanFromInflight(ackPacketId);
         SessionRegistry.EnqueuedMessage removed = inflightWindow.remove(ackPacketId);
         if (removed == null) {
-            LOG.warn("Received a PUBACK with not matching packetId");
+            LOG.warn("Received a PUBACK with not matching packetId in the inflight cache");
             return;
         }
         removed.release();
 
-        inflightSlots.incrementAndGet();
+        mqttConnection.sendQuota().releaseSlot();
         LOG.debug("Received PUBACK {} for session {}", ackPacketId, getClientID());
         drainQueueToConnection();
     }
@@ -370,7 +369,7 @@ class Session {
         Collection<Integer> nonAckPacketIds;
         if (resendInflightOnTimeout) {
             // MQTT3 behavior, resend on timeout
-            Collection<InFlightPacket> expired = new ArrayList<>(INFLIGHT_WINDOW_SIZE);
+            Collection<InFlightPacket> expired = new ArrayList<>();
             inflightTimeouts.drainTo(expired);
             nonAckPacketIds = expired.stream().map(p -> p.packetId).collect(Collectors.toList());
         } else {
@@ -380,6 +379,7 @@ class Session {
 
         debugLogPacketIds(nonAckPacketIds);
 
+        // TODO rework here because send quota max can be lower than the inflight window width!
         for (Integer notAckPacketId : nonAckPacketIds) {
             final SessionRegistry.EnqueuedMessage msg = inflightWindow.get(notAckPacketId);
             if (msg == null) {
@@ -435,14 +435,14 @@ class Session {
                 return;
             }
 
-            inflightSlots.decrementAndGet();
+            mqttConnection.sendQuota().consumeSlot();
             int sendPacketId = mqttConnection.nextPacketId();
 
             // Putting it in a map, but the retain is cancelled out by the below release.
             EnqueuedMessage old = inflightWindow.put(sendPacketId, msg);
             if (old != null) {
                 old.release();
-                inflightSlots.incrementAndGet();
+                mqttConnection.sendQuota().releaseSlot();
             }
             if (resendInflightOnTimeout) {
                 inflightTimeouts.add(new InFlightPacket(sendPacketId, FLIGHT_BEFORE_RESEND_MS));
@@ -529,7 +529,7 @@ class Session {
             "clientId='" + data.clientId() + '\'' +
             ", clean=" + clean +
             ", status=" + status +
-            ", inflightSlots=" + inflightSlots +
+            ", inflightSlots=" + mqttConnection.sendQuota().availableSlots() +
             '}';
     }
 }
