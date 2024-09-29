@@ -690,7 +690,7 @@ final class MQTTConnection {
                 }).ifFailed(msg::release);
             case AT_LEAST_ONCE:
                 if (!receivedQuota.hasFreeSlots()) {
-                    LOG.info("Client {} exceeded the quota {} processing QoS1, disconnecting it", clientId, receivedQuota);
+                    LOG.warn("Client {} exceeded the quota {} processing QoS1, disconnecting it", clientId, receivedQuota);
                     brokerDisconnect(MqttReasonCodes.Disconnect.RECEIVE_MAXIMUM_EXCEEDED);
                     disconnectSession();
                     dropConnection();
@@ -709,8 +709,8 @@ final class MQTTConnection {
                     return null;
                 }).ifFailed(msg::release);
             case EXACTLY_ONCE: {
-                if (receivedQuota.hasFreeSlots()) {
-                    LOG.info("Client {} exceeded the quota {} processing QoS2, disconnecting it", clientId, receivedQuota);
+                if (!receivedQuota.hasFreeSlots()) {
+                    LOG.warn("Client {} exceeded the quota {} processing QoS2, disconnecting it", clientId, receivedQuota);
                     brokerDisconnect(MqttReasonCodes.Disconnect.RECEIVE_MAXIMUM_EXCEEDED);
                     disconnectSession();
                     dropConnection();
