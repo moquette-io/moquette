@@ -20,7 +20,6 @@ package io.moquette.integration.mqtt5;
 
 import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
-import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5PublishResult;
 import io.moquette.broker.config.FluentConfig;
 import io.moquette.broker.config.IConfig;
 import io.moquette.testclient.Client;
@@ -36,8 +35,9 @@ import java.util.concurrent.TimeUnit;
 
 import static io.moquette.integration.mqtt5.TestUtils.assertConnectionAccepted;
 import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class FlowControlTest extends AbstractServerIntegrationTest {
 

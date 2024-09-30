@@ -239,9 +239,13 @@ final class MQTTConnection {
     }
 
     private Quota retrieveSendQuota(MqttConnectMessage msg) {
-        if (!isProtocolVersion(msg, MqttVersion.MQTT_5)) {
+        if (isProtocolVersion(msg, MqttVersion.MQTT_3_1) || isProtocolVersion(msg, MqttVersion.MQTT_3_1_1)) {
+            // for protocol versions that didn't define explicit
+            // the receiver maximum and without specification of flow control
+            // define one by the default.
             return createQuota(BrokerConstants.INFLIGHT_WINDOW_SIZE);
         }
+
         MqttProperties.IntegerProperty receiveMaximumProperty = (MqttProperties.IntegerProperty) msg.variableHeader()
             .properties()
             .getProperty(MqttProperties.MqttPropertyType.RECEIVE_MAXIMUM.value());
