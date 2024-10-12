@@ -1,6 +1,7 @@
 package io.moquette.integration.mqtt5;
 
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
+import io.moquette.BrokerConstants;
 import io.moquette.testclient.Client;
 import io.netty.handler.codec.mqtt.*;
 import org.jetbrains.annotations.NotNull;
@@ -51,7 +52,7 @@ public abstract class AbstractServerIntegrationTest extends AbstractServerIntegr
     }
 
     void connectLowLevel(int keepAliveSecs) {
-        MqttConnAckMessage connAck = lowLevelClient.connectV5(keepAliveSecs);
+        MqttConnAckMessage connAck = lowLevelClient.connectV5(keepAliveSecs, BrokerConstants.INFLIGHT_WINDOW_SIZE);
         assertConnectionAccepted(connAck, "Connection must be accepted");
     }
 

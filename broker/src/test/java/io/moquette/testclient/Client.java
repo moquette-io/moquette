@@ -139,11 +139,15 @@ public class Client {
     }
 
     public MqttConnAckMessage connectV5() {
-        return connectV5(2);
+        return connectV5(2, BrokerConstants.INFLIGHT_WINDOW_SIZE);
+    }
+
+    public MqttConnAckMessage connectV5WithReceiveMaximum(int receiveMaximumInflight) {
+        return connectV5(2, receiveMaximumInflight);
     }
 
     @NotNull
-    public MqttConnAckMessage connectV5(int keepAliveSecs) {
+    public MqttConnAckMessage connectV5(int keepAliveSecs, int receiveMaximumInflight) {
         final MqttMessageBuilders.ConnectBuilder builder = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_5);
         if (clientId != null) {
             builder.clientId(clientId);
@@ -152,7 +156,7 @@ public class Client {
         final MqttProperties connectProperties = new MqttProperties();
         MqttProperties.IntegerProperty receiveMaximum = new MqttProperties.IntegerProperty(
             MqttProperties.MqttPropertyType.RECEIVE_MAXIMUM.value(),
-            BrokerConstants.INFLIGHT_WINDOW_SIZE);
+            receiveMaximumInflight);
         connectProperties.add(receiveMaximum);
 
         MqttConnectMessage connectMessage = builder

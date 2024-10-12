@@ -43,6 +43,7 @@ class Session {
     // session that doesn't expire, it's ~68 years.
     static final int INFINITE_EXPIRY = Integer.MAX_VALUE;
     private final boolean resendInflightOnTimeout;
+    private Collection<Integer> nonAckPacketIds;
 
     static class InFlightPacket implements Delayed {
 
@@ -87,6 +88,7 @@ class Session {
     private final DelayQueue<InFlightPacket> inflightTimeouts = new DelayQueue<>();
     private final Map<Integer, MqttPublishMessage> qos2Receiving = new HashMap<>();
     private ISessionsRepository.SessionData data;
+    private boolean resendingNonAcked = false;
 
     Session(ISessionsRepository.SessionData data, boolean clean, SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue) {
         if (sessionQueue == null) {
@@ -212,7 +214,11 @@ class Session {
         MqttMessage pubRel = MQTTConnection.pubrel(pubRecPacketId);
         mqttConnection.sendIfWritableElseDrop(pubRel);
 
-        drainQueueToConnection();
+        if (resendingNonAcked) {
+            resendInflightNotAcked();
+        } else {
+            drainQueueToConnection();
+        }
     }
 
     public void processPubComp(int messageID) {
@@ -346,14 +352,19 @@ class Session {
         cleanFromInflight(ackPacketId);
         SessionRegistry.EnqueuedMessage removed = inflightWindow.remove(ackPacketId);
         if (removed == null) {
-            LOG.warn("Received a PUBACK with not matching packetId in the inflight cache");
+            LOG.warn("Received a PUBACK with not matching packetId({}) in the inflight cache({})",
+                ackPacketId, inflightWindow.keySet());
             return;
         }
         removed.release();
 
         mqttConnection.sendQuota().releaseSlot();
         LOG.debug("Received PUBACK {} for session {}", ackPacketId, getClientID());
-        drainQueueToConnection();
+        if (resendingNonAcked) {
+            resendInflightNotAcked();
+        } else {
+            drainQueueToConnection();
+        }
     }
 
     private void cleanFromInflight(int ackPacketId) {
@@ -365,22 +376,45 @@ class Session {
     }
 
     public void resendInflightNotAcked() {
-        Collection<Integer> nonAckPacketIds;
-        if (resendInflightOnTimeout) {
-            // MQTT3 behavior, resend on timeout
-            Collection<InFlightPacket> expired = new ArrayList<>();
-            inflightTimeouts.drainTo(expired);
-            nonAckPacketIds = expired.stream().map(p -> p.packetId).collect(Collectors.toList());
-        } else {
-            // MQTT5 behavior resend only not acked present in reopened session.
-            nonAckPacketIds = inflightWindow.keySet();
+        if (!resendingNonAcked) {
+            if (resendInflightOnTimeout) {
+                // MQTT3 behavior, resend on timeout
+                Collection<InFlightPacket> expired = new ArrayList<>();
+                inflightTimeouts.drainTo(expired);
+                nonAckPacketIds = expired.stream().map(p -> p.packetId).collect(Collectors.toList());
+            } else {
+                // MQTT5 behavior resend only not acked present in reopened session.
+                // need a copy else removing from the nonAckPacketIds would remove also from inflightWindow
+                nonAckPacketIds = new ArrayList<>(inflightWindow.keySet());
+            }
+
+            debugLogPacketIds(nonAckPacketIds);
         }
 
-        debugLogPacketIds(nonAckPacketIds);
-
         // TODO rework here because send quota max can be lower than the inflight window width!
-        for (Integer notAckPacketId : nonAckPacketIds) {
-            final SessionRegistry.EnqueuedMessage msg = inflightWindow.get(notAckPacketId);
+        if (nonAckPacketIds.size() > mqttConnection.sendQuota().availableSlots()) {
+            // send quota is smaller than the inflight messages to resend, split it
+            resendingNonAcked = true;
+            List<Integer> partition = nonAckPacketIds.stream()
+                .limit(mqttConnection.sendQuota().availableSlots())
+                .collect(Collectors.toList());
+
+            resendNonAckedIdsPartition(partition);
+
+            // clean up the partition sent
+            for (Integer id : partition) {
+                nonAckPacketIds.remove(id);
+            }
+        } else {
+            resendNonAckedIdsPartition(nonAckPacketIds);
+            resendingNonAcked = false;
+        }
+
+    }
+
+    private void resendNonAckedIdsPartition(Collection<Integer> packetIdsToResend) {
+        for (Integer notAckPacketId : packetIdsToResend) {
+            final EnqueuedMessage msg = inflightWindow.get(notAckPacketId);
             if (msg == null) {
                 // Already acked...
                 continue;
@@ -392,7 +426,7 @@ class Session {
                 }
                 mqttConnection.sendIfWritableElseDrop(pubRel);
             } else {
-                final SessionRegistry.PublishedMessage pubMsg = (SessionRegistry.PublishedMessage) msg;
+                final PublishedMessage pubMsg = (PublishedMessage) msg;
                 final Topic topic = pubMsg.topic;
                 final MqttQoS qos = pubMsg.publishingQos;
                 final ByteBuf payload = pubMsg.payload;
@@ -404,6 +438,8 @@ class Session {
                     inflightTimeouts.add(new InFlightPacket(notAckPacketId, FLIGHT_BEFORE_RESEND_MS));
                 }
                 mqttConnection.sendPublish(publishMsg);
+
+                mqttConnection.sendQuota().consumeSlot();
             }
         }
     }
@@ -469,8 +505,12 @@ class Session {
         LOG.trace("Republishing all saved messages for session {}", this);
         resendInflightNotAcked();
 
-        // send queued messages while offline
-        drainQueueToConnection();
+        if (!resendingNonAcked) {
+            // if resend of inflight is bigger than send quota, till it's finished
+            // do not drain the queue.
+            // send queued messages while offline
+            drainQueueToConnection();
+        }
     }
 
     public void receivedPublishQos2(int messageID, MqttPublishMessage msg) {

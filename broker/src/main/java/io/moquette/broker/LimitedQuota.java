@@ -58,7 +58,7 @@ class LimitedQuota implements Quota {
 
     @Override
     public int availableSlots() {
-        return receiveMaximum - receivedQuota;
+        return receivedQuota;
     }
 
     @Override

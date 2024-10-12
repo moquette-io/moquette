@@ -140,13 +140,48 @@ public class FlowControlTest extends AbstractServerIntegrationTest {
         assertTrue(publish.release(), "Reference of publish should be released");
     }
 
-    private static void fillInFlightWindow(int inflightWindowSize, Mqtt5BlockingClient publisher) {
-        for (int i = 0; i < inflightWindowSize; i++) {
+    private static void fillInFlightWindow(int numPublishToSend, Mqtt5BlockingClient publisher) {
+        for (int i = 0; i < numPublishToSend; i++) {
             publisher.publishWith()
                 .topic("temperature/living")
                 .payload(Integer.toString(i).getBytes(StandardCharsets.UTF_8))
                 .qos(MqttQos.AT_LEAST_ONCE)
                 .send();
         }
+    }
+
+    @Test
+    public void givenClientThatReconnectWithSmallerReceiveMaximumThenForwardCorrectlyTheFullListOfPendingMessagesWithoutAnyLose() throws InterruptedException {
+        // connect subscriber and published
+        // publisher send 20 events, 10 should be in the inflight, 10 remains on the queue
+        connectLowLevel();
+
+        // subscribe with an identifier
+        MqttMessage received = lowLevelClient.subscribeWithIdentifier("temperature/living",
+            MqttQoS.AT_LEAST_ONCE, 123);
+        verifyOfType(received, MqttMessageType.SUBACK);
+
+        //lowlevel client doesn't ACK any pub, so the in flight window fills up
+        Mqtt5BlockingClient publisher = createPublisherClient();
+        int inflightWindowSize = 10;
+        // fill the in flight window so that messages starts to be enqueued
+        fillInFlightWindow(inflightWindowSize + 10, publisher);
+
+        System.out.println("Filled inflight and queue");
+
+        // disconnect subscriber
+        lowLevelClient.disconnect();
+        lowLevelClient.close();
+
+        System.out.println("Closed old client, reconnecting");
+
+        // reconnect the subscriber with smaller received maximum
+        lowLevelClient = new Client("localhost").clientId(clientName());
+        MqttConnAckMessage connAck = lowLevelClient.connectV5WithReceiveMaximum(5);
+        assertConnectionAccepted(connAck, "Connection must be re-accepted with smaller window size");
+        System.out.println("Client reconnected second time");
+
+        // should receive all the 20 messages
+        consumesPublishesInflightWindow(inflightWindowSize + 10);
     }
 }
