@@ -54,7 +54,7 @@ public class CTrieSharedSubscriptionDirectoryMatchingTest extends CTrieSubscript
         sut.addShared("TempSensor1", new ShareName("temp_sensors"), asTopic("/livingroom"), asOption(MqttQoS.AT_MOST_ONCE));
         sut.addShared("TempSensor1", new ShareName("livingroom_devices"), asTopic("/livingroom"), asOption(MqttQoS.AT_MOST_ONCE));
 
-        List<Subscription> matchingSubscriptions = sut.matchWithoutQosSharpening(asTopic("/livingroom"));
+        SubscriptionCollection matchingSubscriptions = sut.matchWithoutQosSharpening(asTopic("/livingroom"));
         assertThat(matchingSubscriptions)
             .containsOnly(SubscriptionTestUtils.asSubscription("TempSensor1", "/livingroom", "temp_sensors"),
                 SubscriptionTestUtils.asSubscription("TempSensor1", "/livingroom", "livingroom_devices"))
@@ -71,7 +71,7 @@ public class CTrieSharedSubscriptionDirectoryMatchingTest extends CTrieSubscript
         sut.removeSharedSubscriptionsForClient(clientId);
 
         // Verify
-        List<Subscription> matchingSubscriptions = sut.matchWithoutQosSharpening(asTopic("/livingroom"));
+        SubscriptionCollection matchingSubscriptions = sut.matchWithoutQosSharpening(asTopic("/livingroom"));
         assertThat(matchingSubscriptions).isEmpty();
     }
 
@@ -82,7 +82,7 @@ public class CTrieSharedSubscriptionDirectoryMatchingTest extends CTrieSubscript
             new SubscriptionIdentifier(1));
 
         // verify it contains the subscription identifier
-        final List<Subscription> matchingSubscriptions = sut.matchQosSharpening(asTopic("client/test/b"));
+        final SubscriptionCollection matchingSubscriptions = sut.matchWithoutQosSharpening(asTopic("client/test/b"));
         verifySubscriptionIdentifierIsPresent(matchingSubscriptions, new SubscriptionIdentifier(1), "share_temp");
 
         // update the subscription of same clientId on same topic filter but with different subscription identifier
@@ -90,11 +90,11 @@ public class CTrieSharedSubscriptionDirectoryMatchingTest extends CTrieSubscript
             new SubscriptionIdentifier(123));
 
         // verify the subscription identifier is updated
-        final List<Subscription> reloadedSubscriptions = sut.matchQosSharpening(asTopic("client/test/b"));
+        final SubscriptionCollection reloadedSubscriptions = sut.matchWithoutQosSharpening(asTopic("client/test/b"));
         verifySubscriptionIdentifierIsPresent(reloadedSubscriptions, new SubscriptionIdentifier(123), "share_temp");
     }
 
-    private static void verifySubscriptionIdentifierIsPresent(List<Subscription> matchingSubscriptions, SubscriptionIdentifier subscriptionIdentifier, String expectedShareName) {
+    private static void verifySubscriptionIdentifierIsPresent(SubscriptionCollection matchingSubscriptions, SubscriptionIdentifier subscriptionIdentifier, String expectedShareName) {
         assertAll("subscription contains the subscription identifier",
             () -> assertEquals(1, matchingSubscriptions.size()),
             () -> assertEquals(expectedShareName, matchingSubscriptions.iterator().next().shareName),
@@ -111,13 +111,13 @@ public class CTrieSharedSubscriptionDirectoryMatchingTest extends CTrieSubscript
 
         // verify it contains the subscription identifier
         SubscriptionIdentifier expectedSubscriptionId = new SubscriptionIdentifier(1);
-        verifySubscriptionIdentifierIsPresent(sut.matchQosSharpening(asTopic("client/test/b")), expectedSubscriptionId, "share_temp");
+        verifySubscriptionIdentifierIsPresent(sut.matchWithoutQosSharpening(asTopic("client/test/b")), expectedSubscriptionId, "share_temp");
 
         // update the subscription of same clientId on same topic filter but removing subscription identifier
         sut.addShared("client", new ShareName("share_temp"), asTopic("client/test/b"), asOption(MqttQoS.AT_MOST_ONCE));
 
         // verify the subscription identifier is removed
-        final List<Subscription> reloadedSubscriptions = sut.matchQosSharpening(asTopic("client/test/b"));
+        final SubscriptionCollection reloadedSubscriptions = sut.matchWithoutQosSharpening(asTopic("client/test/b"));
         assertAll("subscription doesn't contain subscription identifier",
             () -> assertEquals(1, reloadedSubscriptions.size()),
             () -> assertFalse(reloadedSubscriptions.iterator().next().hasSubscriptionIdentifier())

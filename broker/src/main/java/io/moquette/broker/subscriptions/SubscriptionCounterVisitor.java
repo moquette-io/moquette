@@ -19,11 +19,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 class SubscriptionCounterVisitor implements CTrie.IVisitor<Integer> {
 
-    private AtomicInteger accumulator = new AtomicInteger(0);
+    private final AtomicInteger accumulator = new AtomicInteger(0);
 
     @Override
     public void visit(CNode node, int deep) {
-        accumulator.addAndGet(node.subscriptions().size());
+        accumulator.addAndGet(node.getSubscriptions().size());
     }
 
     @Override

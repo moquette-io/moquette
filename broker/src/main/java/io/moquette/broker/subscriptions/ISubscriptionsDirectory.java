@@ -27,9 +27,7 @@ public interface ISubscriptionsDirectory {
 
     void init(ISubscriptionsRepository sessionsRepository);
 
-    List<Subscription> matchWithoutQosSharpening(Topic topic);
-
-    List<Subscription> matchQosSharpening(Topic topic);
+    SubscriptionCollection matchWithoutQosSharpening(Topic topic);
 
     boolean add(String clientId, Topic filter, MqttSubscriptionOption option);
 

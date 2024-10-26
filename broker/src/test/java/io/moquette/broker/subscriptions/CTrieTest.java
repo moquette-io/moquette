@@ -15,7 +15,6 @@
  */
 package io.moquette.broker.subscriptions;
 
-
 import io.moquette.broker.subscriptions.CTrie.SubscriptionRequest;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
@@ -26,11 +25,11 @@ import java.util.Optional;
 
 import static io.moquette.broker.subscriptions.SubscriptionTestUtils.asSubscription;
 import static io.moquette.broker.subscriptions.Topic.asTopic;
-import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.pcollections.PMap;
 
 public class CTrieTest {
 
@@ -51,15 +50,15 @@ public class CTrieTest {
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/"));
         assertTrue(matchedNode.isPresent(), "Node on path / must be present");
         //verify structure, only root INode and the first CNode should be present
-        assertThat(this.sut.root.mainNode().subscriptions()).isEmpty();
+        assertThat(this.sut.root.mainNode().getSubscriptions()).isEmpty();
         assertThat(this.sut.root.mainNode().allChildren()).isNotEmpty();
 
-        INode firstLayer = this.sut.root.mainNode().allChildren().get(0);
-        assertThat(firstLayer.mainNode().subscriptions()).isEmpty();
+        INode firstLayer = this.sut.root.mainNode().allChildren().stream().findFirst().get();
+        assertThat(firstLayer.mainNode().getSubscriptions()).isEmpty();
         assertThat(firstLayer.mainNode().allChildren()).isNotEmpty();
 
-        INode secondLayer = firstLayer.mainNode().allChildren().get(0);
-        assertThat(secondLayer.mainNode().subscriptions()).isNotEmpty();
+        INode secondLayer = firstLayer.mainNode().allChildren().stream().findFirst().get();
+        assertThat(secondLayer.mainNode().getSubscriptions()).isNotEmpty();
         assertThat(secondLayer.mainNode().allChildren()).isEmpty();
     }
 
@@ -72,7 +71,7 @@ public class CTrieTest {
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/temp"));
         assertTrue(matchedNode.isPresent(), "Node on path /temp must be present");
-        assertFalse(matchedNode.get().subscriptions().isEmpty());
+        assertFalse(matchedNode.get().getSubscriptions().isEmpty());
     }
 
     @Test
@@ -99,8 +98,8 @@ public class CTrieTest {
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/temp"));
         assertTrue(matchedNode.isPresent(), "Node on path /temp must be present");
-        final List<Subscription> subscriptions = matchedNode.get().subscriptions();
-        assertTrue(subscriptions.contains(asSubscription("TempSensor2", "/temp")));
+        final PMap<String, Subscription> subscriptions = matchedNode.get().getSubscriptions();
+        assertTrue(subscriptions.containsValue(asSubscription("TempSensor2", "/temp")));
     }
 
     @Test
@@ -117,8 +116,8 @@ public class CTrieTest {
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/italy/happiness"));
         assertTrue(matchedNode.isPresent(), "Node on path /italy/happiness must be present");
-        final List<Subscription> subscriptions = matchedNode.get().subscriptions();
-        assertTrue(subscriptions.contains(asSubscription("HappinessSensor", "/italy/happiness")));
+        final PMap<String, Subscription> subscriptions = matchedNode.get().getSubscriptions();
+        assertTrue(subscriptions.containsValue(asSubscription("HappinessSensor", "/italy/happiness")));
     }
 
     static SubscriptionRequest clientSubOnTopic(String clientID, String topicFilter) {
@@ -191,7 +190,7 @@ public class CTrieTest {
         sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("/temp/1")));
 
         sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("/temp/1")));
-        final List<Subscription> matchingSubs = sut.recursiveMatch(asTopic("/temp/2"));
+        final SubscriptionCollection matchingSubs = sut.recursiveMatch(asTopic("/temp/2"));
 
         //Verify
         final Subscription expectedMatchingsub = new Subscription("TempSensor1", asTopic("/temp/2"), MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE));
@@ -208,8 +207,8 @@ public class CTrieTest {
         //Exercise
         sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("/temp")));
 
-        final List<Subscription> matchingSubs1 = sut.recursiveMatch(asTopic("/temp/1"));
-        final List<Subscription> matchingSubs2 = sut.recursiveMatch(asTopic("/temp/2"));
+        final SubscriptionCollection matchingSubs1 = sut.recursiveMatch(asTopic("/temp/1"));
+        final SubscriptionCollection matchingSubs2 = sut.recursiveMatch(asTopic("/temp/2"));
 
         //Verify
         // not clear to me, but I believe /temp unsubscribe should not unsub you from downstream /temp/1 or /temp/2
@@ -237,7 +236,7 @@ public class CTrieTest {
         sut.addToTree(newSubscription);
 
         //Exercise
-        final List<Subscription> matchingSubs = sut.recursiveMatch(asTopic("/temp"));
+        final SubscriptionCollection matchingSubs = sut.recursiveMatch(asTopic("/temp"));
 
         //Verify
         final Subscription expectedMatchingsub = new Subscription("TempSensor1", asTopic("/temp"), MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE));
@@ -252,8 +251,8 @@ public class CTrieTest {
         sut.addToTree(newSubscription);
 
         //Exercise
-        final List<Subscription> matchingSubs1 = sut.recursiveMatch(asTopic("temp"));
-        final List<Subscription> matchingSubs2 = sut.recursiveMatch(asTopic("temp/1"));
+        final SubscriptionCollection matchingSubs1 = sut.recursiveMatch(asTopic("temp"));
+        final SubscriptionCollection matchingSubs2 = sut.recursiveMatch(asTopic("temp/1"));
 
         //Verify
         final Subscription expectedMatchingsub1 = new Subscription("TempSensor1", asTopic("temp"), MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE));
@@ -265,8 +264,8 @@ public class CTrieTest {
         sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("temp")));
 
         //Exercise
-        final List<Subscription> matchingSubs3 = sut.recursiveMatch(asTopic("temp"));
-        final List<Subscription> matchingSubs4 = sut.recursiveMatch(asTopic("temp/1"));
+        final SubscriptionCollection matchingSubs3 = sut.recursiveMatch(asTopic("temp"));
+        final SubscriptionCollection matchingSubs4 = sut.recursiveMatch(asTopic("temp/1"));
 
         assertThat(matchingSubs3).doesNotContain(expectedMatchingsub1);
         assertThat(matchingSubs4).contains(expectedMatchingsub2);
@@ -280,8 +279,8 @@ public class CTrieTest {
         sut.addToTree(newSubscription);
 
         //Exercise
-        final List<Subscription> matchingSubs1 = sut.recursiveMatch(asTopic("temp"));
-        final List<Subscription> matchingSubs2 = sut.recursiveMatch(asTopic("temp/1"));
+        final SubscriptionCollection matchingSubs1 = sut.recursiveMatch(asTopic("temp"));
+        final SubscriptionCollection matchingSubs2 = sut.recursiveMatch(asTopic("temp/1"));
 
         //Verify
         final Subscription expectedMatchingsub1 = new Subscription("TempSensor1", asTopic("temp"), MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE));
@@ -293,8 +292,8 @@ public class CTrieTest {
         sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("temp")));
 
         //Exercise
-        final List<Subscription> matchingSubs3 = sut.recursiveMatch(asTopic("temp"));
-        final List<Subscription> matchingSubs4 = sut.recursiveMatch(asTopic("temp/1"));
+        final SubscriptionCollection matchingSubs3 = sut.recursiveMatch(asTopic("temp"));
+        final SubscriptionCollection matchingSubs4 = sut.recursiveMatch(asTopic("temp/1"));
 
         assertThat(matchingSubs3).doesNotContain(expectedMatchingsub1);
         assertThat(matchingSubs4).contains(expectedMatchingsub2);
@@ -308,8 +307,8 @@ public class CTrieTest {
         sut.addToTree(newSubscription);
 
         //Exercise
-        final List<Subscription> matchingSubs1 = sut.recursiveMatch(asTopic("temp"));
-        final List<Subscription> matchingSubs2 = sut.recursiveMatch(asTopic("temp/1"));
+        final SubscriptionCollection matchingSubs1 = sut.recursiveMatch(asTopic("temp"));
+        final SubscriptionCollection matchingSubs2 = sut.recursiveMatch(asTopic("temp/1"));
 
         //Verify
         final Subscription expectedMatchingsub1 = new Subscription("TempSensor1", asTopic("temp"), MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE));
@@ -321,8 +320,8 @@ public class CTrieTest {
         sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor2", asTopic("temp/1")));
 
         //Exercise
-        final List<Subscription> matchingSubs3 = sut.recursiveMatch(asTopic("temp"));
-        final List<Subscription> matchingSubs4 = sut.recursiveMatch(asTopic("temp/1"));
+        final SubscriptionCollection matchingSubs3 = sut.recursiveMatch(asTopic("temp"));
+        final SubscriptionCollection matchingSubs4 = sut.recursiveMatch(asTopic("temp/1"));
 
         assertThat(matchingSubs3).contains(expectedMatchingsub1);
         assertThat(matchingSubs4).doesNotContain(expectedMatchingsub2);
