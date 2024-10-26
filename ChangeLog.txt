@@ -1,4 +1,5 @@
 Version 0.18-SNAPSHOT:
+   [feature] Flow-control: Handled client's receive maximum property to configure the inflight window through the client. (#858)
    [feature] Generate correct MANIFEST.MF with bnd-maven-plugin. (#848)
    [feature] Flow-control: implemented publish's quota management on the server side. (#852)
    [fix] Incorrect reference used in compareAndSet in CTrie.cleanTomb. (#841)
