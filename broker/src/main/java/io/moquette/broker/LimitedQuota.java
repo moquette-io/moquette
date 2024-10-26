@@ -18,8 +18,10 @@
 
 package io.moquette.broker;
 
+import io.moquette.BrokerConstants;
+
 class LimitedQuota implements Quota {
-    private int receiveMaximum;
+    private final int receiveMaximum;
     private int receivedQuota;
 
     public LimitedQuota(int receiveMaximum) {
@@ -29,24 +31,24 @@ class LimitedQuota implements Quota {
 
     @Override
     public boolean hasLimit() {
-        return true;
+        return receiveMaximum != BrokerConstants.RECEIVE_MAXIMUM;
     }
 
     @Override
-    public void decrement() {
+    public void consumeSlot() {
         assert receivedQuota > 0;
         receivedQuota--;
     }
 
     @Override
-    public void increment() {
+    public void releaseSlot() {
         receivedQuota++;
         assert receivedQuota <= receiveMaximum;
     }
 
     @Override
-    public boolean isConsumed() {
-        return receivedQuota == 0;
+    public boolean hasFreeSlots() {
+        return receivedQuota != 0;
     }
 
     @Override
@@ -55,7 +57,12 @@ class LimitedQuota implements Quota {
     }
 
     @Override
+    public int availableSlots() {
+        return receivedQuota;
+    }
+
+    @Override
     public String toString() {
-        return "limited quota to " + receivedQuota;
+        return "limited quota to " + receivedQuota + " max slots: " + receiveMaximum;
     }
 }

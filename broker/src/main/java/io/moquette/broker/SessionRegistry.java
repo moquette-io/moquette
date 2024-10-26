@@ -38,6 +38,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
+import static io.moquette.BrokerConstants.INFLIGHT_WINDOW_SIZE;
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
 
 public class SessionRegistry {

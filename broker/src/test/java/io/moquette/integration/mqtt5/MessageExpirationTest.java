@@ -147,41 +147,6 @@ public class MessageExpirationTest extends AbstractServerIntegrationTest {
     }
 
     @Test
-    public void givenPublishedMessageWithExpiryWhenMessageRemainInBrokerForMoreThanTheExipiryIsNotPublished() throws InterruptedException {
-        int messageExpiryInterval = 2; // seconds
-        // avoid the keep alive period could disconnect
-        connectLowLevel(messageExpiryInterval * 2);
-
-        // subscribe with an identifier
-        MqttMessage received = lowLevelClient.subscribeWithIdentifier("temperature/living",
-            MqttQoS.AT_LEAST_ONCE, 123);
-        verifyOfType(received, MqttMessageType.SUBACK);
-
-        //lowlevel client doesn't ACK any pub, so the in flight window fills up
-        Mqtt5BlockingClient publisher = createPublisherClient();
-        int inflightWindowSize = 10;
-        // fill the in flight window so that messages starts to be enqueued
-        fillInFlightWindow(inflightWindowSize, publisher, messageExpiryInterval);
-
-        // send another message, which is enqueued and has an expiry of messageExpiryInterval seconds
-        publisher.publishWith()
-            .topic("temperature/living")
-            .payload(("Enqueued").getBytes(StandardCharsets.UTF_8))
-            .qos(MqttQos.AT_LEAST_ONCE) // Broker enqueues only QoS1 and QoS2
-            .messageExpiryInterval(messageExpiryInterval)
-            .send();
-
-        // let time flow so that the message in queue passes its expiry time
-        Thread.sleep(Duration.ofSeconds(messageExpiryInterval + 1).toMillis());
-
-        // now subscriber consumes messages, shouldn't receive any message in the form "Enqueued-"
-        consumesPublishesInflightWindow(inflightWindowSize);
-
-        MqttMessage mqttMessage = lowLevelClient.receiveNextMessage(Duration.ofMillis(100));
-        assertNull(mqttMessage, "No other messages MUST be received after consuming the in flight window");
-    }
-
-    @Test
     public void givenPublishWithMessageExpiryPropertyWhenItsForwardedToSubscriberThenExpiryValueHasToBeDeducedByTheTimeSpentInBroker() throws InterruptedException {
         int messageExpiryInterval = 10; // seconds
         // avoid the keep alive period could disconnect
@@ -229,22 +194,39 @@ public class MessageExpirationTest extends AbstractServerIntegrationTest {
         assertTrue(publishMessage.release(), "Last reference of publish should be released");
     }
 
-    private void consumesPublishesInflightWindow(int inflightWindowSize) throws InterruptedException {
-        for (int i = 0; i < inflightWindowSize; i++) {
-            MqttMessage mqttMessage = lowLevelClient.receiveNextMessage(Duration.ofMillis(20000));
-            assertNotNull(mqttMessage, "A message MUST be received");
+    @Test
+    public void givenPublishedMessageWithExpiryWhenMessageRemainInBrokerForMoreThanTheExpiryIsNotPublished() throws InterruptedException {
+        int messageExpiryInterval = 2; // seconds
+        // avoid the keep alive period could disconnect
+        connectLowLevel(messageExpiryInterval * 2);
 
-            assertEquals(MqttMessageType.PUBLISH, mqttMessage.fixedHeader().messageType(), "Message received should MqttPublishMessage");
-            MqttPublishMessage publish = (MqttPublishMessage) mqttMessage;
-            assertEquals(Integer.toString(i), publish.payload().toString(StandardCharsets.UTF_8));
-            int packetId = publish.variableHeader().packetId();
-            assertTrue(publish.release(), "Reference of publish should be released");
+        // subscribe with an identifier
+        MqttMessage received = lowLevelClient.subscribeWithIdentifier("temperature/living",
+            MqttQoS.AT_LEAST_ONCE, 123);
+        verifyOfType(received, MqttMessageType.SUBACK);
 
-            MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBACK, false, AT_MOST_ONCE,
-                false, 0);
-            MqttPubAckMessage pubAck = new MqttPubAckMessage(fixedHeader, MqttMessageIdVariableHeader.from(packetId));
-            lowLevelClient.sendMessage(pubAck);
-        }
+        //lowlevel client doesn't ACK any pub, so the in flight window fills up
+        Mqtt5BlockingClient publisher = createPublisherClient();
+        int inflightWindowSize = 10;
+        // fill the in flight window so that messages starts to be enqueued
+        fillInFlightWindow(inflightWindowSize, publisher, messageExpiryInterval);
+
+        // send another message, which is enqueued and has an expiry of messageExpiryInterval seconds
+        publisher.publishWith()
+            .topic("temperature/living")
+            .payload(("Enqueued").getBytes(StandardCharsets.UTF_8))
+            .qos(MqttQos.AT_LEAST_ONCE) // Broker enqueues only QoS1 and QoS2
+            .messageExpiryInterval(messageExpiryInterval)
+            .send();
+
+        // let time flow so that the message in queue passes its expiry time
+        sleepSeconds(messageExpiryInterval + 1);
+
+        // now subscriber consumes messages, shouldn't receive any message in the form "Enqueued-"
+        consumesPublishesInflightWindow(inflightWindowSize);
+
+        MqttMessage mqttMessage = lowLevelClient.receiveNextMessage(Duration.ofMillis(100));
+        assertNull(mqttMessage, "No other messages MUST be received after consuming the in flight window");
     }
 
     private static void fillInFlightWindow(int inflightWindowSize, Mqtt5BlockingClient publisher, int messageExpiryInterval) {
