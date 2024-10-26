@@ -391,9 +391,9 @@ class Session {
             debugLogPacketIds(nonAckPacketIds);
         }
 
-        // TODO rework here because send quota max can be lower than the inflight window width!
         if (nonAckPacketIds.size() > mqttConnection.sendQuota().availableSlots()) {
-            // send quota is smaller than the inflight messages to resend, split it
+            // Send quota is smaller than the inflight messages to resend, split it.
+            // Next partition will be sent on PUBREC or PUBACK reception to continue flushing the in flight.
             resendingNonAcked = true;
             List<Integer> partition = nonAckPacketIds.stream()
                 .limit(mqttConnection.sendQuota().availableSlots())

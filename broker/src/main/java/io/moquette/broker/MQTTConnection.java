@@ -366,6 +366,7 @@ final class MQTTConnection {
                         LOG.trace("dispatch connection: {}", msg);
                     }
                 } else {
+                    // here the session should still be in CONNECTING state
                     sessionRegistry.connectionClosed(bindedSession);
                     LOG.error("CONNACK send failed, cleanup session and close the connection", future.cause());
                     channel.close();
