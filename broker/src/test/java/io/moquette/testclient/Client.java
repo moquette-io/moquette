@@ -42,6 +42,7 @@ import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttSubAckMessage;
 import io.netty.handler.codec.mqtt.MqttSubscribeMessage;
 import io.netty.handler.codec.mqtt.MqttVersion;
+import io.netty.util.ReferenceCountUtil;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -188,7 +189,6 @@ public class Client {
         return doConnect(connectMessage);
     }
 
-
     private MqttConnAckMessage doConnect(MqttConnectMessage connectMessage) throws InterruptedException {
         this.sendMessage(connectMessage);
 
@@ -288,6 +288,10 @@ public class Client {
     public void disconnect() {
         final MqttMessage disconnectMessage = MqttMessageBuilders.disconnect().build();
         sendMessage(disconnectMessage);
+        // release all queued publishes
+        for (MqttMessage msg : receivedMessages) {
+            ReferenceCountUtil.release(msg);
+        }
     }
 
     public void shutdownConnection() throws InterruptedException {
