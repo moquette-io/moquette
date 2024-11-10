@@ -127,6 +127,7 @@ class ConnectTest extends AbstractServerIntegrationTest {
             publishPayload = "Fake Payload";
         }
         assertEquals("Hello", publishPayload, "The inflight payload from previous subscription MUST be received");
+        acknowledge(opt.get().variableHeader().packetId(), reconnectingSubscriber);
 
         reconnectingSubscriber.disconnect();
     }
