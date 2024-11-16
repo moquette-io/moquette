@@ -116,6 +116,9 @@ public class MessageExpirationTest extends AbstractServerIntegrationTest {
             .getProperty(MqttProperties.MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL.value());
         assertNotNull(messageExpiryProperty, "message expiry property must be present");
         assertTrue(messageExpiryProperty.value() < messageExpiryInterval, "Forwarded message expiry should be lowered");
+
+        // send PUBACK to release
+        acknowledge(publish.variableHeader().packetId());
         assertTrue(publish.release(), "Last reference of publish should be released");
     }
 

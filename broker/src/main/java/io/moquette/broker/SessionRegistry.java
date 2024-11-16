@@ -559,6 +559,7 @@ public class SessionRegistry {
         // Update all not clean session with the proper expiry date
         updateNotCleanSessionsWithProperExpire();
         queueRepository.close();
+        pool.values().forEach(Session::cleanUp);
     }
 
     private void updateNotCleanSessionsWithProperExpire() {
