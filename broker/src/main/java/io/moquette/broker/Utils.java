@@ -16,10 +16,15 @@
 package io.moquette.broker;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufHolder;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttMessage;
 import io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader;
 import io.netty.handler.codec.mqtt.MqttVersion;
+import io.netty.util.ReferenceCountUtil;
+import io.netty.util.ReferenceCounted;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.Objects;
@@ -28,6 +33,89 @@ import java.util.Objects;
  * Utility static methods, like Map get with default value, or elvis operator.
  */
 public final class Utils {
+
+    private static final Logger BUFF_LOGGER = LoggerFactory.getLogger("BufferManagement");
+
+    public static void release(Object obj, String tag) {
+        if (obj instanceof SessionRegistry.PublishedMessage) {
+            SessionRegistry.PublishedMessage msg = (SessionRegistry.PublishedMessage) obj;
+            msg.release();
+            if (BUFF_LOGGER.isTraceEnabled()) {
+                if (tag == null) {
+                    BUFF_LOGGER.trace("release object");
+                } else {
+                    BUFF_LOGGER.trace("release object, tag: {}", tag);
+                }
+            }
+        } else if (obj instanceof ReferenceCounted) {
+            ReferenceCountUtil.release(obj);
+            if (BUFF_LOGGER.isTraceEnabled()) {
+                if (tag == null) {
+                    BUFF_LOGGER.trace("release object");
+                } else {
+                    BUFF_LOGGER.trace("release object, tag: {}", tag);
+                }
+            }
+        }
+    }
+
+    public static ByteBufHolder retainDuplicate(ByteBufHolder obj, String tag) {
+        final ByteBufHolder duplicate = obj.retainedDuplicate();
+        if (BUFF_LOGGER.isTraceEnabled()) {
+            if (tag == null) {
+                BUFF_LOGGER.trace("retain duplicate");
+            } else {
+                BUFF_LOGGER.trace("retain duplicate tag: {}", tag);
+            }
+        }
+        return duplicate;
+    }
+
+    public static void retain(Object obj, int increment, String tag) {
+        if (obj instanceof SessionRegistry.PublishedMessage) {
+            SessionRegistry.PublishedMessage msg = (SessionRegistry.PublishedMessage) obj;
+            msg.retain();
+            if (BUFF_LOGGER.isTraceEnabled()) {
+                if (tag == null) {
+                    BUFF_LOGGER.trace("retain object incr {}", increment);
+                } else {
+                    BUFF_LOGGER.trace("retain object incr {}, tag: {}", increment, tag);
+                }
+            }
+        } else if (obj instanceof ReferenceCounted) {
+            ReferenceCountUtil.retain(obj, increment);
+            if (BUFF_LOGGER.isTraceEnabled()) {
+                if (tag == null) {
+                    BUFF_LOGGER.trace("retain object incr {}", increment);
+                } else {
+                    BUFF_LOGGER.trace("retain object incr {}, tag: {}", increment, tag);
+                }
+            }
+        }
+    }
+
+    public static void retain(Object obj, String tag) {
+        if (obj instanceof SessionRegistry.PublishedMessage) {
+            SessionRegistry.PublishedMessage msg = (SessionRegistry.PublishedMessage) obj;
+            msg.retain();
+            if (BUFF_LOGGER.isTraceEnabled()) {
+                if (tag == null) {
+                    BUFF_LOGGER.trace("retain object");
+                } else {
+                    BUFF_LOGGER.trace("retain object, tag: {}", tag);
+                }
+            }
+        } else if (obj instanceof ReferenceCounted) {
+            ReferenceCountUtil.retain(obj);
+            if (BUFF_LOGGER.isTraceEnabled()) {
+                if (tag == null) {
+                    BUFF_LOGGER.trace("retain object");
+                } else {
+                    BUFF_LOGGER.trace("retain object, tag: {}", tag);
+                }
+            }
+        }
+    }
 
     public static <T, K> T defaultGet(Map<K, T> map, K key, T defaultValue) {
         T value = map.get(key);

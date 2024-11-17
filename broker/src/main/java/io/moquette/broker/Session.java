@@ -198,7 +198,7 @@ class Session {
             LOG.warn("Received a PUBREC with not matching packetId");
             return;
         }
-        removed.release();
+        Utils.release(removed, "target session - phase 1 Qos2 pull from inflight");
         if (removed instanceof SessionRegistry.PubRelMarker) {
             LOG.info("Received a PUBREC for packetId that was already moved in second step of Qos2");
             return;
@@ -229,7 +229,7 @@ class Session {
             LOG.warn("Received a PUBCOMP with not matching packetId in the inflight cache");
             return;
         }
-        removed.release();
+        Utils.release(removed, "target session - phase 2 Qos2 pull from inflight");
         mqttConnection.sendQuota().releaseSlot();
         drainQueueToConnection();
 
@@ -302,7 +302,7 @@ class Session {
     private void sendPublishInFlightWindowOrQueueing(MQTTConnection localMqttConnectionRef,
                                                      PublishedMessage publishRequest) {
         // retain the payload because it's going to be added to map or to the queue.
-        publishRequest.retain();
+        Utils.retain(publishRequest, "target session - forward to inflight or queue");
 
         if (canSkipQueue(localMqttConnectionRef)) {
             mqttConnection.sendQuota().consumeSlot();
@@ -313,7 +313,7 @@ class Session {
             EnqueuedMessage old = inflightWindow.put(packetId, publishRequest);
             // If there already was something, release it.
             if (old != null) {
-                old.release();
+                Utils.release(old, "target session - replace existing slot");
                 mqttConnection.sendQuota().releaseSlot();
             }
             if (resendInflightOnTimeout) {
@@ -356,7 +356,7 @@ class Session {
                 ackPacketId, inflightWindow.keySet());
             return;
         }
-        removed.release();
+        Utils.release(removed, "target session - inflight remove");
 
         mqttConnection.sendQuota().releaseSlot();
         LOG.debug("Received PUBACK {} for session {}", ackPacketId, getClientID());
@@ -476,7 +476,7 @@ class Session {
             // Putting it in a map, but the retain is cancelled out by the below release.
             EnqueuedMessage old = inflightWindow.put(sendPacketId, msg);
             if (old != null) {
-                old.release();
+                Utils.release(old, "target session - drain queue push to inflight");
                 mqttConnection.sendQuota().releaseSlot();
             }
             if (resendInflightOnTimeout) {
@@ -515,11 +515,11 @@ class Session {
 
     public void receivedPublishQos2(int messageID, MqttPublishMessage msg) {
         // Retain before putting msg in map.
-        ReferenceCountUtil.retain(msg);
+        Utils.retain(msg, "phase 2 qos2");
 
         MqttPublishMessage old = qos2Receiving.put(messageID, msg);
         // In case of evil client with duplicate msgid.
-        ReferenceCountUtil.release(old);
+        Utils.release(old, "phase 2 qos2 - packet id duplicated");
 
 //        mqttConnection.sendPublishReceived(messageID);
     }
@@ -527,7 +527,7 @@ class Session {
     public void receivedPubRelQos2(int messageID) {
         // Done with the message, remove from queue and release payload.
         final MqttPublishMessage removedMsg = qos2Receiving.remove(messageID);
-        ReferenceCountUtil.release(removedMsg);
+        Utils.release(removedMsg, "phase 2 qos2");
     }
 
     Optional<InetSocketAddress> remoteAddress() {
@@ -543,10 +543,10 @@ class Session {
         sessionQueue.closeAndPurge();
         inflightTimeouts.clear();
         for (EnqueuedMessage msg : inflightWindow.values()) {
-            msg.release();
+            Utils.release(msg, "session cleanup - inflight window");
         }
         for (MqttPublishMessage msg : qos2Receiving.values()) {
-            msg.release();
+            Utils.release(msg, "session cleanup - phase 2 cache");
         }
     }
 

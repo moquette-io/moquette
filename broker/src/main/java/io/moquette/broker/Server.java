@@ -592,7 +592,7 @@ public class Server {
         }
         LOG.trace("Internal publishing message CId: {}, messageId: {}", clientId, messageID);
         final RoutingResults routingResults = dispatcher.internalPublish(msg);
-        msg.payload().release();
+        Utils.release(msg, "Routing - internal PUB");
         return routingResults;
     }
 

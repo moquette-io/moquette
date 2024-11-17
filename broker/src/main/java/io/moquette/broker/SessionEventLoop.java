@@ -10,27 +10,27 @@ final class SessionEventLoop extends Thread {
 
     private static final Logger LOG = LoggerFactory.getLogger(SessionEventLoop.class);
 
-    private final BlockingQueue<FutureTask<String>> sessionQueue;
+    private final BlockingQueue<FutureTask<String>> taskQueue;
     private final boolean flushOnExit;
 
-    public SessionEventLoop(BlockingQueue<FutureTask<String>> sessionQueue) {
-        this(sessionQueue, true);
+    public SessionEventLoop(BlockingQueue<FutureTask<String>> taskQueue) {
+        this(taskQueue, true);
     }
 
     /**
      * @param flushOnExit consume the commands queue before exit.
      * */
-    public SessionEventLoop(BlockingQueue<FutureTask<String>> sessionQueue, boolean flushOnExit) {
-        this.sessionQueue = sessionQueue;
+    public SessionEventLoop(BlockingQueue<FutureTask<String>> taskQueue, boolean flushOnExit) {
+        this.taskQueue = taskQueue;
         this.flushOnExit = flushOnExit;
     }
 
     @Override
     public void run() {
-        while (!Thread.interrupted() || (Thread.interrupted() && !sessionQueue.isEmpty() && flushOnExit)) {
+        while (!Thread.interrupted() || (Thread.interrupted() && !taskQueue.isEmpty() && flushOnExit)) {
             try {
                 // blocking call
-                final FutureTask<String> task = this.sessionQueue.take();
+                final FutureTask<String> task = this.taskQueue.take();
                 executeTask(task);
             } catch (InterruptedException e) {
                 LOG.info("SessionEventLoop {} interrupted", Thread.currentThread().getName());

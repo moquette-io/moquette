@@ -42,7 +42,7 @@ public class InMemoryQueue extends AbstractSessionMessageQueue<SessionRegistry.E
     @Override
     public void closeAndPurge() {
         for (SessionRegistry.EnqueuedMessage msg : queue) {
-            msg.release();
+            Utils.release(msg, "in memory queue cleanup");
         }
         if (queueRepository != null) {
             // clean up the queue from the repository

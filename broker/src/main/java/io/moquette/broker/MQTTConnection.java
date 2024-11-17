@@ -682,7 +682,7 @@ final class MQTTConnection {
 
         // retain else msg is cleaned by the NewNettyMQTTHandler and is not available
         // in execution by SessionEventLoop
-        msg.retain();
+        Utils.retain(msg, PostOffice.BT_PUB_IN);
         switch (qos) {
             case AT_MOST_ONCE:
                 return postOffice.routeCommand(clientId, "PUB QoS0", () -> {
@@ -692,10 +692,11 @@ final class MQTTConnection {
                     }
                     postOffice.receivedPublishQos0(this, username, clientId, msg, expiry);
                     return null;
-                }).ifFailed(msg::release);
+                }).ifFailed(() -> Utils.release(msg, PostOffice.BT_PUB_IN + " - failed"));
             case AT_LEAST_ONCE:
                 if (!receivedQuota.hasFreeSlots()) {
                     LOG.warn("Client {} exceeded the quota {} processing QoS1, disconnecting it", clientId, receivedQuota);
+                    Utils.release(msg, PostOffice.BT_PUB_IN + " - QoS1 exceeded quota");
                     brokerDisconnect(MqttReasonCodes.Disconnect.RECEIVE_MAXIMUM_EXCEEDED);
                     disconnectSession();
                     dropConnection();
@@ -712,10 +713,11 @@ final class MQTTConnection {
                             receivedQuota.releaseSlot();
                         });
                     return null;
-                }).ifFailed(msg::release);
+                }).ifFailed(() -> Utils.release(msg, PostOffice.BT_PUB_IN + " - failed"));
             case EXACTLY_ONCE: {
                 if (!receivedQuota.hasFreeSlots()) {
                     LOG.warn("Client {} exceeded the quota {} processing QoS2, disconnecting it", clientId, receivedQuota);
+                    Utils.release(msg, PostOffice.BT_PUB_IN + " - phase 1 QoS2 exceeded quota");
                     brokerDisconnect(MqttReasonCodes.Disconnect.RECEIVE_MAXIMUM_EXCEEDED);
                     disconnectSession();
                     dropConnection();
@@ -731,7 +733,7 @@ final class MQTTConnection {
                     return null;
                 });
                 if (!firstStepResult.isSuccess()) {
-                    msg.release();
+                    Utils.release(msg, PostOffice.BT_PUB_IN + " - failed");
                     LOG.trace("Failed to enqueue PUB QoS2 to session loop for {}", clientId);
                     return firstStepResult;
                 }
@@ -816,9 +818,10 @@ final class MQTTConnection {
             LOG.debug("Sending message {} on the wire to {}", msg.fixedHeader().messageType(), getClientId());
             // Sending to external, retain a duplicate. Just retain is not
             // enough, since the receiver must have full control.
+            // Retain because the OutboundHandler does a release of the buffer.
             Object retainedDup = msg;
             if (msg instanceof ByteBufHolder) {
-                retainedDup = ((ByteBufHolder) msg).retainedDuplicate();
+                retainedDup = Utils.retainDuplicate((ByteBufHolder) msg, "mqtt connection send PUB");
             }
 
             ChannelFuture channelFuture;

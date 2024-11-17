@@ -67,6 +67,8 @@ class PostOffice {
 
     private static final String WILL_PUBLISHER = "will_publisher";
     private static final String INTERNAL_PUBLISHER = "internal_publisher";
+    public static final String BT_ROUTE_TARGET = "Route to target session";
+    public static final String BT_PUB_IN = "PUB in";
 
     /**
      * Maps the failed packetID per clientId (id client source, id_packet) -> [id client target]
@@ -621,14 +623,14 @@ class PostOffice {
         final Topic topic = new Topic(msg.variableHeader().topicName());
         if (!authorizator.canWrite(topic, username, clientID)) {
             LOG.error("client is not authorized to publish on topic: {}", topic);
-            ReferenceCountUtil.release(msg);
+            Utils.release(msg,PostOffice.BT_PUB_IN + " - ok, auth failed");
             return CompletableFuture.completedFuture(null);
         }
 
         if (isPayloadFormatToValidate(msg)) {
             if (!validatePayloadAsUTF8(msg)) {
                 LOG.warn("Received not valid UTF-8 payload when payload format indicator was enabled (QoS0)");
-                ReferenceCountUtil.release(msg);
+                Utils.release(msg,PostOffice.BT_PUB_IN + " - ok, invalid format");
                 connection.brokerDisconnect(MqttReasonCodes.Disconnect.PAYLOAD_FORMAT_INVALID);
                 connection.disconnectSession();
                 connection.dropConnection();
@@ -639,7 +641,7 @@ class PostOffice {
         final RoutingResults publishResult = publish2Subscribers(clientID, messageExpiry, msg);
         if (publishResult.isAllFailed()) {
             LOG.info("No one publish was successfully enqueued to session loops");
-            ReferenceCountUtil.release(msg);
+            Utils.release(msg,PostOffice.BT_PUB_IN + " - ok, can't forward to next session loop");
             return CompletableFuture.completedFuture(null);
         }
 
@@ -650,7 +652,7 @@ class PostOffice {
             }
 
             interceptor.notifyTopicPublished(msg, clientID, username);
-            ReferenceCountUtil.release(msg);
+            Utils.release(msg,PostOffice.BT_PUB_IN + " - ok");
         });
     }
 
@@ -662,13 +664,13 @@ class PostOffice {
         if (!topic.isValid()) {
             LOG.warn("Invalid topic format, force close the connection");
             connection.dropConnection();
-            ReferenceCountUtil.release(msg);
+            Utils.release(msg,PostOffice.BT_PUB_IN + " - ok, qos1 invalid topic");
             return RoutingResults.preroutingError();
         }
         final String clientId = connection.getClientId();
         if (!authorizator.canWrite(topic, username, clientId)) {
             LOG.error("MQTT client: {} is not authorized to publish on topic: {}", clientId, topic);
-            ReferenceCountUtil.release(msg);
+            Utils.release(msg,PostOffice.BT_PUB_IN + " - ok, qos1 auth failed");
             return RoutingResults.preroutingError();
         }
 
@@ -677,7 +679,7 @@ class PostOffice {
                 LOG.warn("Received not valid UTF-8 payload when payload format indicator was enabled (QoS1)");
                 connection.sendPubAck(messageID, MqttReasonCodes.PubAck.PAYLOAD_FORMAT_INVALID);
 
-                ReferenceCountUtil.release(msg);
+                Utils.release(msg,PostOffice.BT_PUB_IN + " - ok, qos1 invalid format");
                 return RoutingResults.preroutingError();
             }
         }
@@ -685,7 +687,7 @@ class PostOffice {
         if (isContentTypeToValidate(msg)) {
             if (!validateContentTypeAsUTF8(msg)) {
                 LOG.warn("Received not valid UTF-8 content type (QoS1)");
-                ReferenceCountUtil.release(msg);
+                Utils.release(msg,PostOffice.BT_PUB_IN + " - ok, qos1 invalid content type");
                 connection.brokerDisconnect(MqttReasonCodes.Disconnect.PROTOCOL_ERROR);
                 connection.disconnectSession();
                 connection.dropConnection();
@@ -713,7 +715,7 @@ class PostOffice {
             // some session event loop enqueue raised a problem
             failedPublishes.insertAll(messageID, clientId, routes.failedRoutings);
         }
-        ReferenceCountUtil.release(msg);
+        Utils.release(msg,PostOffice.BT_PUB_IN + " - ok, qos1");
 
         // cleanup success resends from the failed publishes cache
         failedPublishes.removeAll(messageID, clientId, routes.successedRoutings);
@@ -871,12 +873,18 @@ class PostOffice {
             LOG.trace("No matching subscriptions for topic: {}", topic);
             return new RoutingResults(Collections.emptyList(), Collections.emptyList(), CompletableFuture.completedFuture(null));
         }
+        // sanity check
+        if (subscriptionCount > sessionLoops.getEventLoopCount()) {
+            LOG.error("Cardinality of subscription batches ({}) is bigger then the available session loops {}",
+                subscriptionCount, sessionLoops.getEventLoopCount());
+            return new RoutingResults(Collections.emptyList(), Collections.emptyList(), CompletableFuture.completedFuture(null));
+        }
 
-        msg.retain(subscriptionCount);
+        Utils.retain(msg, subscriptionCount, BT_ROUTE_TARGET);
 
         List<RouteResult> publishResults = collector.routeBatchedPublishes((batch) -> {
             publishToSession(topic, batch, publishingQos, retainPublish, messageExpiry, msg);
-            msg.release();
+            Utils.release(msg, BT_ROUTE_TARGET);
         });
 
         final CompletableFuture[] publishFutures = publishResults.stream()
@@ -890,7 +898,7 @@ class PostOffice {
             Collection<String> subscibersIds = collector.subscriberIdsByEventLoop(rr.clientId);
             if (rr.status == RouteResult.Status.FAIL) {
                 failedRoutings.addAll(subscibersIds);
-                msg.release();
+                Utils.release(msg, BT_ROUTE_TARGET + "- failed routing");
             } else {
                 successedRoutings.addAll(subscibersIds);
             }
@@ -970,7 +978,7 @@ class PostOffice {
         final String clientId = connection.getClientId();
         if (!authorizator.canWrite(topic, username, clientId)) {
             LOG.error("MQTT client is not authorized to publish on topic: {}", topic);
-            ReferenceCountUtil.release(msg);
+            Utils.release(msg,PostOffice.BT_PUB_IN + " - ok, phase 2 qos2 auth failed");
             // WARN this is a special case failed is empty, but this result is to be considered as error.
             return RoutingResults.preroutingError();
         }
@@ -981,7 +989,7 @@ class PostOffice {
                 LOG.warn("Received not valid UTF-8 payload when payload format indicator was enabled (QoS2)");
                 connection.sendPubRec(messageID, MqttReasonCodes.PubRec.PAYLOAD_FORMAT_INVALID);
 
-                ReferenceCountUtil.release(msg);
+                Utils.release(msg,PostOffice.BT_PUB_IN + " - ok, phase 2 qos2 invalid format");
                 return RoutingResults.preroutingError();
             }
         }
@@ -1002,7 +1010,7 @@ class PostOffice {
             // some session event loop enqueue raised a problem
             failedPublishes.insertAll(messageID, clientId, publishRoutings.failedRoutings);
         }
-        ReferenceCountUtil.release(msg);
+        Utils.release(msg,PostOffice.BT_PUB_IN + " - ok, phase 2 qos2");
 
         // cleanup success resends from the failed publishes cache
         failedPublishes.removeAll(messageID, clientId, publishRoutings.successedRoutings);
