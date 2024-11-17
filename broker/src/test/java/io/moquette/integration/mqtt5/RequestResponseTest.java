@@ -26,15 +26,21 @@ import com.hivemq.client.mqtt.mqtt5.message.publish.puback.Mqtt5PubAckReasonCode
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.Mqtt5Subscribe;
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAck;
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAckReasonCode;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 public class RequestResponseTest extends AbstractServerIntegrationWithoutClientFixture {
 
@@ -60,7 +66,7 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
             .topicFilter("requester/door/open")
             .qos(MqttQos.AT_LEAST_ONCE)
             .build();
-        responder.toAsync().subscribe(subscribeToRequest,
+        CompletableFuture<@NotNull Mqtt5SubAck> subackFuture = responder.toAsync().subscribe(subscribeToRequest,
             (Mqtt5Publish pub) -> {
                 assertTrue(pub.getResponseTopic().isPresent(), "Response topic MUST defined in request publish");
                 Mqtt5PublishResult responseResult = responder.publishWith()
@@ -73,6 +79,9 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
                 assertEquals(Mqtt5PubAckReasonCode.SUCCESS, qos1Result.getPubAck().getReasonCode(),
                     "Open door response cannot be published ");
             });
+
+        // wait for the SUBACK in 1 second, else if PUB is sent before the client is fully subscribed, then it's lost
+        waitForSubAck(subackFuture);
 
         Mqtt5PublishResult.Mqtt5Qos1Result requestResult = (Mqtt5PublishResult.Mqtt5Qos1Result) requester.publishWith()
             .topic("requester/door/open")
@@ -104,7 +113,7 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
             .topicFilter("requester/door/open")
             .qos(MqttQos.AT_LEAST_ONCE)
             .build();
-        responder.toAsync().subscribe(subscribeToRequest,
+        CompletableFuture<@NotNull Mqtt5SubAck> subackFuture = responder.toAsync().subscribe(subscribeToRequest,
             (Mqtt5Publish pub) -> {
                 assertTrue(pub.getResponseTopic().isPresent(), "Response topic MUST defined in request publish");
                 assertTrue(pub.getCorrelationData().isPresent(), "Correlation data MUST defined in request publish");
@@ -115,6 +124,7 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
                     .send();
                 assertFalse(responseResult.getError().isPresent(), "Open door response cannot be published ");
             });
+        waitForSubAck(subackFuture);
 
         Mqtt5PublishResult.Mqtt5Qos1Result requestResult = (Mqtt5PublishResult.Mqtt5Qos1Result) requester.publishWith()
             .topic("requester/door/open")
@@ -134,6 +144,20 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
             final byte[] correlationData = asByteArray(msgPub.getCorrelationData().get());
             assertEquals("req-open-door", new String(correlationData, StandardCharsets.UTF_8));
         });
+    }
+
+    private static void waitForSubAck(CompletableFuture<@NotNull Mqtt5SubAck> subackFuture) {
+        try {
+            Mqtt5SubAck mqtt5SubAck = subackFuture.get(1, TimeUnit.SECONDS);
+            assertEquals(1, mqtt5SubAck.getReasonCodes().size());
+            assertEquals(Mqtt5SubAckReasonCode.GRANTED_QOS_1, mqtt5SubAck.getReasonCodes().iterator().next());
+        } catch (InterruptedException e) {
+            fail("Sub ack waiting interrupted before 1 sec expires");
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        } catch (TimeoutException e) {
+            fail("Sub ack didn't arrive in 1 second timeout");
+        }
     }
 
     private byte[] asByteArray(ByteBuffer byteBuffer) {
