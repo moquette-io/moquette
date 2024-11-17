@@ -1,6 +1,7 @@
 package io.moquette.persistence;
 
 import io.moquette.broker.SessionRegistry;
+import io.moquette.broker.Utils;
 import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -57,7 +58,8 @@ class SegmentedPersistentQueueSerDes {
     private void writePayload(ByteBuffer target, ByteBuf source) {
         final int payloadSize = source.readableBytes();
         byte[] rawBytes = new byte[payloadSize];
-        source.getBytes(source.readerIndex(), rawBytes).release();
+        source.getBytes(source.readerIndex(), rawBytes);
+        Utils.release(source, "persisted queue payload");
         target.putInt(payloadSize);
         target.put(rawBytes);
     }

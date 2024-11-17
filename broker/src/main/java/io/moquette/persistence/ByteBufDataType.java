@@ -15,6 +15,7 @@
  */
 package io.moquette.persistence;
 
+import io.moquette.broker.Utils;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.h2.mvstore.DataUtils;
@@ -51,7 +52,8 @@ public final class ByteBufDataType extends BasicDataType<ByteBuf> {
     public void write(WriteBuffer buff, ByteBuf obj) {
         final int payloadSize = obj.readableBytes();
         byte[] rawBytes = new byte[payloadSize];
-        obj.copy().readBytes(rawBytes).release();
+        ByteBuf copiedBuffer = obj.copy().readBytes(rawBytes);
+        Utils.release(copiedBuffer, "temp copy buffer");
         buff.putInt(payloadSize);
         buff.put(rawBytes);
     }

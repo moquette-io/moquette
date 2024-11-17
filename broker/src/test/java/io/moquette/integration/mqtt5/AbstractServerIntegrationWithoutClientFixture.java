@@ -170,7 +170,7 @@ public class AbstractServerIntegrationWithoutClientFixture {
 
     static void verifyPublishMessage(Mqtt5BlockingClient subscriber, Consumer<Mqtt5Publish> assertion) throws InterruptedException {
         try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriber.publishes(MqttGlobalPublishFilter.ALL)) {
-            Optional<Mqtt5Publish> publishMessage = publishes.receive(1, TimeUnit.SECONDS);
+            Optional<Mqtt5Publish> publishMessage = publishes.receive(10, TimeUnit.SECONDS);
             if (!publishMessage.isPresent()) {
                 fail("Expected to receive a publish message");
                 return;

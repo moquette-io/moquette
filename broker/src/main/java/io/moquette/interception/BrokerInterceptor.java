@@ -17,6 +17,7 @@
 package io.moquette.interception;
 
 import io.moquette.BrokerConstants;
+import io.moquette.broker.Utils;
 import io.moquette.interception.messages.*;
 import io.moquette.broker.config.IConfig;
 import io.moquette.broker.subscriptions.Subscription;
@@ -121,7 +122,7 @@ public final class BrokerInterceptor implements Interceptor {
 
     @Override
     public void notifyTopicPublished(final MqttPublishMessage msg, final String clientID, final String username) {
-        msg.retain();
+        Utils.retain(msg, "notify interceptors");
 
         executor.execute(() -> {
                 try {
@@ -131,10 +132,11 @@ public final class BrokerInterceptor implements Interceptor {
                         LOG.debug("Notifying MQTT PUBLISH message to interceptor. CId={}, messageId={}, topic={}, "
                                 + "interceptorId={}", clientID, messageId, topic, handler.getID());
                         // Sending to the outside, make a retainedDuplicate.
-                        handler.onPublish(new InterceptPublishMessage(msg.retainedDuplicate(), clientID, username));
+                        MqttPublishMessage duplicate = (MqttPublishMessage) Utils.retainDuplicate(msg, "interceptor notification");
+                        handler.onPublish(new InterceptPublishMessage(duplicate, clientID, username));
                     }
                 } finally {
-                    ReferenceCountUtil.release(msg);
+                    Utils.release(msg, "notify interceptors");
                 }
         });
     }

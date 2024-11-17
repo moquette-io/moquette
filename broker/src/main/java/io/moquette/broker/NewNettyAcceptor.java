@@ -77,7 +77,7 @@ class NewNettyAcceptor {
             ByteBuf bb = frame.content();
             // System.out.println("WebSocketFrameToByteBufDecoder decode - " +
             // ByteBufUtil.hexDump(bb));
-            bb.retain();
+            Utils.retain(bb, "Websocket decoder");
             out.add(bb);
         }
     }
