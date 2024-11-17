@@ -51,7 +51,7 @@ public class Client {
 
     private static final Logger LOG = LoggerFactory.getLogger(Client.class);
 
-    private static final Duration TIMEOUT_DURATION = Duration.ofMillis(500);
+    private static final Duration TIMEOUT_DURATION = Duration.ofMillis(1000);
 
     final ClientNettyMQTTHandler handler = new ClientNettyMQTTHandler();
     EventLoopGroup workerGroup;
