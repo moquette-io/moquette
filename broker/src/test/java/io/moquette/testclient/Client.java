@@ -16,6 +16,7 @@
 package io.moquette.testclient;
 
 import io.moquette.BrokerConstants;
+import io.moquette.broker.metrics.MQTTMessageLogger;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -57,7 +58,7 @@ public class Client {
     EventLoopGroup workerGroup;
     Channel m_channel;
     private boolean m_connectionLost;
-    private ICallback callback;
+    private volatile ICallback callback;
     private String clientId;
     private AtomicReference<MqttMessage> receivedMsg = new AtomicReference<>();
     private final BlockingQueue<MqttMessage> receivedMessages = new LinkedBlockingQueue<>();
@@ -82,6 +83,7 @@ public class Client {
                     ChannelPipeline pipeline = ch.pipeline();
                     pipeline.addLast("rawcli_decoder", new MqttDecoder());
                     pipeline.addLast("rawcli_encoder", MqttEncoder.INSTANCE);
+                    pipeline.addLast("messageLogger", new MQTTMessageLogger());
                     pipeline.addLast("rawcli_handler", handler);
                 }
             });
@@ -171,12 +173,14 @@ public class Client {
 
     private MqttConnAckMessage doConnect(MqttConnectMessage connectMessage) {
         final CountDownLatch latch = new CountDownLatch(1);
+        LOG.info("Callback set by CONNECT");
         this.setCallback(msg -> {
             receivedMsg.getAndSet(msg);
             LOG.info("Connect callback invocation, received message {}", msg.fixedHeader().messageType());
             latch.countDown();
 
             // clear the callback
+            LOG.info("Callback set null by CONNACK");
             setCallback(null);
         });
 
@@ -255,12 +259,14 @@ public class Client {
 
     private void doSubscribe(MqttSubscribeMessage subscribeMessage, long timeout, TimeUnit timeUnit) {
         final CountDownLatch subscribeAckLatch = new CountDownLatch(1);
+        LOG.info("Callback set by SUBSCRIBE");
         this.setCallback(msg -> {
             receivedMsg.getAndSet(msg);
             LOG.debug("Subscribe callback invocation, received message {}", msg.fixedHeader().messageType());
             subscribeAckLatch.countDown();
 
             // clear the callback
+            LOG.info("Callback set null by SUBACK");
             setCallback(null);
         });
 
@@ -282,12 +288,14 @@ public class Client {
 
     public void publish(MqttPublishMessage publishMessage, int timeout, TimeUnit timeUnit) {
         final CountDownLatch publishResponseLatch = new CountDownLatch(1);
+        LOG.info("Callback set by PUBLISH");
         this.setCallback(msg -> {
             receivedMsg.getAndSet(msg);
             LOG.debug("Publish callback invocation, received message {}", msg.fixedHeader().messageType());
             publishResponseLatch.countDown();
 
             // clear the callback
+            LOG.info("Callback set null by PUBLISH");
             setCallback(null);
         });
 
@@ -340,6 +348,7 @@ public class Client {
 
     void messageReceived(MqttMessage msg) {
         LOG.info("Received message {}", msg);
+        LOG.debug("Callback is {}", callback);
         if (this.callback != null) {
             this.callback.call(msg);
         } else {

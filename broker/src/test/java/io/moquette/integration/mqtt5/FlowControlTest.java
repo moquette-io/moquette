@@ -27,6 +27,8 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.*;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -41,8 +43,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class FlowControlTest extends AbstractServerIntegrationTest {
 
+    private static final Logger LOG = LoggerFactory.getLogger(FlowControlTest.class);
+
     @Test
     public void givenServerWithReceiveMaximumWhenClientPassSendQuotaThenIsDisconnected() throws IOException, InterruptedException {
+        LOG.info("givenServerWithReceiveMaximumWhenClientPassSendQuotaThenIsDisconnected");
         final int serverSendQuota = 5;
 
         // stop existing broker to restart with receiveMaximum configured
@@ -105,6 +110,7 @@ public class FlowControlTest extends AbstractServerIntegrationTest {
 
     @Test
     public void givenClientConnectedWithCertainReceiveMaximumWhenInFlightSizeIsSurpassedThenTheServerEnqueueAndDontFloodTheClient() throws InterruptedException {
+        LOG.info("givenClientConnectedWithCertainReceiveMaximumWhenInFlightSizeIsSurpassedThenTheServerEnqueueAndDontFloodTheClient");
         connectLowLevel();
 
         // subscribe with an identifier
@@ -152,6 +158,7 @@ public class FlowControlTest extends AbstractServerIntegrationTest {
 
     @Test
     public void givenClientThatReconnectWithSmallerReceiveMaximumThenForwardCorrectlyTheFullListOfPendingMessagesWithoutAnyLose() throws InterruptedException {
+        LOG.info("givenClientThatReconnectWithSmallerReceiveMaximumThenForwardCorrectlyTheFullListOfPendingMessagesWithoutAnyLose");
         // connect subscriber and published
         // publisher send 20 events, 10 should be in the inflight, 10 remains on the queue
         connectLowLevel();
@@ -159,6 +166,8 @@ public class FlowControlTest extends AbstractServerIntegrationTest {
         // subscribe with an identifier
         MqttMessage received = lowLevelClient.subscribeWithIdentifier("temperature/living",
             MqttQoS.AT_LEAST_ONCE, 123);
+
+        LOG.info("\n\n\n\n");
         verifyOfType(received, MqttMessageType.SUBACK);
 
         //lowlevel client doesn't ACK any pub, so the in flight window fills up
