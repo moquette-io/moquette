@@ -46,12 +46,12 @@ public abstract class AbstractServerIntegrationTest extends AbstractServerIntegr
         super.tearDown();
     }
 
-    void connectLowLevel() {
+    void connectLowLevel() throws InterruptedException {
         MqttConnAckMessage connAck = lowLevelClient.connectV5();
         assertConnectionAccepted(connAck, "Connection must be accepted");
     }
 
-    void connectLowLevel(int keepAliveSecs) {
+    void connectLowLevel(int keepAliveSecs) throws InterruptedException {
         MqttConnAckMessage connAck = lowLevelClient.connectV5(keepAliveSecs, BrokerConstants.INFLIGHT_WINDOW_SIZE);
         assertConnectionAccepted(connAck, "Connection must be accepted");
     }

@@ -45,7 +45,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
     }
 
     @Test
-    public void givenAClientSendingBadlyFormattedSharedSubscriptionNameThenItIsDisconnected() {
+    public void givenAClientSendingBadlyFormattedSharedSubscriptionNameThenItIsDisconnected() throws InterruptedException {
         connectLowLevel();
 
         MqttMessage received = lowLevelClient.subscribeWithError("$share/+/measures/temp", MqttQoS.AT_LEAST_ONCE);
@@ -57,7 +57,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
     }
 
     @Test
-    public void givenClientSubscribingToSharedTopicThenReceiveTheExpectedSubscriptionACK() {
+    public void givenClientSubscribingToSharedTopicThenReceiveTheExpectedSubscriptionACK() throws InterruptedException {
         connectLowLevel();
 
         MqttMessage received = lowLevelClient.subscribeWithError("$share/metrics/measures/temp", MqttQoS.AT_LEAST_ONCE);
@@ -70,7 +70,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
     }
 
     @Test
-    public void givenATopicNotReadableWhenAClientSubscribeSharedThenReceiveSubackWithNegativeResponse() throws IOException {
+    public void givenATopicNotReadableWhenAClientSubscribeSharedThenReceiveSubackWithNegativeResponse() throws IOException, InterruptedException {
         // stop already started broker instance
         stopServer();
 
@@ -93,7 +93,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
 
 
     @Test
-    public void givenClientSubscribingToSharedAndNonSharedWhenTheSharedIsNotReadableReceivesPositiveAckOnlyForNonShared() throws IOException {
+    public void givenClientSubscribingToSharedAndNonSharedWhenTheSharedIsNotReadableReceivesPositiveAckOnlyForNonShared() throws IOException, InterruptedException {
         // stop already started broker instance
         stopServer();
 

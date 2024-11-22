@@ -27,13 +27,10 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.*;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.concurrent.TimeUnit;
 
 import static io.moquette.integration.mqtt5.TestUtils.assertConnectionAccepted;
 import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
@@ -43,11 +40,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class FlowControlTest extends AbstractServerIntegrationTest {
 
-    private static final Logger LOG = LoggerFactory.getLogger(FlowControlTest.class);
-
     @Test
     public void givenServerWithReceiveMaximumWhenClientPassSendQuotaThenIsDisconnected() throws IOException, InterruptedException {
-        LOG.info("givenServerWithReceiveMaximumWhenClientPassSendQuotaThenIsDisconnected");
         final int serverSendQuota = 5;
 
         // stop existing broker to restart with receiveMaximum configured
@@ -78,7 +72,7 @@ public class FlowControlTest extends AbstractServerIntegrationTest {
         // sixth should exceed quota and the client should get a disconnect
         sendQoS2Publish();
 
-        MqttMessage receivedMsg = lowLevelClient.lastReceivedMessage();
+        MqttMessage receivedMsg = lowLevelClient.receiveNextMessage(Duration.ofMillis(500));
         assertEquals(MqttMessageType.DISCONNECT, receivedMsg.fixedHeader().messageType(),
             "On sixth in flight message the send quota is exhausted and response should be DISCONNECT");
         MqttReasonCodeAndPropertiesVariableHeader disconnectHeader = (MqttReasonCodeAndPropertiesVariableHeader) receivedMsg.variableHeader();
@@ -88,8 +82,8 @@ public class FlowControlTest extends AbstractServerIntegrationTest {
         assertTrue(lowLevelClient.isConnectionLost(), "Connection MUST be closed by the server");
     }
 
-    private void verifyReceived(MqttMessageType expectedMessageType) {
-        MqttMessage receivedMsg = lowLevelClient.lastReceivedMessage();
+    private void verifyReceived(MqttMessageType expectedMessageType) throws InterruptedException {
+        MqttMessage receivedMsg = lowLevelClient.receiveNextMessage(Duration.ofMillis(500));
         assertEquals(expectedMessageType, receivedMsg.fixedHeader().messageType());
     }
 
@@ -99,7 +93,7 @@ public class FlowControlTest extends AbstractServerIntegrationTest {
         MqttPublishVariableHeader variableHeader = new MqttPublishVariableHeader("temperature/living", 1, MqttProperties.NO_PROPERTIES);
         ByteBuf payload = Unpooled.wrappedBuffer("18°C".getBytes(StandardCharsets.UTF_8));
         MqttPublishMessage publishQoS2 = new MqttPublishMessage(fixedHeader, variableHeader, payload);
-        lowLevelClient.publish(publishQoS2, 500, TimeUnit.MILLISECONDS);
+        lowLevelClient.publish(publishQoS2);
     }
 
     @Override
@@ -110,7 +104,6 @@ public class FlowControlTest extends AbstractServerIntegrationTest {
 
     @Test
     public void givenClientConnectedWithCertainReceiveMaximumWhenInFlightSizeIsSurpassedThenTheServerEnqueueAndDontFloodTheClient() throws InterruptedException {
-        LOG.info("givenClientConnectedWithCertainReceiveMaximumWhenInFlightSizeIsSurpassedThenTheServerEnqueueAndDontFloodTheClient");
         connectLowLevel();
 
         // subscribe with an identifier
@@ -158,7 +151,6 @@ public class FlowControlTest extends AbstractServerIntegrationTest {
 
     @Test
     public void givenClientThatReconnectWithSmallerReceiveMaximumThenForwardCorrectlyTheFullListOfPendingMessagesWithoutAnyLose() throws InterruptedException {
-        LOG.info("givenClientThatReconnectWithSmallerReceiveMaximumThenForwardCorrectlyTheFullListOfPendingMessagesWithoutAnyLose");
         // connect subscriber and published
         // publisher send 20 events, 10 should be in the inflight, 10 remains on the queue
         connectLowLevel();
@@ -167,7 +159,6 @@ public class FlowControlTest extends AbstractServerIntegrationTest {
         MqttMessage received = lowLevelClient.subscribeWithIdentifier("temperature/living",
             MqttQoS.AT_LEAST_ONCE, 123);
 
-        LOG.info("\n\n\n\n");
         verifyOfType(received, MqttMessageType.SUBACK);
 
         //lowlevel client doesn't ACK any pub, so the in flight window fills up

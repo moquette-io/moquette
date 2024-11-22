@@ -71,7 +71,7 @@ class ConnectTest extends AbstractServerIntegrationTest {
     }
 
     @Test
-    public void sendConnectOnDisconnectedConnection() {
+    public void sendConnectOnDisconnectedConnection() throws InterruptedException {
         MqttConnAckMessage connAck = lowLevelClient.connectV5();
         TestUtils.assertConnectionAccepted(connAck, "Connection must be accepted");
         lowLevelClient.disconnect();
@@ -85,7 +85,7 @@ class ConnectTest extends AbstractServerIntegrationTest {
     }
 
     @Test
-    public void receiveInflightPublishesAfterAReconnect() {
+    public void receiveInflightPublishesAfterAReconnect() throws InterruptedException {
         final Mqtt5BlockingClient publisher = MqttClient.builder()
             .useMqttVersion5()
             .identifier("publisher")

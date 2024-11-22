@@ -29,7 +29,7 @@ public class SubscriptionWithIdentifierTest extends AbstractSubscriptionIntegrat
 
         // subscribe with an identifier
         MqttMessage received = lowLevelClient.subscribeWithIdentifier("/metrics/measures/temp",
-            MqttQoS.AT_LEAST_ONCE, 123, 400, TimeUnit.MILLISECONDS);
+            MqttQoS.AT_LEAST_ONCE, 123, Duration.ofMillis(400));
         verifyOfType(received, MqttMessageType.SUBACK);
 
         Mqtt5BlockingClient publisher = createPublisherClient();

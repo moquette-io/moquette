@@ -57,7 +57,7 @@ class ConnectAckTest extends  AbstractServerIntegrationTest {
     }
 
     @Test
-    public void testAssignedClientIdentifier() {
+    public void testAssignedClientIdentifier() throws InterruptedException {
         Client unnamedClient = new Client("localhost").clientId("");
         connAck = unnamedClient.connectV5();
         assertEquals(MqttConnectReturnCode.CONNECTION_ACCEPTED, connAck.variableHeader().connectReturnCode(), "Client connected");
