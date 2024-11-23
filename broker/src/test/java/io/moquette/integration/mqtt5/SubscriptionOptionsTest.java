@@ -30,6 +30,8 @@ import org.eclipse.paho.mqttv5.common.MqttMessage;
 import org.eclipse.paho.mqttv5.common.MqttSubscription;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
@@ -41,6 +43,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest {
+
+    private static final Logger LOG = LoggerFactory.getLogger(SubscriptionOptionsTest.class);
 
     @Override
     public String clientName() {
@@ -94,6 +98,7 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
 
     @Test
     public void givenSubscriptionWithNoLocalEnabledWhenTopicMatchPublishByItselfThenNoPublishAreSentBackToSubscriber() throws MqttException {
+        LOG.info("givenSubscriptionWithNoLocalEnabledWhenTopicMatchPublishByItselfThenNoPublishAreSentBackToSubscriber START");
         MqttClient client = new MqttClient("tcp://localhost:1883", "subscriber", new MemoryPersistence());
         client.connect();
         MqttSubscription subscription = new MqttSubscription("/metering/temp", 1);
@@ -113,6 +118,7 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
 
     @Test
     public void givenSubscriptionWithNoLocalDisabledWhenTopicMatchPublishByItselfThenAPublishAreSentBackToSubscriber() throws MqttException {
+        LOG.info("givenSubscriptionWithNoLocalDisabledWhenTopicMatchPublishByItselfThenAPublishAreSentBackToSubscriber START");
         MqttClient client = new MqttClient("tcp://localhost:1883", "subscriber", new MemoryPersistence());
         client.connect();
         MqttSubscription subscription = new MqttSubscription("/metering/temp", 1);
@@ -134,6 +140,7 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
 
     @Test
     public void givenAnExistingRetainedMessageWhenClientSubscribeWithAnyRetainAsPublishedSubscriptionOptionThenPublishedMessageIsAlwaysFlaggedAsRetained() throws Exception {
+        LOG.info("givenAnExistingRetainedMessageWhenClientSubscribeWithAnyRetainAsPublishedSubscriptionOptionThenPublishedMessageIsAlwaysFlaggedAsRetained START");
         // publish a retained message, must be at qos => AT_LEAST_ONCE,
         // because AT_MOST_ONCE is not managed in retain (best effort)
         Mqtt5BlockingClient publisher = createPublisherClient();
@@ -177,6 +184,7 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
 
     @Test
     public void givenSubscriptionWithRetainAsPublishedSetThenRespectTheFlagOnForward() throws MqttException {
+        LOG.info("givenSubscriptionWithRetainAsPublishedSetThenRespectTheFlagOnForward START");
         Mqtt5BlockingClient publisher = createPublisherClient();
 
         PublishCollector publishCollector = new PublishCollector();
@@ -212,6 +220,7 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
 
     @Test
     public void givenSubscriptionWithRetainAsPublishedUnsetThenRetainedFlagIsUnsetOnForwardedPublishes() throws MqttException {
+        LOG.info("givenSubscriptionWithRetainAsPublishedUnsetThenRetainedFlagIsUnsetOnForwardedPublishes START");
         Mqtt5BlockingClient publisher = createPublisherClient();
 
         PublishCollector publishCollector = new PublishCollector();
@@ -247,6 +256,7 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
 
     @Test
     public void givenFirstSubscriptionWithRetainPolicyToSendAtSubscribeIfNotYetExistsAndARetainedMessagedExistsThenPublishIsReceived() throws Exception {
+        LOG.info("givenFirstSubscriptionWithRetainPolicyToSendAtSubscribeIfNotYetExistsAndARetainedMessagedExistsThenPublishIsReceived START");
         Mqtt5BlockingClient publisher = createPublisherClient();
         //publish a retained message
         publisher.publishWith()
@@ -267,6 +277,7 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
 
     @Test
     public void givenNonFirstSubscriptionWithRetainPolicyToSendAtSubscribeIfAlreadyExistsAndARetainedMessagedExistsThenPublishIsNotReceived() throws Exception {
+        LOG.info("givenNonFirstSubscriptionWithRetainPolicyToSendAtSubscribeIfAlreadyExistsAndARetainedMessagedExistsThenPublishIsNotReceived START");
         Mqtt5BlockingClient publisher = createPublisherClient();
         //publish a retained message
         publisher.publishWith()
@@ -290,6 +301,7 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
 
     @Test
     public void givenSubscriptionWithRetainPolicyToDoNotSendAndARetainedMessagedExistsThenPublishIsNotReceived() throws Exception {
+        LOG.info("givenSubscriptionWithRetainPolicyToDoNotSendAndARetainedMessagedExistsThenPublishIsNotReceived START");
         Mqtt5BlockingClient publisher = createPublisherClient();
         //publish a retained message
         publisher.publishWith()

@@ -46,6 +46,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
 
     @Test
     public void givenAClientSendingBadlyFormattedSharedSubscriptionNameThenItIsDisconnected() throws InterruptedException {
+        LOG.info("givenAClientSendingBadlyFormattedSharedSubscriptionNameThenItIsDisconnected START");
         connectLowLevel();
 
         MqttMessage received = lowLevelClient.subscribeWithError("$share/+/measures/temp", MqttQoS.AT_LEAST_ONCE);
@@ -58,6 +59,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
 
     @Test
     public void givenClientSubscribingToSharedTopicThenReceiveTheExpectedSubscriptionACK() throws InterruptedException {
+        LOG.info("givenClientSubscribingToSharedTopicThenReceiveTheExpectedSubscriptionACK START");
         connectLowLevel();
 
         MqttMessage received = lowLevelClient.subscribeWithError("$share/metrics/measures/temp", MqttQoS.AT_LEAST_ONCE);
@@ -71,6 +73,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
 
     @Test
     public void givenATopicNotReadableWhenAClientSubscribeSharedThenReceiveSubackWithNegativeResponse() throws IOException, InterruptedException {
+        LOG.info("givenATopicNotReadableWhenAClientSubscribeSharedThenReceiveSubackWithNegativeResponse START");
         // stop already started broker instance
         stopServer();
 
@@ -94,6 +97,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
 
     @Test
     public void givenClientSubscribingToSharedAndNonSharedWhenTheSharedIsNotReadableReceivesPositiveAckOnlyForNonShared() throws IOException, InterruptedException {
+        LOG.info("givenClientSubscribingToSharedAndNonSharedWhenTheSharedIsNotReadableReceivesPositiveAckOnlyForNonShared START");
         // stop already started broker instance
         stopServer();
 
@@ -131,6 +135,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
 
     @Test
     public void givenASharedSubscriptionClientReceivesANotification() throws Exception {
+        LOG.info("givenASharedSubscriptionClientReceivesANotification START");
         final Mqtt5BlockingClient subscriberClient = createSubscriberClient();
         subscriberClient.subscribeWith()
             .topicFilter("$share/collectors/metric/temperature/#")
@@ -146,6 +151,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
 
     @Test
     public void givenAClientWithOverlappingSharedSubscriptionsThenReceivesMultiplePublishes() throws InterruptedException {
+        LOG.info("givenAClientWithOverlappingSharedSubscriptionsThenReceivesMultiplePublishes START");
         // Connect a subscriber client
         lowLevelClient = new Client("localhost").clientId(clientName());
 
@@ -184,6 +190,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
 
     @Test
     public void whenAClientSubscribeToASharedTopicThenDoesntReceiveAnyRetainedMessagedOnTheMatchingTopicFilter() throws InterruptedException {
+        LOG.info("whenAClientSubscribeToASharedTopicThenDoesntReceiveAnyRetainedMessagedOnTheMatchingTopicFilter START");
         // publish a message with retained on a shared topic
         Mqtt5BlockingClient publisherClient = createPublisherClient();
         publisherClient.publishWith()
@@ -214,6 +221,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
 
     @Test
     public void givenSharedSubscriptionWithCertainQoSWhenSameClientWithSameShareSubscribeToSameTopicFilterThenQoSUpdates() throws Exception {
+        LOG.info("givenSharedSubscriptionWithCertainQoSWhenSameClientWithSameShareSubscribeToSameTopicFilterThenQoSUpdates START");
         final Mqtt5BlockingClient subscriberClient = createSubscriberClient();
         subscribe(subscriberClient, "$share/collectors/metric/temperature/living", MqttQos.AT_MOST_ONCE);
 
@@ -250,6 +258,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
 
     @Test
     public void givenMultipleClientSubscribedToSharedSubscriptionWhenOneUnsubscribeThenTheSharedSubscriptionRemainsValid() throws Exception {
+        LOG.info("givenMultipleClientSubscribedToSharedSubscriptionWhenOneUnsubscribeThenTheSharedSubscriptionRemainsValid START");
         String fullSharedSubscriptionTopicFilter = "$share/collectors/metric/temperature/living";
 
         // subscribe first client to shared subscription
@@ -283,6 +292,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
 
     @Test
     public void givenASharedSubscriptionWhenLastSubscribedClientUnsubscribeThenTheSharedSubscriptionCeasesToExist() throws Exception {
+        LOG.info("givenASharedSubscriptionWhenLastSubscribedClientUnsubscribeThenTheSharedSubscriptionCeasesToExist START");
         String fullSharedSubscriptionTopicFilter = "$share/collectors/metric/temperature/living";
 
         // subscribe client to shared subscription
@@ -313,6 +323,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
 
     @Test
     public void givenASharedSubscriptionWhenLastSubscribedClientSessionTerminatesThenTheSharedSubscriptionCeasesToExist() throws Exception {
+        LOG.info("givenASharedSubscriptionWhenLastSubscribedClientSessionTerminatesThenTheSharedSubscriptionCeasesToExist START");
         String fullSharedSubscriptionTopicFilter = "$share/collectors/metric/temperature/living";
 
         // subscribe client to shared subscription
@@ -338,6 +349,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
 
     @Test
     public void givenASharedSubscriptionWhenBrokerRestartsAndClientReconnectsThenSharedSubscriptionIsReloaded() throws Exception {
+        LOG.info("givenASharedSubscriptionWhenBrokerRestartsAndClientReconnectsThenSharedSubscriptionIsReloaded START");
         String fullSharedSubscriptionTopicFilter = "$share/collectors/metric/temperature/living";
 
         // subscribe client to shared subscription
