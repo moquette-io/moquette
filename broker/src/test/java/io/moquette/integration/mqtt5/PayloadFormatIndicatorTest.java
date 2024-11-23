@@ -23,12 +23,10 @@ import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import com.hivemq.client.mqtt.mqtt5.exceptions.Mqtt5PubAckException;
 import com.hivemq.client.mqtt.mqtt5.exceptions.Mqtt5PubRecException;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5PayloadFormatIndicator;
-import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5PublishResult;
 import com.hivemq.client.mqtt.mqtt5.message.publish.puback.Mqtt5PubAckReasonCode;
 import com.hivemq.client.mqtt.mqtt5.message.publish.pubrec.Mqtt5PubRecReasonCode;
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAck;
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAckReasonCode;
-import io.moquette.logging.LoggingUtils;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttFixedHeader;
 import io.netty.handler.codec.mqtt.MqttMessage;
@@ -47,8 +45,6 @@ import org.eclipse.paho.mqttv5.client.persist.MemoryPersistence;
 import org.eclipse.paho.mqttv5.common.MqttException;
 import org.eclipse.paho.mqttv5.common.MqttSubscription;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -61,7 +57,6 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class PayloadFormatIndicatorTest extends AbstractServerIntegrationTest {
-    private static final Logger LOG = LoggerFactory.getLogger(PayloadFormatIndicatorTest.class);
 
     // second octet is invalid
     public static final byte[] INVALID_UTF_8_BYTES = new byte[]{(byte) 0xC3, 0x28};
@@ -73,13 +68,6 @@ public class PayloadFormatIndicatorTest extends AbstractServerIntegrationTest {
 
     @Test
     public void givenAPublishWithPayloadFormatIndicatorWhenForwardedToSubscriberThenIsPresent() throws InterruptedException, MqttException {
-        LOG.info("givenAPublishWithPayloadFormatIndicatorWhenForwardedToSubscriberThenIsPresent TEST START");
-//        Mqtt5BlockingClient subscriber = createSubscriberClient();
-//        Mqtt5SubAck subAck = subscriber.subscribeWith()
-//            .topicFilter("temperature/living")
-//            .qos(MqttQos.AT_LEAST_ONCE)
-//            .send();
-//        assertThat(subAck.getReasonCodes()).contains(Mqtt5SubAckReasonCode.GRANTED_QOS_1);
         MqttClient client = new MqttClient("tcp://localhost:1883", "subscriber", new MemoryPersistence());
         client.connect();
         MqttSubscription subscription = new MqttSubscription("temperature/living", 1);
@@ -87,7 +75,6 @@ public class PayloadFormatIndicatorTest extends AbstractServerIntegrationTest {
         IMqttToken subscribeToken = client.subscribe(new MqttSubscription[]{subscription},
             new IMqttMessageListener[] {publishCollector});
         TestUtils.verifySubscribedSuccessfully(subscribeToken);
-        LOG.info("SUBACK received");
 
         Mqtt5BlockingClient publisher = createPublisherClient();
         publisher.publishWith()
@@ -96,11 +83,7 @@ public class PayloadFormatIndicatorTest extends AbstractServerIntegrationTest {
             .payloadFormatIndicator(Mqtt5PayloadFormatIndicator.UTF_8)
             .qos(MqttQos.AT_LEAST_ONCE)
             .send();
-        LOG.info("PUB QoS1 sent");
 
-//        verifyPublishMessage(subscriber, msgPub -> {
-//            assertTrue(msgPub.getPayloadFormatIndicator().isPresent());
-//        });
         // Verify the message is also reflected back to the sender
         publishCollector.assertReceivedMessageIn(2, TimeUnit.SECONDS);
         assertEquals("temperature/living", publishCollector.receivedTopic());

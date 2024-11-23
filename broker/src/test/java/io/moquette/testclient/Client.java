@@ -18,11 +18,30 @@ package io.moquette.testclient;
 import io.moquette.BrokerConstants;
 import io.moquette.broker.metrics.MQTTMessageLogger;
 import io.netty.bootstrap.Bootstrap;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.mqtt.*;
+import io.netty.handler.codec.mqtt.MqttConnAckMessage;
+import io.netty.handler.codec.mqtt.MqttConnectMessage;
+import io.netty.handler.codec.mqtt.MqttConnectPayload;
+import io.netty.handler.codec.mqtt.MqttConnectVariableHeader;
+import io.netty.handler.codec.mqtt.MqttDecoder;
+import io.netty.handler.codec.mqtt.MqttEncoder;
+import io.netty.handler.codec.mqtt.MqttFixedHeader;
+import io.netty.handler.codec.mqtt.MqttMessage;
+import io.netty.handler.codec.mqtt.MqttMessageBuilders;
+import io.netty.handler.codec.mqtt.MqttMessageType;
+import io.netty.handler.codec.mqtt.MqttProperties;
+import io.netty.handler.codec.mqtt.MqttPublishMessage;
+import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttSubAckMessage;
+import io.netty.handler.codec.mqtt.MqttSubscribeMessage;
+import io.netty.handler.codec.mqtt.MqttVersion;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,7 +76,6 @@ public class Client {
     EventLoopGroup workerGroup;
     Channel m_channel;
     private boolean m_connectionLost;
-//    private volatile ICallback callback;
     private String clientId;
     private AtomicReference<MqttMessage> receivedMsg = new AtomicReference<>();
     private final BlockingQueue<MqttMessage> receivedMessages = new LinkedBlockingQueue<>();
@@ -276,10 +294,6 @@ public class Client {
         this.workerGroup.shutdownGracefully().sync();
     }
 
-//    public void setCallback(ICallback callback) {
-//        this.callback = callback;
-//    }
-
     public void sendMessage(MqttMessage msg) {
         m_channel.writeAndFlush(msg).addListener(FIRE_EXCEPTION_ON_FAILURE);
     }
@@ -289,13 +303,8 @@ public class Client {
     }
 
     void messageReceived(MqttMessage msg) {
-        LOG.info("Received message {}", msg);
-//        LOG.debug("Callback is {}", callback);
-//        if (this.callback != null) {
-//            this.callback.call(msg);
-//        } else {
-            receivedMessages.add(msg);
-//        }
+        LOG.debug("Received message {}", msg);
+        receivedMessages.add(msg);
     }
 
     public boolean hasReceivedMessages() {
