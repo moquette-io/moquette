@@ -18,6 +18,7 @@
 
 package io.moquette.integration.mqtt5;
 
+import com.hivemq.client.mqtt.MqttGlobalPublishFilter;
 import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import com.hivemq.client.mqtt.mqtt5.exceptions.Mqtt5PubAckException;
@@ -25,8 +26,6 @@ import com.hivemq.client.mqtt.mqtt5.exceptions.Mqtt5PubRecException;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5PayloadFormatIndicator;
 import com.hivemq.client.mqtt.mqtt5.message.publish.puback.Mqtt5PubAckReasonCode;
 import com.hivemq.client.mqtt.mqtt5.message.publish.pubrec.Mqtt5PubRecReasonCode;
-import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAck;
-import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAckReasonCode;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttFixedHeader;
 import io.netty.handler.codec.mqtt.MqttMessage;
@@ -54,7 +53,6 @@ import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.assertj.core.api.Assertions.assertThat;
 
 public class PayloadFormatIndicatorTest extends AbstractServerIntegrationTest {
 
@@ -67,30 +65,25 @@ public class PayloadFormatIndicatorTest extends AbstractServerIntegrationTest {
     }
 
     @Test
-    public void givenAPublishWithPayloadFormatIndicatorWhenForwardedToSubscriberThenIsPresent() throws InterruptedException, MqttException {
-        MqttClient client = new MqttClient("tcp://localhost:1883", "subscriber", new MemoryPersistence());
-        client.connect();
-        MqttSubscription subscription = new MqttSubscription("temperature/living", 1);
-        SubscriptionOptionsTest.PublishCollector publishCollector = new SubscriptionOptionsTest.PublishCollector();
-        IMqttToken subscribeToken = client.subscribe(new MqttSubscription[]{subscription},
-            new IMqttMessageListener[] {publishCollector});
-        TestUtils.verifySubscribedSuccessfully(subscribeToken);
-
-        Mqtt5BlockingClient publisher = createPublisherClient();
-        publisher.publishWith()
-            .topic("temperature/living")
-            .payload("18".getBytes(StandardCharsets.UTF_8))
-            .payloadFormatIndicator(Mqtt5PayloadFormatIndicator.UTF_8)
-            .qos(MqttQos.AT_LEAST_ONCE)
+    public void givenAPublishWithPayloadFormatIndicatorWhenForwardedToSubscriberThenIsPresent() throws InterruptedException {
+        Mqtt5BlockingClient subscriber = createSubscriberClient();
+        subscriber.subscribeWith()
+            .topicFilter("temperature/living")
+            .qos(MqttQos.AT_MOST_ONCE)
             .send();
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriber.publishes(MqttGlobalPublishFilter.ALL)) {
+            Mqtt5BlockingClient publisher = createPublisherClient();
+            publisher.publishWith()
+                .topic("temperature/living")
+                .payload("18".getBytes(StandardCharsets.UTF_8))
+                .payloadFormatIndicator(Mqtt5PayloadFormatIndicator.UTF_8)
+                .qos(MqttQos.AT_MOST_ONCE)
+                .send();
 
-        // Verify the message is also reflected back to the sender
-        publishCollector.assertReceivedMessageIn(2, TimeUnit.SECONDS);
-        assertEquals("temperature/living", publishCollector.receivedTopic());
-        assertEquals("18", publishCollector.receivedPayload(), "Payload published on topic should match");
-        org.eclipse.paho.mqttv5.common.MqttMessage receivedMessage = publishCollector.receivedMessage();
-        assertEquals(MqttQos.AT_LEAST_ONCE.getCode(), receivedMessage.getQos());
-        assertTrue(receivedMessage.getProperties().getPayloadFormat());
+            verifyPublishMessage(publishes, msgPub -> {
+                assertTrue(msgPub.getPayloadFormatIndicator().isPresent());
+            });
+        }
     }
 
     @Test

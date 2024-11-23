@@ -18,6 +18,7 @@
 
 package io.moquette.integration.mqtt5;
 
+import com.hivemq.client.mqtt.MqttGlobalPublishFilter;
 import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
@@ -52,13 +53,15 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
 
         final Mqtt5BlockingClient responder = createHiveBlockingClient("responder");
 
-        responderRepliesToRequesterPublish(responder, requester, responseTopic);
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = requester.publishes(MqttGlobalPublishFilter.ALL)) {
+            responderRepliesToRequesterPublish(responder, requester, responseTopic);
 
-        verifyPublishMessage(requester, msgPub -> {
-            assertTrue(msgPub.getPayload().isPresent(), "Response payload MUST be present");
-            String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
-            assertEquals("OK", payload);
-        });
+            verifyPublishMessage(publishes, msgPub -> {
+                assertTrue(msgPub.getPayload().isPresent(), "Response payload MUST be present");
+                String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
+                assertEquals("OK", payload);
+            });
+        }
     }
 
     private static void responderRepliesToRequesterPublish(Mqtt5BlockingClient responder, Mqtt5BlockingClient requester, String responseTopic) {
@@ -126,24 +129,26 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
             });
         waitForSubAck(subackFuture);
 
-        Mqtt5PublishResult.Mqtt5Qos1Result requestResult = (Mqtt5PublishResult.Mqtt5Qos1Result) requester.publishWith()
-            .topic("requester/door/open")
-            .responseTopic(responseTopic)
-            .correlationData("req-open-door".getBytes(StandardCharsets.UTF_8))
-            .payload("Please open the door".getBytes(StandardCharsets.UTF_8))
-            .qos(MqttQos.AT_LEAST_ONCE)
-            .send();
-        assertEquals(Mqtt5PubAckReasonCode.SUCCESS, requestResult.getPubAck().getReasonCode(),
-            "Open door request cannot be published ");
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = requester.publishes(MqttGlobalPublishFilter.ALL)) {
+            Mqtt5PublishResult.Mqtt5Qos1Result requestResult = (Mqtt5PublishResult.Mqtt5Qos1Result) requester.publishWith()
+                .topic("requester/door/open")
+                .responseTopic(responseTopic)
+                .correlationData("req-open-door".getBytes(StandardCharsets.UTF_8))
+                .payload("Please open the door".getBytes(StandardCharsets.UTF_8))
+                .qos(MqttQos.AT_LEAST_ONCE)
+                .send();
+            assertEquals(Mqtt5PubAckReasonCode.SUCCESS, requestResult.getPubAck().getReasonCode(),
+                "Open door request cannot be published ");
 
-        verifyPublishMessage(requester, msgPub -> {
-            assertTrue(msgPub.getPayload().isPresent(), "Response payload MUST be present");
-            String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
-            assertEquals("OK", payload);
-            assertTrue(msgPub.getCorrelationData().isPresent(), "Request correlation data MUST defined in response publish");
-            final byte[] correlationData = asByteArray(msgPub.getCorrelationData().get());
-            assertEquals("req-open-door", new String(correlationData, StandardCharsets.UTF_8));
-        });
+            verifyPublishMessage(publishes, msgPub -> {
+                assertTrue(msgPub.getPayload().isPresent(), "Response payload MUST be present");
+                String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
+                assertEquals("OK", payload);
+                assertTrue(msgPub.getCorrelationData().isPresent(), "Request correlation data MUST defined in response publish");
+                final byte[] correlationData = asByteArray(msgPub.getCorrelationData().get());
+                assertEquals("req-open-door", new String(correlationData, StandardCharsets.UTF_8));
+            });
+        }
     }
 
     private static void waitForSubAck(CompletableFuture<@NotNull Mqtt5SubAck> subackFuture) {
@@ -174,12 +179,14 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
 
         final Mqtt5BlockingClient responder = createHiveBlockingClient("responder");
 
-        responderRepliesToRequesterPublish(responder, requester, responseTopic);
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = requester.publishes(MqttGlobalPublishFilter.ALL)) {
+            responderRepliesToRequesterPublish(responder, requester, responseTopic);
 
-        verifyPublishMessage(requester, msgPub -> {
-            assertTrue(msgPub.getPayload().isPresent(), "Response payload MUST be present");
-            String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
-            assertEquals("OK", payload);
-        });
+            verifyPublishMessage(publishes, msgPub -> {
+                assertTrue(msgPub.getPayload().isPresent(), "Response payload MUST be present");
+                String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
+                assertEquals("OK", payload);
+            });
+        }
     }
 }

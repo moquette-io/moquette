@@ -180,30 +180,32 @@ class ConnectTest extends AbstractServerIntegrationTest {
         final Mqtt5BlockingClient clientWithWill = createAndConnectClientWithWillTestament(clientId);
 
         final Mqtt5BlockingClient testamentSubscriber = createAndConnectClientListeningToTestament();
+        try (Mqtt5BlockingClient.Mqtt5Publishes testamentListener = testamentSubscriber.publishes(MqttGlobalPublishFilter.ALL)) {
 
-        // client trigger a will message, disconnecting with bad reason code
-        final Mqtt5Disconnect malformedPacketReason = Mqtt5Disconnect.builder()
-            .reasonCode(Mqtt5DisconnectReasonCode.MALFORMED_PACKET)
-            .build();
-        clientWithWill.disconnect(malformedPacketReason);
+            // client trigger a will message, disconnecting with bad reason code
+            final Mqtt5Disconnect malformedPacketReason = Mqtt5Disconnect.builder()
+                .reasonCode(Mqtt5DisconnectReasonCode.MALFORMED_PACKET)
+                .build();
+            clientWithWill.disconnect(malformedPacketReason);
 
-        // wait no will is published
-        verifyNoTestamentIsPublished(testamentSubscriber, unused -> {
-            // reconnect another client with same clientId
-            final Mqtt5BlockingClient client = MqttClient.builder()
-                .useMqttVersion5()
-                .identifier(clientId)
-                .serverHost("localhost")
-                .serverPort(1883)
-                .buildBlocking();
-            Mqtt5ConnAck connectAck = client.connect();
-            assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, connectAck.getReasonCode(), "Client connected");
+            // wait no will is published
+            verifyNoTestamentIsPublished(testamentListener, unused -> {
+                // reconnect another client with same clientId
+                final Mqtt5BlockingClient client = MqttClient.builder()
+                    .useMqttVersion5()
+                    .identifier(clientId)
+                    .serverHost("localhost")
+                    .serverPort(1883)
+                    .buildBlocking();
+                Mqtt5ConnAck connectAck = client.connect();
+                assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, connectAck.getReasonCode(), "Client connected");
 
-        }, Duration.ofSeconds(10));
+            }, Duration.ofSeconds(10));
+        }
     }
 
-    private static void verifyNoTestamentIsPublished(Mqtt5BlockingClient testamentSubscriber, Consumer<Void> action, Duration timeout) throws InterruptedException {
-        verifyNoPublish(testamentSubscriber, action, timeout, "No will message should be published");
+    private static void verifyNoTestamentIsPublished(Mqtt5BlockingClient.Mqtt5Publishes testamentListener, Consumer<Void> action, Duration timeout) throws InterruptedException {
+        verifyNoPublish(testamentListener, action, timeout, "No will message should be published");
     }
 
     @Test
@@ -230,12 +232,14 @@ class ConnectTest extends AbstractServerIntegrationTest {
         final Mqtt5BlockingClient clientWithWill = createAndConnectClientWithWillTestament(clientId,  10, 60);
 
         final Mqtt5BlockingClient testamentSubscriber = createAndConnectClientListeningToTestament();
+        try (Mqtt5BlockingClient.Mqtt5Publishes testamentListener = testamentSubscriber.publishes(MqttGlobalPublishFilter.ALL)) {
 
-        // wait no will is published
-        verifyNoTestamentIsPublished(testamentSubscriber, unused -> {
-            // normal session disconnection
-            clientWithWill.disconnect(Mqtt5Disconnect.builder().build());
-        }, Duration.ofSeconds(10));
+            // wait no will is published
+            verifyNoTestamentIsPublished(testamentListener, unused -> {
+                // normal session disconnection
+                clientWithWill.disconnect(Mqtt5Disconnect.builder().build());
+            }, Duration.ofSeconds(10));
+        }
     }
 
     @Test
@@ -245,14 +249,16 @@ class ConnectTest extends AbstractServerIntegrationTest {
         final Mqtt5BlockingClient clientWithWill = createAndConnectClientWithWillTestament(clientId,  10, 60);
 
         final Mqtt5BlockingClient testamentSubscriber = createAndConnectClientListeningToTestament();
+        try (Mqtt5BlockingClient.Mqtt5Publishes testamentListener = testamentSubscriber.publishes(MqttGlobalPublishFilter.ALL)) {
 
-        // wait no will is published
-        verifyNoTestamentIsPublished(testamentSubscriber, unused -> {
-            // normal session disconnection with will
-            clientWithWill.disconnect(Mqtt5Disconnect.builder()
-                .reasonCode(Mqtt5DisconnectReasonCode.DISCONNECT_WITH_WILL_MESSAGE)
-                .build());
-        }, Duration.ofSeconds(10));
+            // wait no will is published
+            verifyNoTestamentIsPublished(testamentListener, unused -> {
+                // normal session disconnection with will
+                clientWithWill.disconnect(Mqtt5Disconnect.builder()
+                    .reasonCode(Mqtt5DisconnectReasonCode.DISCONNECT_WITH_WILL_MESSAGE)
+                    .build());
+            }, Duration.ofSeconds(10));
+        }
     }
 
     @Test

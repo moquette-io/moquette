@@ -18,6 +18,7 @@
 
 package io.moquette.integration.mqtt5;
 
+import com.hivemq.client.mqtt.MqttGlobalPublishFilter;
 import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import com.hivemq.client.mqtt.mqtt5.exceptions.Mqtt5PubAckException;
@@ -65,17 +66,19 @@ public class ContentTypeTest extends AbstractServerIntegrationTest {
             .send();
 
         Mqtt5BlockingClient publisher = createPublisherClient();
-        publisher.publishWith()
-            .topic("temperature/living")
-            .payload("{\"max\": 18}".getBytes(StandardCharsets.UTF_8))
-            .contentType("application/json")
-            .qos(MqttQos.AT_MOST_ONCE)
-            .send();
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriber.publishes(MqttGlobalPublishFilter.ALL)) {
+            publisher.publishWith()
+                .topic("temperature/living")
+                .payload("{\"max\": 18}".getBytes(StandardCharsets.UTF_8))
+                .contentType("application/json")
+                .qos(MqttQos.AT_MOST_ONCE)
+                .send();
 
-        verifyPublishMessage(subscriber, msgPub -> {
-            assertTrue(msgPub.getContentType().isPresent(), "Content-type MUST be present");
-            assertEquals("application/json", msgPub.getContentType().get().toString(), "Content-type MUST be untouched");
-        });
+            verifyPublishMessage(publishes, msgPub -> {
+                assertTrue(msgPub.getContentType().isPresent(), "Content-type MUST be present");
+                assertEquals("application/json", msgPub.getContentType().get().toString(), "Content-type MUST be untouched");
+            });
+        }
     }
 
     @Test
