@@ -77,9 +77,9 @@ public class PayloadFormatIndicatorTest extends AbstractServerIntegrationTest {
         Mqtt5BlockingClient subscriber = createSubscriberClient();
         Mqtt5SubAck subAck = subscriber.subscribeWith()
             .topicFilter("temperature/living")
-            .qos(MqttQos.AT_MOST_ONCE)
+            .qos(MqttQos.AT_LEAST_ONCE)
             .send();
-        assertThat(subAck.getReasonCodes()).contains(Mqtt5SubAckReasonCode.GRANTED_QOS_0);
+        assertThat(subAck.getReasonCodes()).contains(Mqtt5SubAckReasonCode.GRANTED_QOS_1);
         LOG.info("SUBACK received");
 
         Mqtt5BlockingClient publisher = createPublisherClient();
@@ -87,9 +87,9 @@ public class PayloadFormatIndicatorTest extends AbstractServerIntegrationTest {
             .topic("temperature/living")
             .payload("18".getBytes(StandardCharsets.UTF_8))
             .payloadFormatIndicator(Mqtt5PayloadFormatIndicator.UTF_8)
-            .qos(MqttQos.AT_MOST_ONCE)
+            .qos(MqttQos.AT_LEAST_ONCE)
             .send();
-        LOG.info("PUB QoS0 sent");
+        LOG.info("PUB QoS1 sent");
 
         verifyPublishMessage(subscriber, msgPub -> {
             assertTrue(msgPub.getPayloadFormatIndicator().isPresent());
