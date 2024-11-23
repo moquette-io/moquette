@@ -145,9 +145,7 @@ public class ServerLowlevelMessagesIntegrationTest {
     @Test
     public void testRejectConnectWithEmptyClientID() throws InterruptedException {
         LOG.info("*** testRejectConnectWithEmptyClientID ***");
-        m_client.clientId("").connect();
-
-        this.receivedMsg = this.m_client.lastReceivedMessage();
+        this.receivedMsg = m_client.clientId("").connect();
 
         assertTrue(receivedMsg instanceof MqttConnAckMessage);
         MqttConnAckMessage connAck = (MqttConnAckMessage) receivedMsg;

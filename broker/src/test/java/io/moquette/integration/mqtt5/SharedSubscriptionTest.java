@@ -1,5 +1,6 @@
 package io.moquette.integration.mqtt5;
 
+import com.hivemq.client.mqtt.MqttGlobalPublishFilter;
 import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import com.hivemq.client.mqtt.mqtt5.message.unsubscribe.unsuback.Mqtt5UnsubAck;
@@ -19,8 +20,6 @@ import io.netty.handler.codec.mqtt.MqttReasonCodeAndPropertiesVariableHeader;
 import io.netty.handler.codec.mqtt.MqttReasonCodes;
 import io.netty.handler.codec.mqtt.MqttSubAckMessage;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -33,11 +32,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest {
-
-    private static final Logger LOG = LoggerFactory.getLogger(SharedSubscriptionTest.class);
 
     @Override
     public String clientName() {
@@ -45,7 +41,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
     }
 
     @Test
-    public void givenAClientSendingBadlyFormattedSharedSubscriptionNameThenItIsDisconnected() {
+    public void givenAClientSendingBadlyFormattedSharedSubscriptionNameThenItIsDisconnected() throws InterruptedException {
         connectLowLevel();
 
         MqttMessage received = lowLevelClient.subscribeWithError("$share/+/measures/temp", MqttQoS.AT_LEAST_ONCE);
@@ -57,7 +53,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
     }
 
     @Test
-    public void givenClientSubscribingToSharedTopicThenReceiveTheExpectedSubscriptionACK() {
+    public void givenClientSubscribingToSharedTopicThenReceiveTheExpectedSubscriptionACK() throws InterruptedException {
         connectLowLevel();
 
         MqttMessage received = lowLevelClient.subscribeWithError("$share/metrics/measures/temp", MqttQoS.AT_LEAST_ONCE);
@@ -70,7 +66,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
     }
 
     @Test
-    public void givenATopicNotReadableWhenAClientSubscribeSharedThenReceiveSubackWithNegativeResponse() throws IOException {
+    public void givenATopicNotReadableWhenAClientSubscribeSharedThenReceiveSubackWithNegativeResponse() throws IOException, InterruptedException {
         // stop already started broker instance
         stopServer();
 
@@ -93,7 +89,7 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
 
 
     @Test
-    public void givenClientSubscribingToSharedAndNonSharedWhenTheSharedIsNotReadableReceivesPositiveAckOnlyForNonShared() throws IOException {
+    public void givenClientSubscribingToSharedAndNonSharedWhenTheSharedIsNotReadableReceivesPositiveAckOnlyForNonShared() throws IOException, InterruptedException {
         // stop already started broker instance
         stopServer();
 
@@ -135,13 +131,14 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
         subscriberClient.subscribeWith()
             .topicFilter("$share/collectors/metric/temperature/#")
             .send();
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriberClient.publishes(MqttGlobalPublishFilter.ALL)) {
+            Mqtt5BlockingClient publisherClient = createPublisherClient();
 
-        Mqtt5BlockingClient publisherClient = createPublisherClient();
-
-        verifyPublishedMessage(subscriberClient, unused -> publisherClient.publishWith()
-            .topic("metric/temperature/living")
-            .payload("18".getBytes(StandardCharsets.UTF_8))
-            .send(), MqttQos.AT_MOST_ONCE, "18", "Shared message must be received", 10);
+            verifyPublishedMessage(publishes, unused -> publisherClient.publishWith()
+                .topic("metric/temperature/living")
+                .payload("18".getBytes(StandardCharsets.UTF_8))
+                .send(), MqttQos.AT_MOST_ONCE, "18", "Shared message must be received", 10);
+        }
     }
 
     @Test
@@ -216,21 +213,22 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
     public void givenSharedSubscriptionWithCertainQoSWhenSameClientWithSameShareSubscribeToSameTopicFilterThenQoSUpdates() throws Exception {
         final Mqtt5BlockingClient subscriberClient = createSubscriberClient();
         subscribe(subscriberClient, "$share/collectors/metric/temperature/living", MqttQos.AT_MOST_ONCE);
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriberClient.publishes(MqttGlobalPublishFilter.ALL)) {
+            Mqtt5BlockingClient publisherClient = createPublisherClient();
 
-        Mqtt5BlockingClient publisherClient = createPublisherClient();
+            verifyPublishedMessage(publishes,
+                unused -> publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE),
+                MqttQos.AT_MOST_ONCE, "18", "QoS0 publish message is expected by the subscriber when subscribed with AT_MOST_ONCE", 1);
 
-        verifyPublishedMessage(subscriberClient,
-            unused -> publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE),
-            MqttQos.AT_MOST_ONCE, "18", "QoS0 publish message is expected by the subscriber when subscribed with AT_MOST_ONCE", 1);
+            // update QoS for shared subscription
+            subscribe(subscriberClient, "$share/collectors/metric/temperature/living", MqttQos.AT_LEAST_ONCE);
 
-        // update QoS for shared subscription
-        subscribe(subscriberClient, "$share/collectors/metric/temperature/living", MqttQos.AT_LEAST_ONCE);
-
-        // This time the publish reaches the subscription
-        verifyPublishedMessage(subscriberClient, v -> {
-            // publish the message again and verify the captured message
-            publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
-        }, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 30);
+            // This time the publish reaches the subscription
+            verifyPublishedMessage(publishes, v -> {
+                // publish the message again and verify the captured message
+                publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
+            }, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 30);
+        }
     }
 
     private static void publish(Mqtt5BlockingClient publisherClient, String topicName, MqttQos mqttQos) {
@@ -259,25 +257,27 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
         // subscribe second client to shared subscription
         final Mqtt5BlockingClient subscriber2 = createHiveBlockingClient("subscriber2");
         subscribe(subscriber2, fullSharedSubscriptionTopicFilter, MqttQos.AT_LEAST_ONCE);
+        try (Mqtt5BlockingClient.Mqtt5Publishes subscriber2Listener = subscriber2.publishes(MqttGlobalPublishFilter.ALL)) {
 
-        // unsubscribe successfully the first subscriber
-        Mqtt5UnsubAck result = subscriber1.unsubscribeWith()
-            .topicFilter(fullSharedSubscriptionTopicFilter)
-            .send();
-        assertTrue(result.getReasonCodes().stream().allMatch(rc -> rc == Mqtt5UnsubAckReasonCode.SUCCESS),
-            "Unsubscribe of shared subscription must be successful");
+            // unsubscribe successfully the first subscriber
+            Mqtt5UnsubAck result = subscriber1.unsubscribeWith()
+                .topicFilter(fullSharedSubscriptionTopicFilter)
+                .send();
+            assertTrue(result.getReasonCodes().stream().allMatch(rc -> rc == Mqtt5UnsubAckReasonCode.SUCCESS),
+                "Unsubscribe of shared subscription must be successful");
 
 
-        // verify it's received from the survivor subscriber2
-        Mqtt5BlockingClient publisherClient = createPublisherClient();
-        // try 4 times we should hit all the 4 times the subscriber2
-        // if the other shared subscription remains active we have 50% of possibility
-        // to hit the not removed subscriber, so 4 iterations should be enough.
-        for (int i = 0; i < 4; i++) {
-            verifyPublishedMessage(subscriber2, v -> {
-                // push a message to the shared subscription
-                publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
-            }, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 2);
+            // verify it's received from the survivor subscriber2
+            Mqtt5BlockingClient publisherClient = createPublisherClient();
+            // try 4 times we should hit all the 4 times the subscriber2
+            // if the other shared subscription remains active we have 50% of possibility
+            // to hit the not removed subscriber, so 4 iterations should be enough.
+            for (int i = 0; i < 4; i++) {
+                verifyPublishedMessage(subscriber2Listener, v -> {
+                    // push a message to the shared subscription
+                    publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
+                }, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 2);
+            }
         }
     }
 
@@ -288,27 +288,29 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
         // subscribe client to shared subscription
         final Mqtt5BlockingClient subscriber = createHiveBlockingClient("subscriber1");
         subscribe(subscriber, fullSharedSubscriptionTopicFilter, MqttQos.AT_LEAST_ONCE);
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriber.publishes(MqttGlobalPublishFilter.ALL)) {
 
-        // verify subscribed to the shared receives a message
-        Mqtt5BlockingClient publisherClient = createPublisherClient();
-        verifyPublishedMessage(subscriber, v -> {
-            // push a message to the shared subscription
-            publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
-        }, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 2);
-
-        // unsubscribe the only shared subscription client
-        Mqtt5UnsubAck result = subscriber.unsubscribeWith()
-            .topicFilter(fullSharedSubscriptionTopicFilter)
-            .send();
-        assertTrue(result.getReasonCodes().stream().allMatch(rc -> rc == Mqtt5UnsubAckReasonCode.SUCCESS),
-            "Unsubscribe of shared subscription must be successful");
-
-        // verify no publish is propagated by shared subscription
-        verifyNoPublish(subscriber, v -> {
+            // verify subscribed to the shared receives a message
+            Mqtt5BlockingClient publisherClient = createPublisherClient();
+            verifyPublishedMessage(publishes, v -> {
                 // push a message to the shared subscription
                 publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
-            }, Duration.ofSeconds(2),
-            "Subscriber must not receive any message from the left shared subscription");
+            }, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 2);
+
+            // unsubscribe the only shared subscription client
+            Mqtt5UnsubAck result = subscriber.unsubscribeWith()
+                .topicFilter(fullSharedSubscriptionTopicFilter)
+                .send();
+            assertTrue(result.getReasonCodes().stream().allMatch(rc -> rc == Mqtt5UnsubAckReasonCode.SUCCESS),
+                "Unsubscribe of shared subscription must be successful");
+
+            // verify no publish is propagated by shared subscription
+            verifyNoPublish(publishes, v -> {
+                    // push a message to the shared subscription
+                    publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
+                }, Duration.ofSeconds(2),
+                "Subscriber must not receive any message from the left shared subscription");
+        }
     }
 
     @Test
@@ -318,22 +320,24 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
         // subscribe client to shared subscription
         final Mqtt5BlockingClient subscriber = createCleanStartClient("subscriber1");
         subscribe(subscriber, fullSharedSubscriptionTopicFilter, MqttQos.AT_LEAST_ONCE);
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriber.publishes(MqttGlobalPublishFilter.ALL)) {
 
-        // verify subscribed to the shared receives a message
-        Mqtt5BlockingClient publisherClient = createPublisherClient();
-        verifyPublishedMessage(subscriber, v -> {
-            // push a message to the shared subscription
-            publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
-        }, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 2);
+            // verify subscribed to the shared receives a message
+            Mqtt5BlockingClient publisherClient = createPublisherClient();
+            verifyPublishedMessage(publishes, v -> {
+                // push a message to the shared subscription
+                publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
+            }, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 2);
 
-        // disconnect the subscriber, so becuase it's clean, wipe all shared subscriptions
-        subscriber.disconnect();
+            // disconnect the subscriber, so becuase it's clean, wipe all shared subscriptions
+            subscriber.disconnect();
 
-        // verify that a publish on shared topic doesn't have any side effect
-        verifyNoPublish(subscriber, v -> {
-            // push a message to the shared subscription
-            publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
-        }, Duration.ofSeconds(2), "Shared message must be received");
+            // verify that a publish on shared topic doesn't have any side effect
+            verifyNoPublish(publishes, v -> {
+                // push a message to the shared subscription
+                publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
+            }, Duration.ofSeconds(2), "Shared message must be received");
+        }
     }
 
     @Test
@@ -343,25 +347,27 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
         // subscribe client to shared subscription
         Mqtt5BlockingClient subscriber = createNonCleanStartClient("subscriber");
         subscribe(subscriber, fullSharedSubscriptionTopicFilter, MqttQos.AT_LEAST_ONCE);
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriber.publishes(MqttGlobalPublishFilter.ALL)) {
 
-        // verify subscribed to the shared receives a message
-        final Mqtt5BlockingClient publisherClient = createPublisherClient();
-        verifyPublishedMessage(subscriber, v -> {
-            // push a message to the shared subscription
-            publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
-        }, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 2);
-
+            // verify subscribed to the shared receives a message
+            final Mqtt5BlockingClient publisherClient = createPublisherClient();
+            verifyPublishedMessage(publishes, v -> {
+                // push a message to the shared subscription
+                publish(publisherClient, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
+            }, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 2);
+        }
         // restart the broker
         restartServerWithSuspension(Duration.ofSeconds(2));
 
         // reconnect subscriber
         subscriber = createNonCleanStartClient("subscriber");
-
-        // verify after restart the shared subscription becomes again active
-        final Mqtt5BlockingClient publisherClientReconnected = createPublisherClient();
-        verifyPublishedMessage(subscriber, v -> {
-            // push a message to the shared subscription
-            publish(publisherClientReconnected, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
-        }, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 2);
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriber.publishes(MqttGlobalPublishFilter.ALL)) {
+            // verify after restart the shared subscription becomes again active
+            final Mqtt5BlockingClient publisherClientReconnected = createPublisherClient();
+            verifyPublishedMessage(publishes, v -> {
+                // push a message to the shared subscription
+                publish(publisherClientReconnected, "metric/temperature/living", MqttQos.AT_LEAST_ONCE);
+            }, MqttQos.AT_LEAST_ONCE, "18", "Shared message must be received", 2);
+        }
     }
 }

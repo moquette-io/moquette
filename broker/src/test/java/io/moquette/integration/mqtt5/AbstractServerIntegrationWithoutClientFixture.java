@@ -148,35 +148,39 @@ public class AbstractServerIntegrationWithoutClientFixture {
         }
     }
 
-    protected static void verifyPublishedMessage(Mqtt5BlockingClient client, Consumer<Void> action, MqttQos expectedQos,
+    protected static void verifyNoPublish(Mqtt5BlockingClient.Mqtt5Publishes publishes, Consumer<Void> action, Duration timeout, String message) throws InterruptedException {
+        action.accept(null);
+        Optional<Mqtt5Publish> publishedMessage = publishes.receive(timeout.getSeconds(), TimeUnit.SECONDS);
+
+        // verify no published will in 10 seconds
+        assertFalse(publishedMessage.isPresent(), message);
+    }
+
+    protected static void verifyPublishedMessage(Mqtt5BlockingClient.Mqtt5Publishes publishes, Consumer<Void> action, MqttQos expectedQos,
                                                  String expectedPayload, String errorMessage, int timeoutSeconds) throws Exception {
-        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = client.publishes(MqttGlobalPublishFilter.ALL)) {
-            action.accept(null);
-            Optional<Mqtt5Publish> publishMessage = publishes.receive(timeoutSeconds, TimeUnit.SECONDS);
-            if (!publishMessage.isPresent()) {
-                fail("Expected to receive a publish message");
-                return;
-            }
-            Mqtt5Publish msgPub = publishMessage.get();
-            final String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
-            assertEquals(expectedPayload, payload, errorMessage);
-            assertEquals(expectedQos, msgPub.getQos());
+        action.accept(null);
+        Optional<Mqtt5Publish> publishMessage = publishes.receive(timeoutSeconds, TimeUnit.SECONDS);
+        if (!publishMessage.isPresent()) {
+            fail("Expected to receive a publish message");
+            return;
         }
+        Mqtt5Publish msgPub = publishMessage.get();
+        final String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
+        assertEquals(expectedPayload, payload, errorMessage);
+        assertEquals(expectedQos, msgPub.getQos());
     }
 
     static void verifyOfType(MqttMessage received, MqttMessageType mqttMessageType) {
         assertEquals(mqttMessageType, received.fixedHeader().messageType());
     }
 
-    static void verifyPublishMessage(Mqtt5BlockingClient subscriber, Consumer<Mqtt5Publish> assertion) throws InterruptedException {
-        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriber.publishes(MqttGlobalPublishFilter.ALL)) {
-            Optional<Mqtt5Publish> publishMessage = publishes.receive(1, TimeUnit.SECONDS);
-            if (!publishMessage.isPresent()) {
-                fail("Expected to receive a publish message");
-                return;
-            }
-            Mqtt5Publish msgPub = publishMessage.get();
-            assertion.accept(msgPub);
+    static void verifyPublishMessage(Mqtt5BlockingClient.Mqtt5Publishes publishListener, Consumer<Mqtt5Publish> assertion) throws InterruptedException {
+        Optional<Mqtt5Publish> publishMessage = publishListener.receive(1, TimeUnit.SECONDS);
+        if (!publishMessage.isPresent()) {
+            fail("Expected to receive a publish message");
+            return;
         }
+        Mqtt5Publish msgPub = publishMessage.get();
+        assertion.accept(msgPub);
     }
 }

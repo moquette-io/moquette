@@ -16,12 +16,32 @@
 package io.moquette.testclient;
 
 import io.moquette.BrokerConstants;
+import io.moquette.broker.metrics.MQTTMessageLogger;
 import io.netty.bootstrap.Bootstrap;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.mqtt.*;
+import io.netty.handler.codec.mqtt.MqttConnAckMessage;
+import io.netty.handler.codec.mqtt.MqttConnectMessage;
+import io.netty.handler.codec.mqtt.MqttConnectPayload;
+import io.netty.handler.codec.mqtt.MqttConnectVariableHeader;
+import io.netty.handler.codec.mqtt.MqttDecoder;
+import io.netty.handler.codec.mqtt.MqttEncoder;
+import io.netty.handler.codec.mqtt.MqttFixedHeader;
+import io.netty.handler.codec.mqtt.MqttMessage;
+import io.netty.handler.codec.mqtt.MqttMessageBuilders;
+import io.netty.handler.codec.mqtt.MqttMessageType;
+import io.netty.handler.codec.mqtt.MqttProperties;
+import io.netty.handler.codec.mqtt.MqttPublishMessage;
+import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttSubAckMessage;
+import io.netty.handler.codec.mqtt.MqttSubscribeMessage;
+import io.netty.handler.codec.mqtt.MqttVersion;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +50,6 @@ import java.nio.charset.Charset;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -51,13 +70,12 @@ public class Client {
 
     private static final Logger LOG = LoggerFactory.getLogger(Client.class);
 
-    private static final Duration TIMEOUT_DURATION = Duration.ofMillis(500);
+    private static final Duration TIMEOUT_DURATION = Duration.ofMillis(1000);
 
     final ClientNettyMQTTHandler handler = new ClientNettyMQTTHandler();
     EventLoopGroup workerGroup;
     Channel m_channel;
     private boolean m_connectionLost;
-    private ICallback callback;
     private String clientId;
     private AtomicReference<MqttMessage> receivedMsg = new AtomicReference<>();
     private final BlockingQueue<MqttMessage> receivedMessages = new LinkedBlockingQueue<>();
@@ -82,6 +100,7 @@ public class Client {
                     ChannelPipeline pipeline = ch.pipeline();
                     pipeline.addLast("rawcli_decoder", new MqttDecoder());
                     pipeline.addLast("rawcli_encoder", MqttEncoder.INSTANCE);
+                    pipeline.addLast("messageLogger", new MQTTMessageLogger());
                     pipeline.addLast("rawcli_handler", handler);
                 }
             });
@@ -99,7 +118,7 @@ public class Client {
         return this;
     }
 
-    public void connect(String willTestamentTopic, String willTestamentMsg) {
+    public void connect(String willTestamentTopic, String willTestamentMsg) throws InterruptedException {
         MqttFixedHeader mqttFixedHeader = new MqttFixedHeader(
                 MqttMessageType.CONNECT,
                 false,
@@ -130,24 +149,24 @@ public class Client {
         doConnect(connectMessage);
     }
 
-    public void connect() {
+    public MqttConnAckMessage connect() throws InterruptedException {
         MqttConnectMessage connectMessage = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_3_1_1)
                 .clientId("").keepAlive(2) // secs
                 .willFlag(false).willQoS(MqttQoS.AT_MOST_ONCE).build();
 
-        doConnect(connectMessage);
+        return doConnect(connectMessage);
     }
 
-    public MqttConnAckMessage connectV5() {
+    public MqttConnAckMessage connectV5() throws InterruptedException {
         return connectV5(2, BrokerConstants.INFLIGHT_WINDOW_SIZE);
     }
 
-    public MqttConnAckMessage connectV5WithReceiveMaximum(int receiveMaximumInflight) {
+    public MqttConnAckMessage connectV5WithReceiveMaximum(int receiveMaximumInflight) throws InterruptedException {
         return connectV5(2, receiveMaximumInflight);
     }
 
     @NotNull
-    public MqttConnAckMessage connectV5(int keepAliveSecs, int receiveMaximumInflight) {
+    public MqttConnAckMessage connectV5(int keepAliveSecs, int receiveMaximumInflight) throws InterruptedException {
         final MqttMessageBuilders.ConnectBuilder builder = MqttMessageBuilders.connect().protocolVersion(MqttVersion.MQTT_5);
         if (clientId != null) {
             builder.clientId(clientId);
@@ -169,31 +188,14 @@ public class Client {
         return doConnect(connectMessage);
     }
 
-    private MqttConnAckMessage doConnect(MqttConnectMessage connectMessage) {
-        final CountDownLatch latch = new CountDownLatch(1);
-        this.setCallback(msg -> {
-            receivedMsg.getAndSet(msg);
-            LOG.info("Connect callback invocation, received message {}", msg.fixedHeader().messageType());
-            latch.countDown();
 
-            // clear the callback
-            setCallback(null);
-        });
-
+    private MqttConnAckMessage doConnect(MqttConnectMessage connectMessage) throws InterruptedException {
         this.sendMessage(connectMessage);
 
-        boolean waitElapsed;
-        try {
-            waitElapsed = !latch.await(2_000, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            throw new RuntimeException("Interrupted while waiting", e);
-        }
-
-        if (waitElapsed) {
+        final MqttMessage connAckMessage = this.receiveNextMessage(Duration.ofMillis(2_000));
+        if (connAckMessage == null) {
             throw new RuntimeException("Cannot receive ConnAck in 2 s");
         }
-
-        final MqttMessage connAckMessage = this.receivedMsg.get();
         if (!(connAckMessage instanceof MqttConnAckMessage)) {
             MqttMessageType messageType = connAckMessage.fixedHeader().messageType();
             throw new RuntimeException("Expected a CONN_ACK message but received " + messageType);
@@ -201,32 +203,32 @@ public class Client {
         return (MqttConnAckMessage) connAckMessage;
     }
 
-    public MqttSubAckMessage subscribe(String topic1, MqttQoS qos1, String topic2, MqttQoS qos2) {
+    public MqttSubAckMessage subscribe(String topic1, MqttQoS qos1, String topic2, MqttQoS qos2) throws InterruptedException {
         final MqttSubscribeMessage subscribeMessage = MqttMessageBuilders.subscribe()
             .messageId(1)
             .addSubscription(qos1, topic1)
             .addSubscription(qos2, topic2)
             .build();
 
-        return doSubscribeWithAckCasting(subscribeMessage, TIMEOUT_DURATION.toMillis(), TimeUnit.MILLISECONDS);
+        return doSubscribeWithAckCasting(subscribeMessage, TIMEOUT_DURATION);
     }
 
-    public MqttSubAckMessage subscribe(String topic, MqttQoS qos) {
+    public MqttSubAckMessage subscribe(String topic, MqttQoS qos) throws InterruptedException {
         final MqttSubscribeMessage subscribeMessage = MqttMessageBuilders.subscribe()
             .messageId(1)
             .addSubscription(qos, topic)
             .build();
 
-        return doSubscribeWithAckCasting(subscribeMessage, TIMEOUT_DURATION.toMillis(), TimeUnit.MILLISECONDS);
+        return doSubscribeWithAckCasting(subscribeMessage, TIMEOUT_DURATION);
     }
 
-    public MqttSubAckMessage subscribeWithIdentifier(String topic, MqttQoS qos, int subscriptionIdentifier) {
-        return subscribeWithIdentifier(topic, qos, subscriptionIdentifier, TIMEOUT_DURATION.toMillis(), TimeUnit.MILLISECONDS);
+    public MqttSubAckMessage subscribeWithIdentifier(String topic, MqttQoS qos, int subscriptionIdentifier) throws InterruptedException {
+        return subscribeWithIdentifier(topic, qos, subscriptionIdentifier, TIMEOUT_DURATION);
     }
 
     @NotNull
     public MqttSubAckMessage subscribeWithIdentifier(String topic, MqttQoS qos, int subscriptionIdentifier,
-                                                      long timeout, TimeUnit timeUnit) {
+                                                     Duration timeout) throws InterruptedException {
         MqttProperties subProps = new MqttProperties();
         subProps.add(new MqttProperties.IntegerProperty(
             MqttProperties.MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value(),
@@ -238,14 +240,14 @@ public class Client {
             .properties(subProps)
             .build();
 
-        return doSubscribeWithAckCasting(subscribeMessage, timeout, timeUnit);
+        return doSubscribeWithAckCasting(subscribeMessage, timeout);
     }
 
     @NotNull
-    private MqttSubAckMessage doSubscribeWithAckCasting(MqttSubscribeMessage subscribeMessage, long timeout, TimeUnit timeUnit) {
-        doSubscribe(subscribeMessage, timeout, timeUnit);
+    private MqttSubAckMessage doSubscribeWithAckCasting(MqttSubscribeMessage subscribeMessage, Duration timeout) throws InterruptedException {
+        doSubscribe(subscribeMessage);
 
-        final MqttMessage subAckMessage = this.receivedMsg.get();
+        final MqttMessage subAckMessage = this.receiveNextMessage(timeout);
         if (!(subAckMessage instanceof MqttSubAckMessage)) {
             MqttMessageType messageType = subAckMessage.fixedHeader().messageType();
             throw new RuntimeException("Expected a SUB_ACK message but received " + messageType);
@@ -253,58 +255,16 @@ public class Client {
         return (MqttSubAckMessage) subAckMessage;
     }
 
-    private void doSubscribe(MqttSubscribeMessage subscribeMessage, long timeout, TimeUnit timeUnit) {
-        final CountDownLatch subscribeAckLatch = new CountDownLatch(1);
-        this.setCallback(msg -> {
-            receivedMsg.getAndSet(msg);
-            LOG.debug("Subscribe callback invocation, received message {}", msg.fixedHeader().messageType());
-            subscribeAckLatch.countDown();
-
-            // clear the callback
-            setCallback(null);
-        });
-
+    private void doSubscribe(MqttSubscribeMessage subscribeMessage) {
         LOG.debug("Sending SUBSCRIBE message");
         sendMessage(subscribeMessage);
         LOG.debug("Sent SUBSCRIBE message");
-
-        boolean waitElapsed;
-        try {
-            waitElapsed = !subscribeAckLatch.await(timeout, timeUnit);
-        } catch (InterruptedException e) {
-            throw new RuntimeException("Interrupted while waiting", e);
-        }
-
-        if (waitElapsed) {
-            throw new RuntimeException("Cannot receive SubscribeAck in " + timeout + " " + timeUnit);
-        }
     }
 
-    public void publish(MqttPublishMessage publishMessage, int timeout, TimeUnit timeUnit) {
-        final CountDownLatch publishResponseLatch = new CountDownLatch(1);
-        this.setCallback(msg -> {
-            receivedMsg.getAndSet(msg);
-            LOG.debug("Publish callback invocation, received message {}", msg.fixedHeader().messageType());
-            publishResponseLatch.countDown();
-
-            // clear the callback
-            setCallback(null);
-        });
-
+    public void publish(MqttPublishMessage publishMessage) {
         LOG.debug("Sending PUBLISH message");
         sendMessage(publishMessage);
         LOG.debug("Sent PUBLISH message");
-
-        boolean notExpired;
-        try {
-            notExpired = publishResponseLatch.await(timeout, timeUnit);
-        } catch (InterruptedException e) {
-            throw new RuntimeException("Interrupted while waiting", e);
-        }
-
-        if (! notExpired) {
-            throw new RuntimeException("Cannot receive any message after PUBLISH in " + timeout + " " + timeUnit);
-        }
     }
 
     public MqttMessage subscribeWithError(String topic, MqttQoS qos) {
@@ -313,8 +273,16 @@ public class Client {
             .addSubscription(qos, topic)
             .build();
 
-        doSubscribe(subscribeMessage, TIMEOUT_DURATION.toMillis(), TimeUnit.MILLISECONDS);
-        return this.receivedMsg.get();
+        doSubscribe(subscribeMessage);
+        try {
+            MqttMessage mqttMessage = this.receiveNextMessage(TIMEOUT_DURATION);
+            if (mqttMessage == null) {
+                throw new RuntimeException("Cannot receive SubscribeAck in " + TIMEOUT_DURATION);
+            }
+            return mqttMessage;
+        } catch (InterruptedException e) {
+            throw new RuntimeException("Interrupted while waiting", e);
+        }
     }
 
     public void disconnect() {
@@ -326,10 +294,6 @@ public class Client {
         this.workerGroup.shutdownGracefully().sync();
     }
 
-    public void setCallback(ICallback callback) {
-        this.callback = callback;
-    }
-
     public void sendMessage(MqttMessage msg) {
         m_channel.writeAndFlush(msg).addListener(FIRE_EXCEPTION_ON_FAILURE);
     }
@@ -339,12 +303,8 @@ public class Client {
     }
 
     void messageReceived(MqttMessage msg) {
-        LOG.info("Received message {}", msg);
-        if (this.callback != null) {
-            this.callback.call(msg);
-        } else {
-            receivedMessages.add(msg);
-        }
+        LOG.debug("Received message {}", msg);
+        receivedMessages.add(msg);
     }
 
     public boolean hasReceivedMessages() {

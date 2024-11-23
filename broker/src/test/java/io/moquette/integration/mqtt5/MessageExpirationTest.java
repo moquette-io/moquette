@@ -18,6 +18,7 @@
 
 package io.moquette.integration.mqtt5;
 
+import com.hivemq.client.mqtt.MqttGlobalPublishFilter;
 import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5PublishBuilder;
@@ -68,13 +69,16 @@ public class MessageExpirationTest extends AbstractServerIntegrationTest {
 
         // subscribe to same topic and verify no message
         Mqtt5BlockingClient subscriber = createSubscriberClient();
-        subscriber.subscribeWith()
-            .topicFilter("temperature/living")
-            .qos(MqttQos.AT_MOST_ONCE)
-            .send();
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriber.publishes(MqttGlobalPublishFilter.ALL)) {
+            subscriber.subscribeWith()
+                .topicFilter("temperature/living")
+                .qos(MqttQos.AT_MOST_ONCE)
+                .send();
 
-        verifyNoPublish(subscriber, v -> {}, Duration.ofSeconds(2),
-            "Subscriber must not receive any retained message");
+            verifyNoPublish(publishes, v -> {
+                }, Duration.ofSeconds(2),
+                "Subscriber must not receive any retained message");
+        }
     }
 
     // TODO verify the elapsed
@@ -153,7 +157,7 @@ public class MessageExpirationTest extends AbstractServerIntegrationTest {
 
         // subscribe with an identifier
         MqttMessage received = lowLevelClient.subscribeWithIdentifier("temperature/living",
-            MqttQoS.AT_LEAST_ONCE, 123, 500, TimeUnit.MILLISECONDS);
+            MqttQoS.AT_LEAST_ONCE, 123, Duration.ofMillis(500));
         verifyOfType(received, MqttMessageType.SUBACK);
 
         //lowlevel client doesn't ACK any pub, so the in flight window fills up

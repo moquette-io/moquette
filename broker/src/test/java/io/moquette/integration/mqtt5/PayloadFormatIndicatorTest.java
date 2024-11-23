@@ -18,6 +18,7 @@
 
 package io.moquette.integration.mqtt5;
 
+import com.hivemq.client.mqtt.MqttGlobalPublishFilter;
 import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import com.hivemq.client.mqtt.mqtt5.exceptions.Mqtt5PubAckException;
@@ -45,6 +46,7 @@ import org.eclipse.paho.mqttv5.common.MqttSubscription;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
@@ -69,18 +71,19 @@ public class PayloadFormatIndicatorTest extends AbstractServerIntegrationTest {
             .topicFilter("temperature/living")
             .qos(MqttQos.AT_MOST_ONCE)
             .send();
+        try (Mqtt5BlockingClient.Mqtt5Publishes publishes = subscriber.publishes(MqttGlobalPublishFilter.ALL)) {
+            Mqtt5BlockingClient publisher = createPublisherClient();
+            publisher.publishWith()
+                .topic("temperature/living")
+                .payload("18".getBytes(StandardCharsets.UTF_8))
+                .payloadFormatIndicator(Mqtt5PayloadFormatIndicator.UTF_8)
+                .qos(MqttQos.AT_MOST_ONCE)
+                .send();
 
-        Mqtt5BlockingClient publisher = createPublisherClient();
-        publisher.publishWith()
-            .topic("temperature/living")
-            .payload("18".getBytes(StandardCharsets.UTF_8))
-            .payloadFormatIndicator(Mqtt5PayloadFormatIndicator.UTF_8)
-            .qos(MqttQos.AT_MOST_ONCE)
-            .send();
-
-        verifyPublishMessage(subscriber, msgPub -> {
-            assertTrue(msgPub.getPayloadFormatIndicator().isPresent());
-        });
+            verifyPublishMessage(publishes, msgPub -> {
+                assertTrue(msgPub.getPayloadFormatIndicator().isPresent());
+            });
+        }
     }
 
     @Test
@@ -168,10 +171,10 @@ public class PayloadFormatIndicatorTest extends AbstractServerIntegrationTest {
         MqttPublishVariableHeader variableHeader = new MqttPublishVariableHeader("temperature/living", 1, props);
         MqttPublishMessage publishQoS0 = new MqttPublishMessage(fixedHeader, variableHeader, Unpooled.wrappedBuffer(INVALID_UTF_8_BYTES));
         // in a reasonable amount of time (say 500 ms) it should receive a DISCONNECT
-        lowLevelClient.publish(publishQoS0, 500, TimeUnit.MILLISECONDS);
+        lowLevelClient.publish(publishQoS0);
 
         // Verify a DISCONNECT is received with PAYLOAD_FORMAT_INVALID reason code and connection is closed
-        final MqttMessage receivedMessage = lowLevelClient.lastReceivedMessage();
+        final MqttMessage receivedMessage = lowLevelClient.receiveNextMessage(Duration.ofMillis(500));
         assertEquals(MqttMessageType.DISCONNECT, receivedMessage.fixedHeader().messageType());
         MqttReasonCodeAndPropertiesVariableHeader disconnectHeader = (MqttReasonCodeAndPropertiesVariableHeader) receivedMessage.variableHeader();
         assertEquals(MqttReasonCodes.Disconnect.PAYLOAD_FORMAT_INVALID.byteValue(), disconnectHeader.reasonCode(),

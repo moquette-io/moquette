@@ -54,9 +54,9 @@ public class SubscriptionOptionsTest extends AbstractSubscriptionIntegrationTest
 
         @Override
         public void messageArrived(String topic, MqttMessage message) throws Exception {
-            latch.countDown();
             receivedTopic = topic;
             receivedMessage = message;
+            latch.countDown();
         }
 
         public String receivedPayload() {
