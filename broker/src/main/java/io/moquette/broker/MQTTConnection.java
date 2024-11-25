@@ -42,6 +42,7 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -61,6 +62,7 @@ final class MQTTConnection {
 
     static final boolean sessionLoopDebug = Boolean.parseBoolean(System.getProperty("moquette.session_loop.debug", "false"));
     private static final int UNDEFINED_VERSION = -1;
+    public static final int DEFAULT_TOPIC_ALIAS_MAXIMUM = 16;
 
     final Channel channel;
     private final BrokerConfiguration brokerConfig;
@@ -73,6 +75,7 @@ final class MQTTConnection {
     private int protocolVersion;
     private Quota receivedQuota;
     private Quota sendQuota;
+    private TopicAliasMapping aliasMappings;
 
     MQTTConnection(Channel channel, BrokerConfiguration brokerConfig, IAuthenticator authenticator,
                    SessionRegistry sessionRegistry, PostOffice postOffice) {
@@ -225,6 +228,12 @@ final class MQTTConnection {
             channel.close().addListener(CLOSE_ON_FAILURE);
             return PostOffice.RouteResult.failed(clientId);
         }
+
+        // initialize topic alias mapping
+        if (isProtocolVersion(msg, MqttVersion.MQTT_5)) {
+            aliasMappings = new TopicAliasMapping();
+        }
+
         receivedQuota = createQuota(brokerConfig.receiveMaximum());
 
         sendQuota = retrieveSendQuota(msg);
@@ -328,6 +337,7 @@ final class MQTTConnection {
             if (receivedQuota.hasLimit()) {
                 connAckPropertiesBuilder.receiveMaximum(receivedQuota.getMaximum());
             }
+            connAckPropertiesBuilder.topicAliasMaximum(DEFAULT_TOPIC_ALIAS_MAXIMUM);
             final MqttProperties ackProperties = connAckPropertiesBuilder.build();
             connAckBuilder.properties(ackProperties);
         }
@@ -667,7 +677,60 @@ final class MQTTConnection {
         final String clientId = getClientId();
         final int messageID = msg.variableHeader().packetId();
         LOG.trace("Processing PUBLISH message, topic: {}, messageId: {}, qos: {}", topicName, messageID, qos);
-        final Topic topic = new Topic(topicName);
+        Topic topic = new Topic(topicName);
+
+        if (isProtocolVersion5()) {
+            MqttProperties.MqttProperty topicAlias = msg.variableHeader()
+                .properties().getProperty(MqttProperties.MqttPropertyType.TOPIC_ALIAS.value());
+            if (topicAlias != null) {
+                MqttProperties.IntegerProperty topicAliasTyped = (MqttProperties.IntegerProperty) topicAlias;
+                if (topicAliasTyped.value() == 0 || topicAliasTyped.value() > DEFAULT_TOPIC_ALIAS_MAXIMUM) {
+                    // invalid topic alias value
+                    brokerDisconnect(MqttReasonCodes.Disconnect.TOPIC_ALIAS_INVALID);
+                    disconnectSession();
+                    dropConnection();
+                    return PostOffice.RouteResult.failed(clientId);
+                }
+
+                Optional<String> mappedTopicName = aliasMappings.topicFromAlias(topicAliasTyped.value());
+                if (mappedTopicName.isPresent()) {
+                    // already established a mapping for the Topic Alias
+                    if (topicName != null) {
+                        // contains a topic name then update the mapping
+                        aliasMappings.update(topicName, topicAliasTyped.value());
+                    }
+                } else {
+                    // does not already have a mapping for this Topic Alias
+                    if (topicName.isEmpty()) {
+                        // protocol error, not present mapping, topic alias is present and no topic name
+                        brokerDisconnect(MqttReasonCodes.Disconnect.PROTOCOL_ERROR);
+                        disconnectSession();
+                        dropConnection();
+                        return PostOffice.RouteResult.failed(clientId);
+                    }
+                    // update the mapping
+                    aliasMappings.update(topicName, topicAliasTyped.value());
+                }
+                final String translatedTopicName = mappedTopicName.orElse(topicName);
+                // Replace the topicName with the one retrieved and remove the topic alias property
+                // to avoid to forward or store.
+                final MqttProperties rewrittenProps = new MqttProperties();
+                for (MqttProperties.MqttProperty property : msg.variableHeader().properties().listAll()) {
+                    if (property.propertyId() == MqttProperties.MqttPropertyType.TOPIC_ALIAS.value()) {
+                        continue;
+                    }
+                    rewrittenProps.add(property);
+                }
+
+                MqttPublishVariableHeader rewrittenVariableHeader = new MqttPublishVariableHeader(translatedTopicName,
+                    messageID, rewrittenProps);
+                msg = new MqttPublishMessage(msg.fixedHeader(), rewrittenVariableHeader,
+                    msg.payload());
+
+                topic = new Topic(translatedTopicName);
+            }
+        }
+
         if (!topic.isValid()) {
             LOG.debug("Drop connection because of invalid topic format");
             dropConnection();
@@ -683,6 +746,7 @@ final class MQTTConnection {
         // retain else msg is cleaned by the NewNettyMQTTHandler and is not available
         // in execution by SessionEventLoop
         Utils.retain(msg, PostOffice.BT_PUB_IN);
+        final MqttPublishMessage finalMsg = msg;
         switch (qos) {
             case AT_MOST_ONCE:
                 return postOffice.routeCommand(clientId, "PUB QoS0", () -> {
@@ -690,9 +754,9 @@ final class MQTTConnection {
                     if (!isBoundToSession()) {
                         return null;
                     }
-                    postOffice.receivedPublishQos0(this, username, clientId, msg, expiry);
+                    postOffice.receivedPublishQos0(this, username, clientId, finalMsg, expiry);
                     return null;
-                }).ifFailed(() -> Utils.release(msg, PostOffice.BT_PUB_IN + " - failed"));
+                }).ifFailed(() -> Utils.release(finalMsg, PostOffice.BT_PUB_IN + " - failed"));
             case AT_LEAST_ONCE:
                 if (!receivedQuota.hasFreeSlots()) {
                     LOG.warn("Client {} exceeded the quota {} processing QoS1, disconnecting it", clientId, receivedQuota);
@@ -708,16 +772,16 @@ final class MQTTConnection {
                     if (!isBoundToSession())
                         return null;
                     receivedQuota.consumeSlot();
-                    postOffice.receivedPublishQos1(this, username, messageID, msg, expiry)
+                    postOffice.receivedPublishQos1(this, username, messageID, finalMsg, expiry)
                         .completableFuture().thenRun(() -> {
                             receivedQuota.releaseSlot();
                         });
                     return null;
-                }).ifFailed(() -> Utils.release(msg, PostOffice.BT_PUB_IN + " - failed"));
+                }).ifFailed(() -> Utils.release(finalMsg, PostOffice.BT_PUB_IN + " - failed"));
             case EXACTLY_ONCE: {
                 if (!receivedQuota.hasFreeSlots()) {
                     LOG.warn("Client {} exceeded the quota {} processing QoS2, disconnecting it", clientId, receivedQuota);
-                    Utils.release(msg, PostOffice.BT_PUB_IN + " - phase 1 QoS2 exceeded quota");
+                    Utils.release(finalMsg, PostOffice.BT_PUB_IN + " - phase 1 QoS2 exceeded quota");
                     brokerDisconnect(MqttReasonCodes.Disconnect.RECEIVE_MAXIMUM_EXCEEDED);
                     disconnectSession();
                     dropConnection();
@@ -728,7 +792,7 @@ final class MQTTConnection {
                     checkMatchSessionLoop(clientId);
                     if (!isBoundToSession())
                         return null;
-                    bindedSession.receivedPublishQos2(messageID, msg);
+                    bindedSession.receivedPublishQos2(messageID, finalMsg);
                     receivedQuota.consumeSlot();
                     return null;
                 });
@@ -738,7 +802,7 @@ final class MQTTConnection {
                     return firstStepResult;
                 }
                 firstStepResult.completableFuture().thenRun(() ->
-                    postOffice.receivedPublishQos2(this, msg, username, expiry).completableFuture()
+                    postOffice.receivedPublishQos2(this, finalMsg, username, expiry).completableFuture()
                 );
                 return firstStepResult;
             }
