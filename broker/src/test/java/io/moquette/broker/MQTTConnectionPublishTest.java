@@ -54,6 +54,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import static io.moquette.BrokerConstants.DISABLED_TOPIC_ALIAS;
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singleton;
@@ -147,7 +148,6 @@ public class MQTTConnectionPublishTest {
         return new MQTTConnection(channel, config, mockAuthenticator, sessionRegistry, postOffice);
     }
 
-//    @NotNull
     static ISessionsRepository memorySessionsRepository() {
         return new MemorySessionsRepository();
     }
@@ -177,13 +177,7 @@ public class MQTTConnectionPublishTest {
         PostOffice.RouteResult pubResult = sut.processPublish(publish);
 
         // Verify
-        assertNotNull(pubResult);
-        assertFalse(pubResult.isSuccess());
-        assertFalse(channel.isOpen(), "Connection should be closed by the broker");
-        // read last message sent
-        MqttMessage disconnectMsg = channel.readOutbound();
-        assertEquals(MqttMessageType.DISCONNECT, disconnectMsg.fixedHeader().messageType());
-        assertEquals(MqttReasonCodes.Disconnect.TOPIC_ALIAS_INVALID.byteValue(), ((MqttReasonCodeAndPropertiesVariableHeader) disconnectMsg.variableHeader()).reasonCode());
+        verifyConnectionIsDropped(pubResult, MqttReasonCodes.Disconnect.TOPIC_ALIAS_INVALID);
     }
 
     @Test
@@ -249,13 +243,41 @@ public class MQTTConnectionPublishTest {
         PostOffice.RouteResult pubResult = sut.processPublish(publish);
 
         // Verify
+        verifyConnectionIsDropped(pubResult, MqttReasonCodes.Disconnect.PROTOCOL_ERROR);
+    }
+
+    @Test
+    public void givenTopicAliasDisabledWhenPublishContainingTopicAliasIsReceivedThenConnectionIsDropped() {
+        // update code and test to implement the behaviour:
+        // If broker side the maximum topic alias is 0 or not send, means no topic alias should be received.
+        // If in such condition a broker receives a topic alias, it MUST drop the connection.
+
+        // create a configuration with topic alias disabled
+        BrokerConfiguration config = new BrokerConfiguration(true, false, true,
+            false, NO_BUFFER_FLUSH, BrokerConstants.INFLIGHT_WINDOW_SIZE,
+            DISABLED_TOPIC_ALIAS);
+        // Overwrite the existing connection with new with topic alias disabled
+        createMQTTConnection(config);
+
+        connectMqtt5AndVerifyAck(sut);
+
+        MqttPublishMessage publish = createPublishWithTopicNameAndTopicAlias("kitchen/blinds", 10);
+
+        // Exercise
+        PostOffice.RouteResult pubResult = sut.processPublish(publish);
+
+        // Verify
+        verifyConnectionIsDropped(pubResult, MqttReasonCodes.Disconnect.PROTOCOL_ERROR);
+    }
+
+    private void verifyConnectionIsDropped(PostOffice.RouteResult pubResult, MqttReasonCodes.Disconnect protocolError) {
         assertNotNull(pubResult);
         assertFalse(pubResult.isSuccess());
         assertFalse(channel.isOpen(), "Connection should be closed by the broker");
         // read last message sent
         MqttMessage disconnectMsg = channel.readOutbound();
         assertEquals(MqttMessageType.DISCONNECT, disconnectMsg.fixedHeader().messageType());
-        assertEquals(MqttReasonCodes.Disconnect.PROTOCOL_ERROR.byteValue(), ((MqttReasonCodeAndPropertiesVariableHeader) disconnectMsg.variableHeader()).reasonCode());
+        assertEquals(protocolError.byteValue(), ((MqttReasonCodeAndPropertiesVariableHeader) disconnectMsg.variableHeader()).reasonCode());
     }
 
     private static void verifyNotContainsProperty(MqttPublishVariableHeader header, MqttProperties.MqttPropertyType typeToVerify) {

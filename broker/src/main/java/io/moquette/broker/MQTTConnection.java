@@ -688,9 +688,19 @@ final class MQTTConnection {
             MqttProperties.MqttProperty topicAlias = msg.variableHeader()
                 .properties().getProperty(MqttProperties.MqttPropertyType.TOPIC_ALIAS.value());
             if (topicAlias != null) {
+                if (topicAliasMaximum == BrokerConstants.DISABLED_TOPIC_ALIAS) {
+                    // client is sending a topic alias when the feature was disabled form the server
+                    LOG.info("Dropping connection {}, received a PUBLISH with topic alias while the feature is not enaled on the broker", channel);
+                    brokerDisconnect(MqttReasonCodes.Disconnect.PROTOCOL_ERROR);
+                    disconnectSession();
+                    dropConnection();
+                    return PostOffice.RouteResult.failed(clientId);
+                }
                 MqttProperties.IntegerProperty topicAliasTyped = (MqttProperties.IntegerProperty) topicAlias;
                 if (topicAliasTyped.value() == 0 || topicAliasTyped.value() > topicAliasMaximum) {
                     // invalid topic alias value
+                    LOG.info("Dropping connection {}, received a topic alias ({}) outside of range (0..{}]",
+                        channel, topicAliasTyped.value(), topicAliasMaximum);
                     brokerDisconnect(MqttReasonCodes.Disconnect.TOPIC_ALIAS_INVALID);
                     disconnectSession();
                     dropConnection();
