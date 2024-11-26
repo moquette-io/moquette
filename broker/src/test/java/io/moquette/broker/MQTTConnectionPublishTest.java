@@ -248,10 +248,6 @@ public class MQTTConnectionPublishTest {
 
     @Test
     public void givenTopicAliasDisabledWhenPublishContainingTopicAliasIsReceivedThenConnectionIsDropped() {
-        // update code and test to implement the behaviour:
-        // If broker side the maximum topic alias is 0 or not send, means no topic alias should be received.
-        // If in such condition a broker receives a topic alias, it MUST drop the connection.
-
         // create a configuration with topic alias disabled
         BrokerConfiguration config = new BrokerConfiguration(true, false, true,
             false, NO_BUFFER_FLUSH, BrokerConstants.INFLIGHT_WINDOW_SIZE,
