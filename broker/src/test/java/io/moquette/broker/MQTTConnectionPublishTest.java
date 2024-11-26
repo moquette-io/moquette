@@ -15,6 +15,7 @@
  */
 package io.moquette.broker;
 
+import io.moquette.BrokerConstants;
 import io.moquette.broker.security.PermitAllAuthorizatorPolicy;
 import io.moquette.broker.subscriptions.CTrieSubscriptionDirectory;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
@@ -25,8 +26,18 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.embedded.EmbeddedChannel;
-import io.netty.handler.codec.mqtt.*;
-//import org.jetbrains.annotations.NotNull;
+import io.netty.handler.codec.mqtt.MqttConnAckMessage;
+import io.netty.handler.codec.mqtt.MqttConnectMessage;
+import io.netty.handler.codec.mqtt.MqttMessage;
+import io.netty.handler.codec.mqtt.MqttMessageBuilders;
+import io.netty.handler.codec.mqtt.MqttMessageType;
+import io.netty.handler.codec.mqtt.MqttProperties;
+import io.netty.handler.codec.mqtt.MqttPublishMessage;
+import io.netty.handler.codec.mqtt.MqttPublishVariableHeader;
+import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttReasonCodeAndPropertiesVariableHeader;
+import io.netty.handler.codec.mqtt.MqttReasonCodes;
+import io.netty.handler.codec.mqtt.MqttVersion;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,16 +46,26 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
-import java.util.concurrent.*;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class MQTTConnectionPublishTest {
 
+    public static final int DEFAULT_TOPIC_ALIAS_MAXIMUM = 16;
     private static final String FAKE_CLIENT_ID = "FAKE_123";
     private static final String TEST_USER = "fakeuser";
     private static final String TEST_PWD = "fakepwd";
@@ -61,7 +82,8 @@ public class MQTTConnectionPublishTest {
     public void setUp() {
         forwardedPublishes = new LinkedBlockingQueue<>();
 
-        BrokerConfiguration config = new BrokerConfiguration(true, true, false, NO_BUFFER_FLUSH);
+        BrokerConfiguration config = new BrokerConfiguration(true, false, true,
+            false, NO_BUFFER_FLUSH, BrokerConstants.INFLIGHT_WINDOW_SIZE, DEFAULT_TOPIC_ALIAS_MAXIMUM);
 
         scheduler = Executors.newScheduledThreadPool(1);
 
@@ -146,7 +168,7 @@ public class MQTTConnectionPublishTest {
     }
 
     @Test
-    public void givenPublishMessageWithInvalidTopicAliasThenConnectionDisconnects() throws ExecutionException, InterruptedException {
+    public void givenPublishMessageWithInvalidTopicAliasThenConnectionDisconnects() {
         connectMqtt5AndVerifyAck(sut);
 
         MqttPublishMessage publish = createPublishWithTopicNameAndTopicAlias("kitchen/blinds", 0);
@@ -165,7 +187,7 @@ public class MQTTConnectionPublishTest {
     }
 
     @Test
-    public void givenPublishMessageWithUnmappedTopicAliasThenPublishMessageIsForwardedWithoutAliasAndJustTopicName() throws ExecutionException, InterruptedException {
+    public void givenPublishMessageWithUnmappedTopicAliasThenPublishMessageIsForwardedWithoutAliasAndJustTopicName() throws InterruptedException {
         connectMqtt5AndVerifyAck(sut);
 
         String topicName = "kitchen/blinds";
@@ -187,7 +209,7 @@ public class MQTTConnectionPublishTest {
     }
 
     @Test
-    public void givenPublishMessageWithAlreadyMappedTopicAliasThenPublishMessageIsForwardedWithoutAliasAndJustTopicName() throws ExecutionException, InterruptedException {
+    public void givenPublishMessageWithAlreadyMappedTopicAliasThenPublishMessageIsForwardedWithoutAliasAndJustTopicName() throws InterruptedException {
         connectMqtt5AndVerifyAck(sut);
 
         String topicName = "kitchen/blinds";
@@ -218,7 +240,7 @@ public class MQTTConnectionPublishTest {
     }
 
     @Test
-    public void givenPublishMessageWithUnmappedTopicAliasAndEmptyTopicNameThenConnectionDisconnects() throws ExecutionException, InterruptedException {
+    public void givenPublishMessageWithUnmappedTopicAliasAndEmptyTopicNameThenConnectionDisconnects() {
         connectMqtt5AndVerifyAck(sut);
 
         MqttPublishMessage publish = createPublishWithTopicNameAndTopicAlias("", 10);

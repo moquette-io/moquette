@@ -27,6 +27,7 @@ class BrokerConfiguration {
     private final boolean allowZeroByteClientId;
     private final boolean reauthorizeSubscriptionsOnConnect;
     private final int bufferFlushMillis;
+    private final int topicAliasMaximum;
     // integer max value means that the property is unset
     private int receiveMaximum;
 
@@ -67,6 +68,8 @@ class BrokerConfiguration {
         }
 
         receiveMaximum = props.intProp(IConfig.RECEIVE_MAXIMUM, BrokerConstants.RECEIVE_MAXIMUM);
+
+        topicAliasMaximum = props.intProp(IConfig.TOPIC_ALIAS_MAXIMUM_PROPERTY_NAME, BrokerConstants.DISABLED_TOPIC_ALIAS);
     }
 
     // test method
@@ -86,12 +89,21 @@ class BrokerConfiguration {
     // test method
     public BrokerConfiguration(boolean allowAnonymous, boolean peerCertificateAsUsername, boolean allowZeroByteClientId,
                                boolean reauthorizeSubscriptionsOnConnect, int bufferFlushMillis, int receiveMaximum) {
+        this(allowAnonymous, peerCertificateAsUsername, allowZeroByteClientId, reauthorizeSubscriptionsOnConnect,
+            bufferFlushMillis, receiveMaximum, BrokerConstants.DISABLED_TOPIC_ALIAS);
+    }
+
+    // test method
+    public BrokerConfiguration(boolean allowAnonymous, boolean peerCertificateAsUsername, boolean allowZeroByteClientId,
+                               boolean reauthorizeSubscriptionsOnConnect, int bufferFlushMillis, int receiveMaximum,
+                               int topicAliasMaximum) {
         this.allowAnonymous = allowAnonymous;
         this.peerCertificateAsUsername = peerCertificateAsUsername;
         this.allowZeroByteClientId = allowZeroByteClientId;
         this.reauthorizeSubscriptionsOnConnect = reauthorizeSubscriptionsOnConnect;
         this.bufferFlushMillis = bufferFlushMillis;
         this.receiveMaximum = receiveMaximum;
+        this.topicAliasMaximum = topicAliasMaximum;
     }
 
     public boolean isAllowAnonymous() {
@@ -116,5 +128,9 @@ class BrokerConfiguration {
 
     public int receiveMaximum() {
         return receiveMaximum;
+    }
+
+    public int topicAliasMaximum() {
+        return topicAliasMaximum;
     }
 }

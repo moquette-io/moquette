@@ -62,13 +62,13 @@ final class MQTTConnection {
 
     static final boolean sessionLoopDebug = Boolean.parseBoolean(System.getProperty("moquette.session_loop.debug", "false"));
     private static final int UNDEFINED_VERSION = -1;
-    public static final int DEFAULT_TOPIC_ALIAS_MAXIMUM = 16;
 
     final Channel channel;
     private final BrokerConfiguration brokerConfig;
     private final IAuthenticator authenticator;
     private final SessionRegistry sessionRegistry;
     private final PostOffice postOffice;
+    private final int topicAliasMaximum;
     private volatile boolean connected;
     private final AtomicInteger lastPacketId = new AtomicInteger(0);
     private Session bindedSession;
@@ -86,6 +86,7 @@ final class MQTTConnection {
         this.postOffice = postOffice;
         this.connected = false;
         this.protocolVersion = UNDEFINED_VERSION;
+        this.topicAliasMaximum = brokerConfig.topicAliasMaximum();
     }
 
     void handleMessage(MqttMessage msg) {
@@ -337,7 +338,11 @@ final class MQTTConnection {
             if (receivedQuota.hasLimit()) {
                 connAckPropertiesBuilder.receiveMaximum(receivedQuota.getMaximum());
             }
-            connAckPropertiesBuilder.topicAliasMaximum(DEFAULT_TOPIC_ALIAS_MAXIMUM);
+
+            if (topicAliasMaximum != BrokerConstants.DISABLED_TOPIC_ALIAS) {
+                connAckPropertiesBuilder.topicAliasMaximum(topicAliasMaximum);
+            }
+
             final MqttProperties ackProperties = connAckPropertiesBuilder.build();
             connAckBuilder.properties(ackProperties);
         }
@@ -684,7 +689,7 @@ final class MQTTConnection {
                 .properties().getProperty(MqttProperties.MqttPropertyType.TOPIC_ALIAS.value());
             if (topicAlias != null) {
                 MqttProperties.IntegerProperty topicAliasTyped = (MqttProperties.IntegerProperty) topicAlias;
-                if (topicAliasTyped.value() == 0 || topicAliasTyped.value() > DEFAULT_TOPIC_ALIAS_MAXIMUM) {
+                if (topicAliasTyped.value() == 0 || topicAliasTyped.value() > topicAliasMaximum) {
                     // invalid topic alias value
                     brokerDisconnect(MqttReasonCodes.Disconnect.TOPIC_ALIAS_INVALID);
                     disconnectSession();
