@@ -77,6 +77,21 @@ final class MQTTConnection {
     private Quota sendQuota;
     private TopicAliasMapping aliasMappings;
 
+    static final class ErrorCodeException extends Exception {
+
+        private final String hexErrorCode;
+        private final MqttReasonCodes.Disconnect errorCode;
+
+        public ErrorCodeException(MqttReasonCodes.Disconnect disconnectError) {
+            errorCode = disconnectError;
+            hexErrorCode = Integer.toHexString(disconnectError.byteValue());
+        }
+
+        public MqttReasonCodes.Disconnect getErrorCode() {
+            return errorCode;
+        }
+    }
+
     MQTTConnection(Channel channel, BrokerConfiguration brokerConfig, IAuthenticator authenticator,
                    SessionRegistry sessionRegistry, PostOffice postOffice) {
         this.channel = channel;
@@ -688,61 +703,17 @@ final class MQTTConnection {
             MqttProperties.MqttProperty topicAlias = msg.variableHeader()
                 .properties().getProperty(MqttProperties.MqttPropertyType.TOPIC_ALIAS.value());
             if (topicAlias != null) {
-                if (topicAliasMaximum == BrokerConstants.DISABLED_TOPIC_ALIAS) {
-                    // client is sending a topic alias when the feature was disabled form the server
-                    LOG.info("Dropping connection {}, received a PUBLISH with topic alias while the feature is not enaled on the broker", channel);
-                    brokerDisconnect(MqttReasonCodes.Disconnect.PROTOCOL_ERROR);
+                try {
+                    Optional<String> mappedTopicName = updateAndMapTopicAlias((MqttProperties.IntegerProperty) topicAlias, topicName);
+                    final String translatedTopicName = mappedTopicName.orElse(topicName);
+                    msg = copyPublishMessageExceptTopicAlias(msg, translatedTopicName, messageID);
+                    topic = new Topic(translatedTopicName);
+                } catch (ErrorCodeException e) {
+                    brokerDisconnect(e.getErrorCode());
                     disconnectSession();
                     dropConnection();
                     return PostOffice.RouteResult.failed(clientId);
                 }
-                MqttProperties.IntegerProperty topicAliasTyped = (MqttProperties.IntegerProperty) topicAlias;
-                if (topicAliasTyped.value() == 0 || topicAliasTyped.value() > topicAliasMaximum) {
-                    // invalid topic alias value
-                    LOG.info("Dropping connection {}, received a topic alias ({}) outside of range (0..{}]",
-                        channel, topicAliasTyped.value(), topicAliasMaximum);
-                    brokerDisconnect(MqttReasonCodes.Disconnect.TOPIC_ALIAS_INVALID);
-                    disconnectSession();
-                    dropConnection();
-                    return PostOffice.RouteResult.failed(clientId);
-                }
-
-                Optional<String> mappedTopicName = aliasMappings.topicFromAlias(topicAliasTyped.value());
-                if (mappedTopicName.isPresent()) {
-                    // already established a mapping for the Topic Alias
-                    if (topicName != null) {
-                        // contains a topic name then update the mapping
-                        aliasMappings.update(topicName, topicAliasTyped.value());
-                    }
-                } else {
-                    // does not already have a mapping for this Topic Alias
-                    if (topicName.isEmpty()) {
-                        // protocol error, not present mapping, topic alias is present and no topic name
-                        brokerDisconnect(MqttReasonCodes.Disconnect.PROTOCOL_ERROR);
-                        disconnectSession();
-                        dropConnection();
-                        return PostOffice.RouteResult.failed(clientId);
-                    }
-                    // update the mapping
-                    aliasMappings.update(topicName, topicAliasTyped.value());
-                }
-                final String translatedTopicName = mappedTopicName.orElse(topicName);
-                // Replace the topicName with the one retrieved and remove the topic alias property
-                // to avoid to forward or store.
-                final MqttProperties rewrittenProps = new MqttProperties();
-                for (MqttProperties.MqttProperty property : msg.variableHeader().properties().listAll()) {
-                    if (property.propertyId() == MqttProperties.MqttPropertyType.TOPIC_ALIAS.value()) {
-                        continue;
-                    }
-                    rewrittenProps.add(property);
-                }
-
-                MqttPublishVariableHeader rewrittenVariableHeader = new MqttPublishVariableHeader(translatedTopicName,
-                    messageID, rewrittenProps);
-                msg = new MqttPublishMessage(msg.fixedHeader(), rewrittenVariableHeader,
-                    msg.payload());
-
-                topic = new Topic(translatedTopicName);
             }
         }
 
@@ -825,6 +796,55 @@ final class MQTTConnection {
                 LOG.error("Unknown QoS-Type:{}", qos);
                 return PostOffice.RouteResult.failed(clientId, "Unknown QoS-");
         }
+    }
+
+    private Optional<String> updateAndMapTopicAlias(MqttProperties.IntegerProperty topicAlias, String topicName) throws ErrorCodeException {
+        if (topicAliasMaximum == BrokerConstants.DISABLED_TOPIC_ALIAS) {
+            // client is sending a topic alias when the feature was disabled form the server
+            LOG.info("Dropping connection {}, received a PUBLISH with topic alias while the feature is not enaled on the broker", channel);
+            throw new ErrorCodeException(MqttReasonCodes.Disconnect.PROTOCOL_ERROR);
+        }
+        MqttProperties.IntegerProperty topicAliasTyped = topicAlias;
+        if (topicAliasTyped.value() == 0 || topicAliasTyped.value() > topicAliasMaximum) {
+            // invalid topic alias value
+            LOG.info("Dropping connection {}, received a topic alias ({}) outside of range (0..{}]",
+                channel, topicAliasTyped.value(), topicAliasMaximum);
+            throw new ErrorCodeException(MqttReasonCodes.Disconnect.TOPIC_ALIAS_INVALID);
+        }
+
+        Optional<String> mappedTopicName = aliasMappings.topicFromAlias(topicAliasTyped.value());
+        if (mappedTopicName.isPresent()) {
+            // already established a mapping for the Topic Alias
+            if (topicName != null) {
+                // contains a topic name then update the mapping
+                aliasMappings.update(topicName, topicAliasTyped.value());
+            }
+        } else {
+            // does not already have a mapping for this Topic Alias
+            if (topicName.isEmpty()) {
+                // protocol error, not present mapping, topic alias is present and no topic name
+                throw new ErrorCodeException(MqttReasonCodes.Disconnect.PROTOCOL_ERROR);
+            }
+            // update the mapping
+            aliasMappings.update(topicName, topicAliasTyped.value());
+        }
+        return mappedTopicName;
+    }
+
+    private static MqttPublishMessage copyPublishMessageExceptTopicAlias(MqttPublishMessage msg, String translatedTopicName, int messageID) {
+        // Replace the topicName with the one retrieved and remove the topic alias property
+        // to avoid to forward or store.
+        final MqttProperties rewrittenProps = new MqttProperties();
+        for (MqttProperties.MqttProperty property : msg.variableHeader().properties().listAll()) {
+            if (property.propertyId() == MqttProperties.MqttPropertyType.TOPIC_ALIAS.value()) {
+                continue;
+            }
+            rewrittenProps.add(property);
+        }
+
+        MqttPublishVariableHeader rewrittenVariableHeader =
+            new MqttPublishVariableHeader(translatedTopicName, messageID, rewrittenProps);
+        return new MqttPublishMessage(msg.fixedHeader(), rewrittenVariableHeader, msg.payload());
     }
 
     private Instant extractExpiryFromProperty(MqttPublishMessage msg) {
