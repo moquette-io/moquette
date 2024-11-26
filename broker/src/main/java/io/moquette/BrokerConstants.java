@@ -124,8 +124,6 @@ public final class BrokerConstants {
     public static final String BUGSNAG_ENABLE_PROPERTY_NAME = "use_bugsnag";
     public static final String BUGSNAG_TOKEN_PROPERTY_NAME = "bugsnag.token";
 
-    public static final String STORAGE_CLASS_NAME = "storage_class";
-
     @Deprecated
     public static final String PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME = IConfig.PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME;
 
@@ -133,6 +131,8 @@ public final class BrokerConstants {
     public static final int INFLIGHT_WINDOW_SIZE = 10;
     public static final int INFINITE_SESSION_EXPIRY = 0xFFFFFFFF;
     public static final int RECEIVE_MAXIMUM = 65 * 1024;
+
+    public static final int DISABLED_TOPIC_ALIAS = 0;
 
     private BrokerConstants() {
     }
