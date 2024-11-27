@@ -13,6 +13,7 @@ import java.time.Duration;
 
 import static io.moquette.integration.mqtt5.TestUtils.assertConnectionAccepted;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;

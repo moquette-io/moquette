@@ -37,7 +37,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -77,10 +76,7 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
                     .payload("OK".getBytes(StandardCharsets.UTF_8))
                     .qos(MqttQos.AT_LEAST_ONCE)
                     .send();
-                assertTrue(responseResult instanceof Mqtt5PublishResult.Mqtt5Qos1Result, "QoS1 Response must be present");
-                Mqtt5PublishResult.Mqtt5Qos1Result qos1Result = (Mqtt5PublishResult.Mqtt5Qos1Result) responseResult;
-                assertEquals(Mqtt5PubAckReasonCode.SUCCESS, qos1Result.getPubAck().getReasonCode(),
-                    "Open door response cannot be published ");
+                AbstractServerIntegrationWithoutClientFixture.verifyPublishSucceeded(responseResult);
             });
 
         // wait for the SUBACK in 1 second, else if PUB is sent before the client is fully subscribed, then it's lost
@@ -97,11 +93,7 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
     }
 
     private static void subscribeToResponseTopic(Mqtt5BlockingClient requester, String responseTopic) {
-        Mqtt5SubAck subAck = requester.subscribeWith()
-            .topicFilter(responseTopic)
-            .qos(MqttQos.AT_LEAST_ONCE)
-            .send();
-        assertThat(subAck.getReasonCodes()).contains(Mqtt5SubAckReasonCode.GRANTED_QOS_1);
+        subscribeToAtQos1(requester, responseTopic);
     }
 
     @Test

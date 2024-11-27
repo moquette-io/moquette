@@ -26,6 +26,10 @@ import com.hivemq.client.mqtt.mqtt5.message.connect.Mqtt5Connect;
 import com.hivemq.client.mqtt.mqtt5.message.connect.connack.Mqtt5ConnAck;
 import com.hivemq.client.mqtt.mqtt5.message.connect.connack.Mqtt5ConnAckReasonCode;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
+import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5PublishResult;
+import com.hivemq.client.mqtt.mqtt5.message.publish.puback.Mqtt5PubAckReasonCode;
+import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAck;
+import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAckReasonCode;
 import io.moquette.broker.Server;
 import io.moquette.broker.config.IConfig;
 import io.moquette.broker.config.MemoryConfig;
@@ -50,7 +54,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 public class AbstractServerIntegrationWithoutClientFixture {
 
@@ -63,6 +70,11 @@ public class AbstractServerIntegrationWithoutClientFixture {
     @BeforeAll
     public static void beforeTests() {
         Awaitility.setDefaultTimeout(Durations.ONE_SECOND);
+    }
+
+    static void verifyPayloadInUTF8(Mqtt5Publish msgPub, String expectedPayload) {
+        assertTrue(msgPub.getPayload().isPresent(), "Response payload MUST be present");
+        assertEquals(expectedPayload, new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8));
     }
 
     @BeforeEach
@@ -136,6 +148,25 @@ public class AbstractServerIntegrationWithoutClientFixture {
     @NotNull
     static Mqtt5BlockingClient createPublisherClient() {
         return AbstractSubscriptionIntegrationTest.createClientWithStartFlagAndClientId(true, "publisher");
+    }
+
+    static void subscribeToAtQos1(Mqtt5BlockingClient subscriber, String topicFilter) {
+        Mqtt5SubAck subAck = subscribe(subscriber, topicFilter, MqttQos.AT_LEAST_ONCE);
+        assertThat(subAck.getReasonCodes()).contains(Mqtt5SubAckReasonCode.GRANTED_QOS_1);
+    }
+
+    static Mqtt5SubAck subscribe(Mqtt5BlockingClient subscriberClient, String topicFilter, MqttQos mqttQos) {
+        return subscriberClient.subscribeWith()
+            .topicFilter(topicFilter)
+            .qos(mqttQos)
+            .send();
+    }
+
+    static void verifyPublishSucceeded(Mqtt5PublishResult publishResult) {
+        assertTrue(publishResult instanceof Mqtt5PublishResult.Mqtt5Qos1Result, "QoS1 Response must be present");
+        Mqtt5PublishResult.Mqtt5Qos1Result qos1Result = (Mqtt5PublishResult.Mqtt5Qos1Result) publishResult;
+        assertEquals(Mqtt5PubAckReasonCode.SUCCESS, qos1Result.getPubAck().getReasonCode(),
+            "Publish can't be accepted by the broker");
     }
 
     protected static void verifyNoPublish(Mqtt5BlockingClient subscriber, Consumer<Void> action, Duration timeout, String message) throws InterruptedException {

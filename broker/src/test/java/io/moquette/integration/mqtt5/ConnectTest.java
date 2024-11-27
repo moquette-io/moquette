@@ -157,11 +157,39 @@ class ConnectTest extends AbstractServerIntegrationTest {
 
         TestUtils.verifyPublishedMessage(testamentSubscriber, 10,
             (Mqtt5Publish message) -> {
-                final String payload = new String(message.getPayloadAsBytes(), StandardCharsets.UTF_8);
-                assertEquals("Goodbye", payload, "Will message must be received");
+                verifyPayloadInUTF8(message, "Goodbye");
 
                 long expiry = message.getMessageExpiryInterval().orElse(-1L);
                 assertEquals(messageExpiry, expiry);
+            });
+    }
+
+    @Test
+    public void givenWillPropertiesWithUserPropertySetDuringConnectionWhenWillPublishIsTriggeredThenAlsoTheUserPropertiesAreSent() throws InterruptedException {
+        int messageExpiry = 5;
+        Mqtt5ConnectBuilder connectBuilder = defaultWillBuilder(1)
+            .messageExpiryInterval(messageExpiry)
+            .userProperties()
+                .add("content-type", "text/plain")
+                .applyUserProperties()
+            .applyWillPublish();
+
+        final Mqtt5BlockingClient clientWithWill =
+            createAndConnectWithBuilder("simple_client", connectBuilder);
+
+        final Mqtt5BlockingClient testamentSubscriber = createAndConnectClientListeningToTestament();
+
+        // schedule a bad disconnect
+        scheduleDisconnectWithErrorCode(clientWithWill, Duration.ofMillis(500));
+
+        TestUtils.verifyPublishedMessage(testamentSubscriber, 10,
+            (Mqtt5Publish message) -> {
+                verifyPayloadInUTF8(message, "Goodbye");
+
+                long expiry = message.getMessageExpiryInterval().orElse(-1L);
+                assertEquals(messageExpiry, expiry);
+
+                UserPropertiesTest.verifyContainUserProperty(message, "content-type", "text/plain");
             });
     }
 
@@ -314,7 +342,7 @@ class ConnectTest extends AbstractServerIntegrationTest {
 
     @NotNull
     private static Mqtt5BlockingClient createAndConnectClientWithWillTestament(String clientId, int delayInSeconds) {
-        Mqtt5WillPublishBuilder.Nested.Complete<? extends Mqtt5ConnectBuilder> willPublishBuilder = deafaultWillBuilder(delayInSeconds);
+        Mqtt5WillPublishBuilder.Nested.Complete<? extends Mqtt5ConnectBuilder> willPublishBuilder = defaultWillBuilder(delayInSeconds);
 
         Mqtt5ConnectBuilder connectBuilder = willPublishBuilder.applyWillPublish();
 
@@ -322,7 +350,7 @@ class ConnectTest extends AbstractServerIntegrationTest {
     }
 
     @NotNull
-    private static Mqtt5WillPublishBuilder.Nested.Complete<? extends Mqtt5ConnectBuilder> deafaultWillBuilder(int delayInSeconds) {
+    private static Mqtt5WillPublishBuilder.Nested.Complete<? extends Mqtt5ConnectBuilder> defaultWillBuilder(int delayInSeconds) {
         Mqtt5WillPublishBuilder.Nested.Complete<? extends Mqtt5ConnectBuilder> willPublishBuilder = Mqtt5Connect.builder()
             .keepAlive(10)
             .willPublish()
@@ -337,10 +365,10 @@ class ConnectTest extends AbstractServerIntegrationTest {
     }
 
     @NotNull
-    private static Mqtt5BlockingClient createAndConnectClientWithWillTestamentAndMessageExpiry(String clientId,
-                                                                                               int delayInSeconds,
-                                                                                               int messageExpirySeconds) {
-        Mqtt5WillPublishBuilder.Nested.Complete<? extends Mqtt5ConnectBuilder> willPublishBuilder = deafaultWillBuilder(delayInSeconds);
+    static Mqtt5BlockingClient createAndConnectClientWithWillTestamentAndMessageExpiry(String clientId,
+                                                                                       int delayInSeconds,
+                                                                                       int messageExpirySeconds) {
+        Mqtt5WillPublishBuilder.Nested.Complete<? extends Mqtt5ConnectBuilder> willPublishBuilder = defaultWillBuilder(delayInSeconds);
 
         willPublishBuilder.messageExpiryInterval(messageExpirySeconds);
 
