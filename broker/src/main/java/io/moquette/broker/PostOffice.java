@@ -311,14 +311,31 @@ class PostOffice {
 
     private void publishWill(ISessionsRepository.Will will) {
         final Instant messageExpiryInstant = willMessageExpiry(will);
-        MqttPublishMessage willPublishMessage = MqttMessageBuilders.publish()
+        MqttMessageBuilders.PublishBuilder publishBuilder = MqttMessageBuilders.publish()
             .topicName(will.topic)
             .retained(will.retained)
             .qos(will.qos)
-            .payload(Unpooled.copiedBuffer(will.payload))
-            .build();
+            .payload(Unpooled.copiedBuffer(will.payload));
+
+        if (will.properties.userProperties().isPresent()) {
+            Map<String, String> willUserProperties = will.properties.userProperties().get();
+            if (!willUserProperties.isEmpty()) {
+                publishBuilder.properties(copyWillUserProperties(willUserProperties));
+            }
+        }
+        MqttPublishMessage willPublishMessage = publishBuilder.build();
 
         publish2Subscribers(WILL_PUBLISHER, messageExpiryInstant, willPublishMessage);
+    }
+
+    private static MqttProperties copyWillUserProperties(Map<String, String> willUserProperties) {
+        MqttProperties.UserProperties userProperties = new MqttProperties.UserProperties();
+        for (Map.Entry<String, String> userProperty : willUserProperties.entrySet()) {
+            userProperties.add(userProperty.getKey(), userProperty.getValue());
+        }
+        final MqttProperties willProperties = new MqttProperties();
+        willProperties.add(userProperties);
+        return willProperties;
     }
 
     private static Instant willMessageExpiry(ISessionsRepository.Will will) {
