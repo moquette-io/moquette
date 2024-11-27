@@ -8,6 +8,7 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import io.netty.handler.codec.mqtt.MqttVersion;
+import io.netty.util.ReferenceCountUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -65,16 +66,18 @@ public class SessionTest {
         testChannel.close();
     }
 
-    private void sendQoS1To(Session client, Topic destinationTopic, String message) {
+    private ByteBuf sendQoS1To(Session client, Topic destinationTopic, String message) {
         final ByteBuf payload = ByteBufUtil.writeUtf8(UnpooledByteBufAllocator.DEFAULT, message);
         final SessionRegistry.PublishedMessage publishedMessage = new SessionRegistry.PublishedMessage(destinationTopic, MqttQoS.AT_LEAST_ONCE, payload, false, Instant.MAX);
         client.sendPublishOnSessionAtQos(publishedMessage);
+        ReferenceCountUtil.release(payload);
+        return payload;
     }
 
     @Test
     public void testFirstResendOfANotAckedMessage() throws InterruptedException {
         final Topic destinationTopic = new Topic("/a/b");
-        sendQoS1To(client, destinationTopic, "Message not ACK-ed at first send!");
+        ByteBuf payloadCreated = sendQoS1To(client, destinationTopic, "Message not ACK-ed at first send!");
         // verify the first time the message is sent
         ConnectionTestUtils.verifyReceivePublish(testChannel, destinationTopic.toString(), "Message not ACK-ed at first send!");
 
@@ -86,12 +89,14 @@ public class SessionTest {
 
         // verify the first time the message is sent
         ConnectionTestUtils.verifyReceivePublish(testChannel, destinationTopic.toString(), "Message not ACK-ed at first send!");
+
+        ReferenceCountUtil.release(payloadCreated);
     }
 
     @Test
     public void testSecondResendOfANotAckedMessage() throws InterruptedException {
         final Topic destinationTopic = new Topic("/a/b");
-        sendQoS1To(client, destinationTopic, "Message not ACK-ed at first send!");
+        ByteBuf payloadCreated = sendQoS1To(client, destinationTopic, "Message not ACK-ed at first send!");
         // verify the first time the message is sent
         ConnectionTestUtils.verifyReceivePublish(testChannel, destinationTopic.toString(), "Message not ACK-ed at first send!");
 
@@ -112,6 +117,8 @@ public class SessionTest {
 
         // verify the first time the message is sent
         ConnectionTestUtils.verifyReceivePublish(testChannel, destinationTopic.toString(), "Message not ACK-ed at first send!");
+
+        ReferenceCountUtil.release(payloadCreated);
     }
 
     @Test

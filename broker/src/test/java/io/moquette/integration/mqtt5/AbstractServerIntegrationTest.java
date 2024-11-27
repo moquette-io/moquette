@@ -75,10 +75,14 @@ public abstract class AbstractServerIntegrationTest extends AbstractServerIntegr
         acknowledge(packetId);
     }
 
-    private void acknowledge(int packetId) {
+    protected void acknowledge(int packetId) {
+        acknowledge(packetId, lowLevelClient);
+    }
+
+    protected void acknowledge(int packetId, Client client) {
         MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBACK, false, AT_MOST_ONCE,
             false, 0);
         MqttPubAckMessage pubAck = new MqttPubAckMessage(fixedHeader, MqttMessageIdVariableHeader.from(packetId));
-        lowLevelClient.sendMessage(pubAck);
+        client.sendMessage(pubAck);
     }
 }

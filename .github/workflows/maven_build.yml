@@ -5,17 +5,17 @@ name: Java CI with Maven
 
 on:
     push:
-        branches: [ main, mqtt5_development ]
+        branches: [ main ]
     pull_request:
-        branches: [ main, mqtt5_development ]
+        branches: [ main ]
 
 jobs:
     test:
         runs-on: ${{ matrix.os }}
         strategy:
             matrix:
-                os: [ubuntu-20.04, ubuntu-latest]
-                java: [11, 17]
+                os: [ubuntu-22.04, ubuntu-latest]
+                java: [17, 21]
                 arch: [x64] # when ARM will be present add aarch64
             fail-fast: false
             max-parallel: 4

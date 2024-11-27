@@ -20,6 +20,7 @@ import io.moquette.interception.InterceptHandler;
 import io.moquette.interception.BrokerInterceptor;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.*;
+import io.netty.util.ReferenceCountUtil;
 
 import java.util.Collections;
 import java.util.List;
@@ -49,6 +50,7 @@ public final class ConnectionTestUtils {
     static void verifyReceivePublish(EmbeddedChannel embeddedChannel, String expectedTopic, String expectedContent) {
         MqttPublishMessage receivedPublish = embeddedChannel.flushOutbound().readOutbound();
         assertPublishIsCorrect(expectedTopic, expectedContent, receivedPublish);
+        ReferenceCountUtil.release(receivedPublish);
     }
 
     private static void assertPublishIsCorrect(String expectedTopic, String expectedContent,
