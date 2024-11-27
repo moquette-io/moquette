@@ -19,7 +19,7 @@ The features implemented by the broker are:
 Its designed to be evented, uses Netty for the protocol encoding and decoding part.
 
 ## Community feedback
-We would love to hear from the users of Moquette, please :pry: let us know in [this discussion thread](https://github.com/moquette-io/moquette/discussions/874)
+We would love :heart: to hear from Moquette users, please [let us know how you use it 👣 ](https://github.com/moquette-io/moquette/discussions/874)
 
 ## Embedding in other projects
 
