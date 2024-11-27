@@ -239,13 +239,6 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
             .send();
     }
 
-    static void subscribe(Mqtt5BlockingClient subscriberClient, String topicFilter, MqttQos mqttQos) {
-        subscriberClient.subscribeWith()
-            .topicFilter(topicFilter)
-            .qos(mqttQos)
-            .send();
-    }
-
     @Test
     public void givenMultipleClientSubscribedToSharedSubscriptionWhenOneUnsubscribeThenTheSharedSubscriptionRemainsValid() throws Exception {
         String fullSharedSubscriptionTopicFilter = "$share/collectors/metric/temperature/living";
