@@ -27,6 +27,7 @@ import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5PublishResult;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -87,7 +88,7 @@ public class UserPropertiesTest extends AbstractServerIntegrationTest {
         }
     }
 
-    private void verifyContainUserProperty(Mqtt5Publish receivedPub, String expectedName, String expectedValue) {
+    protected static void verifyContainUserProperty(Mqtt5Publish receivedPub, String expectedName, String expectedValue) {
         Optional<? extends Mqtt5UserProperty> userProp = receivedPub.getUserProperties().asList()
             .stream()
             .filter(prop -> prop.getName().toString().equals(expectedName))
@@ -98,10 +99,5 @@ public class UserPropertiesTest extends AbstractServerIntegrationTest {
             .map(Object::toString)
             .orElse("<empty-string>");
         assertEquals(expectedValue, propertyValue);
-    }
-
-    private static void verifyPayloadInUTF8(Mqtt5Publish msgPub, String expectedPayload) {
-        assertTrue(msgPub.getPayload().isPresent(), "Response payload MUST be present");
-        assertEquals(expectedPayload, new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8));
     }
 }

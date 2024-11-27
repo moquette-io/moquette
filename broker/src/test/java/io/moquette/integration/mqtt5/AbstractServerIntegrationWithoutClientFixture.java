@@ -72,6 +72,11 @@ public class AbstractServerIntegrationWithoutClientFixture {
         Awaitility.setDefaultTimeout(Durations.ONE_SECOND);
     }
 
+    static void verifyPayloadInUTF8(Mqtt5Publish msgPub, String expectedPayload) {
+        assertTrue(msgPub.getPayload().isPresent(), "Response payload MUST be present");
+        assertEquals(expectedPayload, new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8));
+    }
+
     @BeforeEach
     public void setUp() throws Exception {
         dbPath = IntegrationUtils.tempH2Path(tempFolder);
