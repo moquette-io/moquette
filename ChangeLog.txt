@@ -1,4 +1,5 @@
 Version 0.18-SNAPSHOT:
+   [feature] User properties: covered publish with user properties with tests and fixed publish of will messages. (#877)
    [feature] Topic alias: implemented handling of topic alias received by publishers. (#873)
    [feature] Flow-control: Handled client's receive maximum property to configure the inflight window through the client. (#858)
    [feature] Generate correct MANIFEST.MF with bnd-maven-plugin. (#848)
