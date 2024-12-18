@@ -113,16 +113,8 @@ public final class BrokerConstants {
     public static final int NO_BUFFER_FLUSH = -1;
     public static final int IMMEDIATE_BUFFER_FLUSH = 0;
 
-    public static final String METRICS_ENABLE_PROPERTY_NAME = "use_metrics";
-    public static final String METRICS_LIBRATO_EMAIL_PROPERTY_NAME = "metrics.librato.email";
-    public static final String METRICS_LIBRATO_TOKEN_PROPERTY_NAME = "metrics.librato.token";
-    public static final String METRICS_LIBRATO_SOURCE_PROPERTY_NAME = "metrics.librato.source";
-
     @Deprecated
     public static final String ENABLE_TELEMETRY_NAME = IConfig.ENABLE_TELEMETRY_NAME;
-
-    public static final String BUGSNAG_ENABLE_PROPERTY_NAME = "use_bugsnag";
-    public static final String BUGSNAG_TOKEN_PROPERTY_NAME = "bugsnag.token";
 
     @Deprecated
     public static final String PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME = IConfig.PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME;
