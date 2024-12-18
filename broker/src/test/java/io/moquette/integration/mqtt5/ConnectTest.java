@@ -13,6 +13,8 @@ import com.hivemq.client.mqtt.mqtt5.message.disconnect.Mqtt5DisconnectReasonCode
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5PublishResult;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5WillPublishBuilder;
+import io.moquette.broker.config.FluentConfig;
+import io.moquette.broker.config.IConfig;
 import io.moquette.testclient.Client;
 import io.netty.handler.codec.mqtt.*;
 import org.awaitility.Awaitility;
@@ -66,6 +68,35 @@ class ConnectTest extends AbstractServerIntegrationTest {
             .buildBlocking();
         final Mqtt5ConnAck connectAck = client.connect();
         assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, connectAck.getReasonCode(), "Accept plain connection");
+
+        client.disconnect();
+    }
+
+    @Test
+    public void givenServerKeepAliveConfiguredThenConnectAckMustRespectIt() throws IOException {
+        stopServer();
+        IConfig config = new FluentConfig()
+            .dataPath(dbPath)
+            .enablePersistence()
+            .port(1883)
+            .disableTelemetry()
+            .persistentQueueType(FluentConfig.PersistentQueueType.SEGMENTED)
+            .serverKeepAlive(Duration.ofSeconds(12))
+            .build();
+        startServer(config);
+
+        Mqtt5BlockingClient client = MqttClient.builder()
+            .useMqttVersion5()
+            .identifier("simple_connect_test")
+            .serverHost("localhost")
+            .serverPort(1883)
+            .buildBlocking();
+        final Mqtt5ConnAck connectAck = client.connect();
+        assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, connectAck.getReasonCode(), "Accept plain connection");
+        assertTrue(connectAck.getServerKeepAlive().isPresent());
+        connectAck.getServerKeepAlive().ifPresent(serverKeepAlive -> {
+            assertEquals(12 ,serverKeepAlive);
+        });
 
         client.disconnect();
     }
