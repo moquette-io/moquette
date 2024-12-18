@@ -5,6 +5,7 @@ import io.moquette.broker.Server;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.function.Consumer;
@@ -30,6 +31,7 @@ import static io.moquette.broker.config.IConfig.PERSISTENT_CLIENT_EXPIRATION_PRO
 import static io.moquette.broker.config.IConfig.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME;
 import static io.moquette.broker.config.IConfig.PORT_PROPERTY_NAME;
 import static io.moquette.broker.config.IConfig.RECEIVE_MAXIMUM;
+import static io.moquette.broker.config.IConfig.SERVER_KEEP_ALIVE_PROPERTY_NAME;
 import static io.moquette.broker.config.IConfig.SESSION_QUEUE_SIZE;
 import static io.moquette.broker.config.IConfig.SSL_PORT_PROPERTY_NAME;
 import static io.moquette.broker.config.IConfig.SSL_PROVIDER;
@@ -212,6 +214,12 @@ public class FluentConfig {
 
     public FluentConfig topicAliasMaximum(int topicAliasMaximum) {
         configAccumulator.put(TOPIC_ALIAS_MAXIMUM_PROPERTY_NAME, Integer.valueOf(topicAliasMaximum).toString());
+        return this;
+    }
+
+    public FluentConfig serverKeepAlive(Duration keepAliveSeconds) {
+        int seconds = (int) keepAliveSeconds.toMillis() / 1_000;
+        configAccumulator.put(SERVER_KEEP_ALIVE_PROPERTY_NAME, seconds + "s");
         return this;
     }
 

@@ -19,6 +19,7 @@ import io.moquette.BrokerConstants;
 import io.moquette.broker.config.IConfig;
 
 import java.util.Locale;
+import java.util.Optional;
 
 class BrokerConfiguration {
 
@@ -30,6 +31,7 @@ class BrokerConfiguration {
     private final int topicAliasMaximum;
     // integer max value means that the property is unset
     private int receiveMaximum;
+    private Optional<Integer> serverKeepAlive = Optional.empty();
 
     BrokerConfiguration(IConfig props) {
         allowAnonymous = props.boolProp(BrokerConstants.ALLOW_ANONYMOUS_PROPERTY_NAME, true);
@@ -70,6 +72,10 @@ class BrokerConfiguration {
         receiveMaximum = props.intProp(IConfig.RECEIVE_MAXIMUM, BrokerConstants.RECEIVE_MAXIMUM);
 
         topicAliasMaximum = props.intProp(IConfig.TOPIC_ALIAS_MAXIMUM_PROPERTY_NAME, BrokerConstants.DISABLED_TOPIC_ALIAS);
+
+        if (props.getProperty(IConfig.SERVER_KEEP_ALIVE_PROPERTY_NAME) != null) {
+            serverKeepAlive = Optional.of((int) props.durationProp(IConfig.SERVER_KEEP_ALIVE_PROPERTY_NAME).toMillis() / 1_000);
+        }
     }
 
     // test method
@@ -132,5 +138,9 @@ class BrokerConfiguration {
 
     public int topicAliasMaximum() {
         return topicAliasMaximum;
+    }
+
+    public Optional<Integer> getServerKeepAlive() {
+        return serverKeepAlive;
     }
 }

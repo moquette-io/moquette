@@ -358,6 +358,10 @@ final class MQTTConnection {
                 connAckPropertiesBuilder.topicAliasMaximum(topicAliasMaximum);
             }
 
+            if (brokerConfig.getServerKeepAlive().isPresent()) {
+                connAckPropertiesBuilder.serverKeepAlive(brokerConfig.getServerKeepAlive().get());
+            }
+
             final MqttProperties ackProperties = connAckPropertiesBuilder.build();
             connAckBuilder.properties(ackProperties);
         }
@@ -464,6 +468,13 @@ final class MQTTConnection {
 
     private void initializeKeepAliveTimeout(Channel channel, MqttConnectMessage msg, String clientId) {
         int keepAlive = msg.variableHeader().keepAliveTimeSeconds();
+
+        // force server keep alive if configured
+        if (brokerConfig.getServerKeepAlive().isPresent()) {
+            int serverKeepAlive = brokerConfig.getServerKeepAlive().get();
+            LOG.info("Forcing server keep alive ({}) over client selection ({})", serverKeepAlive, keepAlive);
+            keepAlive = serverKeepAlive;
+        }
         NettyUtils.keepAlive(channel, keepAlive);
         NettyUtils.cleanSession(channel, msg.variableHeader().isCleanSession());
         NettyUtils.clientID(channel, clientId);
