@@ -121,9 +121,6 @@ public final class BrokerConstants {
     @Deprecated
     public static final String ENABLE_TELEMETRY_NAME = IConfig.ENABLE_TELEMETRY_NAME;
 
-    public static final String BUGSNAG_ENABLE_PROPERTY_NAME = "use_bugsnag";
-    public static final String BUGSNAG_TOKEN_PROPERTY_NAME = "bugsnag.token";
-
     @Deprecated
     public static final String PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME = IConfig.PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME;
 

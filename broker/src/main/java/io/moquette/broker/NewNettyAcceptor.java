@@ -133,7 +133,6 @@ class NewNettyAcceptor {
     private BytesMetricsCollector bytesMetricsCollector = new BytesMetricsCollector();
     private MessageMetricsCollector metricsCollector = new MessageMetricsCollector();
     private Optional<? extends ChannelInboundHandler> metrics;
-    private Optional<? extends ChannelInboundHandler> errorsCather;
 
     private int nettySoBacklog;
     private boolean nettySoReuseaddr;
@@ -182,14 +181,6 @@ class NewNettyAcceptor {
             this.metrics = Optional.empty();
         }
 
-        final boolean useBugSnag = props.boolProp(BUGSNAG_ENABLE_PROPERTY_NAME, false);
-        if (useBugSnag) {
-            BugSnagErrorsHandler bugSnagHandler = new BugSnagErrorsHandler();
-            bugSnagHandler.init(props);
-            this.errorsCather = Optional.of(bugSnagHandler);
-        } else {
-            this.errorsCather = Optional.empty();
-        }
         initializePlainTCPTransport(mqttHandler, props, brokerConfiguration);
         initializeWebSocketTransport(mqttHandler, props, brokerConfiguration);
         if (securityPortsConfigured(props)) {
@@ -287,9 +278,6 @@ class NewNettyAcceptor {
         pipeline.addFirst("idleStateHandler", new IdleStateHandler(nettyChannelTimeoutSeconds, 0, 0));
         pipeline.addAfter("idleStateHandler", "idleEventHandler", timeoutHandler);
         // pipeline.addLast("logger", new LoggingHandler("Netty", LogLevel.ERROR));
-        if (errorsCather.isPresent()) {
-            pipeline.addLast("bugsnagCatcher", errorsCather.get());
-        }
         pipeline.addFirst("bytemetrics", new BytesMetricsHandler(bytesMetricsCollector));
         if (writeFlushMillis > IMMEDIATE_BUFFER_FLUSH) {
             pipeline.addLast("autoflush", new AutoFlushHandler(writeFlushMillis, TimeUnit.MILLISECONDS));
