@@ -132,7 +132,6 @@ class NewNettyAcceptor {
     private final Map<String, Integer> ports = new HashMap<>();
     private BytesMetricsCollector bytesMetricsCollector = new BytesMetricsCollector();
     private MessageMetricsCollector metricsCollector = new MessageMetricsCollector();
-    private Optional<? extends ChannelInboundHandler> metrics;
 
     private int nettySoBacklog;
     private boolean nettySoReuseaddr;
@@ -170,15 +169,6 @@ class NewNettyAcceptor {
             bossGroup = new NioEventLoopGroup();
             workerGroup = new NioEventLoopGroup();
             channelClass = NioServerSocketChannel.class;
-        }
-
-        final boolean useFineMetrics = props.boolProp(METRICS_ENABLE_PROPERTY_NAME, false);
-        if (useFineMetrics) {
-            DropWizardMetricsHandler metricsHandler = new DropWizardMetricsHandler();
-            metricsHandler.init(props);
-            this.metrics = Optional.of(metricsHandler);
-        } else {
-            this.metrics = Optional.empty();
         }
 
         initializePlainTCPTransport(mqttHandler, props, brokerConfiguration);
@@ -286,9 +276,6 @@ class NewNettyAcceptor {
         pipeline.addLast("encoder", MqttEncoder.INSTANCE);
         pipeline.addLast("metrics", new MessageMetricsHandler(metricsCollector));
         pipeline.addLast("messageLogger", new MQTTMessageLogger());
-        if (metrics.isPresent()) {
-            pipeline.addLast("wizardMetrics", metrics.get());
-        }
         pipeline.addLast("handler", handler);
     }
 
