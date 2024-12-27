@@ -1,5 +1,7 @@
 [Java CI with Maven](https://github.com/moquette-io/moquette/workflows/Java%20CI%20with%20Maven/badge.svg?branch=main)
 
+[![](https://jitpack.io/v/moquette-io/moquette.svg)](https://jitpack.io/#moquette-io/moquette)
+
 ## Moquette MQTT broker
 [Documentation reference guide](http://moquette-io.github.io/moquette/) Guide on how to use and configure Moquette
 
@@ -23,19 +25,30 @@ We would love :heart: to hear from Moquette users, please [let us know how you u
 
 ## Embedding in other projects
 
-Include dependency in your project: 
+Use JitPack to resolve Moquette dependency in your project. 
 
+In repositories section, add:
+```
+<repositories>
+  <repository>
+    <id>jitpack.io</id>
+    <url>https://jitpack.io</url>
+  </repository>
+</repositories>
+```
+
+In dependencies section add:
 ```
 <dependency>
-      <groupId>io.moquette</groupId>
-      <artifactId>moquette-broker</artifactId>
-      <version>0.17</version>
+  <groupId>com.github.moquette-io</groupId>
+  <artifactId>moquette-broker</artifactId>
+  <version>0.18.0</version>
 </dependency>
 ```
 
 ## Build from sources
 
 After a git clone of the repository, cd into the cloned sources and: `./gradlew package`, at the end the distribution 
-package is present at `distribution/target/distribution-0.18-SNAPSHOT-bundle.tar.gz`
+package is present at `distribution/target/distribution-0.19-SNAPSHOT-bundle.tar.gz`
 
 In distribution/target directory will be produced the selfcontained file for the broker with all dependencies and a running script. 
