@@ -1,5 +1,7 @@
 [Java CI with Maven](https://github.com/moquette-io/moquette/workflows/Java%20CI%20with%20Maven/badge.svg?branch=main)
 
+[![](https://jitpack.io/v/moquette-io/moquette.svg)](https://jitpack.io/#moquette-io/moquette)
+
 ## Moquette MQTT broker
 [Documentation reference guide](http://moquette-io.github.io/moquette/) Guide on how to use and configure Moquette
 
@@ -23,13 +25,24 @@ We would love :heart: to hear from Moquette users, please [let us know how you u
 
 ## Embedding in other projects
 
-Include dependency in your project: 
+Use JitPack to resolve Moquette dependency in your project. 
 
+In repositories section, add:
+```
+<repositories>
+  <repository>
+    <id>jitpack.io</id>
+    <url>https://jitpack.io</url>
+  </repository>
+</repositories>
+```
+
+In dependencies section add:
 ```
 <dependency>
-      <groupId>io.moquette</groupId>
-      <artifactId>moquette-broker</artifactId>
-      <version>0.17</version>
+  <groupId>com.github.moquette-io</groupId>
+  <artifactId>moquette-broker</artifactId>
+  <version>0.18.0</version>
 </dependency>
 ```
 
