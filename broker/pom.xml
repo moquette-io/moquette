@@ -14,10 +14,10 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <netty.version>4.1.116.Final</netty.version>
+        <netty.version>4.1.118.Final</netty.version>
         <!-- Check Netty pom.xm to know the right version of tcnative, for example
-             https://github.com/netty/netty/blob/netty-4.1.116.Final/pom.xml#L740 -->
-        <netty.tcnative.version>2.0.69.Final</netty.tcnative.version>
+             https://github.com/netty/netty/blob/netty-4.1.118.Final/pom.xml#L742 -->
+        <netty.tcnative.version>2.0.70.Final</netty.tcnative.version>
         <paho.version>1.2.5</paho.version>
         <paho.mttt5.version>1.2.5</paho.mttt5.version>
         <hivemqclient.version>1.3.3</hivemqclient.version>
