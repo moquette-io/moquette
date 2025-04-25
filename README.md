@@ -42,7 +42,7 @@ In dependencies section add:
 <dependency>
   <groupId>com.github.moquette-io.moquette</groupId>
   <artifactId>moquette-broker</artifactId>
-  <version>v0.18.0</version>
+  <version>0.18.0</version>
 </dependency>
 ```
 
