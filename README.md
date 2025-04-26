@@ -40,7 +40,7 @@ In repositories section, add:
 In dependencies section add:
 ```
 <dependency>
-  <groupId>com.github.moquette-io</groupId>
+  <groupId>com.github.moquette-io.moquette</groupId>
   <artifactId>moquette-broker</artifactId>
   <version>0.18.0</version>
 </dependency>
