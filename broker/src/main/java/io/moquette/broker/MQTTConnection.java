@@ -210,7 +210,7 @@ final class MQTTConnection {
         final boolean cleanSession = msg.variableHeader().isCleanSession();
         final boolean serverGeneratedClientId;
         if (clientId == null || clientId.isEmpty()) {
-            if (isNotProtocolVersion(msg, MqttVersion.MQTT_5)) {
+            if (isNotProtocolVersion(msg, MqttVersion.MQTT_5) && isNotProtocolVersion(msg, MqttVersion.MQTT_3_1_1)) {
                 if (!brokerConfig.isAllowZeroByteClientId()) {
                     LOG.info("Broker doesn't permit MQTT empty client ID. Username: {}", username);
                     abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
