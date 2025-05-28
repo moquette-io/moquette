@@ -35,11 +35,16 @@ public interface MetricsProvider {
     public void initSessionQueues(int queueCount, int queueSize);
 
     /**
-     * Set the number of items currently in the given session queue.
+     * Increase the fill level of the given session queue.
      * @param queue The queueId, 0-based.
-     * @param fill The number of items in the queue.
      */
-    public void setSessionQueueFill(int queue, int fill);
+    public void sessionQueueInc(int queue);
+
+    /**
+     * Decrease the fill level of the given session queue.
+     * @param queue The queueId, 0-based.
+     */
+    public void sessionQueueDec(int queue);
 
     /**
      * Add a queue overrun event for the given queue.

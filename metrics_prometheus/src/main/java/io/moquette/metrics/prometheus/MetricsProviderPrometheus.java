@@ -38,7 +38,6 @@ public class MetricsProviderPrometheus implements MetricsProvider {
 
     private HTTPServer metricsServer;
 
-    private int sessionQueueSize;
     private Gauge sessionQueueFillGauge;
     private GaugeDataPoint[] sessionQueueFillGauges;
     private Counter sessionQueueOverrunCounter;
@@ -77,7 +76,6 @@ public class MetricsProviderPrometheus implements MetricsProvider {
 
     @Override
     public void initSessionQueues(int queueCount, int queueSize) {
-        sessionQueueSize = queueSize;
         sessionQueueFillGauge = Gauge.builder()
                 .name("moquette_session_queue_fill")
                 .help("Number of items in the Session Queue")
@@ -102,11 +100,19 @@ public class MetricsProviderPrometheus implements MetricsProvider {
     }
 
     @Override
-    public void setSessionQueueFill(int queue, int fill) {
+    public void sessionQueueInc(int queue) {
         if (queue >= sessionQueueFillGauges.length) {
             return;
         }
-        sessionQueueFillGauges[queue].set(1.0 * fill / sessionQueueSize);
+        sessionQueueFillGauges[queue].inc();
+    }
+
+    @Override
+    public void sessionQueueDec(int queue) {
+        if (queue >= sessionQueueFillGauges.length) {
+            return;
+        }
+        sessionQueueFillGauges[queue].dec();
     }
 
     @Override

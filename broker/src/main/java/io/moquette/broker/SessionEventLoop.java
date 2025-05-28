@@ -34,7 +34,7 @@ final class SessionEventLoop extends Thread {
             try {
                 // blocking call
                 final FutureTask<String> task = taskQueue.take();
-                MetricsManager.getMetricsProvider().setSessionQueueFill(queueId, taskQueue.size());
+                MetricsManager.getMetricsProvider().sessionQueueDec(queueId);
                 executeTask(task);
             } catch (InterruptedException e) {
                 LOG.info("SessionEventLoop {} interrupted", Thread.currentThread().getName());

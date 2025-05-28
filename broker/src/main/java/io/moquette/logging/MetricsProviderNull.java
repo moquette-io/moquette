@@ -38,7 +38,12 @@ public class MetricsProviderNull implements MetricsProvider {
     }
 
     @Override
-    public void setSessionQueueFill(int queue, int fill) {
+    public void sessionQueueInc(int queue) {
+        // ignored
+    }
+
+    @Override
+    public void sessionQueueDec(int queue) {
         // ignored
     }
 

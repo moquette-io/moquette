@@ -82,7 +82,7 @@ class SessionEventLoopGroup {
         }
         final BlockingQueue<FutureTask<String>> targetQueue = this.sessionQueues[targetQueueId];
         if (targetQueue.offer(task)) {
-            MetricsManager.getMetricsProvider().setSessionQueueFill(targetQueueId, targetQueue.size());
+            MetricsManager.getMetricsProvider().sessionQueueInc(targetQueueId);
             return PostOffice.RouteResult.success(clientId, cmd.completableFuture());
         } else {
             LOG.warn("Session command queue {} is full executing action {}", targetQueueId, actionDescription);
