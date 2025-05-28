@@ -38,8 +38,8 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
-import static io.moquette.BrokerConstants.INFLIGHT_WINDOW_SIZE;
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
+import io.moquette.logging.MetricsManager;
 
 public class SessionRegistry {
 
@@ -261,6 +261,7 @@ public class SessionRegistry {
                 queues.remove(session.clientId());
                 Session rehydrated = new Session(session, false, persistentQueue);
                 pool.put(session.clientId(), rehydrated);
+                MetricsManager.getMetricsProvider().addOpenSession();
 
                 trackForRemovalOnExpiration(session);
             }
@@ -280,6 +281,7 @@ public class SessionRegistry {
 
             // publish the session
             final Session previous = pool.put(clientId, newSession);
+            MetricsManager.getMetricsProvider().addOpenSession();
             if (previous != null) {
                 // if this happens mean that another Session Event Loop thread processed a CONNECT message
                 // with the same clientId. This is a bug because all messages for the same clientId should
@@ -307,7 +309,10 @@ public class SessionRegistry {
             purgeSessionState(oldSession);
             // publish new session
             final Session newSession = createNewSession(msg, clientId);
-            pool.put(clientId, newSession);
+            Session previous = pool.put(clientId, newSession);
+            if (previous == null) {
+                LOG.error("We're re-opening a session for clientId {}, but the old one is not in the pool! this is a bug!", clientId);
+            }
 
             LOG.trace("case 2, oldSession with same CId {} disconnected", clientId);
             creationResult = new SessionCreationResult(newSession, CreationModeEnum.CREATED_CLEAN_NEW, true);
@@ -499,6 +504,7 @@ public class SessionRegistry {
     void remove(String clientID) {
         final Session old = pool.remove(clientID);
         if (old != null) {
+            MetricsManager.getMetricsProvider().removeOpenSession();
             // remove from expired tracker if present
             sessionExpirationService.untrack(clientID);
             loopsGroup.routeCommand(clientID, "Clean up removed session", () -> {

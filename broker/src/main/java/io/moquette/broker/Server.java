@@ -69,6 +69,7 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
 import static io.moquette.logging.LoggingUtils.getInterceptorIds;
+import io.moquette.logging.MetricsManager;
 
 public class Server {
 
@@ -181,6 +182,8 @@ public class Server {
             handlers = Collections.emptyList();
         }
         LOG.trace("Starting Moquette Server. MQTT message interceptors={}", getInterceptorIds(handlers));
+
+        MetricsManager.init(config);
 
         scheduler = Executors.newScheduledThreadPool(1);
 
@@ -619,6 +622,7 @@ public class Server {
 
         interceptor.stop();
         dispatcher.terminate();
+        MetricsManager.stop();
         LOG.info("Moquette integration has been stopped.");
     }
 

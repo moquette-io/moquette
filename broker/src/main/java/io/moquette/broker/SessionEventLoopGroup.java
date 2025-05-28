@@ -2,6 +2,7 @@ package io.moquette.broker;
 
 import io.moquette.interception.BrokerInterceptor;
 import io.moquette.interception.messages.InterceptExceptionMessage;
+import io.moquette.logging.MetricsManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,12 +24,13 @@ class SessionEventLoopGroup {
 
     SessionEventLoopGroup(BrokerInterceptor interceptor, int sessionQueueSize) {
         this.sessionQueues = new BlockingQueue[eventLoops];
+        MetricsManager.getMetricsProvider().initSessionQueues(eventLoops, sessionQueueSize);
         for (int i = 0; i < eventLoops; i++) {
             this.sessionQueues[i] = new ArrayBlockingQueue<>(sessionQueueSize);
         }
         this.sessionExecutors = new SessionEventLoop[eventLoops];
         for (int i = 0; i < eventLoops; i++) {
-            SessionEventLoop newLoop = new SessionEventLoop(this.sessionQueues[i]);
+            SessionEventLoop newLoop = new SessionEventLoop(this.sessionQueues[i], i);
             newLoop.setName(sessionLoopName(i));
             newLoop.setUncaughtExceptionHandler((loopThread, ex) -> {
                 // executed in session loop thread
@@ -78,10 +80,13 @@ class SessionEventLoopGroup {
             SessionEventLoop.executeTask(task);
             return PostOffice.RouteResult.success(clientId, cmd.completableFuture());
         }
-        if (this.sessionQueues[targetQueueId].offer(task)) {
+        final BlockingQueue<FutureTask<String>> targetQueue = this.sessionQueues[targetQueueId];
+        if (targetQueue.offer(task)) {
+            MetricsManager.getMetricsProvider().setSessionQueueFill(targetQueueId, targetQueue.size());
             return PostOffice.RouteResult.success(clientId, cmd.completableFuture());
         } else {
             LOG.warn("Session command queue {} is full executing action {}", targetQueueId, actionDescription);
+            MetricsManager.getMetricsProvider().addSessionQueueOverrun(targetQueueId);
             return PostOffice.RouteResult.failed(clientId);
         }
     }

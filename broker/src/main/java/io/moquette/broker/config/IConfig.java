@@ -70,6 +70,8 @@ public abstract class IConfig {
     public static final String TOPIC_ALIAS_MAXIMUM_PROPERTY_NAME = "topic_alias_maximum";
     public static final String SERVER_KEEP_ALIVE_PROPERTY_NAME = "server_keep_alive";
 
+    public static final String METRICS_PROVIDER_CLASS = "metrics_provider_class";
+
     public abstract void setProperty(String name, String value);
 
     /**
