@@ -902,7 +902,6 @@ class PostOffice {
         Utils.retain(msg, subscriptionCount, BT_ROUTE_TARGET);
 
         List<RouteResult> publishResults = collector.routeBatchedPublishes((batch) -> {
-            MetricsManager.getMetricsProvider().addMessage(SessionEventLoop.getThreadQueueId(), publishingQos.value());
             publishToSession(topic, batch, publishingQos, retainPublish, messageExpiry, msg);
             Utils.release(msg, BT_ROUTE_TARGET);
         });
@@ -948,6 +947,7 @@ class PostOffice {
             LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
                       sub.getClientId(), sub.getTopicFilter(), qos);
 
+            MetricsManager.getMetricsProvider().addMessage(SessionEventLoop.getThreadQueueId(), qos.value());
             Collection<? extends MqttProperties.MqttProperty> existingProperties = msg.variableHeader().properties().listAll();
             final MqttProperties.MqttProperty[] properties = prepareSubscriptionProperties(sub, existingProperties);
             final SessionRegistry.PublishedMessage publishedMessage =
