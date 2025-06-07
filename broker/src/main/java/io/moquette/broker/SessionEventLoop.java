@@ -30,11 +30,11 @@ final class SessionEventLoop extends Thread {
         this.taskQueue = taskQueue;
         this.queueId = queueId;
         this.flushOnExit = flushOnExit;
-        threadQueueId.set(queueId);
     }
 
     @Override
     public void run() {
+        threadQueueId.set(queueId);
         while (!Thread.interrupted() || (Thread.interrupted() && !taskQueue.isEmpty() && flushOnExit)) {
             try {
                 // blocking call
