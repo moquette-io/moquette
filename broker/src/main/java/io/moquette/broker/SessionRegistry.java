@@ -311,8 +311,8 @@ public class SessionRegistry {
             // publish new session
             final Session newSession = createNewSession(msg, clientId);
             Session previous = pool.put(clientId, newSession);
-            if (previous == null) {
-                LOG.error("We're re-opening a session for clientId {}, but the old one is not in the pool! this is a bug!", clientId);
+            if (previous != null) {
+                LOG.error("We're re-opening a session for clientId {} and we purged the old session, but there is still a session in the pool! this is a bug!", clientId);
             }
 
             LOG.trace("case 2, oldSession with same CId {} disconnected", clientId);
