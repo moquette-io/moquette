@@ -62,4 +62,14 @@ public class MetricsProviderNull implements MetricsProvider {
         // ignored
     }
 
+    @Override
+    public void addPublish() {
+        // ignored
+    }
+
+    @Override
+    public void addMessage(int queue, int qos) {
+        // ignored
+    }
+
 }

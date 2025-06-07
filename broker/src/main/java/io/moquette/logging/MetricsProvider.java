@@ -61,4 +61,16 @@ public interface MetricsProvider {
      * Register the removal of a session.
      */
     public void removeOpenSession();
+
+    /**
+     * Register a publish.
+     */
+    public void addPublish();
+
+    /**
+     * Register the sending of a message to a client, on the given session queue.
+     * @param queue The queueId, 0-based, or -1 if called from a non-session thread.
+     * @param qos The QoS of the message.
+     */
+    public void addMessage(int queue, int qos);
 }

@@ -43,6 +43,9 @@ public class MetricsProviderPrometheus implements MetricsProvider {
     private Counter sessionQueueOverrunCounter;
     private CounterDataPoint[] sessionQueueOverrunCounters;
     private Gauge openSessionsGauge;
+    private Counter messageCounter;
+    private CounterDataPoint[][] messageCounters;
+    private Counter publishCounter;
 
     @Override
     public void init(IConfig config) {
@@ -65,6 +68,10 @@ public class MetricsProviderPrometheus implements MetricsProvider {
                 .help("The number of open sessions in the broker.")
                 .register();
 
+        publishCounter = Counter.builder()
+                .name("moquette_publishes")
+                .help("Number of publishes made on the broker")
+                .register();
     }
 
     @Override
@@ -83,19 +90,30 @@ public class MetricsProviderPrometheus implements MetricsProvider {
                 .register();
 
         sessionQueueOverrunCounter = Counter.builder()
-                .name("moquette_queue_overruns")
+                .name("moquette_session_queue_overruns")
                 .help("Number of items dropped because the queue was full")
                 .labelNames("queue_name")
                 .register();
 
+        messageCounter = Counter.builder()
+                .name("moquette_session_messages")
+                .help("Number of messages send by this session queue")
+                .labelNames("queue_name", "QoS")
+                .register();
+
         sessionQueueFillGauges = new GaugeDataPoint[queueCount];
         sessionQueueOverrunCounters = new CounterDataPoint[queueCount];
+        messageCounters = new CounterDataPoint[queueCount][3];
         for (int id = 0; id < queueCount; id++) {
             final String label = "queue-" + id;
             sessionQueueFillGauges[id] = sessionQueueFillGauge.labelValues(label);
             sessionQueueFillGauges[id].set(0);
             sessionQueueOverrunCounters[id] = sessionQueueOverrunCounter.labelValues(label);
             sessionQueueOverrunCounter.initLabelValues(label);
+            for (int qos = 0; qos <= 2; qos++) {
+                messageCounters[id][qos] = messageCounter.labelValues(label, Integer.toString(qos));
+                messageCounter.initLabelValues(label, Integer.toString(qos));
+            }
         }
     }
 
@@ -131,6 +149,19 @@ public class MetricsProviderPrometheus implements MetricsProvider {
     @Override
     public void removeOpenSession() {
         openSessionsGauge.dec();
+    }
+
+    @Override
+    public void addPublish() {
+        publishCounter.inc();
+    }
+
+    @Override
+    public void addMessage(int queue, int qos) {
+        if (queue < 0 || queue >= messageCounters.length) {
+            return;
+        }
+        messageCounters[queue][qos].inc();
     }
 
 }

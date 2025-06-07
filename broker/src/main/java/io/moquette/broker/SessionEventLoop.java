@@ -14,6 +14,10 @@ final class SessionEventLoop extends Thread {
     private final BlockingQueue<FutureTask<String>> taskQueue;
     private final boolean flushOnExit;
     private final int queueId;
+    /**
+     * Allows a task to fetch the id of the session queue that is executing it.
+     */
+    private static final ThreadLocal<Integer> threadQueueId = new ThreadLocal<>();
 
     public SessionEventLoop(BlockingQueue<FutureTask<String>> taskQueue, int queueId) {
         this(taskQueue, queueId, true);
@@ -26,6 +30,7 @@ final class SessionEventLoop extends Thread {
         this.taskQueue = taskQueue;
         this.queueId = queueId;
         this.flushOnExit = flushOnExit;
+        threadQueueId.set(queueId);
     }
 
     @Override
@@ -56,5 +61,13 @@ final class SessionEventLoop extends Thread {
                 throw new RuntimeException(th);
             }
         }
+    }
+
+    public static int getThreadQueueId() {
+        Integer id = threadQueueId.get();
+        if (id == null) {
+            return -1;
+        }
+        return id;
     }
 }

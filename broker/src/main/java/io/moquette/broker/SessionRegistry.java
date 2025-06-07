@@ -152,8 +152,8 @@ public class SessionRegistry {
         }
 
         private static boolean isPublicationExpiryProperty(MqttProperties.MqttProperty property) {
-            return property instanceof MqttProperties.IntegerProperty &&
-                property.propertyId() == MqttProperties.MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL.value();
+            return property instanceof MqttProperties.IntegerProperty
+                && property.propertyId() == MqttProperties.MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL.value();
         }
 
         public Instant getMessageExpiry() {
@@ -162,18 +162,19 @@ public class SessionRegistry {
 
         @Override
         public String toString() {
-            return "PublishedMessage{" +
-                "topic=" + topic +
-                ", publishingQos=" + publishingQos +
-                ", payload=" + payload +
-                ", retained=" + retained +
-                ", messageExpiry=" + messageExpiry +
-                ", mqttProperties=" + Arrays.toString(mqttProperties) +
-                '}';
+            return "PublishedMessage{"
+                + "topic=" + topic
+                + ", publishingQos=" + publishingQos
+                + ", payload=" + payload
+                + ", retained=" + retained
+                + ", messageExpiry=" + messageExpiry
+                + ", mqttProperties=" + Arrays.toString(mqttProperties)
+                + '}';
         }
     }
 
     public static final class PubRelMarker extends EnqueuedMessage {
+
         @Override
         public String toString() {
             return "PubRelMarker{}";

@@ -58,6 +58,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static io.moquette.broker.Utils.messageId;
+import io.moquette.logging.MetricsManager;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
@@ -858,6 +859,7 @@ class PostOffice {
     private RoutingResults publish2Subscribers(String publisherClientId,
                                                Set<String> filterTargetClients, Instant messageExpiry,
                                                MqttPublishMessage msg) {
+        MetricsManager.getMetricsProvider().addPublish();
         final boolean retainPublish = msg.fixedHeader().isRetain();
         final Topic topic = new Topic(msg.variableHeader().topicName());
         final MqttQoS publishingQos = msg.fixedHeader().qosLevel();
@@ -900,6 +902,7 @@ class PostOffice {
         Utils.retain(msg, subscriptionCount, BT_ROUTE_TARGET);
 
         List<RouteResult> publishResults = collector.routeBatchedPublishes((batch) -> {
+            MetricsManager.getMetricsProvider().addMessage(SessionEventLoop.getThreadQueueId(), publishingQos.value());
             publishToSession(topic, batch, publishingQos, retainPublish, messageExpiry, msg);
             Utils.release(msg, BT_ROUTE_TARGET);
         });
