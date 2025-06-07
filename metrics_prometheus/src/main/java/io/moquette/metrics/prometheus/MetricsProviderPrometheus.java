@@ -21,6 +21,7 @@ import io.prometheus.metrics.core.datapoints.CounterDataPoint;
 import io.prometheus.metrics.core.datapoints.GaugeDataPoint;
 import io.prometheus.metrics.core.metrics.Counter;
 import io.prometheus.metrics.core.metrics.Gauge;
+import io.prometheus.metrics.core.metrics.GaugeWithCallback;
 import io.prometheus.metrics.exporter.httpserver.HTTPServer;
 import io.prometheus.metrics.instrumentation.jvm.JvmMetrics;
 import java.io.IOException;
@@ -38,12 +39,10 @@ public class MetricsProviderPrometheus implements MetricsProvider {
 
     private HTTPServer metricsServer;
 
-    private Gauge sessionQueueFillGauge;
-    private GaugeDataPoint[] sessionQueueFillGauges;
-    private Counter sessionQueueOverrunCounter;
-    private CounterDataPoint[] sessionQueueOverrunCounters;
     private Gauge openSessionsGauge;
-    private Counter messageCounter;
+    private int[] sessionQueueFillMax;
+    private GaugeDataPoint[] sessionQueueFillGauges;
+    private CounterDataPoint[] sessionQueueOverrunCounters;
     private CounterDataPoint[][] messageCounters;
     private Counter publishCounter;
 
@@ -83,19 +82,19 @@ public class MetricsProviderPrometheus implements MetricsProvider {
 
     @Override
     public void initSessionQueues(int queueCount, int queueSize) {
-        sessionQueueFillGauge = Gauge.builder()
+        Gauge sessionQueueFillGauge = Gauge.builder()
                 .name("moquette_session_queue_fill")
                 .help("Number of items in the Session Queue")
                 .labelNames("queue_id")
                 .register();
 
-        sessionQueueOverrunCounter = Counter.builder()
+        Counter sessionQueueOverrunCounter = Counter.builder()
                 .name("moquette_session_queue_overruns")
                 .help("Number of items dropped because the queue was full")
                 .labelNames("queue_name")
                 .register();
 
-        messageCounter = Counter.builder()
+        Counter messageCounter = Counter.builder()
                 .name("moquette_session_messages")
                 .help("Number of messages send by this session queue")
                 .labelNames("queue_name", "QoS")
@@ -104,6 +103,7 @@ public class MetricsProviderPrometheus implements MetricsProvider {
         sessionQueueFillGauges = new GaugeDataPoint[queueCount];
         sessionQueueOverrunCounters = new CounterDataPoint[queueCount];
         messageCounters = new CounterDataPoint[queueCount][3];
+        sessionQueueFillMax = new int[queueCount];
         for (int id = 0; id < queueCount; id++) {
             final String label = "queue-" + id;
             sessionQueueFillGauges[id] = sessionQueueFillGauge.labelValues(label);
@@ -115,6 +115,19 @@ public class MetricsProviderPrometheus implements MetricsProvider {
                 messageCounter.initLabelValues(label, Integer.toString(qos));
             }
         }
+
+        GaugeWithCallback.builder()
+                .name("moquette_session_queue_fill_max")
+                .help("Maximum number of items in the Session Queue since the last scrape call")
+                .labelNames("queue_id")
+                .callback(cb -> {
+                    for (int idx = 0; idx < sessionQueueFillMax.length; idx++) {
+                        final String label = "queue-" + idx;
+                        cb.call(sessionQueueFillMax[idx], label);
+                        sessionQueueFillMax[idx] = 0;
+                    }
+                })
+                .register();
     }
 
     @Override
@@ -122,7 +135,12 @@ public class MetricsProviderPrometheus implements MetricsProvider {
         if (queue >= sessionQueueFillGauges.length) {
             return;
         }
-        sessionQueueFillGauges[queue].inc();
+        final GaugeDataPoint gauge = sessionQueueFillGauges[queue];
+        gauge.inc();
+        double value = gauge.get();
+        if (value > sessionQueueFillMax[queue]) {
+            sessionQueueFillMax[queue] = (int) value;
+        }
     }
 
     @Override
