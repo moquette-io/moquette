@@ -68,7 +68,7 @@ public class MetricsProviderPrometheus implements MetricsProvider {
                 .register();
 
         publishCounter = Counter.builder()
-                .name("moquette_publishes")
+                .name("moquette_publishes_total")
                 .help("Number of publishes made on the broker")
                 .register();
     }
@@ -89,13 +89,13 @@ public class MetricsProviderPrometheus implements MetricsProvider {
                 .register();
 
         Counter sessionQueueOverrunCounter = Counter.builder()
-                .name("moquette_session_queue_overruns")
+                .name("moquette_session_queue_overruns_total")
                 .help("Number of items dropped because the queue was full")
                 .labelNames("queue_name")
                 .register();
 
         Counter messageCounter = Counter.builder()
-                .name("moquette_session_messages")
+                .name("moquette_session_messages_total")
                 .help("Number of messages send by this session queue")
                 .labelNames("queue_name", "QoS")
                 .register();
