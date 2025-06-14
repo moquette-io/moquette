@@ -48,3 +48,4 @@ broker/nbactions-Server.xml
 maven-metadata.xml
 /.gradle/
 /bin/
+/metrics_prometheus/nbproject/

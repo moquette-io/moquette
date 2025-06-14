@@ -36,6 +36,13 @@ public class MetricsProviderPrometheus implements MetricsProvider {
 
     public static final String TAG_ENDPOINT_PORT = "metrics_endpoint_port";
 
+    public static final String METRIC_MOQUETTE_PUBLISHES_TOTAL = "moquette_publishes_total";
+    public static final String METRIC_MOQUETTE_OPEN_SESSIONS = "moquette_open_sessions";
+    public static final String METRIC_MOQUETTE_SESSION_QUEUE_FILL_MAX = "moquette_session_queue_fill_max";
+    public static final String METRIC_MOQUETTE_SESSION_MESSAGES_TOTAL = "moquette_session_messages_total";
+    public static final String METRIC_MOQUETTE_SESSION_QUEUE_OVERRUNS_TOTAL = "moquette_session_queue_overruns_total";
+    public static final String METRIC_MOQUETTE_SESSION_QUEUE_FILL = "moquette_session_queue_fill";
+
     private static final Logger LOG = LoggerFactory.getLogger(MetricsProviderPrometheus.class);
 
     private HTTPServer metricsServer;
@@ -65,12 +72,12 @@ public class MetricsProviderPrometheus implements MetricsProvider {
             LOG.error("Failed to start metrics server.", ex);
         }
         openSessionsGauge = Gauge.builder()
-                .name("moquette_open_sessions")
+                .name(METRIC_MOQUETTE_OPEN_SESSIONS)
                 .help("The number of open sessions in the broker.")
                 .register();
 
         publishCounter = Counter.builder()
-                .name("moquette_publishes_total")
+                .name(METRIC_MOQUETTE_PUBLISHES_TOTAL)
                 .help("Number of publishes made on the broker")
                 .register();
     }
@@ -90,7 +97,7 @@ public class MetricsProviderPrometheus implements MetricsProvider {
     public void initSessionQueues(int queueCount, int queueSize) {
         this.sessionQueueSize = queueSize;
         GaugeWithCallback.builder()
-                .name("moquette_session_queue_fill")
+                .name(METRIC_MOQUETTE_SESSION_QUEUE_FILL)
                 .help("Fill level of the Session Queue (0 - 1)")
                 .labelNames("queue_id")
                 .callback(cb -> {
@@ -101,13 +108,13 @@ public class MetricsProviderPrometheus implements MetricsProvider {
                 .register();
 
         Counter sessionQueueOverrunCounter = Counter.builder()
-                .name("moquette_session_queue_overruns_total")
+                .name(METRIC_MOQUETTE_SESSION_QUEUE_OVERRUNS_TOTAL)
                 .help("Number of items dropped because the queue was full")
                 .labelNames("queue_name")
                 .register();
 
         Counter messageCounter = Counter.builder()
-                .name("moquette_session_messages_total")
+                .name(METRIC_MOQUETTE_SESSION_MESSAGES_TOTAL)
                 .help("Number of messages send by this session queue")
                 .labelNames("queue_name", "QoS")
                 .register();
@@ -128,7 +135,7 @@ public class MetricsProviderPrometheus implements MetricsProvider {
         }
 
         GaugeWithCallback.builder()
-                .name("moquette_session_queue_fill_max")
+                .name(METRIC_MOQUETTE_SESSION_QUEUE_FILL_MAX)
                 .help("Maximum fill level of the Session Queue since the last scrape call (0 - 1)")
                 .labelNames("queue_id")
                 .callback(cb -> {
