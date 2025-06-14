@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The original author or authors
+ * Copyright (c) 2025 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -25,6 +25,7 @@ import io.prometheus.metrics.core.metrics.GaugeWithCallback;
 import io.prometheus.metrics.exporter.httpserver.HTTPServer;
 import io.prometheus.metrics.instrumentation.jvm.JvmMetrics;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,9 +40,10 @@ public class MetricsProviderPrometheus implements MetricsProvider {
 
     private HTTPServer metricsServer;
 
+    private int sessionQueueSize;
     private Gauge openSessionsGauge;
+    private AtomicInteger[] sessionQueueFill;
     private int[] sessionQueueFillMax;
-    private GaugeDataPoint[] sessionQueueFillGauges;
     private CounterDataPoint[] sessionQueueOverrunCounters;
     private CounterDataPoint[][] messageCounters;
     private Counter publishCounter;
@@ -80,12 +82,22 @@ public class MetricsProviderPrometheus implements MetricsProvider {
         }
     }
 
+    private String labelForQueue(int id) {
+        return "queue-" + id;
+    }
+
     @Override
     public void initSessionQueues(int queueCount, int queueSize) {
-        Gauge sessionQueueFillGauge = Gauge.builder()
+        this.sessionQueueSize = queueSize;
+        GaugeWithCallback.builder()
                 .name("moquette_session_queue_fill")
-                .help("Number of items in the Session Queue")
+                .help("Fill level of the Session Queue (0 - 1)")
                 .labelNames("queue_id")
+                .callback(cb -> {
+                    for (int idx = 0; idx < sessionQueueFill.length; idx++) {
+                        cb.call(1.0 * sessionQueueFill[idx].get() / sessionQueueSize, labelForQueue(idx));
+                    }
+                })
                 .register();
 
         Counter sessionQueueOverrunCounter = Counter.builder()
@@ -100,14 +112,13 @@ public class MetricsProviderPrometheus implements MetricsProvider {
                 .labelNames("queue_name", "QoS")
                 .register();
 
-        sessionQueueFillGauges = new GaugeDataPoint[queueCount];
+        sessionQueueFill = new AtomicInteger[queueCount];
         sessionQueueOverrunCounters = new CounterDataPoint[queueCount];
         messageCounters = new CounterDataPoint[queueCount][3];
         sessionQueueFillMax = new int[queueCount];
         for (int id = 0; id < queueCount; id++) {
             final String label = "queue-" + id;
-            sessionQueueFillGauges[id] = sessionQueueFillGauge.labelValues(label);
-            sessionQueueFillGauges[id].set(0);
+            sessionQueueFill[id] = new AtomicInteger();
             sessionQueueOverrunCounters[id] = sessionQueueOverrunCounter.labelValues(label);
             sessionQueueOverrunCounter.initLabelValues(label);
             for (int qos = 0; qos <= 2; qos++) {
@@ -118,12 +129,12 @@ public class MetricsProviderPrometheus implements MetricsProvider {
 
         GaugeWithCallback.builder()
                 .name("moquette_session_queue_fill_max")
-                .help("Maximum number of items in the Session Queue since the last scrape call")
+                .help("Maximum fill level of the Session Queue since the last scrape call (0 - 1)")
                 .labelNames("queue_id")
                 .callback(cb -> {
                     for (int idx = 0; idx < sessionQueueFillMax.length; idx++) {
                         final String label = "queue-" + idx;
-                        cb.call(sessionQueueFillMax[idx], label);
+                        cb.call(1.0 * sessionQueueFillMax[idx] / sessionQueueSize, label);
                         sessionQueueFillMax[idx] = 0;
                     }
                 })
@@ -132,12 +143,10 @@ public class MetricsProviderPrometheus implements MetricsProvider {
 
     @Override
     public void sessionQueueInc(int queue) {
-        if (queue >= sessionQueueFillGauges.length) {
+        if (queue >= sessionQueueFill.length) {
             return;
         }
-        final GaugeDataPoint gauge = sessionQueueFillGauges[queue];
-        gauge.inc();
-        double value = gauge.get();
+        int value = sessionQueueFill[queue].incrementAndGet();
         if (value > sessionQueueFillMax[queue]) {
             sessionQueueFillMax[queue] = (int) value;
         }
@@ -145,10 +154,10 @@ public class MetricsProviderPrometheus implements MetricsProvider {
 
     @Override
     public void sessionQueueDec(int queue) {
-        if (queue >= sessionQueueFillGauges.length) {
+        if (queue >= sessionQueueFill.length) {
             return;
         }
-        sessionQueueFillGauges[queue].dec();
+        sessionQueueFill[queue].decrementAndGet();
     }
 
     @Override
