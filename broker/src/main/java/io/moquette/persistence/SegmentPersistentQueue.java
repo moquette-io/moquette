@@ -63,5 +63,6 @@ public class SegmentPersistentQueue extends AbstractSessionMessageQueue<SessionR
     @Override
     public void closeAndPurge() {
         closed = true;
+        segmentedQueue.close();
     }
 }

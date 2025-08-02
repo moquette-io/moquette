@@ -1,4 +1,5 @@
 Version 0.19-SNAPSHOT
+   [fix] Fixed SegmentedQueues not being cleaned up on session purge. (#833)
 
 Version 0.18:
    [fix] Update Netty to 4.1.116 and H2 2.1.214
