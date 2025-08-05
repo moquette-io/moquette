@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The original author or authors
+ * Copyright (c) 2012-2025 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -99,11 +99,5 @@ public class MessageCollector implements MqttCallback {
      */
     @Override
     public void deliveryComplete(IMqttDeliveryToken token) {
-//        try {
-//            token.waitForCompletion(1_000);
-//            m_messages.offer(new ReceivedMessage(token.getMessage(), token.getTopics()[0]));
-//        } catch (MqttException e) {
-//            e.printStackTrace();
-//        }
     }
 }

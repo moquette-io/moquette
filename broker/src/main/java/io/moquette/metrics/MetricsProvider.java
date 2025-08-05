@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The original author or authors
+ * Copyright (c) 2012-2025 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -13,12 +13,13 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
-package io.moquette.logging;
+package io.moquette.metrics;
 
 import io.moquette.broker.config.IConfig;
 
 /**
  * Interface that a metrics implementation must implement.
+ * It mainly defines methods that are used to track Moquette metrics.
  */
 public interface MetricsProvider {
 

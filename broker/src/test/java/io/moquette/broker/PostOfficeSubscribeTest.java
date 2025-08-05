@@ -43,6 +43,7 @@ import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsReposit
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static io.moquette.broker.PostOfficePublishTest.ALLOW_ANONYMOUS_AND_ZERO_BYTES_CLID;
 import static io.moquette.broker.PostOfficePublishTest.SUBSCRIBER_ID;
+import io.moquette.metrics.MetricsManager;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;
 import static java.util.Collections.singleton;
@@ -86,6 +87,7 @@ public class PostOfficeSubscribeTest {
     @AfterEach
     public void tearDown() {
         scheduler.shutdown();
+        MetricsManager.stop();
     }
 
     private void createMQTTConnection(BrokerConfiguration config) {
@@ -180,6 +182,7 @@ public class PostOfficeSubscribeTest {
         when(prohibitReadOnNewsTopic.canRead(eq(new Topic(NEWS_TOPIC)), eq(FAKE_USER_NAME), eq(FAKE_CLIENT_ID)))
             .thenReturn(false);
 
+        MetricsManager.stop();
         final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024);
         sut = new PostOffice(subscriptions, new MemoryRetainedRepository(), sessionRegistry, fakeSessionRepo,
                              ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, new Authorizator(prohibitReadOnNewsTopic), loopsGroup);

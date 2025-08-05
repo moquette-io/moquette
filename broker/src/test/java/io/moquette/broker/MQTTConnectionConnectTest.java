@@ -52,6 +52,7 @@ import javax.net.ssl.SSLSession;
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
 import static io.moquette.broker.NettyChannelAssertions.assertEqualsConnAck;
+import io.moquette.metrics.MetricsManager;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.*;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
@@ -109,6 +110,7 @@ public class MQTTConnectionConnectTest {
     @AfterEach
     public void tearDown() {
         scheduler.shutdown();
+        MetricsManager.stop();
     }
 
     private MQTTConnection createMQTTConnection(BrokerConfiguration config) {

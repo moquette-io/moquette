@@ -56,6 +56,7 @@ import java.util.concurrent.TimeUnit;
 
 import static io.moquette.BrokerConstants.DISABLED_TOPIC_ALIAS;
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
+import io.moquette.metrics.MetricsManager;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
@@ -97,6 +98,7 @@ public class MQTTConnectionPublishTest {
     public void tearDown() {
         payload.release();
         scheduler.shutdown();
+        MetricsManager.stop();
     }
 
     private void createMQTTConnection(BrokerConfiguration config) {
@@ -252,6 +254,7 @@ public class MQTTConnectionPublishTest {
         BrokerConfiguration config = new BrokerConfiguration(true, false, true,
             false, NO_BUFFER_FLUSH, BrokerConstants.INFLIGHT_WINDOW_SIZE,
             DISABLED_TOPIC_ALIAS);
+        MetricsManager.stop();
         // Overwrite the existing connection with new with topic alias disabled
         createMQTTConnection(config);
 

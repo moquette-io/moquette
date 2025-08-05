@@ -40,10 +40,11 @@ import org.eclipse.paho.client.mqttv3.MqttClientPersistence;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
 import org.junit.jupiter.api.AfterEach;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,21 +56,21 @@ public class MetricsProviderPrometheusTest {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MetricsProviderPrometheusTest.class.getName());
 
-    Server m_server;
+    Server server;
     IMqttClient clientListener;
     IMqttClient clientPublisher;
     MessageCollector messagesCollector;
-    IConfig m_config;
+    IConfig config;
 
     @TempDir
     Path tempFolder;
     private String dbPath;
 
     protected void startServer(String dbPath) throws IOException {
-        m_server = new Server();
+        server = new Server();
         final Properties configProps = prepareTestProperties(dbPath);
-        m_config = new MemoryConfig(configProps);
-        m_server.startServer(m_config);
+        config = new MemoryConfig(configProps);
+        server.startServer(config);
     }
 
     public static Properties prepareTestProperties(String dbPath) {
@@ -108,7 +109,7 @@ public class MetricsProviderPrometheusTest {
     }
 
     private void stopServer() {
-        m_server.stopServer();
+        server.stopServer();
     }
 
     @Test

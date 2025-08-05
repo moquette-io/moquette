@@ -39,6 +39,7 @@ import java.util.concurrent.*;
 import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static io.moquette.broker.PostOfficePublishTest.PUBLISHER_ID;
+import io.moquette.metrics.MetricsManager;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
 import static java.util.Collections.*;
 import java.util.List;
@@ -77,6 +78,7 @@ public class PostOfficeUnsubscribeTest {
     @AfterEach
     public void tearDown() {
         scheduler.shutdown();
+        MetricsManager.stop();
     }
 
     private void createMQTTConnection(BrokerConfiguration config) {

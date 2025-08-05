@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 The original author or authors
+ * Copyright (c) 2012-2025 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -16,9 +16,8 @@
 package io.moquette.metrics.prometheus;
 
 import io.moquette.broker.config.IConfig;
-import io.moquette.logging.MetricsProvider;
+import io.moquette.metrics.MetricsProvider;
 import io.prometheus.metrics.core.datapoints.CounterDataPoint;
-import io.prometheus.metrics.core.datapoints.GaugeDataPoint;
 import io.prometheus.metrics.core.metrics.Counter;
 import io.prometheus.metrics.core.metrics.Gauge;
 import io.prometheus.metrics.core.metrics.GaugeWithCallback;

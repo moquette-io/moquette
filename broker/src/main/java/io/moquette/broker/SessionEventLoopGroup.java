@@ -2,7 +2,7 @@ package io.moquette.broker;
 
 import io.moquette.interception.BrokerInterceptor;
 import io.moquette.interception.messages.InterceptExceptionMessage;
-import io.moquette.logging.MetricsManager;
+import io.moquette.metrics.MetricsManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

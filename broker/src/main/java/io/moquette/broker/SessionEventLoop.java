@@ -1,6 +1,6 @@
 package io.moquette.broker;
 
-import io.moquette.logging.MetricsManager;
+import io.moquette.metrics.MetricsManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

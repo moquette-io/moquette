@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static io.moquette.broker.PostOfficeUnsubscribeTest.CONFIG;
+import io.moquette.metrics.MetricsManager;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singleton;
@@ -80,6 +81,7 @@ public class PostOfficeInternalPublishTest {
     @AfterEach
     public void tearDown() {
         scheduler.shutdown();
+        MetricsManager.stop();
     }
 
     private MQTTConnection createMQTTConnection(BrokerConfiguration config) {

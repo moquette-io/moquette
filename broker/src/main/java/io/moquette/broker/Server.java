@@ -68,8 +68,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
-import static io.moquette.logging.LoggingUtils.getInterceptorIds;
-import io.moquette.logging.MetricsManager;
+import static io.moquette.metrics.MetricsUtils.getInterceptorIds;
+import io.moquette.metrics.MetricsManager;
 
 public class Server {
 

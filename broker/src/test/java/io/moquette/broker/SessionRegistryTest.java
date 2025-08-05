@@ -57,6 +57,7 @@ import java.util.concurrent.TimeUnit;
 import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static io.moquette.broker.NettyChannelAssertions.assertEqualsConnAck;
+import io.moquette.metrics.MetricsManager;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
@@ -98,6 +99,7 @@ public class SessionRegistryTest {
     @AfterEach
     public void tearDown() {
         scheduler.shutdown();
+        MetricsManager.stop();
     }
 
     private void createMQTTConnection(BrokerConfiguration config) {
@@ -138,6 +140,7 @@ public class SessionRegistryTest {
         // disconnect
         res.session.disconnect();
 //        sut.disconnect(FAKE_CLIENT_ID);
+        MetricsManager.stop();
 
         // Exercise, reconnect
         EmbeddedChannel anotherChannel = new EmbeddedChannel();
@@ -158,6 +161,7 @@ public class SessionRegistryTest {
         assertEqualsConnAck(CONNECTION_ACCEPTED, channel.readOutbound());
         connection.processDisconnect(null).completableFuture().get();
         assertFalse(channel.isOpen());
+        MetricsManager.stop();
 
         // second connect with clean session false
         EmbeddedChannel anotherChannel = new EmbeddedChannel();

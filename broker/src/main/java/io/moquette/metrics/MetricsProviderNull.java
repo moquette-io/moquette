@@ -13,14 +13,14 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
-package io.moquette.logging;
+package io.moquette.metrics;
 
 import io.moquette.broker.config.IConfig;
 
 /**
  * A MetricsProvider interface that does nothing.
  */
-public class MetricsProviderNull implements MetricsProvider {
+public class MetricsProviderNull extends AbstractMetricsProvider {
 
     @Override
     public void init(IConfig config) {
@@ -30,11 +30,6 @@ public class MetricsProviderNull implements MetricsProvider {
     @Override
     public void stop() {
         // Nothing to configure for this implementation.
-    }
-
-    @Override
-    public void initSessionQueues(int queueCount, int queueSize) {
-        // ignored
     }
 
     @Override

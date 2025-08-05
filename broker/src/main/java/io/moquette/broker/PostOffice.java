@@ -58,7 +58,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static io.moquette.broker.Utils.messageId;
-import io.moquette.logging.MetricsManager;
+import io.moquette.metrics.MetricsManager;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_MOST_ONCE;
 import static io.netty.handler.codec.mqtt.MqttQoS.EXACTLY_ONCE;

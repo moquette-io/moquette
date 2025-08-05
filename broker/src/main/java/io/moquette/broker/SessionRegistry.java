@@ -39,7 +39,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
-import io.moquette.logging.MetricsManager;
+import io.moquette.metrics.MetricsManager;
 
 public class SessionRegistry {
 

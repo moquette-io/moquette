@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The original author or authors
+ * Copyright (c) 2012-2025 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -13,14 +13,16 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
-package io.moquette.logging;
+package io.moquette.metrics;
 
 import io.moquette.broker.config.IConfig;
 import static io.moquette.broker.config.IConfig.METRICS_PROVIDER_CLASS;
 import io.netty.util.internal.StringUtil;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.ServiceLoader;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,35 +37,43 @@ public class MetricsManager {
      * To ensure there is always an implementation ready, we initialise with a
      * null provider, and replace on init.
      */
-    private static MetricsProvider metricsProvider = new MetricsProviderNull();
+    private static MetricsProvider metricsProvider;
 
     public static void init(IConfig config) {
         ServiceLoader<MetricsProvider> loader = ServiceLoader.load(MetricsProvider.class);
         String classname = config.getProperty(METRICS_PROVIDER_CLASS, "");
+        List<MetricsProvider> foundProviders = new ArrayList<>();
+        loader.forEach(foundProviders::add);
 
-        MetricsProvider usedProvider = null;
-        List<String> foundProviders = new ArrayList<>();
-        for (MetricsProvider provider : loader) {
-            foundProviders.add(provider.getClass().getName());
-            if (!StringUtil.isNullOrEmpty(classname) && provider.getClass().getName().endsWith(classname)) {
-                LOG.info("Using configured MetricsProvider: {}", provider.getClass().getName());
-                usedProvider = provider;
-                break;
-            }
-        }
-        if (usedProvider == null) {
-            LOG.info("No MetricsProvider configured, or no matching found, using NULL provider. Available providers: {}", foundProviders);
-        } else {
+        Optional<MetricsProvider> usedProviderOpt = foundProviders.stream()
+                .filter(provider -> providerMatchClassname(provider, classname))
+                .findFirst();
+        if (usedProviderOpt.isPresent()) {
+            MetricsProvider usedProvider = usedProviderOpt.get();
+            LOG.info("Using configured MetricsProvider: {}", usedProvider.getClass().getName());
             metricsProvider = usedProvider;
+        } else {
+            LOG.info("No MetricsProvider configured, or no matching found, using NULL provider. Available providers: {}",
+                    foundProviders.stream().map(p -> p.getClass().getName()).collect(Collectors.toList()));
         }
-        metricsProvider.init(config);
+        getMetricsProvider().init(config);
+    }
+
+    private static boolean providerMatchClassname(MetricsProvider provider, String classname) {
+        return !StringUtil.isNullOrEmpty(classname) && provider.getClass().getName().endsWith(classname);
     }
 
     public static void stop() {
-        metricsProvider.stop();
+        if (metricsProvider != null) {
+            metricsProvider.stop();
+            metricsProvider = null;
+        }
     }
 
     public static MetricsProvider getMetricsProvider() {
+        if (metricsProvider == null) {
+            metricsProvider = new MetricsProviderNull();
+        }
         return metricsProvider;
     }
 }
