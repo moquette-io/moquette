@@ -1,4 +1,8 @@
 Version 0.19-SNAPSHOT
+   [feature] Added metrics framework and Prometheus implementation.
+     - Enable by setting `metrics_provider_class` to `MetricsProviderPrometheus`.
+     - Metrics endpoint can be found on http://localhost:9400/metrics by default.
+     - port can be changed with `metrics_endpoint_port`. Set to 0 to disable http endpoint.
    [fix] Fixed SegmentedQueues not being cleaned up on session purge. (#833)
 
 Version 0.18:

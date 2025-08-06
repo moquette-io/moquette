@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The original author or authors
+ * Copyright (c) 2012-2025 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -14,7 +14,7 @@
  * You may elect to redistribute this code under either of these licenses.
  */
 
-package io.moquette.integration;
+package io.moquette.metrics.prometheus;
 
 import org.eclipse.paho.client.mqttv3.IMqttActionListener;
 import org.eclipse.paho.client.mqttv3.IMqttAsyncClient;
@@ -70,19 +70,19 @@ public final class IntegrationUtils {
     private IntegrationUtils() {
     }
 
-    public static void disconnectClient(IMqttClient client) throws MqttException {
+    static void disconnectClient(IMqttClient client) throws MqttException {
         if (client != null && client.isConnected()) {
             client.disconnect();
         }
     }
 
-    public static void disconnectClient(IMqttAsyncClient client, IMqttActionListener callback) throws MqttException {
+    static void disconnectClient(IMqttAsyncClient client, IMqttActionListener callback) throws MqttException {
         if (client != null && client.isConnected()) {
             client.disconnect(null, callback);
         }
     }
 
-    public static void disconnectClient(IMqttAsyncClient client) throws MqttException {
+    static void disconnectClient(IMqttAsyncClient client) throws MqttException {
         if (client != null && client.isConnected()) {
             client.disconnect();
         }

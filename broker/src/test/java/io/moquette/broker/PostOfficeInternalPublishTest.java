@@ -37,6 +37,9 @@ import java.util.concurrent.TimeUnit;
 import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static io.moquette.broker.PostOfficeUnsubscribeTest.CONFIG;
+import io.moquette.metrics.MetricsManager;
+import io.moquette.metrics.MetricsProvider;
+import io.moquette.metrics.MetricsProviderNull;
 import static io.netty.handler.codec.mqtt.MqttQoS.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singleton;
@@ -99,13 +102,14 @@ public class PostOfficeInternalPublishTest {
         retainedRepository = new MemoryRetainedRepository();
         queueRepository = new MemoryQueueRepository();
 
+        final MetricsProvider mp = new MetricsProviderNull();
         final PermitAllAuthorizatorPolicy authorizatorPolicy = new PermitAllAuthorizatorPolicy();
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
-        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024);
+        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024, mp);
         ISessionsRepository fakeSessionRepo = memorySessionsRepository();
-        sessionRegistry = new SessionRegistry(subscriptions, fakeSessionRepo, queueRepository, permitAll, scheduler, loopsGroup);
+        sessionRegistry = new SessionRegistry(subscriptions, fakeSessionRepo, queueRepository, permitAll, scheduler, loopsGroup, mp);
         sut = new PostOffice(subscriptions, retainedRepository, sessionRegistry, fakeSessionRepo,
-                             ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup);
+                             ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup, mp);
     }
 
     private void internalPublishNotRetainedTo(String topic) {
