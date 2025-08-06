@@ -70,19 +70,19 @@ public final class IntegrationUtils {
     private IntegrationUtils() {
     }
 
-    static void disconnectClient(IMqttClient client) throws MqttException {
+    public static void disconnectClient(IMqttClient client) throws MqttException {
         if (client != null && client.isConnected()) {
             client.disconnect();
         }
     }
 
-    static void disconnectClient(IMqttAsyncClient client, IMqttActionListener callback) throws MqttException {
+    public static void disconnectClient(IMqttAsyncClient client, IMqttActionListener callback) throws MqttException {
         if (client != null && client.isConnected()) {
             client.disconnect(null, callback);
         }
     }
 
-    static void disconnectClient(IMqttAsyncClient client) throws MqttException {
+    public static void disconnectClient(IMqttAsyncClient client) throws MqttException {
         if (client != null && client.isConnected()) {
             client.disconnect();
         }

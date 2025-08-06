@@ -636,6 +636,10 @@ public class Server {
         return acceptor.getSslPort();
     }
 
+    public MetricsProvider getMetricsProvider() {
+        return metricsProvider;
+    }
+    
     /**
      * SPI method used by Broker embedded applications to get list of subscribers. Returns null if
      * the broker is not started.
