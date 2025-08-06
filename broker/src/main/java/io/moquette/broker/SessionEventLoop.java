@@ -1,6 +1,7 @@
 package io.moquette.broker;
 
 import io.moquette.metrics.MetricsManager;
+import io.moquette.metrics.MetricsProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,22 +15,25 @@ final class SessionEventLoop extends Thread {
     private final BlockingQueue<FutureTask<String>> taskQueue;
     private final boolean flushOnExit;
     private final int queueId;
+    private final MetricsProvider metricsProvider;
     /**
      * Allows a task to fetch the id of the session queue that is executing it.
      */
     private static final ThreadLocal<Integer> threadQueueId = new ThreadLocal<>();
 
-    public SessionEventLoop(BlockingQueue<FutureTask<String>> taskQueue, int queueId) {
-        this(taskQueue, queueId, true);
+    public SessionEventLoop(BlockingQueue<FutureTask<String>> taskQueue, int queueId, MetricsProvider metricsProvider) {
+        this(taskQueue, queueId, true, metricsProvider);
     }
 
     /**
      * @param flushOnExit consume the commands queue before exit.
-     * */
-    public SessionEventLoop(BlockingQueue<FutureTask<String>> taskQueue, int queueId, boolean flushOnExit) {
+     *
+     */
+    public SessionEventLoop(BlockingQueue<FutureTask<String>> taskQueue, int queueId, boolean flushOnExit, MetricsProvider metricsProvider) {
         this.taskQueue = taskQueue;
         this.queueId = queueId;
         this.flushOnExit = flushOnExit;
+        this.metricsProvider = metricsProvider;
     }
 
     @Override
@@ -39,7 +43,7 @@ final class SessionEventLoop extends Thread {
             try {
                 // blocking call
                 final FutureTask<String> task = taskQueue.take();
-                MetricsManager.getMetricsProvider().sessionQueueDec(queueId);
+                metricsProvider.sessionQueueDec(queueId);
                 executeTask(task);
             } catch (InterruptedException e) {
                 LOG.info("SessionEventLoop {} interrupted", Thread.currentThread().getName());

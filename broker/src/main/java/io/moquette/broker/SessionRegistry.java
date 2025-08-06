@@ -40,6 +40,7 @@ import java.util.stream.Collectors;
 
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
 import io.moquette.metrics.MetricsManager;
+import io.moquette.metrics.MetricsProvider;
 
 public class SessionRegistry {
 
@@ -206,6 +207,7 @@ public class SessionRegistry {
     private final IQueueRepository queueRepository;
     private final Authorizator authorizator;
     private final Clock clock;
+    private final MetricsProvider metricsProvider;
 
     // Used in testing
     SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory,
@@ -213,8 +215,9 @@ public class SessionRegistry {
                     IQueueRepository queueRepository,
                     Authorizator authorizator,
                     ScheduledExecutorService scheduler,
-                    SessionEventLoopGroup loopsGroup) {
-        this(subscriptionsDirectory, sessionsRepository, queueRepository, authorizator, scheduler, Clock.systemDefaultZone(), INFINITE_EXPIRY, loopsGroup);
+                    SessionEventLoopGroup loopsGroup,
+                    MetricsProvider metricsProvider) {
+        this(subscriptionsDirectory, sessionsRepository, queueRepository, authorizator, scheduler, Clock.systemDefaultZone(), INFINITE_EXPIRY, loopsGroup, metricsProvider);
     }
 
     SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory,
@@ -223,7 +226,8 @@ public class SessionRegistry {
                     Authorizator authorizator,
                     ScheduledExecutorService scheduler,
                     Clock clock, int globalExpirySeconds,
-                    SessionEventLoopGroup loopsGroup) {
+                    SessionEventLoopGroup loopsGroup,
+                    MetricsProvider metricsProvider) {
         this.subscriptionsDirectory = subscriptionsDirectory;
         this.sessionsRepository = sessionsRepository;
         this.queueRepository = queueRepository;
@@ -232,6 +236,7 @@ public class SessionRegistry {
         this.clock = clock;
         this.globalExpirySeconds = globalExpirySeconds;
         this.loopsGroup = loopsGroup;
+        this.metricsProvider = metricsProvider;
         recreateSessionPool();
     }
 
@@ -262,7 +267,7 @@ public class SessionRegistry {
                 queues.remove(session.clientId());
                 Session rehydrated = new Session(session, false, persistentQueue);
                 pool.put(session.clientId(), rehydrated);
-                MetricsManager.getMetricsProvider().addOpenSession();
+                metricsProvider.addOpenSession();
 
                 trackForRemovalOnExpiration(session);
             }
@@ -282,7 +287,7 @@ public class SessionRegistry {
 
             // publish the session
             final Session previous = pool.put(clientId, newSession);
-            MetricsManager.getMetricsProvider().addOpenSession();
+            metricsProvider.addOpenSession();
             if (previous != null) {
                 // if this happens mean that another Session Event Loop thread processed a CONNECT message
                 // with the same clientId. This is a bug because all messages for the same clientId should
@@ -505,7 +510,7 @@ public class SessionRegistry {
     void remove(String clientID) {
         final Session old = pool.remove(clientID);
         if (old != null) {
-            MetricsManager.getMetricsProvider().removeOpenSession();
+            metricsProvider.removeOpenSession();
             // remove from expired tracker if present
             sessionExpirationService.untrack(clientID);
             loopsGroup.routeCommand(clientID, "Clean up removed session", () -> {

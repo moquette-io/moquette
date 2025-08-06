@@ -33,17 +33,13 @@ public class MetricsManager {
 
     private static final Logger LOG = LoggerFactory.getLogger(MetricsManager.class);
 
-    /**
-     * To ensure there is always an implementation ready, we initialise with a
-     * null provider, and replace on init.
-     */
-    private static MetricsProvider metricsProvider;
-
-    public static void init(IConfig config) {
+    public static MetricsProvider createMetricsProvider(IConfig config) {
         ServiceLoader<MetricsProvider> loader = ServiceLoader.load(MetricsProvider.class);
         String classname = config.getProperty(METRICS_PROVIDER_CLASS, "");
         List<MetricsProvider> foundProviders = new ArrayList<>();
         loader.forEach(foundProviders::add);
+
+        MetricsProvider metricsProvider = new MetricsProviderNull();
 
         Optional<MetricsProvider> usedProviderOpt = foundProviders.stream()
                 .filter(provider -> providerMatchClassname(provider, classname))
@@ -56,24 +52,11 @@ public class MetricsManager {
             LOG.info("No MetricsProvider configured, or no matching found, using NULL provider. Available providers: {}",
                     foundProviders.stream().map(p -> p.getClass().getName()).collect(Collectors.toList()));
         }
-        getMetricsProvider().init(config);
+        metricsProvider.init(config);
+        return metricsProvider;
     }
 
     private static boolean providerMatchClassname(MetricsProvider provider, String classname) {
         return !StringUtil.isNullOrEmpty(classname) && provider.getClass().getName().endsWith(classname);
-    }
-
-    public static void stop() {
-        if (metricsProvider != null) {
-            metricsProvider.stop();
-            metricsProvider = null;
-        }
-    }
-
-    public static MetricsProvider getMetricsProvider() {
-        if (metricsProvider == null) {
-            metricsProvider = new MetricsProviderNull();
-        }
-        return metricsProvider;
     }
 }

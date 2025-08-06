@@ -70,6 +70,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
 import static io.moquette.metrics.MetricsUtils.getInterceptorIds;
 import io.moquette.metrics.MetricsManager;
+import io.moquette.metrics.MetricsProvider;
 
 public class Server {
 
@@ -84,6 +85,7 @@ public class Server {
     private H2Builder h2Builder;
     private SessionRegistry sessions;
     private boolean standalone = false;
+    private MetricsProvider metricsProvider;
 
     public static void main(String[] args) throws IOException {
         final Server server = new Server();
@@ -183,7 +185,7 @@ public class Server {
         }
         LOG.trace("Starting Moquette Server. MQTT message interceptors={}", getInterceptorIds(handlers));
 
-        MetricsManager.init(config);
+        metricsProvider = MetricsManager.createMetricsProvider(config);
 
         scheduler = Executors.newScheduledThreadPool(1);
 
@@ -257,13 +259,13 @@ public class Server {
         }
 
         final int sessionQueueSize = config.intProp(IConfig.SESSION_QUEUE_SIZE, 1024);
-        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(interceptor, sessionQueueSize);
+        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(interceptor, sessionQueueSize, metricsProvider);
         sessions = new SessionRegistry(subscriptions, sessionsRepository, queueRepository, authorizator, scheduler,
-            clock, globalSessionExpiry, loopsGroup);
+            clock, globalSessionExpiry, loopsGroup, metricsProvider);
 
         final MqttQoS serverGrantedQoS = parseMaxGrantedQoS(config);
         dispatcher = new PostOffice(subscriptions, retainedRepository, sessions, sessionsRepository, interceptor,
-            authorizator, loopsGroup, clock, serverGrantedQoS);
+            authorizator, loopsGroup, clock, serverGrantedQoS, metricsProvider);
         final BrokerConfiguration brokerConfig = new BrokerConfiguration(config);
         MQTTConnectionFactory connectionFactory = new MQTTConnectionFactory(brokerConfig, authenticator, sessions,
                                                                             dispatcher);
@@ -622,7 +624,7 @@ public class Server {
 
         interceptor.stop();
         dispatcher.terminate();
-        MetricsManager.stop();
+        metricsProvider.stop();
         LOG.info("Moquette integration has been stopped.");
     }
 
