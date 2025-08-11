@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * A metrics provider used for testing.
  */
-public class MetricsProviderTest extends AbstractMetricsProvider {
+public class MetricsProviderMock extends AbstractMetricsProvider {
 
     private int queueCount;
     private int queueSize;

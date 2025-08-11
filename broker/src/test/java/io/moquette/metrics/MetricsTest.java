@@ -71,7 +71,7 @@ public class MetricsTest {
 
     public static Properties prepareTestProperties(String dbPath) {
         Properties testProperties = IntegrationUtils.prepareTestProperties(dbPath);
-        testProperties.put(METRICS_PROVIDER_CLASS, "MetricsProviderTest");
+        testProperties.put(METRICS_PROVIDER_CLASS, "MetricsProviderMock");
         return testProperties;
     }
 
@@ -110,11 +110,11 @@ public class MetricsTest {
     @Test
     public void testMetrics() throws MqttException {
         MetricsProvider metricsProvider = server.getMetricsProvider();
-        MetricsProviderTest mp = null;
-        if (metricsProvider instanceof MetricsProviderTest) {
-            mp = (MetricsProviderTest) metricsProvider;
+        MetricsProviderMock mp = null;
+        if (metricsProvider instanceof MetricsProviderMock) {
+            mp = (MetricsProviderMock) metricsProvider;
         } else {
-            Assertions.fail("MetricsProvider should be of type MetricsProviderTest, found " + metricsProvider.getClass());
+            Assertions.fail("MetricsProvider should be of type MetricsProviderMock, found " + metricsProvider.getClass());
         }
 
         assertEquals(0, mp.getSessionCount());
