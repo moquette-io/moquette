@@ -241,10 +241,18 @@ public class SessionRegistry {
 
     private void removeExpiredSession(ISessionsRepository.SessionData expiredSession) {
         final String expiredAt = expiredSession.expireAt().map(Instant::toString).orElse("UNDEFINED");
-        LOG.debug("Removing session {}, expired on {}", expiredSession.clientId(), expiredAt);
-        remove(pool.get(expiredSession.clientId()));
-        sessionsRepository.delete(expiredSession);
-        subscriptionsDirectory.removeSharedSubscriptionsForClient(expiredSession.clientId());
+        final String clientId = expiredSession.clientId();
+        loopsGroup.routeCommand(clientId, "PurgeSession", () -> {
+            LOG.debug("Removing session {}, expired on {}", clientId, expiredAt);
+            final Session session = pool.get(clientId);
+            boolean success = session.assignState(SessionStatus.DISCONNECTED, SessionStatus.DESTROYED);
+            if (!success) {
+                remove(session);
+                sessionsRepository.delete(expiredSession);
+                subscriptionsDirectory.removeSharedSubscriptionsForClient(clientId);
+            }
+            return null;
+        });
     }
 
     private void trackForRemovalOnExpiration(ISessionsRepository.SessionData session) {
