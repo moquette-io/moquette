@@ -39,7 +39,7 @@ class TNode extends CNode {
     }
 
     @Override
-    CNode addSubscription(CTrie.SubscriptionRequest request) {
+    CNode addSubscription(Subscription request) {
         throw new IllegalStateException("Can't be invoked on TNode");
     }
 

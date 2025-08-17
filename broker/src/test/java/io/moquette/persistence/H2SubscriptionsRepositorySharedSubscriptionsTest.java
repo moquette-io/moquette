@@ -1,7 +1,6 @@
 package io.moquette.persistence;
 
 import io.moquette.broker.subscriptions.ShareName;
-import io.moquette.broker.subscriptions.SharedSubscription;
 import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.SubscriptionIdentifier;
 import io.moquette.broker.subscriptions.Topic;
@@ -23,6 +22,7 @@ class H2SubscriptionsRepositorySharedSubscriptionsTest extends H2BaseTest {
     private H2SubscriptionsRepository sut;
 
     @BeforeEach
+    @Override
     public void setUp() {
         super.setUp();
         sut = new H2SubscriptionsRepository(mvStore);
@@ -44,13 +44,13 @@ class H2SubscriptionsRepositorySharedSubscriptionsTest extends H2BaseTest {
     @Test
     public void givenNewSharedSubscriptionWhenItsStoredThenCanGetRetrieved() {
         MqttSubscriptionOption option = MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE);
-        sut.addNewSharedSubscription("subscriber", new ShareName("thermometers"),
-            Topic.asTopic("/first_floor/living/temp"), option, new SubscriptionIdentifier(1));
+        sut.addNewSharedSubscription(new Subscription("subscriber", Topic.asTopic("/first_floor/living/temp"),
+                option, new ShareName("thermometers"), new SubscriptionIdentifier(1)));
 
         // verify deserialize
-        Collection<SharedSubscription> subs = sut.listAllSharedSubscription();
+        Collection<Subscription> subs = sut.listAllSharedSubscription();
         assertThat(subs).hasSize(1);
-        SharedSubscription reloadedSub = subs.iterator().next();
+        Subscription reloadedSub = subs.iterator().next();
         assertTrue(reloadedSub.hasSubscriptionIdentifier());
         assertEquals(1, reloadedSub.getSubscriptionIdentifier().value());
     }
@@ -58,22 +58,22 @@ class H2SubscriptionsRepositorySharedSubscriptionsTest extends H2BaseTest {
     @Test
     public void givenAPersistedSharedSubscriptionWhenListedThenItAppears() {
         MqttSubscriptionOption op = MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE);
-        sut.addNewSharedSubscription("subscriber", new ShareName("thermometers"),
-            Topic.asTopic("/first_floor/living/temp"), op);
+        sut.addNewSharedSubscription(new Subscription("subscriber", Topic.asTopic("/first_floor/living/temp"),
+                op, new ShareName("thermometers")));
 
-        Collection<SharedSubscription> subscriptions = sut.listAllSharedSubscription();
+        Collection<Subscription> subscriptions = sut.listAllSharedSubscription();
         assertThat(subscriptions).hasSize(1);
-        SharedSubscription subscription = subscriptions.iterator().next();
+        Subscription subscription = subscriptions.iterator().next();
         Assertions.assertAll("First subscription match the previously stored",
-            () -> assertEquals("subscriber", subscription.clientId()),
+            () -> assertEquals("subscriber", subscription.getClientId()),
             () -> assertEquals("thermometers", subscription.getShareName().getShareName()));
     }
 
     @Test
     public void givenAPersistedSubscriptionWhenItsDeletedThenItNotAnymoreListed() {
         MqttSubscriptionOption option = MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE);
-        sut.addNewSharedSubscription("subscriber", new ShareName("thermometers"),
-            Topic.asTopic("/first_floor/living/temp"), option);
+        sut.addNewSharedSubscription(new Subscription("subscriber", Topic.asTopic("/first_floor/living/temp"),
+                option, new ShareName("thermometers")));
         assertThat(sut.listAllSharedSubscription()).hasSize(1);
 
         // remove the shared subscription
@@ -88,12 +88,12 @@ class H2SubscriptionsRepositorySharedSubscriptionsTest extends H2BaseTest {
     public void givenMultipleSharedSubscriptionForSameClientIdWhenTheyAreRemovedInBlockThenArentAnymoreListed() {
         String clientId = "subscriber";
         MqttSubscriptionOption atMostOnceOption = MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE);
-        sut.addNewSharedSubscription(clientId, new ShareName("thermometers"),
-            Topic.asTopic("/first_floor/living/temp"), atMostOnceOption);
-        sut.addNewSharedSubscription(clientId, new ShareName("anemometers"),
-            Topic.asTopic("/garden/wind/speed"), atMostOnceOption);
-        sut.addNewSharedSubscription(clientId, new ShareName("anemometers"),
-            Topic.asTopic("/garden/wind/direction"), atMostOnceOption);
+        sut.addNewSharedSubscription(new Subscription(clientId, Topic.asTopic("/first_floor/living/temp"),
+                atMostOnceOption, new ShareName("thermometers")));
+        sut.addNewSharedSubscription(new Subscription(clientId, Topic.asTopic("/garden/wind/speed"),
+                atMostOnceOption, new ShareName("anemometers")));
+        sut.addNewSharedSubscription(new Subscription(clientId, Topic.asTopic("/garden/wind/direction"),
+                atMostOnceOption, new ShareName("anemometers")));
         assertThat(sut.listAllSharedSubscription()).hasSize(3);
 
         // remove all shared subscriptions for client

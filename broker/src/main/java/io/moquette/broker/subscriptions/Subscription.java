@@ -13,10 +13,9 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
-
 package io.moquette.broker.subscriptions;
 
-import io.netty.handler.codec.mqtt.MqttQoS;
+import static io.moquette.broker.subscriptions.ShareName.EMPTY_SHARENAME;
 import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 
 import java.io.Serializable;
@@ -26,43 +25,45 @@ import java.util.Optional;
 /**
  * Maintain the information about which Topic a certain ClientID is subscribed and at which QoS
  */
-public final class Subscription implements Serializable, Comparable<Subscription>{
+public final class Subscription implements Serializable, Comparable<Subscription> {
 
     private static final long serialVersionUID = -3383457629635732794L;
     private final MqttSubscriptionOption option;
     final String clientId;
     final Topic topicFilter;
-    final String shareName;
+    final ShareName shareName;
 
     private final Optional<SubscriptionIdentifier> subscriptionId;
 
     public Subscription(String clientId, Topic topicFilter, MqttSubscriptionOption options) {
-        this(clientId, topicFilter, options, "");
+        this(clientId, topicFilter, options, EMPTY_SHARENAME, Optional.empty());
     }
 
     public Subscription(String clientId, Topic topicFilter, MqttSubscriptionOption options, SubscriptionIdentifier subscriptionId) {
-        this(clientId, topicFilter, options, "", subscriptionId);
+        this(clientId, topicFilter, options, EMPTY_SHARENAME, subscriptionId);
     }
 
-    public Subscription(String clientId, Topic topicFilter, MqttSubscriptionOption options, String shareName) {
-        this(clientId, topicFilter, options, shareName, null);
+    public Subscription(String clientId, Topic topicFilter, MqttSubscriptionOption options, ShareName shareName) {
+        this(clientId, topicFilter, options, shareName, Optional.empty());
     }
 
-    public Subscription(String clientId, Topic topicFilter, MqttSubscriptionOption options, String shareName,
-                        SubscriptionIdentifier subscriptionId) {
+    public Subscription(String clientId, Topic topicFilter, MqttSubscriptionOption options, ShareName shareName,
+            SubscriptionIdentifier subscriptionId) {
+        this(clientId, topicFilter, options, shareName, Optional.ofNullable(subscriptionId));
+    }
+
+    public Subscription(String clientId, Topic topicFilter, MqttSubscriptionOption options,
+            Optional<SubscriptionIdentifier> subscriptionId) {
+        this(clientId, topicFilter, options, EMPTY_SHARENAME, subscriptionId);
+    }
+
+    public Subscription(String clientId, Topic topicFilter, MqttSubscriptionOption options, ShareName shareName,
+            Optional<SubscriptionIdentifier> subscriptionId) {
         this.clientId = clientId;
         this.topicFilter = topicFilter;
         this.shareName = shareName;
-        this.subscriptionId = Optional.ofNullable(subscriptionId);
+        this.subscriptionId = subscriptionId;
         this.option = options;
-    }
-
-    public Subscription(Subscription orig) {
-        this.clientId = orig.clientId;
-        this.topicFilter = orig.topicFilter;
-        this.shareName = orig.shareName;
-        this.subscriptionId = orig.subscriptionId;
-        this.option = orig.option;
     }
 
     public String getClientId() {
@@ -133,14 +134,14 @@ public final class Subscription implements Serializable, Comparable<Subscription
     }
 
     public boolean hasShareName() {
-        return shareName != null;
+        return !shareName.isEmpty();
     }
 
-    public String getShareName() {
+    public ShareName getShareName() {
         return shareName;
     }
 
-    public MqttSubscriptionOption option() {
+    public MqttSubscriptionOption getOption() {
         return option;
     }
 }

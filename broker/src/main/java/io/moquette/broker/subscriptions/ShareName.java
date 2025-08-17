@@ -21,11 +21,17 @@ import java.util.Objects;
  * Shared subscription's name.
  */
 // It's public because used by PostOffice
-public final class ShareName {
+public final class ShareName implements Comparable<ShareName>{
+    public static final ShareName EMPTY_SHARENAME = new ShareName("");
+
     private final String shareName;
 
     public ShareName(String shareName) {
         this.shareName = shareName;
+    }
+
+    public boolean isEmpty() {
+        return shareName == null || shareName.isEmpty();
     }
 
     @Override
@@ -54,5 +60,10 @@ public final class ShareName {
         return "ShareName{" +
             "shareName='" + shareName + '\'' +
             '}';
+    }
+
+    @Override
+    public int compareTo(ShareName o) {
+        return shareName.compareTo(o.shareName);
     }
 }

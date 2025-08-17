@@ -18,11 +18,8 @@ package io.moquette.persistence;
 import io.moquette.broker.ISubscriptionsRepository;
 import io.moquette.broker.Utils;
 import io.moquette.broker.subscriptions.ShareName;
-import io.moquette.broker.subscriptions.SharedSubscription;
 import io.moquette.broker.subscriptions.Subscription;
-import io.moquette.broker.subscriptions.SubscriptionIdentifier;
 import io.moquette.broker.subscriptions.Topic;
-import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,7 +36,7 @@ public class MemorySubscriptionsRepository implements ISubscriptionsRepository {
 
     private static final Logger LOG = LoggerFactory.getLogger(MemorySubscriptionsRepository.class);
     private final Set<Subscription> subscriptions = new ConcurrentSkipListSet<>();
-    private final Map<String, Map<Utils.Couple<ShareName, Topic>, SharedSubscription>> sharedSubscriptions = new HashMap<>();
+    private final Map<String, Map<Utils.Couple<ShareName, Topic>, Subscription>> sharedSubscriptions = new HashMap<>();
 
     @Override
     public Set<Subscription> listAllSubscriptions() {
@@ -66,7 +63,7 @@ public class MemorySubscriptionsRepository implements ISubscriptionsRepository {
 
     @Override
     public void removeSharedSubscription(String clientId, ShareName share, Topic topicFilter) {
-        Map<Utils.Couple<ShareName, Topic>, SharedSubscription> subsMap = sharedSubscriptions.get(clientId);
+        Map<Utils.Couple<ShareName, Topic>, Subscription> subsMap = sharedSubscriptions.get(clientId);
         if (subsMap == null) {
             LOG.info("Removing a non existing shared subscription for client: {}", clientId);
             return;
@@ -79,28 +76,20 @@ public class MemorySubscriptionsRepository implements ISubscriptionsRepository {
     }
 
     @Override
-    public void addNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, MqttSubscriptionOption option) {
-        SharedSubscription sharedSub = new SharedSubscription(share, topicFilter, clientId, option);
-        storeNewSharedSubscription(clientId, share, topicFilter, sharedSub);
+    public void addNewSharedSubscription(Subscription sub) {
+        storeNewSharedSubscription(sub);
     }
 
-    private void storeNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, SharedSubscription sharedSub) {
-        Map<Utils.Couple<ShareName, Topic>, SharedSubscription> subsMap = sharedSubscriptions.computeIfAbsent(clientId, unused -> new HashMap<>());
-        subsMap.put(Utils.Couple.of(share, topicFilter), sharedSub);
-    }
-
-    @Override
-    public void addNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, MqttSubscriptionOption option,
-                                         SubscriptionIdentifier subscriptionIdentifier) {
-        SharedSubscription sharedSub = new SharedSubscription(share, topicFilter, clientId, option, subscriptionIdentifier);
-        storeNewSharedSubscription(clientId, share, topicFilter, sharedSub);
+    private void storeNewSharedSubscription(Subscription sharedSub) {
+        Map<Utils.Couple<ShareName, Topic>, Subscription> subsMap = sharedSubscriptions.computeIfAbsent(sharedSub.getClientId(), unused -> new HashMap<>());
+        subsMap.put(Utils.Couple.of(sharedSub.getShareName(), sharedSub.getTopicFilter()), sharedSub);
     }
 
     @Override
-    public Collection<SharedSubscription> listAllSharedSubscription() {
-        final List<SharedSubscription> result = new ArrayList<>();
-        for (Map.Entry<String, Map<Utils.Couple<ShareName, Topic>, SharedSubscription>> entry : sharedSubscriptions.entrySet()) {
-            for (Map.Entry<Utils.Couple<ShareName, Topic>, SharedSubscription> nestedEntry : entry.getValue().entrySet()) {
+    public Collection<Subscription> listAllSharedSubscription() {
+        final List<Subscription> result = new ArrayList<>();
+        for (Map.Entry<String, Map<Utils.Couple<ShareName, Topic>, Subscription>> entry : sharedSubscriptions.entrySet()) {
+            for (Map.Entry<Utils.Couple<ShareName, Topic>, Subscription> nestedEntry : entry.getValue().entrySet()) {
                 result.add(nestedEntry.getValue());
             }
         }

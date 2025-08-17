@@ -16,7 +16,6 @@
 package io.moquette.broker.subscriptions;
 
 
-import io.moquette.broker.subscriptions.CTrie.SubscriptionRequest;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +43,7 @@ public class CTrieTest {
     @Test
     public void testAddOnSecondLayerWithEmptyTokenOnEmptyTree() {
         //Exercise
-        SubscriptionRequest newSubscription = clientSubOnTopic("TempSensor1", "/");
+        Subscription newSubscription = clientSubOnTopic("TempSensor1", "/");
         sut.addToTree(newSubscription);
 
         //Verify
@@ -66,7 +65,7 @@ public class CTrieTest {
     @Test
     public void testAddFirstLayerNodeOnEmptyTree() {
         //Exercise
-        SubscriptionRequest newSubscription = clientSubOnTopic("TempSensor1", "/temp");
+        Subscription newSubscription = clientSubOnTopic("TempSensor1", "/temp");
         sut.addToTree(newSubscription);
 
         //Verify
@@ -77,7 +76,7 @@ public class CTrieTest {
 
     @Test
     public void testLookup() {
-        final SubscriptionRequest existingSubscription = clientSubOnTopic("TempSensor1", "/temp");
+        final Subscription existingSubscription = clientSubOnTopic("TempSensor1", "/temp");
         sut.addToTree(existingSubscription);
 
         //Exercise
@@ -89,11 +88,11 @@ public class CTrieTest {
 
     @Test
     public void testAddNewSubscriptionOnExistingNode() {
-        final SubscriptionRequest existingSubscription = clientSubOnTopic("TempSensor1", "/temp");
+        final Subscription existingSubscription = clientSubOnTopic("TempSensor1", "/temp");
         assertTrue(sut.addToTree(existingSubscription), "First created subscription on topic filter MUST return true");
 
         //Exercise
-        final SubscriptionRequest newSubscription = clientSubOnTopic("TempSensor2", "/temp");
+        final Subscription newSubscription = clientSubOnTopic("TempSensor2", "/temp");
         assertFalse(sut.addToTree(newSubscription), "Not new created subscription on topic filter MUST return false");
 
         //Verify
@@ -105,13 +104,13 @@ public class CTrieTest {
 
     @Test
     public void testAddNewDeepNodes() {
-        SubscriptionRequest newSubscription2 = clientSubOnTopic("TempSensorRM", "/italy/roma/temp");
+        Subscription newSubscription2 = clientSubOnTopic("TempSensorRM", "/italy/roma/temp");
         sut.addToTree(newSubscription2);
-        SubscriptionRequest newSubscription1 = clientSubOnTopic("TempSensorFI", "/italy/firenze/temp");
+        Subscription newSubscription1 = clientSubOnTopic("TempSensorFI", "/italy/firenze/temp");
         sut.addToTree(newSubscription1);
-        SubscriptionRequest newSubscription = clientSubOnTopic("HumSensorFI", "/italy/roma/humidity");
+        Subscription newSubscription = clientSubOnTopic("HumSensorFI", "/italy/roma/humidity");
         sut.addToTree(newSubscription);
-        final SubscriptionRequest happinessSensor = clientSubOnTopic("HappinessSensor", "/italy/happiness");
+        final Subscription happinessSensor = clientSubOnTopic("HappinessSensor", "/italy/happiness");
         sut.addToTree(happinessSensor);
 
         //Verify
@@ -121,13 +120,13 @@ public class CTrieTest {
         assertTrue(subscriptions.contains(asSubscription("HappinessSensor", "/italy/happiness")));
     }
 
-    static SubscriptionRequest clientSubOnTopic(String clientID, String topicFilter) {
-        return SubscriptionRequest.buildNonShared(clientID, asTopic(topicFilter), MqttSubscriptionOption.onlyFromQos(null));
+    static Subscription clientSubOnTopic(String clientID, String topicFilter) {
+        return new Subscription(clientID, asTopic(topicFilter), MqttSubscriptionOption.onlyFromQos(null));
     }
 
     @Test
     public void givenTreeWithSomeNodeWhenRemoveContainedSubscriptionThenNodeIsUpdated() {
-        SubscriptionRequest newSubscription = clientSubOnTopic("TempSensor1", "/temp");
+        Subscription newSubscription = clientSubOnTopic("TempSensor1", "/temp");
         sut.addToTree(newSubscription);
 
         //Exercise
@@ -140,18 +139,18 @@ public class CTrieTest {
 
     @Test
     public void givenTreeWithSomeNodeUnsubscribeAndResubscribeCleanTomb() {
-        SubscriptionRequest newSubscription1 = clientSubOnTopic("TempSensor1", "test");
+        Subscription newSubscription1 = clientSubOnTopic("TempSensor1", "test");
         sut.addToTree(newSubscription1);
         sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("test")));
 
-        SubscriptionRequest newSubscription = clientSubOnTopic("TempSensor1", "test");
+        Subscription newSubscription = clientSubOnTopic("TempSensor1", "test");
         sut.addToTree(newSubscription);
         assertEquals(1, sut.root.mainNode().allChildren().size());  // looking to see if TNode is cleaned up
     }
 
     @Test
     public void givenTreeWithSomeNodeWhenRemoveMultipleTimes() {
-        SubscriptionRequest newSubscription = clientSubOnTopic("TempSensor1", "test");
+        Subscription newSubscription = clientSubOnTopic("TempSensor1", "test");
         sut.addToTree(newSubscription);
 
         // make sure no TNode exceptions
@@ -167,7 +166,7 @@ public class CTrieTest {
 
     @Test
     public void givenTreeWithSomeDeepNodeWhenRemoveMultipleTimes() {
-        SubscriptionRequest newSubscription = clientSubOnTopic("TempSensor1", "/test/me/1/2/3");
+        Subscription newSubscription = clientSubOnTopic("TempSensor1", "/test/me/1/2/3");
         sut.addToTree(newSubscription);
 
         // make sure no TNode exceptions
@@ -182,9 +181,9 @@ public class CTrieTest {
 
     @Test
     public void givenTreeWithSomeNodeHierarchyWhenRemoveContainedSubscriptionThenNodeIsUpdated() {
-        SubscriptionRequest newSubscription1 = clientSubOnTopic("TempSensor1", "/temp/1");
+        Subscription newSubscription1 = clientSubOnTopic("TempSensor1", "/temp/1");
         sut.addToTree(newSubscription1);
-        SubscriptionRequest newSubscription = clientSubOnTopic("TempSensor1", "/temp/2");
+        Subscription newSubscription = clientSubOnTopic("TempSensor1", "/temp/2");
         sut.addToTree(newSubscription);
 
         //Exercise
@@ -200,9 +199,9 @@ public class CTrieTest {
 
     @Test
     public void givenTreeWithSomeNodeHierarchWhenRemoveContainedSubscriptionSmallerThenNodeIsNotUpdated() {
-        SubscriptionRequest newSubscription1 = clientSubOnTopic("TempSensor1", "/temp/1");
+        Subscription newSubscription1 = clientSubOnTopic("TempSensor1", "/temp/1");
         sut.addToTree(newSubscription1);
-        SubscriptionRequest newSubscription = clientSubOnTopic("TempSensor1", "/temp/2");
+        Subscription newSubscription = clientSubOnTopic("TempSensor1", "/temp/2");
         sut.addToTree(newSubscription);
 
         //Exercise
@@ -221,7 +220,7 @@ public class CTrieTest {
 
     @Test
     public void givenTreeWithDeepNodeWhenRemoveContainedSubscriptionThenNodeIsUpdated() {
-        SubscriptionRequest newSubscription = clientSubOnTopic("TempSensor1", "/bah/bin/bash");
+        Subscription newSubscription = clientSubOnTopic("TempSensor1", "/bah/bin/bash");
         sut.addToTree(newSubscription);
 
         sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("/bah/bin/bash")));
@@ -233,7 +232,7 @@ public class CTrieTest {
 
     @Test
     public void testMatchSubscriptionNoWildcards() {
-        SubscriptionRequest newSubscription = clientSubOnTopic("TempSensor1", "/temp");
+        Subscription newSubscription = clientSubOnTopic("TempSensor1", "/temp");
         sut.addToTree(newSubscription);
 
         //Exercise
@@ -246,9 +245,9 @@ public class CTrieTest {
 
     @Test
     public void testRemovalInnerTopicOffRootSameClient() {
-        SubscriptionRequest newSubscription1 = clientSubOnTopic("TempSensor1", "temp");
+        Subscription newSubscription1 = clientSubOnTopic("TempSensor1", "temp");
         sut.addToTree(newSubscription1);
-        SubscriptionRequest newSubscription = clientSubOnTopic("TempSensor1", "temp/1");
+        Subscription newSubscription = clientSubOnTopic("TempSensor1", "temp/1");
         sut.addToTree(newSubscription);
 
         //Exercise
@@ -274,9 +273,9 @@ public class CTrieTest {
 
     @Test
     public void testRemovalInnerTopicOffRootDiffClient() {
-        SubscriptionRequest newSubscription1 = clientSubOnTopic("TempSensor1", "temp");
+        Subscription newSubscription1 = clientSubOnTopic("TempSensor1", "temp");
         sut.addToTree(newSubscription1);
-        SubscriptionRequest newSubscription = clientSubOnTopic("TempSensor2", "temp/1");
+        Subscription newSubscription = clientSubOnTopic("TempSensor2", "temp/1");
         sut.addToTree(newSubscription);
 
         //Exercise
@@ -302,9 +301,9 @@ public class CTrieTest {
 
     @Test
     public void testRemovalOuterTopicOffRootDiffClient() {
-        SubscriptionRequest newSubscription1 = clientSubOnTopic("TempSensor1", "temp");
+        Subscription newSubscription1 = clientSubOnTopic("TempSensor1", "temp");
         sut.addToTree(newSubscription1);
-        SubscriptionRequest newSubscription = clientSubOnTopic("TempSensor2", "temp/1");
+        Subscription newSubscription = clientSubOnTopic("TempSensor2", "temp/1");
         sut.addToTree(newSubscription);
 
         //Exercise

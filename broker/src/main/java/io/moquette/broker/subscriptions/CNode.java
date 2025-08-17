@@ -15,7 +15,6 @@
  */
 package io.moquette.broker.subscriptions;
 
-import io.moquette.broker.subscriptions.CTrie.SubscriptionRequest;
 import io.moquette.broker.subscriptions.CTrie.UnsubscribeRequest;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
@@ -42,7 +41,7 @@ class CNode implements Comparable<CNode> {
     // Sorted list of subscriptions. The sort is necessary for fast access, instead of linear scan.
     private List<Subscription> subscriptions;
     // the list of SharedSubscription is sorted. The sort is necessary for fast access, instead of linear scan.
-    private Map<ShareName, List<SharedSubscription>> sharedSubscriptions;
+    private Map<ShareName, List<Subscription>> sharedSubscriptions;
 
     CNode(Token token) {
         this.children = new ArrayList<>();
@@ -53,7 +52,7 @@ class CNode implements Comparable<CNode> {
 
     //Copy constructor
     private CNode(Token token, List<INode> children, List<Subscription> subscriptions, Map<ShareName,
-                  List<SharedSubscription>> sharedSubscriptions) {
+                  List<Subscription>> sharedSubscriptions) {
         this.token = token; // keep reference, root comparison in directory logic relies on it for now.
         this.subscriptions = new ArrayList<>(subscriptions);
         this.sharedSubscriptions = new HashMap<>(sharedSubscriptions);
@@ -107,13 +106,13 @@ class CNode implements Comparable<CNode> {
     private List<Subscription> sharedSubscriptions() {
         List<Subscription> selectedSubscriptions = new ArrayList<>(sharedSubscriptions.size());
         // for each sharedSubscription related to a ShareName, select one subscription
-        for (Map.Entry<ShareName, List<SharedSubscription>> subsForName : sharedSubscriptions.entrySet()) {
-            List<SharedSubscription> list = subsForName.getValue();
+        for (Map.Entry<ShareName, List<Subscription>> subsForName : sharedSubscriptions.entrySet()) {
+            List<Subscription> list = subsForName.getValue();
             final String shareName = subsForName.getKey().getShareName();
             // select a subscription randomly
             int randIdx = SECURE_RANDOM.nextInt(list.size());
-            SharedSubscription sub = list.get(randIdx);
-            selectedSubscriptions.add(sub.createSubscription());
+            Subscription sub = list.get(randIdx);
+            selectedSubscriptions.add(sub);
         }
         return selectedSubscriptions;
     }
@@ -123,34 +122,31 @@ class CNode implements Comparable<CNode> {
     }
 
     // Mutating operation
-    CNode addSubscription(SubscriptionRequest request) {
-        if (request.isShared()) {
-            final ShareName shareName = request.getSharedName();
-            final SharedSubscription newSubscription = request.sharedSubscription();
-            List<SharedSubscription> subscriptions = sharedSubscriptions.getOrDefault(shareName, new ArrayList<>());
+    CNode addSubscription(final Subscription subscription) {
+        if (subscription.hasShareName()) {
+            final ShareName shareName = subscription.getShareName();
+            List<Subscription> subscriptionsForShare = sharedSubscriptions.getOrDefault(shareName, new ArrayList<>());
             // if a shared subscription already exists for same clientId and share name, overwrite, because
             // the client could desire to update it.
-            int idx = Collections.binarySearch(subscriptions, newSubscription);
+            int idx = Collections.binarySearch(subscriptionsForShare, subscription);
             if (idx >= 0) {
-                subscriptions.set(idx, newSubscription);
+                subscriptionsForShare.set(idx, subscription);
             } else {
-                subscriptions.add(-1 - idx, newSubscription);
+                subscriptionsForShare.add(-1 - idx, subscription);
             }
-            sharedSubscriptions.put(shareName, subscriptions);
+            sharedSubscriptions.put(shareName, subscriptionsForShare);
         } else {
-            final Subscription newSubscription = request.subscription();
-
             // if already contains one with same topic and same client, keep that with higher QoS
-            int idx = Collections.binarySearch(subscriptions, newSubscription);
+            int idx = Collections.binarySearch(subscriptions, subscription);
             if (idx >= 0) {
                 // Subscription already exists
                 final Subscription existing = subscriptions.get(idx);
-                if (needsToUpdateExistingSubscription(newSubscription, existing)) {
-                    subscriptions.set(idx, newSubscription);
+                if (needsToUpdateExistingSubscription(subscription, existing)) {
+                    subscriptions.set(idx, subscription);
                 }
             } else {
                 // insert into the expected index so that the sorting is maintained
-                this.subscriptions.add(-1 - idx, newSubscription);
+                this.subscriptions.add(-1 - idx, subscription);
             }
         }
         return this;
@@ -162,7 +158,7 @@ class CNode implements Comparable<CNode> {
         ) {
             // if subscription identifier hasn't changed,
             // then check QoS but don't lower the requested QoS level
-            return existing.option().qos().value() < newSubscription.option().qos().value();
+            return existing.getOption().qos().value() < newSubscription.getOption().qos().value();
         }
 
         // subscription identifier changed
@@ -191,18 +187,18 @@ class CNode implements Comparable<CNode> {
 
     private boolean containsSharedSubscriptionsForClient(String clientId) {
         boolean result = false;
-        for (List<SharedSubscription> sharedForShareName : this.sharedSubscriptions.values()) {
-            SharedSubscription keyWrapper = wrapKey(clientId);
-            Comparator<SharedSubscription> compareByClientId = Comparator.comparing(SharedSubscription::clientId);
+        for (List<Subscription> sharedForShareName : this.sharedSubscriptions.values()) {
+            Subscription keyWrapper = wrapKey(clientId);
+            Comparator<Subscription> compareByClientId = Comparator.comparing(Subscription::getClientId);
             int res = Collections.binarySearch(sharedForShareName, keyWrapper, compareByClientId);
             result = res >= 0 || result;
         }
         return result;
     }
 
-    private static SharedSubscription wrapKey(String clientId) {
+    private static Subscription wrapKey(String clientId) {
         MqttQoS unusedQoS = MqttQoS.AT_MOST_ONCE;
-        return new SharedSubscription(null, Topic.asTopic("unused"), clientId, MqttSubscriptionOption.onlyFromQos(unusedQoS));
+        return new Subscription(clientId, Topic.asTopic("unused"), MqttSubscriptionOption.onlyFromQos(unusedQoS), ShareName.EMPTY_SHARENAME);
     }
 
     //TODO this is equivalent to negate(containsOnly(clientId))
@@ -219,9 +215,9 @@ class CNode implements Comparable<CNode> {
         String clientId = request.getClientId();
 
         if (request.isShared()) {
-            List<SharedSubscription> subscriptionsForName = this.sharedSubscriptions.get(request.getSharedName());
-            List<SharedSubscription> toRemove = subscriptionsForName.stream()
-                .filter(sub -> sub.clientId().equals(clientId))
+            List<Subscription> subscriptionsForName = this.sharedSubscriptions.get(request.getSharedName());
+            List<Subscription> toRemove = subscriptionsForName.stream()
+                .filter(sub -> sub.getClientId().equals(clientId))
                 .collect(Collectors.toList());
             subscriptionsForName.removeAll(toRemove);
 

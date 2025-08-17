@@ -3,7 +3,6 @@ package io.moquette.persistence;
 import io.moquette.broker.ISubscriptionsRepository;
 import io.moquette.broker.Utils;
 import io.moquette.broker.subscriptions.ShareName;
-import io.moquette.broker.subscriptions.SharedSubscription;
 import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.SubscriptionIdentifier;
 import io.moquette.broker.subscriptions.Topic;
@@ -130,9 +129,14 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
     }
 
     @Override
-    public void addNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, MqttSubscriptionOption option) {
-        SubscriptionOptionAndId qosPart = new SubscriptionOptionAndId(option);
-        storeNewSharedSubscription(clientId, share, topicFilter, qosPart);
+    public void addNewSharedSubscription(Subscription sub) {
+        SubscriptionOptionAndId qosPart;
+        if (sub.hasSubscriptionIdentifier()) {
+            qosPart = new SubscriptionOptionAndId(sub.getOption(), sub.getSubscriptionIdentifier().value());
+        } else {
+            qosPart = new SubscriptionOptionAndId(sub.getOption());
+        }
+        storeNewSharedSubscription(sub.getClientId(), sub.getShareName(), sub.getTopicFilter(), qosPart);
     }
 
     private void storeNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, SubscriptionOptionAndId value) {
@@ -145,15 +149,8 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
     }
 
     @Override
-    public void addNewSharedSubscription(String clientId, ShareName share, Topic topicFilter, MqttSubscriptionOption option,
-                                         SubscriptionIdentifier subscriptionIdentifier) {
-        SubscriptionOptionAndId qosAndSubscriptionIdPart = new SubscriptionOptionAndId(option, subscriptionIdentifier.value());
-        storeNewSharedSubscription(clientId, share, topicFilter, qosAndSubscriptionIdPart);
-    }
-
-    @Override
-    public Collection<SharedSubscription> listAllSharedSubscription() {
-        List<SharedSubscription> result = new ArrayList<>();
+    public Collection<Subscription> listAllSharedSubscription() {
+        List<Subscription> result = new ArrayList<>();
 
         for (Map.Entry<String, String> entry : sharedSubscriptions.entrySet()) {
             String clientId = entry.getKey();
@@ -164,14 +161,14 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
                 final ShareName shareName = subEntry.getKey().v1;
                 final Topic topicFilter = subEntry.getKey().v2;
                 final MqttSubscriptionOption option = subEntry.getValue().option;
-                SharedSubscription subscription;
+                Subscription subscription;
                 if (subEntry.getValue().subscriptionIdentifier == null) {
                     // without subscription identifier
-                    subscription = new SharedSubscription(shareName, topicFilter, clientId, option);
+                    subscription = new Subscription(clientId, topicFilter, option, shareName);
                 } else {
                     // with subscription identifier
                     SubscriptionIdentifier subscriptionId = new SubscriptionIdentifier(subEntry.getValue().subscriptionIdentifier);
-                    subscription = new SharedSubscription(shareName, topicFilter, clientId, option, subscriptionId);
+                    subscription = new Subscription(clientId, topicFilter, option, shareName, subscriptionId);
                 }
                 result.add(subscription);
             }
@@ -301,9 +298,9 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
         public int getMemory(Subscription sub) {
             return StringDataType.INSTANCE.getMemory(sub.getClientId()) +
                 StringDataType.INSTANCE.getMemory(sub.getTopicFilter().toString()) +
-                SubscriptionOptionValueType.INSTANCE.getMemory(sub.option()) +
+                SubscriptionOptionValueType.INSTANCE.getMemory(sub.getOption()) +
                 1 + // flag to say if share name is present and/or subscription identifier
-                (sub.hasShareName() ? StringDataType.INSTANCE.getMemory(sub.getShareName()) : 0) +
+                (sub.hasShareName() ? StringDataType.INSTANCE.getMemory(sub.getShareName().getShareName()) : 0) +
                 (sub.hasSubscriptionIdentifier() ? 4 : 0);
         }
 
@@ -311,12 +308,12 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
         public void write(WriteBuffer buff, Subscription sub) {
             StringDataType.INSTANCE.write(buff, sub.getClientId());
             StringDataType.INSTANCE.write(buff, sub.getTopicFilter().toString());
-            SubscriptionOptionValueType.INSTANCE.write(buff, sub.option());
+            SubscriptionOptionValueType.INSTANCE.write(buff, sub.getOption());
             final byte flag = (byte) ((sub.hasShareName() ? 0x1 : 0x0) |
                               (sub.hasSubscriptionIdentifier() ? 0x2 : 0x0));
             buff.put(flag);
             if (sub.hasShareName()) {
-                StringDataType.INSTANCE.write(buff, sub.getShareName());
+                StringDataType.INSTANCE.write(buff, sub.getShareName().getShareName());
             }
             if (sub.hasSubscriptionIdentifier()) {
                 buff.putInt(sub.getSubscriptionIdentifier().value());
@@ -333,7 +330,7 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
             boolean hasSubscriptionIdentifier = (flag & (byte) 0x2) > 0;
 
             if (hasShareName) {
-                String shareName = StringDataType.INSTANCE.read(buff);
+                ShareName shareName = new ShareName(StringDataType.INSTANCE.read(buff));
                 if (hasSubscriptionIdentifier) {
                     SubscriptionIdentifier subId = new SubscriptionIdentifier(buff.getInt());
                     return new Subscription(clientId, Topic.asTopic(topicFilter), options, shareName, subId);
