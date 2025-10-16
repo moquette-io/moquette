@@ -92,6 +92,7 @@ public class Server {
         try {
             server.startStandaloneServer();
         } catch (RuntimeException e) {
+            LOG.error("Error starting server", e);
             System.exit(1);
         }
         System.out.println("Server started, version " + MOQUETTE_VERSION);
