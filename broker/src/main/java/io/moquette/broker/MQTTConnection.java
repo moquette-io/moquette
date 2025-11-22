@@ -210,7 +210,7 @@ final class MQTTConnection {
             result.session.bind(this);
             bindedSession = result.session;
         } catch (SessionCorruptedException scex) {
-            LOG.warn("MQTT session for client ID {} cannot be created", clientId);
+            LOG.warn("MQTT session for client ID {} cannot be created", clientId,scex);
             abortConnection(CONNECTION_REFUSED_SERVER_UNAVAILABLE);
             return;
         }
