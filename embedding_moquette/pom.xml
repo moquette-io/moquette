@@ -4,7 +4,7 @@
     <parent>
         <relativePath>../pom.xml</relativePath>
         <artifactId>moquette-parent</artifactId>
-        <groupId>io.moquette</groupId>
+        <groupId>com.timecho</groupId>
         <version>0.19-SNAPSHOT</version>
     </parent>
 

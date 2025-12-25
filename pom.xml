@@ -12,13 +12,13 @@
         <maven.compiler.target>8</maven.compiler.target>
     </properties>
 
-    <groupId>io.moquette</groupId>
+    <groupId>com.timecho</groupId>
     <artifactId>moquette-parent</artifactId>
 
     <packaging>pom</packaging>
     <version>0.19-SNAPSHOT</version>
-    <name>Moquette MQTT</name>
-    <description>Moquette lightweight MQTT Broker</description>
+    <name>Timecho MQTT</name>
+    <description>Timecho lightweight MQTT Broker based on Moquette</description>
     <inceptionYear>2011</inceptionYear>
     <url>http://moquette.io</url>
 
@@ -47,9 +47,9 @@
     </developers>
 
     <scm>
-        <connection>scm:git:git@github.com:moquette-io/moquette.git</connection>
-        <developerConnection>scm:git:git@github.com:moquette-io/moquette.git</developerConnection>
-        <url>git@github.com:moquette-io/moquette.git</url>
+        <connection>scm:git:git@github.com:TimechoLab/moquette.git</connection>
+        <developerConnection>scm:git:git@github.com:TimechoLab/moquette.git</developerConnection>
+        <url>git@github.com:TimechoLab/moquette.git</url>
     </scm>
 
     <modules>
@@ -234,39 +234,18 @@
                             </execution>
                         </executions>
                     </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.7.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <autoPublish>true</autoPublish>
+                        </configuration>
+                    </plugin>
                 </plugins>
             </build>
         </profile>
     </profiles>
-
-    <repositories>
-        <repository>
-            <id>Maven repo</id>
-            <url>https://repo1.maven.org/maven2/</url>
-        </repository>
-
-        <repository>
-            <id>Paho Releases</id>
-            <url>https://repo.eclipse.org/content/repositories/paho-releases/</url>
-        </repository>
-
-        <repository>
-            <id>sonatype-snapshots</id>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-        </repository>
-    </repositories>
-
-    <distributionManagement>
-        <snapshotRepository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-        </snapshotRepository>
-        <repository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
-        </repository>
-    </distributionManagement>
 </project>
