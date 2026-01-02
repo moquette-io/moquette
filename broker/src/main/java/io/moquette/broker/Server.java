@@ -17,6 +17,7 @@ package io.moquette.broker;
 
 import io.moquette.BrokerConstants;
 import io.moquette.broker.config.FileResourceLoader;
+import io.moquette.broker.config.FluentConfig;
 import io.moquette.broker.config.IConfig;
 import io.moquette.broker.config.IResourceLoader;
 import io.moquette.broker.config.MemoryConfig;
@@ -38,6 +39,7 @@ import io.moquette.broker.subscriptions.CTrieSubscriptionDirectory;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
 import io.moquette.persistence.SegmentQueueRepository;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
+import io.netty.handler.codec.mqtt.MqttQoS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,12 +68,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
-import static io.moquette.logging.LoggingUtils.getInterceptorIds;
+import static io.moquette.metrics.MetricsUtils.getInterceptorIds;
+import io.moquette.metrics.MetricsManager;
+import io.moquette.metrics.MetricsProvider;
 
 public class Server {
 
     private static final Logger LOG = LoggerFactory.getLogger(io.moquette.broker.Server.class);
-    public static final String MOQUETTE_VERSION = "0.17-SNAPSHOT";
+    public static final String MOQUETTE_VERSION = "0.19-SNAPSHOT";
 
     private ScheduledExecutorService scheduler;
     private NewNettyAcceptor acceptor;
@@ -81,6 +85,7 @@ public class Server {
     private H2Builder h2Builder;
     private SessionRegistry sessions;
     private boolean standalone = false;
+    private MetricsProvider metricsProvider;
 
     public static void main(String[] args) throws IOException {
         final Server server = new Server();
@@ -168,7 +173,7 @@ public class Server {
      * @throws IOException in case of any IO Error.
      */
     public void startServer(IConfig config, List<? extends InterceptHandler> handlers) throws IOException {
-        LOG.debug("Starting moquette integration using IConfig instance and intercept handlers");
+        LOG.debug("Starting Moquette integration using IConfig instance and intercept handlers");
         startServer(config, handlers, null, null, null);
     }
 
@@ -179,6 +184,8 @@ public class Server {
             handlers = Collections.emptyList();
         }
         LOG.trace("Starting Moquette Server. MQTT message interceptors={}", getInterceptorIds(handlers));
+
+        metricsProvider = MetricsManager.createMetricsProvider(config);
 
         scheduler = Executors.newScheduledThreadPool(1);
 
@@ -202,20 +209,20 @@ public class Server {
 
         if (config.getProperty(BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME) != null) {
             LOG.warn("Using a deprecated setting {} please update to {}",
-                BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME, BrokerConstants.DATA_PATH_PROPERTY_NAME);
-            LOG.warn("Forcing {} to true", BrokerConstants.PERSISTENCE_ENABLED_PROPERTY_NAME);
-            config.setProperty(BrokerConstants.PERSISTENCE_ENABLED_PROPERTY_NAME, Boolean.TRUE.toString());
+                BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME, IConfig.DATA_PATH_PROPERTY_NAME);
+            LOG.warn("Forcing {} to true", IConfig.PERSISTENCE_ENABLED_PROPERTY_NAME);
+            config.setProperty(IConfig.PERSISTENCE_ENABLED_PROPERTY_NAME, Boolean.TRUE.toString());
 
             final String persistencePath = config.getProperty(BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME);
             final String dataPath = persistencePath.substring(0, persistencePath.lastIndexOf("/"));
-            LOG.warn("Forcing {} to {}", BrokerConstants.DATA_PATH_PROPERTY_NAME, dataPath);
-            config.setProperty(BrokerConstants.DATA_PATH_PROPERTY_NAME, dataPath);
+            LOG.warn("Forcing {} to {}", IConfig.DATA_PATH_PROPERTY_NAME, dataPath);
+            config.setProperty(IConfig.DATA_PATH_PROPERTY_NAME, dataPath);
         }
 
         final Clock clock = Clock.systemDefaultZone();
 
-        if (Boolean.parseBoolean(config.getProperty(BrokerConstants.PERSISTENCE_ENABLED_PROPERTY_NAME))) {
-            final Path dataPath = Paths.get(config.getProperty(BrokerConstants.DATA_PATH_PROPERTY_NAME));
+        if (Boolean.parseBoolean(config.getProperty(IConfig.PERSISTENCE_ENABLED_PROPERTY_NAME))) {
+            final Path dataPath = Paths.get(config.getProperty(IConfig.DATA_PATH_PROPERTY_NAME));
             if (!dataPath.toFile().exists()) {
                 if (dataPath.toFile().mkdirs()) {
                     LOG.debug("Created data_path {} folder", dataPath);
@@ -245,18 +252,20 @@ public class Server {
         final Authorizator authorizator = new Authorizator(authorizatorPolicy);
 
         final int globalSessionExpiry;
-        if (config.getProperty(BrokerConstants.PERSISTENT_CLEAN_EXPIRATION_PROPERTY_NAME) != null) {
-            globalSessionExpiry = (int) config.durationProp(BrokerConstants.PERSISTENT_CLEAN_EXPIRATION_PROPERTY_NAME).toMillis() / 1000;
+        if (config.getProperty(IConfig.PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME) != null) {
+            globalSessionExpiry = (int) config.durationProp(IConfig.PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME).toMillis() / 1000;
         } else {
             globalSessionExpiry = INFINITE_EXPIRY;
         }
 
-        final int sessionQueueSize = config.intProp(BrokerConstants.SESSION_QUEUE_SIZE, 1024);
-        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(interceptor, sessionQueueSize);
+        final int sessionQueueSize = config.intProp(IConfig.SESSION_QUEUE_SIZE, 1024);
+        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(interceptor, sessionQueueSize, metricsProvider);
         sessions = new SessionRegistry(subscriptions, sessionsRepository, queueRepository, authorizator, scheduler,
-            clock, globalSessionExpiry, loopsGroup);
-        dispatcher = new PostOffice(subscriptions, retainedRepository, sessions, interceptor, authorizator,
-            loopsGroup);
+            clock, globalSessionExpiry, loopsGroup, metricsProvider);
+
+        final MqttQoS serverGrantedQoS = parseMaxGrantedQoS(config);
+        dispatcher = new PostOffice(subscriptions, retainedRepository, sessions, sessionsRepository, interceptor,
+            authorizator, loopsGroup, clock, serverGrantedQoS, metricsProvider);
         final BrokerConfiguration brokerConfig = new BrokerConfiguration(config);
         MQTTConnectionFactory connectionFactory = new MQTTConnectionFactory(brokerConfig, authenticator, sessions,
                                                                             dispatcher);
@@ -268,16 +277,41 @@ public class Server {
         final long startTime = System.currentTimeMillis() - start;
         LOG.info("Moquette integration has been started successfully in {} ms", startTime);
 
-        if (config.boolProp(BrokerConstants.ENABLE_TELEMETRY_NAME, true)) {
+        if (config.boolProp(IConfig.ENABLE_TELEMETRY_NAME, false)) {
             collectAndSendTelemetryDataAsynch(config);
         }
 
         initialized = true;
     }
 
+    private static MqttQoS parseMaxGrantedQoS(IConfig config) {
+        final String qosValue = config.getProperty(IConfig.MAX_SERVER_GRANTED_QOS_PROPERTY_NAME, "2");
+        try {
+            int qosIntValue = Integer.parseInt(qosValue);
+            if (qosIntValue < 0 || qosIntValue > 2) {
+                LOG.warn("Error parsing max_server_granted_qos int value, found {} but should be [0..2]", qosIntValue);
+                throw new IllegalArgumentException("QoS must in range [0..2] but was " + qosIntValue);
+            }
+            return MqttQoS.valueOf(qosIntValue);
+        } catch (NumberFormatException ex) {
+            // try to parse the string form
+            if (MqttQoS.AT_MOST_ONCE.toString().equalsIgnoreCase(qosValue)) {
+                return MqttQoS.AT_MOST_ONCE;
+            }
+            if (MqttQoS.AT_LEAST_ONCE.toString().equalsIgnoreCase(qosValue)) {
+                return MqttQoS.AT_LEAST_ONCE;
+            }
+            if (MqttQoS.EXACTLY_ONCE.toString().equalsIgnoreCase(qosValue)) {
+                return MqttQoS.EXACTLY_ONCE;
+            }
+            LOG.warn("Error parsing max_server_granted_qos string value, found {} but should be on of 'at_most_once', 'at_least_once', 'exactly_once'", qosValue);
+            throw new IllegalArgumentException("QoS must be one of 'at_most_once', 'at_least_once', 'exactly_once' but was " + qosValue);
+        }
+    }
+
     private static IQueueRepository initQueuesRepository(IConfig config, Path dataPath, H2Builder h2Builder) throws IOException {
         final IQueueRepository queueRepository;
-        final String queueType = config.getProperty(BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME);
+        final String queueType = config.getProperty(IConfig.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME);
         if ("h2".equalsIgnoreCase(queueType)) {
             LOG.info("Configuring H2 queue store");
             queueRepository = h2Builder.queueRepository();
@@ -291,7 +325,7 @@ public class Server {
                 throw new IOException("Problem in configuring persistent queue on path " + dataPath, e);
             }
         } else {
-            final String errMsg = String.format("Invalid property for %s found [%s] while only h2 or segmented are admitted", BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, queueType);
+            final String errMsg = String.format("Invalid property for %s found [%s] while only h2 or segmented are admitted", IConfig.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, queueType);
             throw new RuntimeException(errMsg);
         }
         return queueRepository;
@@ -318,7 +352,7 @@ public class Server {
     }
 
     private String checkOrCreateUUID(IConfig config) {
-        final String storagePath = config.getProperty(BrokerConstants.DATA_PATH_PROPERTY_NAME, "");
+        final String storagePath = config.getProperty(IConfig.DATA_PATH_PROPERTY_NAME, "");
         final Path uuidFilePath = Paths.get(storagePath, ".moquette_uuid");
         if (Files.exists(uuidFilePath)) {
             try {
@@ -448,13 +482,13 @@ public class Server {
 
     private IAuthorizatorPolicy initializeAuthorizatorPolicy(IAuthorizatorPolicy authorizatorPolicy, IConfig props) {
         LOG.debug("Configuring MQTT authorizator policy");
-        String authorizatorClassName = props.getProperty(BrokerConstants.AUTHORIZATOR_CLASS_NAME, "");
+        String authorizatorClassName = props.getProperty(IConfig.AUTHORIZATOR_CLASS_NAME, "");
         if (authorizatorPolicy == null && !authorizatorClassName.isEmpty()) {
             authorizatorPolicy = loadClass(authorizatorClassName, IAuthorizatorPolicy.class, IConfig.class, props);
         }
 
         if (authorizatorPolicy == null) {
-            String aclFilePath = props.getProperty(BrokerConstants.ACL_FILE_PROPERTY_NAME, "");
+            String aclFilePath = props.getProperty(IConfig.ACL_FILE_PROPERTY_NAME, "");
             if (aclFilePath != null && !aclFilePath.isEmpty()) {
                 authorizatorPolicy = new DenyAllAuthorizatorPolicy();
                 try {
@@ -474,7 +508,7 @@ public class Server {
 
     private IAuthenticator initializeAuthenticator(IAuthenticator authenticator, IConfig props) {
         LOG.debug("Configuring MQTT authenticator");
-        String authenticatorClassName = props.getProperty(BrokerConstants.AUTHENTICATOR_CLASS_NAME, "");
+        String authenticatorClassName = props.getProperty(IConfig.AUTHENTICATOR_CLASS_NAME, "");
 
         if (authenticator == null && !authenticatorClassName.isEmpty()) {
             authenticator = loadClass(authenticatorClassName, IAuthenticator.class, IConfig.class, props);
@@ -482,7 +516,7 @@ public class Server {
 
         IResourceLoader resourceLoader = props.getResourceLoader();
         if (authenticator == null) {
-            String passwdPath = props.getProperty(BrokerConstants.PASSWORD_FILE_PROPERTY_NAME, "");
+            String passwdPath = props.getProperty(IConfig.PASSWORD_FILE_PROPERTY_NAME, "");
             if (passwdPath.isEmpty()) {
                 authenticator = new AcceptAllAuthenticator();
             } else {
@@ -563,7 +597,7 @@ public class Server {
         }
         LOG.trace("Internal publishing message CId: {}, messageId: {}", clientId, messageID);
         final RoutingResults routingResults = dispatcher.internalPublish(msg);
-        msg.payload().release();
+        Utils.release(msg, "Routing - internal PUB");
         return routingResults;
     }
 
@@ -584,12 +618,13 @@ public class Server {
         sessions.close();
 
         if (h2Builder != null) {
-            LOG.trace("Shutting down H2 persistence {}");
+            LOG.trace("Shutting down H2 persistence");
             h2Builder.closeStore();
         }
 
         interceptor.stop();
         dispatcher.terminate();
+        metricsProvider.stop();
         LOG.info("Moquette integration has been stopped.");
     }
 
@@ -601,6 +636,10 @@ public class Server {
         return acceptor.getSslPort();
     }
 
+    public MetricsProvider getMetricsProvider() {
+        return metricsProvider;
+    }
+    
     /**
      * SPI method used by Broker embedded applications to get list of subscribers. Returns null if
      * the broker is not started.
@@ -670,5 +709,9 @@ public class Server {
      */
     public boolean disconnectAndPurgeClientState(final String clientId) {
         return sessions.dropSession(clientId, true);
+    }
+
+    public FluentConfig withConfig() {
+        return new FluentConfig(this);
     }
 }

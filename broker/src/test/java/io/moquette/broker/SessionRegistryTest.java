@@ -57,6 +57,9 @@ import java.util.concurrent.TimeUnit;
 import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static io.moquette.broker.NettyChannelAssertions.assertEqualsConnAck;
+import io.moquette.metrics.MetricsManager;
+import io.moquette.metrics.MetricsProvider;
+import io.moquette.metrics.MetricsProviderNull;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
@@ -76,15 +79,15 @@ public class SessionRegistryTest {
 
     private MQTTConnection connection;
     private EmbeddedChannel channel;
-    private SessionRegistry sut;
-    private MqttMessageBuilders.ConnectBuilder connMsg;
+    protected SessionRegistry sut;
+    protected MqttMessageBuilders.ConnectBuilder connMsg;
     private static final BrokerConfiguration ALLOW_ANONYMOUS_AND_ZEROBYTE_CLIENT_ID =
         new BrokerConfiguration(true, true, false, NO_BUFFER_FLUSH);
     private MemoryQueueRepository queueRepository;
     private ScheduledExecutorService scheduler;
     private final Clock pointInTimeFixedClock = Clock.fixed(Instant.parse("2023-03-26T18:09:30.00Z"), ZoneId.of("Europe/Rome"));
-    private ForwardableClock slidingClock = new ForwardableClock(pointInTimeFixedClock);
-    private ISessionsRepository sessionRepository;
+    protected ForwardableClock slidingClock = new ForwardableClock(pointInTimeFixedClock);
+    protected ISessionsRepository sessionRepository;
 
     @BeforeEach
     public void setUp() {
@@ -114,13 +117,14 @@ public class SessionRegistryTest {
         subscriptions.init(subscriptionsRepository);
         queueRepository = new MemoryQueueRepository();
 
+        final MetricsProvider mp = new MetricsProviderNull();
         final PermitAllAuthorizatorPolicy authorizatorPolicy = new PermitAllAuthorizatorPolicy();
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
-        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024);
+        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024, mp);
         sessionRepository = memorySessionsRepository();
-        sut = new SessionRegistry(subscriptions, sessionRepository, queueRepository, permitAll, scheduler, slidingClock, GLOBAL_SESSION_EXPIRY_SECONDS, loopsGroup);
+        sut = new SessionRegistry(subscriptions, sessionRepository, queueRepository, permitAll, scheduler, slidingClock, GLOBAL_SESSION_EXPIRY_SECONDS, loopsGroup, mp);
         final PostOffice postOffice = new PostOffice(subscriptions,
-            new MemoryRetainedRepository(), sut, ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup);
+            new MemoryRetainedRepository(), sut, sessionRepository, ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup, mp);
         return new MQTTConnection(channel, config, mockAuthenticator, sut, postOffice);
     }
 
@@ -230,7 +234,7 @@ public class SessionRegistryTest {
 
         final ByteBuf payload = Unpooled.wrappedBuffer("Hello World!".getBytes(StandardCharsets.UTF_8));
         SessionRegistry.PublishedMessage msg = new SessionRegistry.PublishedMessage(Topic.asTopic("/say"),
-            MqttQoS.AT_LEAST_ONCE, payload, false);
+            MqttQoS.AT_LEAST_ONCE, payload, false, Instant.MAX);
         try {
             // store a message in the MVStore
             final String mapName = "test_map";
@@ -317,7 +321,7 @@ public class SessionRegistryTest {
             .until(sessionsList(), Matchers.not(Matchers.empty()));
     }
 
-    private Callable<Collection<ISessionsRepository.SessionData>> sessionsList() {
+    protected Callable<Collection<ISessionsRepository.SessionData>> sessionsList() {
         return () -> sessionRepository.list();
     }
 }

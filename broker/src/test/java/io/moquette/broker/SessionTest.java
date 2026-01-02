@@ -6,22 +6,23 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import io.netty.handler.codec.mqtt.MqttVersion;
+import io.netty.util.ReferenceCountUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static io.moquette.BrokerConstants.FLIGHT_BEFORE_RESEND_MS;
 import io.moquette.broker.subscriptions.Subscription;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Arrays;
 import org.assertj.core.api.Assertions;
 
+import static io.moquette.BrokerConstants.*;
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
-import static org.junit.jupiter.api.Assertions.*;
 
 public class SessionTest {
 
@@ -37,7 +38,7 @@ public class SessionTest {
         queuedMessages = new InMemoryQueue();
         final Clock clock = Clock.systemDefaultZone();
         final ISessionsRepository.SessionData data = new ISessionsRepository.SessionData(CLIENT_ID, MqttVersion.MQTT_3_1_1, INFINITE_EXPIRY, clock);
-        client = new Session(data, true, null, queuedMessages);
+        client = new Session(data, true, queuedMessages);
         createConnection(client);
     }
 
@@ -65,15 +66,18 @@ public class SessionTest {
         testChannel.close();
     }
 
-    private void sendQoS1To(Session client, Topic destinationTopic, String message) {
+    private ByteBuf sendQoS1To(Session client, Topic destinationTopic, String message) {
         final ByteBuf payload = ByteBufUtil.writeUtf8(UnpooledByteBufAllocator.DEFAULT, message);
-        client.sendNotRetainedPublishOnSessionAtQos(destinationTopic, MqttQoS.AT_LEAST_ONCE, payload);
+        final SessionRegistry.PublishedMessage publishedMessage = new SessionRegistry.PublishedMessage(destinationTopic, MqttQoS.AT_LEAST_ONCE, payload, false, Instant.MAX);
+        client.sendPublishOnSessionAtQos(publishedMessage);
+        ReferenceCountUtil.release(payload);
+        return payload;
     }
 
     @Test
     public void testFirstResendOfANotAckedMessage() throws InterruptedException {
         final Topic destinationTopic = new Topic("/a/b");
-        sendQoS1To(client, destinationTopic, "Message not ACK-ed at first send!");
+        ByteBuf payloadCreated = sendQoS1To(client, destinationTopic, "Message not ACK-ed at first send!");
         // verify the first time the message is sent
         ConnectionTestUtils.verifyReceivePublish(testChannel, destinationTopic.toString(), "Message not ACK-ed at first send!");
 
@@ -85,12 +89,14 @@ public class SessionTest {
 
         // verify the first time the message is sent
         ConnectionTestUtils.verifyReceivePublish(testChannel, destinationTopic.toString(), "Message not ACK-ed at first send!");
+
+        ReferenceCountUtil.release(payloadCreated);
     }
 
     @Test
     public void testSecondResendOfANotAckedMessage() throws InterruptedException {
         final Topic destinationTopic = new Topic("/a/b");
-        sendQoS1To(client, destinationTopic, "Message not ACK-ed at first send!");
+        ByteBuf payloadCreated = sendQoS1To(client, destinationTopic, "Message not ACK-ed at first send!");
         // verify the first time the message is sent
         ConnectionTestUtils.verifyReceivePublish(testChannel, destinationTopic.toString(), "Message not ACK-ed at first send!");
 
@@ -111,13 +117,15 @@ public class SessionTest {
 
         // verify the first time the message is sent
         ConnectionTestUtils.verifyReceivePublish(testChannel, destinationTopic.toString(), "Message not ACK-ed at first send!");
+
+        ReferenceCountUtil.release(payloadCreated);
     }
 
     @Test
     public void testRemoveSubscription() {
-        client.addSubscriptions(Arrays.asList(new Subscription(CLIENT_ID, new Topic("topic/one"), MqttQoS.AT_MOST_ONCE)));
+        client.addSubscriptions(Arrays.asList(new Subscription(CLIENT_ID, new Topic("topic/one"), MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE))));
         Assertions.assertThat(client.getSubscriptions()).hasSize(1);
-        client.addSubscriptions(Arrays.asList(new Subscription(CLIENT_ID, new Topic("topic/one"), MqttQoS.EXACTLY_ONCE)));
+        client.addSubscriptions(Arrays.asList(new Subscription(CLIENT_ID, new Topic("topic/one"), MqttSubscriptionOption.onlyFromQos(MqttQoS.EXACTLY_ONCE))));
         Assertions.assertThat(client.getSubscriptions()).hasSize(1);
         client.removeSubscription(new Topic("topic/one"));
         Assertions.assertThat(client.getSubscriptions()).isEmpty();
@@ -126,6 +134,7 @@ public class SessionTest {
     private void createConnection(Session client) {
         BrokerConfiguration brokerConfiguration = new BrokerConfiguration(true, false, false, NO_BUFFER_FLUSH);
         MQTTConnection mqttConnection = new MQTTConnection(testChannel, brokerConfiguration, null, null, null);
+        mqttConnection.assignSendQuota(new LimitedQuota(INFLIGHT_WINDOW_SIZE));
         client.markConnecting();
         client.bind(mqttConnection);
         client.completeConnection();

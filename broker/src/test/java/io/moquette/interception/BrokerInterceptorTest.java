@@ -23,6 +23,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -145,7 +146,7 @@ public class BrokerInterceptorTest {
 
     @Test
     public void testNotifyTopicSubscribed() throws Exception {
-        interceptor.notifyTopicSubscribed(new Subscription("cli1", new Topic("o2"), MqttQoS.AT_MOST_ONCE), "cli1234");
+        interceptor.notifyTopicSubscribed(new Subscription("cli1", new Topic("o2"), MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE)), "cli1234");
         interval();
         assertEquals(70, n.get());
     }
@@ -165,7 +166,7 @@ public class BrokerInterceptorTest {
         interceptor.addInterceptHandler(interceptHandlerMock1);
         interceptor.addInterceptHandler(interceptHandlerMock2);
 
-        Subscription subscription = new Subscription("cli1", new Topic("o2"), MqttQoS.AT_MOST_ONCE);
+        Subscription subscription = new Subscription("cli1", new Topic("o2"), MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE));
         interceptor.notifyTopicSubscribed(subscription, "cli1234");
         interval();
 

@@ -16,8 +16,14 @@
 package io.moquette.broker.subscriptions;
 
 import static io.moquette.broker.subscriptions.Topic.asTopic;
+
+import io.moquette.broker.subscriptions.CTrie.SubscriptionRequest;
+import io.netty.handler.codec.mqtt.MqttQoS;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
+
+import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
@@ -31,30 +37,37 @@ public class CTrieSpeedTest {
     private static final int CHECK_INTERVAL = 50_000;
     private static final int TOTAL_SUBSCRIPTIONS = 500_000;
 
-    static Subscription clientSubOnTopic(String clientID, String topicName) {
-        return new Subscription(clientID, asTopic(topicName), null);
+    static SubscriptionRequest clientSubOnTopic(String clientID, String topicName) {
+        return SubscriptionRequest.buildNonShared(clientID, asTopic(topicName), MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE));
+    }
+
+    @Test
+    @Timeout(value = MAX_DURATION_S)
+    public void testManyClientsFewTopics() {
+        List<SubscriptionRequest> subscriptionList = prepareSubscriptionsManyClientsFewTopic();
+        createSubscriptions(subscriptionList);
     }
 
     @Test
     @Timeout(value = MAX_DURATION_S)
     public void testFlat() {
-        List<Subscription> results = prepareSubscriptionsFlat();
+        List<SubscriptionRequest> results = prepareSubscriptionsFlat();
         createSubscriptions(results);
     }
 
     @Test
     @Timeout(value = MAX_DURATION_S)
     public void testDeep() {
-        List<Subscription> results = prepareSubscriptionsDeep();
+        List<SubscriptionRequest> results = prepareSubscriptionsDeep();
         createSubscriptions(results);
     }
 
-    public void createSubscriptions(List<Subscription> results) {
+    public void createSubscriptions(List<SubscriptionRequest> results) {
         int count = 0;
         long start = System.currentTimeMillis();
         int log = CHECK_INTERVAL;
         CTrie tree = new CTrie();
-        for (Subscription result : results) {
+        for (SubscriptionRequest result : results) {
             tree.addToTree(result);
             count++;
             log--;
@@ -73,8 +86,17 @@ public class CTrieSpeedTest {
         LOGGER.info("Added " + count + " subscriptions in " + duration + " ms (" + Math.round(1000.0 * count / duration) + "/s)");
     }
 
-    public List<Subscription> prepareSubscriptionsFlat() {
-        List<Subscription> results = new ArrayList<>(TOTAL_SUBSCRIPTIONS);
+    public List<SubscriptionRequest> prepareSubscriptionsManyClientsFewTopic() {
+        List<SubscriptionRequest> subscriptionList = new ArrayList<>(TOTAL_SUBSCRIPTIONS);
+        for (int i = 0; i < TOTAL_SUBSCRIPTIONS; i++) {
+            Topic topic = asTopic("topic/test/" + new Random().nextInt(1 + i % 10) + "/test");
+            subscriptionList.add(SubscriptionRequest.buildNonShared("TestClient-" + i, topic, MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_LEAST_ONCE)));
+        }
+        return subscriptionList;
+    }
+
+    public List<SubscriptionRequest> prepareSubscriptionsFlat() {
+        List<SubscriptionRequest> results = new ArrayList<>(TOTAL_SUBSCRIPTIONS);
         int count = 0;
         long start = System.currentTimeMillis();
         for (int topicNr = 0; topicNr < TOTAL_SUBSCRIPTIONS / 10; topicNr++) {
@@ -89,8 +111,8 @@ public class CTrieSpeedTest {
         return results;
     }
 
-    public List<Subscription> prepareSubscriptionsDeep() {
-        List<Subscription> results = new ArrayList<>(TOTAL_SUBSCRIPTIONS);
+    public List<SubscriptionRequest> prepareSubscriptionsDeep() {
+        List<SubscriptionRequest> results = new ArrayList<>(TOTAL_SUBSCRIPTIONS);
         long countPerLevel = Math.round(Math.pow(TOTAL_SUBSCRIPTIONS, 0.25));
         LOGGER.info("Preparing {} subscriptions, 4 deep with {} per level", TOTAL_SUBSCRIPTIONS, countPerLevel);
         int count = 0;

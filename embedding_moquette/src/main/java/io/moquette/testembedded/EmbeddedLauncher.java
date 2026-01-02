@@ -50,6 +50,9 @@ public final class EmbeddedLauncher {
         public void onPublish(InterceptPublishMessage msg) {
             final String decodedPayload = msg.getPayload().toString(UTF_8);
             System.out.println("Received on topic: " + msg.getTopicName() + " content: " + decodedPayload);
+
+            // super handle the message buffer count
+            super.onPublish(msg);
         }
         
         @Override

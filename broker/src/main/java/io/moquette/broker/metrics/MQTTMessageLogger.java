@@ -100,7 +100,9 @@ public class MQTTMessageLogger extends ChannelDuplexHandler {
                 break;
             case PUBLISH:
                 MqttPublishMessage publish = (MqttPublishMessage) msg;
-                LOG.debug("{} PUBLISH <{}> to topics <{}>", direction, clientID, publish.variableHeader().topicName());
+                LOG.debug("{} PUBLISH <{}> to topics <{}> qos {} packetId <{}>", direction, clientID,
+                    publish.variableHeader().topicName(), publish.fixedHeader().qosLevel(), publish.variableHeader().packetId()
+                );
                 break;
             case PUBREC:
             case PUBCOMP:

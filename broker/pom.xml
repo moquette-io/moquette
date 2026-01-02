@@ -5,7 +5,7 @@
         <relativePath>../pom.xml</relativePath>
         <artifactId>moquette-parent</artifactId>
         <groupId>io.moquette</groupId>
-        <version>0.17-SNAPSHOT</version>
+        <version>0.19-SNAPSHOT</version>
     </parent>
 
     <artifactId>moquette-broker</artifactId>
@@ -14,12 +14,14 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <netty.version>4.1.93.Final</netty.version>
+        <netty.version>4.1.118.Final</netty.version>
         <!-- Check Netty pom.xm to know the right version of tcnative, for example
-             https://github.com/netty/netty/blob/netty-4.1.93.Final/pom.xml#L625 -->
-        <netty.tcnative.version>2.0.61.Final</netty.tcnative.version>
+             https://github.com/netty/netty/blob/netty-4.1.118.Final/pom.xml#L742 -->
+        <netty.tcnative.version>2.0.70.Final</netty.tcnative.version>
         <paho.version>1.2.5</paho.version>
-        <h2.version>2.1.212</h2.version>
+        <paho.mttt5.version>1.2.5</paho.mttt5.version>
+        <hivemqclient.version>1.3.3</hivemqclient.version>
+        <h2.version>2.1.214</h2.version>
     </properties>
 
     <dependencies>
@@ -85,6 +87,56 @@
             <version>${netty.version}</version>
             <classifier>linux-x86_64</classifier>
         </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-transport-native-epoll</artifactId>
+            <version>${netty.version}</version>
+            <classifier>linux-aarch_64</classifier>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-transport-native-kqueue</artifactId>
+            <version>${netty.version}</version>
+            <classifier>osx-aarch_64</classifier>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-transport-native-kqueue</artifactId>
+            <version>${netty.version}</version>
+            <classifier>osx-x86_64</classifier>
+        </dependency>
+
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-tcnative-boringssl-static</artifactId>
+            <version>${netty.tcnative.version}</version>
+            <classifier>linux-x86_64</classifier>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-tcnative-boringssl-static</artifactId>
+            <version>${netty.tcnative.version}</version>
+            <classifier>linux-aarch_64</classifier>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-tcnative-boringssl-static</artifactId>
+            <version>${netty.tcnative.version}</version>
+            <classifier>osx-x86_64</classifier>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-tcnative-boringssl-static</artifactId>
+            <version>${netty.tcnative.version}</version>
+            <classifier>osx-aarch_64</classifier>
+            <scope>runtime</scope>
+        </dependency>
 
         <dependency>
             <groupId>com.h2database</groupId>
@@ -96,34 +148,6 @@
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
             <version>2.4.7</version>
-        </dependency>
-
-        <dependency>
-            <groupId>io.dropwizard.metrics</groupId>
-            <artifactId>metrics-core</artifactId>
-            <version>3.2.2</version>
-        </dependency>
-        <dependency>
-            <groupId>io.dropwizard.metrics</groupId>
-            <artifactId>metrics-jvm</artifactId>
-            <version>3.2.2</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.librato.metrics</groupId>
-            <artifactId>metrics-librato</artifactId>
-            <version>5.1.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.librato.metrics</groupId>
-            <artifactId>librato-java</artifactId>
-            <version>2.1.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.bugsnag</groupId>
-            <artifactId>bugsnag</artifactId>
-            <version>[3.0,4.0)</version>
         </dependency>
 
         <dependency>
@@ -147,19 +171,26 @@
         </dependency>
 
         <dependency>
+            <groupId>org.eclipse.paho</groupId>
+            <artifactId>org.eclipse.paho.mqttv5.client</artifactId>
+            <version>${paho.mttt5.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.hivemq</groupId>
+            <artifactId>hivemq-mqtt-client</artifactId>
+            <version>${hivemqclient.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
             <groupId>org.eclipse.jetty.websocket</groupId>
             <artifactId>websocket-client</artifactId>
             <version>9.2.0.M1</version>
             <scope>test</scope>
         </dependency>
 
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-tcnative-boringssl-static</artifactId>
-            <version>${netty.tcnative.version}</version>
-            <classifier>linux-x86_64</classifier>
-            <scope>test</scope>
-        </dependency>
 
         <dependency>
             <groupId>com.h2database</groupId>
