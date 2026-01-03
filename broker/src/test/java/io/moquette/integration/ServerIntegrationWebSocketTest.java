@@ -18,6 +18,7 @@ package io.moquette.integration;
 
 import io.moquette.broker.Server;
 import io.moquette.BrokerConstants;
+import io.moquette.broker.config.FluentConfig;
 import io.moquette.broker.config.MemoryConfig;
 import org.eclipse.jetty.websocket.client.ClientUpgradeRequest;
 import org.eclipse.jetty.websocket.client.WebSocketClient;
@@ -50,13 +51,22 @@ public class ServerIntegrationWebSocketTest {
     Path tempFolder;
 
     protected void startServer(String dbPath) throws IOException {
-        m_server = new Server();
-        final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
-        configProps.put(BrokerConstants.WEB_SOCKET_PORT_PROPERTY_NAME, Integer.toString(BrokerConstants.WEBSOCKET_PORT));
-        configProps.put(BrokerConstants.DATA_PATH_PROPERTY_NAME, dbPath);
-        configProps.put(BrokerConstants.PERSISTENCE_ENABLED_PROPERTY_NAME, "true");
-        m_config = new MemoryConfig(configProps);
-        m_server.startServer(m_config);
+//        m_server = new Server();
+//        m_config = new FluentConfig()
+//            .dataPath(dbPath)
+//            .enablePersistence()
+//            .disableTelemetry()
+//            .websocketPort(BrokerConstants.WEBSOCKET_PORT)
+//            .build();
+//        m_server.startServer(m_config);
+
+        m_server = new Server()
+            .withConfig()
+            .dataPath(dbPath)
+            .enablePersistence()
+            .disableTelemetry()
+            .websocketPort(BrokerConstants.WEBSOCKET_PORT)
+            .startServer();
     }
 
     @BeforeEach

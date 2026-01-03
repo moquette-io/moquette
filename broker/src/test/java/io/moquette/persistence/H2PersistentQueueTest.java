@@ -22,37 +22,15 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import org.h2.mvstore.MVStore;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class H2PersistentQueueTest {
-
-    private MVStore mvStore;
-
-    @BeforeEach
-    public void setUp() {
-        this.mvStore = new MVStore.Builder()
-            .fileName(BrokerConstants.DEFAULT_PERSISTENT_PATH)
-            .autoCommitDisabled()
-            .open();
-    }
-
-    @AfterEach
-    public void tearDown() {
-        this.mvStore.close();
-        File dbFile = new File(BrokerConstants.DEFAULT_PERSISTENT_PATH);
-        if (dbFile.exists()) {
-            dbFile.delete();
-        }
-        assertFalse(dbFile.exists());
-    }
+public class H2PersistentQueueTest extends H2BaseTest {
 
     @Test
     public void testAdd() {
@@ -68,7 +46,7 @@ public class H2PersistentQueueTest {
 
     private SessionRegistry.PublishedMessage createMessage(String name) {
         final ByteBuf payload = Unpooled.wrappedBuffer(name.getBytes(StandardCharsets.UTF_8));
-        return new SessionRegistry.PublishedMessage(Topic.asTopic(name), MqttQoS.AT_LEAST_ONCE, payload, false);
+        return new SessionRegistry.PublishedMessage(Topic.asTopic(name), MqttQoS.AT_LEAST_ONCE, payload, false, Instant.MAX);
     }
 
     @Test

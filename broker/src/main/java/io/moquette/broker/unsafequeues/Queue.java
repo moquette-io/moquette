@@ -157,6 +157,15 @@ public class Queue {
     }
 
     /**
+     * Close the Queue and release all resources.
+     */
+    public void close() {
+        queuePool.purgeQueue(name);
+        headSegment = null;
+        tailSegment = null;
+    }
+
+    /**
      * Read next message or return null if the queue has no data.
      * */
     public Optional<ByteBuffer> dequeue() throws QueueException {

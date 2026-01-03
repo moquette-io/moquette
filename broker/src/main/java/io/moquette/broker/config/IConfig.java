@@ -28,6 +28,49 @@ import java.time.temporal.TemporalUnit;
 public abstract class IConfig {
 
     public static final String DEFAULT_CONFIG = "config/moquette.conf";
+    public static final String PORT_PROPERTY_NAME = "port";
+    public static final String HOST_PROPERTY_NAME = "host";
+    public static final String PASSWORD_FILE_PROPERTY_NAME = "password_file";
+    public static final String ALLOW_ANONYMOUS_PROPERTY_NAME = "allow_anonymous";
+    public static final String PEER_CERTIFICATE_AS_USERNAME = "peer_certificate_as_username";
+    public static final String AUTHENTICATOR_CLASS_NAME = "authenticator_class";
+    public static final String AUTHORIZATOR_CLASS_NAME = "authorizator_class";
+    public static final String PERSISTENT_QUEUE_TYPE_PROPERTY_NAME = "persistent_queue_type"; // h2 or segmented, default h2
+    public static final String DATA_PATH_PROPERTY_NAME = "data_path";
+    public static final String PERSISTENCE_ENABLED_PROPERTY_NAME = "persistence_enabled"; // true or false, default true
+    /**
+     * 0/immediate means immediate flush, like immediate_buffer_flush = true
+     * -1/full means no explicit flush, let Netty flush when write buffers are full, like immediate_buffer_flush = false
+     * a number of milliseconds to between flushes
+     * */
+    public static final String BUFFER_FLUSH_MS_PROPERTY_NAME = "buffer_flush_millis";
+    public static final String WEB_SOCKET_PORT_PROPERTY_NAME = "websocket_port";
+    public static final String WSS_PORT_PROPERTY_NAME = "secure_websocket_port";
+    public static final String WEB_SOCKET_PATH_PROPERTY_NAME = "websocket_path";
+    public static final String ACL_FILE_PROPERTY_NAME = "acl_file";
+    public static final String PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME = "persistent_client_expiration";
+    public static final String SESSION_QUEUE_SIZE = "session_queue_size";
+    public static final String ENABLE_TELEMETRY_NAME = "telemetry_enabled";
+    public static final String RECEIVE_MAXIMUM = "receive_maximum";
+    /**
+     * Defines the SSL implementation to use, default to "JDK".
+     * @see io.netty.handler.ssl.SslProvider#name()
+     */
+    public static final String SSL_PROVIDER = "ssl_provider";
+    public static final String SSL_PORT_PROPERTY_NAME = "ssl_port";
+    public static final String JKS_PATH_PROPERTY_NAME = "jks_path";
+
+    /** @see java.security.KeyStore#getInstance(String) for allowed types, default to "jks" */
+    public static final String KEY_STORE_TYPE = "key_store_type";
+    public static final String KEY_STORE_PASSWORD_PROPERTY_NAME = "key_store_password";
+    public static final String KEY_MANAGER_PASSWORD_PROPERTY_NAME = "key_manager_password";
+    public static final String NETTY_MAX_BYTES_PROPERTY_NAME = "netty.mqtt.message_size";
+    public static final String MAX_SERVER_GRANTED_QOS_PROPERTY_NAME = "max_server_granted_qos";
+    public static final int DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE = 8092;
+    public static final String TOPIC_ALIAS_MAXIMUM_PROPERTY_NAME = "topic_alias_maximum";
+    public static final String SERVER_KEEP_ALIVE_PROPERTY_NAME = "server_keep_alive";
+
+    public static final String METRICS_PROVIDER_CLASS = "metrics_provider_class";
 
     public abstract void setProperty(String name, String value);
 
@@ -49,21 +92,20 @@ public abstract class IConfig {
     public abstract String getProperty(String name, String defaultValue);
 
     void assignDefaults() {
-        setProperty(BrokerConstants.PORT_PROPERTY_NAME, Integer.toString(BrokerConstants.PORT));
-        setProperty(BrokerConstants.HOST_PROPERTY_NAME, BrokerConstants.HOST);
+        setProperty(PORT_PROPERTY_NAME, Integer.toString(BrokerConstants.PORT));
+        setProperty(HOST_PROPERTY_NAME, BrokerConstants.HOST);
         // setProperty(BrokerConstants.WEB_SOCKET_PORT_PROPERTY_NAME,
         // Integer.toString(BrokerConstants.WEBSOCKET_PORT));
-        setProperty(BrokerConstants.PASSWORD_FILE_PROPERTY_NAME, "");
+        setProperty(PASSWORD_FILE_PROPERTY_NAME, "");
         // setProperty(BrokerConstants.PERSISTENT_STORE_PROPERTY_NAME,
         // BrokerConstants.DEFAULT_PERSISTENT_PATH);
-        setProperty(BrokerConstants.ALLOW_ANONYMOUS_PROPERTY_NAME, Boolean.TRUE.toString());
-        setProperty(BrokerConstants.AUTHENTICATOR_CLASS_NAME, "");
-        setProperty(BrokerConstants.AUTHORIZATOR_CLASS_NAME, "");
-        setProperty(BrokerConstants.NETTY_MAX_BYTES_PROPERTY_NAME,
-            String.valueOf(BrokerConstants.DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE));
-        setProperty(BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, "segmented");
-        setProperty(BrokerConstants.DATA_PATH_PROPERTY_NAME, "data/");
-        setProperty(BrokerConstants.PERSISTENCE_ENABLED_PROPERTY_NAME, Boolean.TRUE.toString());
+        setProperty(ALLOW_ANONYMOUS_PROPERTY_NAME, Boolean.TRUE.toString());
+        setProperty(AUTHENTICATOR_CLASS_NAME, "");
+        setProperty(AUTHORIZATOR_CLASS_NAME, "");
+        setProperty(NETTY_MAX_BYTES_PROPERTY_NAME, String.valueOf(DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE));
+        setProperty(PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, "segmented");
+        setProperty(DATA_PATH_PROPERTY_NAME, "data/");
+        setProperty(PERSISTENCE_ENABLED_PROPERTY_NAME, Boolean.TRUE.toString());
     }
 
     public abstract IResourceLoader getResourceLoader();

@@ -1,4 +1,53 @@
-Version 0.17-SNAPSHOT:
+Version 0.19-SNAPSHOT
+   [feature] Added metrics framework and Prometheus implementation.
+     - Enable by setting `metrics_provider_class` to `MetricsProviderPrometheus`.
+     - Metrics endpoint can be found on http://localhost:9400/metrics by default.
+     - port can be changed with `metrics_endpoint_port`. Set to 0 to disable http endpoint.
+   [fix] Fixed SegmentedQueues not being cleaned up on session purge. (#833)
+
+Version 0.18:
+   [fix] Update Netty to 4.1.116 and H2 2.1.214
+   [feature] Server keep alive: added configuration setting so that the broker can specify a keep alive other then the one selected by clients. (#789)
+   [feature] User properties: covered publish with user properties with tests and fixed publish of will messages. (#877)
+   [feature] Topic alias: implemented handling of topic alias received by publishers. (#873)
+   [feature] Flow-control: Handled client's receive maximum property to configure the inflight window through the client. (#858)
+   [feature] Generate correct MANIFEST.MF with bnd-maven-plugin. (#848)
+   [feature] Flow-control: implemented publish's quota management on the server side. (#852)
+   [fix] Incorrect reference used in compareAndSet in CTrie.cleanTomb. (#841)
+   [feature] Implement response-information property for request-response flow. (#840)
+   [fix] Optimised page file opening for disk-based queues. (#837)
+   [feature] Manage payload format indicator property, when set verify payload format. (#826)
+   [refactoring] Refactory of PostOffice to pass publish message in hits entirety avoiding decomposition into single parameters. (#827)
+   [feature] Add Netty native transport support on MacOS. Bundle all the native transport module by default (#806)
+   [feature] message expiry interval: (issue #818)
+     - Implements the management of message expiry for retained part. (#819)
+     - Avoid to publish messages that has elapsed its expire property. (#822)
+     - Update the message expiry property remaining seconds when a publish is forwarded. (#823)
+     - Updated will publishing to contains also the message expire property. (#824)
+   [feature] subscription option handling: (issue #808)
+     - Move from qos to subscription option implementing the persistence of SubscriptionOption to/from storage. (#810)
+     - Exposed the maximum granted QoS by the server with the config setting 'max_server_granted_qos'. (#811)
+     - Implements handling of noLocal subscription option on MQTT5 connections. (#814)
+     - Implements subscription options retain as published feature. (#815)
+     - Implements subscription options retains handling policies. (#816)
+   [feature] subscription identifiers: (issue #801)
+     - Implements the validation of subscription identifier properties in SUBSCRIBE. (#803)
+     - Store and retrieve the subscription identifier into the subscriptions directory. (#804)
+     - Update H2 storage to persist and reload subscription identifiers for shared and non-shared subscriptions. (#805)
+     - Adds subscription identifier as property in the published message back to the subscriber. (#807)
+   [feature] shared subscriptions:
+     - Initial implementation of shared subscription subscribe and publish part. (#796)
+     - Added unsubscribe of shared subscriptions. (#799)
+     - Implemented persistence for shared subscriptions to sustain broker restarts (#802)
+     - CONNACK set shared subscription available property to true. (#800)
+   [fix] Implements requirements on reserved topics (starts with $). Implements the matching rules and avoid to proceed with processing on client's publishes on those topics (#793)
+   [feature] Handle will delay interval and MQTT5's Will optional properties (#770)
+   [fix] Handle empty collector batches in PostOffice (#777)
+   [feature] Introduce a new option "PEER_CERTIFICATE_AS_USERNAME". When enabled, the client certificate is provided as the username to the authenticator.
+
+Version 0.17:
+   [feature] Introduced DSL FluentConfig to simplify Server's API instantiation #761.
+   [fix] resolved issue #633 of bad perfomance when adding many subscriptions to few topics, resolved in #758.
    [fix] resolved issue #629 that originated from subscription trees wide and flat, resolved in #630
    [dependency] updated Netty to 4.1.93 and tcnative to 2.0.61 (#755)
    [feature] add saved session expiry configurable through the `persistent_client_expiration` setting (#739).

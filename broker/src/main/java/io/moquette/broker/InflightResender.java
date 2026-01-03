@@ -55,7 +55,7 @@ public class InflightResender extends ChannelDuplexHandler {
                 // Writer is idle - set a new timeout and notify the callback.
                 resenderTimeout = ctx.executor().schedule(this, resenderTimeNanos, TimeUnit.NANOSECONDS);
                 try {
-                    resendNotAcked(ctx/* , event */);
+                    resendNotAcked(ctx);
                 } catch (Throwable t) {
                     ctx.fireExceptionCaught(t);
                 }

@@ -78,8 +78,8 @@ public class ServerIntegrationPahoCanPublishOnReadBlockedTopicTest {
         m_server = new Server();
         final Properties configProps = IntegrationUtils.prepareTestProperties(dbPath);
         configProps.setProperty(BrokerConstants.REAUTHORIZE_SUBSCRIPTIONS_ON_CONNECT, "true");
-        configProps.setProperty(BrokerConstants.ENABLE_TELEMETRY_NAME, "false");
-        configProps.setProperty(BrokerConstants.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, "segmented");
+        configProps.setProperty(IConfig.ENABLE_TELEMETRY_NAME, "false");
+        configProps.setProperty(IConfig.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME, "segmented");
         m_config = new MemoryConfig(configProps);
         canRead = true;
 

@@ -66,7 +66,7 @@ public class NewNettyMQTTHandler extends ChannelInboundHandlerAdapter {
                 }
             });
         } finally {
-            ReferenceCountUtil.release(msg);
+            Utils.release(msg, "payload in - channel handler, read");
         }
     }
 

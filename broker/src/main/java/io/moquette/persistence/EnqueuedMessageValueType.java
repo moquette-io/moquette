@@ -19,11 +19,14 @@ import io.moquette.broker.SessionRegistry;
 import io.moquette.broker.SessionRegistry.EnqueuedMessage;
 import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
+import io.netty.handler.codec.mqtt.MqttProperties;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import org.h2.mvstore.WriteBuffer;
 import org.h2.mvstore.type.StringDataType;
 
 import java.nio.ByteBuffer;
+import java.time.Instant;
+
 import org.h2.mvstore.DataUtils;
 import org.h2.mvstore.type.BasicDataType;
 
@@ -33,6 +36,7 @@ public final class EnqueuedMessageValueType extends BasicDataType<EnqueuedMessag
 
     private final StringDataType topicDataType = new StringDataType();
     private final ByteBufDataType payloadDataType = new ByteBufDataType();
+    private final PropertiesDataType propertiesDataType = new PropertiesDataType();
 
     @Override
     public int compare(EnqueuedMessage a, EnqueuedMessage b) {
@@ -45,10 +49,21 @@ public final class EnqueuedMessageValueType extends BasicDataType<EnqueuedMessag
             return 1;
         }
         final SessionRegistry.PublishedMessage casted = (SessionRegistry.PublishedMessage) obj;
+
+        int propertiesSize = hasProperties(casted) ?
+            propertiesDataType.getMemory(casted.getMqttProperties()) :
+            0;
+
         return 1 + // message type
             1 + // qos
             topicDataType.getMemory(casted.getTopic().toString()) +
-            payloadDataType.getMemory(casted.getPayload());
+            payloadDataType.getMemory(casted.getPayload()) +
+            1 +  // flag to indicate if there are MQttProperties or not
+            propertiesSize;
+    }
+
+    static boolean hasProperties(SessionRegistry.PublishedMessage casted) {
+        return casted.getMqttProperties().length > 0;
     }
 
     @Override
@@ -62,6 +77,12 @@ public final class EnqueuedMessageValueType extends BasicDataType<EnqueuedMessag
             final String token = casted.getTopic().toString();
             topicDataType.write(buff, token);
             payloadDataType.write(buff, casted.getPayload());
+            if (hasProperties(casted)) {
+                buff.put((byte) 1); // there are properties
+                propertiesDataType.write(buff, casted.getMqttProperties());
+            } else {
+                buff.put((byte) 0); // there aren't properties
+            }
         } else if (obj instanceof SessionRegistry.PubRelMarker) {
             buff.put((byte) MessageType.PUB_REL_MARKER.ordinal());
         } else {
@@ -78,7 +99,12 @@ public final class EnqueuedMessageValueType extends BasicDataType<EnqueuedMessag
             final MqttQoS qos = MqttQoS.valueOf(buff.get());
             final String topicStr = topicDataType.read(buff);
             final ByteBuf payload = payloadDataType.read(buff);
-            return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload, false);
+            if (SerdesUtils.containsProperties(buff)) {
+                MqttProperties.MqttProperty[] mqttProperties = propertiesDataType.read(buff);
+                return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload, false, Instant.MAX, mqttProperties);
+            } else {
+                return new SessionRegistry.PublishedMessage(Topic.asTopic(topicStr), qos, payload, false, Instant.MAX);
+            }
         } else {
             throw new IllegalArgumentException("Can't recognize record of type: " + messageType);
         }

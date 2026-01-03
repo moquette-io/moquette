@@ -22,8 +22,12 @@ import io.moquette.broker.metrics.*;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
+import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerSocketChannel;
+import io.netty.channel.kqueue.KQueue;
+import io.netty.channel.kqueue.KQueueEventLoopGroup;
+import io.netty.channel.kqueue.KQueueServerSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
@@ -73,7 +77,7 @@ class NewNettyAcceptor {
             ByteBuf bb = frame.content();
             // System.out.println("WebSocketFrameToByteBufDecoder decode - " +
             // ByteBufUtil.hexDump(bb));
-            bb.retain();
+            Utils.retain(bb, "Websocket decoder");
             out.add(bb);
         }
     }
@@ -120,13 +124,14 @@ class NewNettyAcceptor {
 
     private static final Logger LOG = LoggerFactory.getLogger(NewNettyAcceptor.class);
 
+    private static final String EPOLL_TRANSPORT = "io.netty.channel.epoll.Epoll";
+    private static final String KQUEUE_TRANSPORT = "io.netty.channel.kqueue.KQueue";
+
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private final Map<String, Integer> ports = new HashMap<>();
     private BytesMetricsCollector bytesMetricsCollector = new BytesMetricsCollector();
     private MessageMetricsCollector metricsCollector = new MessageMetricsCollector();
-    private Optional<? extends ChannelInboundHandler> metrics;
-    private Optional<? extends ChannelInboundHandler> errorsCather;
 
     private int nettySoBacklog;
     private boolean nettySoReuseaddr;
@@ -148,12 +153,17 @@ class NewNettyAcceptor {
         maxBytesInMessage = props.intProp(BrokerConstants.NETTY_MAX_BYTES_PROPERTY_NAME,
                 BrokerConstants.DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE);
 
-        boolean epoll = props.boolProp(BrokerConstants.NETTY_EPOLL_PROPERTY_NAME, false);
-        if (epoll) {
+        boolean nativeTransport = props.boolProp(BrokerConstants.NETTY_NATIVE_PROPERTY_NAME, false);
+        if (nativeTransport && classAvaliable(EPOLL_TRANSPORT) && Epoll.isAvailable()) {
             LOG.info("Netty is using Epoll");
             bossGroup = new EpollEventLoopGroup();
             workerGroup = new EpollEventLoopGroup();
             channelClass = EpollServerSocketChannel.class;
+        } else if (nativeTransport && classAvaliable(KQUEUE_TRANSPORT) && KQueue.isAvailable()) {
+            LOG.info("Netty is using KQueue");
+            bossGroup = new KQueueEventLoopGroup();
+            workerGroup = new KQueueEventLoopGroup();
+            channelClass = KQueueServerSocketChannel.class;
         } else {
             LOG.info("Netty is using NIO");
             bossGroup = new NioEventLoopGroup();
@@ -161,23 +171,6 @@ class NewNettyAcceptor {
             channelClass = NioServerSocketChannel.class;
         }
 
-        final boolean useFineMetrics = props.boolProp(METRICS_ENABLE_PROPERTY_NAME, false);
-        if (useFineMetrics) {
-            DropWizardMetricsHandler metricsHandler = new DropWizardMetricsHandler();
-            metricsHandler.init(props);
-            this.metrics = Optional.of(metricsHandler);
-        } else {
-            this.metrics = Optional.empty();
-        }
-
-        final boolean useBugSnag = props.boolProp(BUGSNAG_ENABLE_PROPERTY_NAME, false);
-        if (useBugSnag) {
-            BugSnagErrorsHandler bugSnagHandler = new BugSnagErrorsHandler();
-            bugSnagHandler.init(props);
-            this.errorsCather = Optional.of(bugSnagHandler);
-        } else {
-            this.errorsCather = Optional.empty();
-        }
         initializePlainTCPTransport(mqttHandler, props, brokerConfiguration);
         initializeWebSocketTransport(mqttHandler, props, brokerConfiguration);
         if (securityPortsConfigured(props)) {
@@ -188,6 +181,15 @@ class NewNettyAcceptor {
             }
             initializeSSLTCPTransport(mqttHandler, props, sslContext, brokerConfiguration);
             initializeWSSTransport(mqttHandler, props, sslContext, brokerConfiguration);
+        }
+    }
+
+    private boolean classAvaliable(String clazz) {
+        try {
+            Class.forName(clazz, false, getClass().getClassLoader());
+            return true;
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -266,9 +268,6 @@ class NewNettyAcceptor {
         pipeline.addFirst("idleStateHandler", new IdleStateHandler(nettyChannelTimeoutSeconds, 0, 0));
         pipeline.addAfter("idleStateHandler", "idleEventHandler", timeoutHandler);
         // pipeline.addLast("logger", new LoggingHandler("Netty", LogLevel.ERROR));
-        if (errorsCather.isPresent()) {
-            pipeline.addLast("bugsnagCatcher", errorsCather.get());
-        }
         pipeline.addFirst("bytemetrics", new BytesMetricsHandler(bytesMetricsCollector));
         if (writeFlushMillis > IMMEDIATE_BUFFER_FLUSH) {
             pipeline.addLast("autoflush", new AutoFlushHandler(writeFlushMillis, TimeUnit.MILLISECONDS));
@@ -277,9 +276,6 @@ class NewNettyAcceptor {
         pipeline.addLast("encoder", MqttEncoder.INSTANCE);
         pipeline.addLast("metrics", new MessageMetricsHandler(metricsCollector));
         pipeline.addLast("messageLogger", new MQTTMessageLogger());
-        if (metrics.isPresent()) {
-            pipeline.addLast("wizardMetrics", metrics.get());
-        }
         pipeline.addLast("handler", handler);
     }
 

@@ -384,6 +384,24 @@ public class QueuePool {
         }
     }
 
+    void purgeQueue(String name) {
+        final QueueName queueName = new QueueName(name);
+        final LinkedList<SegmentRef> segmentRefs = queueSegments.remove(queueName);
+        SegmentRef segmentRef = segmentRefs.pollLast();
+        segmentsAllocationLock.lock();
+        LOG.debug("Purging segments for queue {}", queueName);
+        try {
+            while (segmentRef != null) {
+                LOG.debug("Purging segment {} from queue {}", segmentRef, queueName);
+                recycledSegments.add(segmentRef);
+                segmentRef = segmentRefs.pollLast();
+            }
+        } finally {
+            segmentsAllocationLock.unlock();
+        }
+        queues.remove(queueName);
+    }
+
     /**
      * Free mapped files
      * */

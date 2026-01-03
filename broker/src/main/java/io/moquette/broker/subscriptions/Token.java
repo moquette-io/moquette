@@ -34,18 +34,6 @@ public class Token implements Comparable<Token> {
         return name;
     }
 
-    protected boolean match(Token t) {
-        if (MULTI.equals(t) || SINGLE.equals(t)) {
-            return false;
-        }
-
-        if (MULTI.equals(this) || SINGLE.equals(this)) {
-            return true;
-        }
-
-        return equals(t);
-    }
-
     @Override
     public int hashCode() {
         int hash = 7;
@@ -85,5 +73,12 @@ public class Token implements Comparable<Token> {
             return -1;
         }
         return name.compareTo(other.name);
+    }
+
+    /**
+     * Token which starts with $ is reserved
+     * */
+    public boolean isReserved() {
+        return name.startsWith("$");
     }
 }

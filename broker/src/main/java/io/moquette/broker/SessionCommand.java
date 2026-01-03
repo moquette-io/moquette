@@ -6,10 +6,10 @@ import java.util.concurrent.CompletableFuture;
 final class SessionCommand {
 
     private final String sessionId;
-    private final Callable<String> action;
+    private final Callable<Void> action;
     private final CompletableFuture<String> task;
 
-    public  SessionCommand(String sessionId, Callable<String> action) {
+    public  SessionCommand(String sessionId, Callable<Void> action) {
         this.sessionId = sessionId;
         this.action = action;
         this.task = new CompletableFuture<>();
