@@ -33,7 +33,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import static io.moquette.logging.LoggingUtils.getInterceptorIds;
+import static io.moquette.metrics.MetricsUtils.getInterceptorIds;
 
 /**
  * An interceptor that execute the interception tasks asynchronously.

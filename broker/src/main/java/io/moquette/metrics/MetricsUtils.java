@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The original author or authors
+ * Copyright (c) 2012-2025 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -14,13 +14,13 @@
  * You may elect to redistribute this code under either of these licenses.
  */
 
-package io.moquette.logging;
+package io.moquette.metrics;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import io.moquette.interception.InterceptHandler;
 
-public final class LoggingUtils {
+public final class MetricsUtils {
 
     public static <T extends InterceptHandler> Collection<String> getInterceptorIds(Collection<T> handlers) {
         Collection<String> result = new ArrayList<>(handlers.size());
@@ -30,6 +30,6 @@ public final class LoggingUtils {
         return result;
     }
 
-    private LoggingUtils() {
+    private MetricsUtils() {
     }
 }

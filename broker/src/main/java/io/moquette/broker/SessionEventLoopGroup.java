@@ -2,6 +2,8 @@ package io.moquette.broker;
 
 import io.moquette.interception.BrokerInterceptor;
 import io.moquette.interception.messages.InterceptExceptionMessage;
+import io.moquette.metrics.MetricsManager;
+import io.moquette.metrics.MetricsProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,15 +22,18 @@ class SessionEventLoopGroup {
     private final BlockingQueue<FutureTask<String>>[] sessionQueues;
     private final int eventLoops = Runtime.getRuntime().availableProcessors();
     private final ConcurrentMap<String, Throwable> loopThrownExceptions = new ConcurrentHashMap<>();
+    private final MetricsProvider metricsProvider;
 
-    SessionEventLoopGroup(BrokerInterceptor interceptor, int sessionQueueSize) {
+    SessionEventLoopGroup(BrokerInterceptor interceptor, int sessionQueueSize, MetricsProvider metricsProvider) {
+        this.metricsProvider = metricsProvider;
         this.sessionQueues = new BlockingQueue[eventLoops];
+        metricsProvider.initSessionQueues(eventLoops, sessionQueueSize);
         for (int i = 0; i < eventLoops; i++) {
             this.sessionQueues[i] = new ArrayBlockingQueue<>(sessionQueueSize);
         }
         this.sessionExecutors = new SessionEventLoop[eventLoops];
         for (int i = 0; i < eventLoops; i++) {
-            SessionEventLoop newLoop = new SessionEventLoop(this.sessionQueues[i]);
+            SessionEventLoop newLoop = new SessionEventLoop(this.sessionQueues[i], i, metricsProvider);
             newLoop.setName(sessionLoopName(i));
             newLoop.setUncaughtExceptionHandler((loopThread, ex) -> {
                 // executed in session loop thread
@@ -78,10 +83,13 @@ class SessionEventLoopGroup {
             SessionEventLoop.executeTask(task);
             return PostOffice.RouteResult.success(clientId, cmd.completableFuture());
         }
-        if (this.sessionQueues[targetQueueId].offer(task)) {
+        final BlockingQueue<FutureTask<String>> targetQueue = this.sessionQueues[targetQueueId];
+        if (targetQueue.offer(task)) {
+            metricsProvider.sessionQueueInc(targetQueueId);
             return PostOffice.RouteResult.success(clientId, cmd.completableFuture());
         } else {
             LOG.warn("Session command queue {} is full executing action {}", targetQueueId, actionDescription);
+            metricsProvider.addSessionQueueOverrun(targetQueueId);
             return PostOffice.RouteResult.failed(clientId);
         }
     }

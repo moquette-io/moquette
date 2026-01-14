@@ -57,6 +57,9 @@ import java.util.concurrent.TimeUnit;
 import static io.moquette.broker.MQTTConnectionPublishTest.memorySessionsRepository;
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
 import static io.moquette.broker.NettyChannelAssertions.assertEqualsConnAck;
+import io.moquette.metrics.MetricsManager;
+import io.moquette.metrics.MetricsProvider;
+import io.moquette.metrics.MetricsProviderNull;
 import static io.netty.handler.codec.mqtt.MqttConnectReturnCode.CONNECTION_ACCEPTED;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
@@ -114,13 +117,14 @@ public class SessionRegistryTest {
         subscriptions.init(subscriptionsRepository);
         queueRepository = new MemoryQueueRepository();
 
+        final MetricsProvider mp = new MetricsProviderNull();
         final PermitAllAuthorizatorPolicy authorizatorPolicy = new PermitAllAuthorizatorPolicy();
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
-        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024);
+        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024, mp);
         sessionRepository = memorySessionsRepository();
-        sut = new SessionRegistry(subscriptions, sessionRepository, queueRepository, permitAll, scheduler, slidingClock, GLOBAL_SESSION_EXPIRY_SECONDS, loopsGroup);
+        sut = new SessionRegistry(subscriptions, sessionRepository, queueRepository, permitAll, scheduler, slidingClock, GLOBAL_SESSION_EXPIRY_SECONDS, loopsGroup, mp);
         final PostOffice postOffice = new PostOffice(subscriptions,
-            new MemoryRetainedRepository(), sut, sessionRepository, ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup);
+            new MemoryRetainedRepository(), sut, sessionRepository, ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup, mp);
         return new MQTTConnection(channel, config, mockAuthenticator, sut, postOffice);
     }
 

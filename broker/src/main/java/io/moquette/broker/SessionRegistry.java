@@ -38,8 +38,9 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
-import static io.moquette.BrokerConstants.INFLIGHT_WINDOW_SIZE;
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
+import io.moquette.metrics.MetricsManager;
+import io.moquette.metrics.MetricsProvider;
 
 public class SessionRegistry {
 
@@ -152,8 +153,8 @@ public class SessionRegistry {
         }
 
         private static boolean isPublicationExpiryProperty(MqttProperties.MqttProperty property) {
-            return property instanceof MqttProperties.IntegerProperty &&
-                property.propertyId() == MqttProperties.MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL.value();
+            return property instanceof MqttProperties.IntegerProperty
+                && property.propertyId() == MqttProperties.MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL.value();
         }
 
         public Instant getMessageExpiry() {
@@ -162,18 +163,19 @@ public class SessionRegistry {
 
         @Override
         public String toString() {
-            return "PublishedMessage{" +
-                "topic=" + topic +
-                ", publishingQos=" + publishingQos +
-                ", payload=" + payload +
-                ", retained=" + retained +
-                ", messageExpiry=" + messageExpiry +
-                ", mqttProperties=" + Arrays.toString(mqttProperties) +
-                '}';
+            return "PublishedMessage{"
+                + "topic=" + topic
+                + ", publishingQos=" + publishingQos
+                + ", payload=" + payload
+                + ", retained=" + retained
+                + ", messageExpiry=" + messageExpiry
+                + ", mqttProperties=" + Arrays.toString(mqttProperties)
+                + '}';
         }
     }
 
     public static final class PubRelMarker extends EnqueuedMessage {
+
         @Override
         public String toString() {
             return "PubRelMarker{}";
@@ -205,6 +207,7 @@ public class SessionRegistry {
     private final IQueueRepository queueRepository;
     private final Authorizator authorizator;
     private final Clock clock;
+    private final MetricsProvider metricsProvider;
 
     // Used in testing
     SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory,
@@ -212,8 +215,9 @@ public class SessionRegistry {
                     IQueueRepository queueRepository,
                     Authorizator authorizator,
                     ScheduledExecutorService scheduler,
-                    SessionEventLoopGroup loopsGroup) {
-        this(subscriptionsDirectory, sessionsRepository, queueRepository, authorizator, scheduler, Clock.systemDefaultZone(), INFINITE_EXPIRY, loopsGroup);
+                    SessionEventLoopGroup loopsGroup,
+                    MetricsProvider metricsProvider) {
+        this(subscriptionsDirectory, sessionsRepository, queueRepository, authorizator, scheduler, Clock.systemDefaultZone(), INFINITE_EXPIRY, loopsGroup, metricsProvider);
     }
 
     SessionRegistry(ISubscriptionsDirectory subscriptionsDirectory,
@@ -222,7 +226,8 @@ public class SessionRegistry {
                     Authorizator authorizator,
                     ScheduledExecutorService scheduler,
                     Clock clock, int globalExpirySeconds,
-                    SessionEventLoopGroup loopsGroup) {
+                    SessionEventLoopGroup loopsGroup,
+                    MetricsProvider metricsProvider) {
         this.subscriptionsDirectory = subscriptionsDirectory;
         this.sessionsRepository = sessionsRepository;
         this.queueRepository = queueRepository;
@@ -231,6 +236,7 @@ public class SessionRegistry {
         this.clock = clock;
         this.globalExpirySeconds = globalExpirySeconds;
         this.loopsGroup = loopsGroup;
+        this.metricsProvider = metricsProvider;
         recreateSessionPool();
     }
 
@@ -261,6 +267,7 @@ public class SessionRegistry {
                 queues.remove(session.clientId());
                 Session rehydrated = new Session(session, false, persistentQueue);
                 pool.put(session.clientId(), rehydrated);
+                metricsProvider.addOpenSession();
 
                 trackForRemovalOnExpiration(session);
             }
@@ -280,6 +287,7 @@ public class SessionRegistry {
 
             // publish the session
             final Session previous = pool.put(clientId, newSession);
+            metricsProvider.addOpenSession();
             if (previous != null) {
                 // if this happens mean that another Session Event Loop thread processed a CONNECT message
                 // with the same clientId. This is a bug because all messages for the same clientId should
@@ -307,7 +315,10 @@ public class SessionRegistry {
             purgeSessionState(oldSession);
             // publish new session
             final Session newSession = createNewSession(msg, clientId);
-            pool.put(clientId, newSession);
+            Session previous = pool.put(clientId, newSession);
+            if (previous != null) {
+                LOG.error("We're re-opening a session for clientId {} and we purged the old session, but there is still a session in the pool! this is a bug!", clientId);
+            }
 
             LOG.trace("case 2, oldSession with same CId {} disconnected", clientId);
             creationResult = new SessionCreationResult(newSession, CreationModeEnum.CREATED_CLEAN_NEW, true);
@@ -499,6 +510,7 @@ public class SessionRegistry {
     void remove(String clientID) {
         final Session old = pool.remove(clientID);
         if (old != null) {
+            metricsProvider.removeOpenSession();
             // remove from expired tracker if present
             sessionExpirationService.untrack(clientID);
             loopsGroup.routeCommand(clientID, "Clean up removed session", () -> {

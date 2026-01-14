@@ -56,6 +56,9 @@ import java.util.concurrent.TimeUnit;
 
 import static io.moquette.BrokerConstants.DISABLED_TOPIC_ALIAS;
 import static io.moquette.BrokerConstants.NO_BUFFER_FLUSH;
+import io.moquette.metrics.MetricsManager;
+import io.moquette.metrics.MetricsProvider;
+import io.moquette.metrics.MetricsProviderNull;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
@@ -114,13 +117,14 @@ public class MQTTConnectionPublishTest {
         subscriptions.init(subscriptionsRepository);
         queueRepository = new MemoryQueueRepository();
 
+        final MetricsProvider mp = new MetricsProviderNull();
         final PermitAllAuthorizatorPolicy authorizatorPolicy = new PermitAllAuthorizatorPolicy();
         final Authorizator permitAll = new Authorizator(authorizatorPolicy);
-        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024);
+        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, 1024, mp);
         ISessionsRepository fakeSessionRepo = memorySessionsRepository();
-        sessionRegistry = new SessionRegistry(subscriptions, fakeSessionRepo, queueRepository, permitAll, scheduler, loopsGroup);
+        sessionRegistry = new SessionRegistry(subscriptions, fakeSessionRepo, queueRepository, permitAll, scheduler, loopsGroup, mp);
         final PostOffice postOffice = new PostOffice(subscriptions,
-            new MemoryRetainedRepository(), sessionRegistry, fakeSessionRepo, ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup) {
+            new MemoryRetainedRepository(), sessionRegistry, fakeSessionRepo, ConnectionTestUtils.NO_OBSERVERS_INTERCEPTOR, permitAll, loopsGroup, mp) {
 
             // mock the publish forwarder method
             @Override

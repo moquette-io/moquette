@@ -68,7 +68,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
-import static io.moquette.logging.LoggingUtils.getInterceptorIds;
+import static io.moquette.metrics.MetricsUtils.getInterceptorIds;
+import io.moquette.metrics.MetricsManager;
+import io.moquette.metrics.MetricsProvider;
 
 public class Server {
 
@@ -83,6 +85,7 @@ public class Server {
     private H2Builder h2Builder;
     private SessionRegistry sessions;
     private boolean standalone = false;
+    private MetricsProvider metricsProvider;
 
     public static void main(String[] args) throws IOException {
         final Server server = new Server();
@@ -182,6 +185,8 @@ public class Server {
         }
         LOG.trace("Starting Moquette Server. MQTT message interceptors={}", getInterceptorIds(handlers));
 
+        metricsProvider = MetricsManager.createMetricsProvider(config);
+
         scheduler = Executors.newScheduledThreadPool(1);
 
         final String handlerProp = System.getProperty(BrokerConstants.INTERCEPT_HANDLER_PROPERTY_NAME);
@@ -254,13 +259,13 @@ public class Server {
         }
 
         final int sessionQueueSize = config.intProp(IConfig.SESSION_QUEUE_SIZE, 1024);
-        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(interceptor, sessionQueueSize);
+        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(interceptor, sessionQueueSize, metricsProvider);
         sessions = new SessionRegistry(subscriptions, sessionsRepository, queueRepository, authorizator, scheduler,
-            clock, globalSessionExpiry, loopsGroup);
+            clock, globalSessionExpiry, loopsGroup, metricsProvider);
 
         final MqttQoS serverGrantedQoS = parseMaxGrantedQoS(config);
         dispatcher = new PostOffice(subscriptions, retainedRepository, sessions, sessionsRepository, interceptor,
-            authorizator, loopsGroup, clock, serverGrantedQoS);
+            authorizator, loopsGroup, clock, serverGrantedQoS, metricsProvider);
         final BrokerConfiguration brokerConfig = new BrokerConfiguration(config);
         MQTTConnectionFactory connectionFactory = new MQTTConnectionFactory(brokerConfig, authenticator, sessions,
                                                                             dispatcher);
@@ -619,6 +624,7 @@ public class Server {
 
         interceptor.stop();
         dispatcher.terminate();
+        metricsProvider.stop();
         LOG.info("Moquette integration has been stopped.");
     }
 
@@ -630,6 +636,10 @@ public class Server {
         return acceptor.getSslPort();
     }
 
+    public MetricsProvider getMetricsProvider() {
+        return metricsProvider;
+    }
+    
     /**
      * SPI method used by Broker embedded applications to get list of subscribers. Returns null if
      * the broker is not started.

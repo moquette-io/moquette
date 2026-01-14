@@ -6,6 +6,7 @@
 .idea/
 *.iml
 broker/target/
+metrics_prometheus/target/
 client/target/
 parser_commons/target/
 netty_parser/target/
@@ -47,3 +48,4 @@ broker/nbactions-Server.xml
 maven-metadata.xml
 /.gradle/
 /bin/
+/metrics_prometheus/nbproject/
