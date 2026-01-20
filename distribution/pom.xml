@@ -4,13 +4,13 @@
     <parent>
         <relativePath>../pom.xml</relativePath>
         <artifactId>moquette-parent</artifactId>
-        <groupId>io.moquette</groupId>
+        <groupId>com.timecho.moquette</groupId>
         <version>0.19-SNAPSHOT</version>
     </parent>
 
     <artifactId>distribution</artifactId>
     <packaging>pom</packaging>
-    <name>Moquette - distribution</name>
+    <name>Timecho Moquette - distribution</name>
 
     <!-- Includes all modules -->
     <dependencies>

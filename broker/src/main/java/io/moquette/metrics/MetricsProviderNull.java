@@ -67,4 +67,30 @@ public class MetricsProviderNull extends AbstractMetricsProvider {
         // ignored
     }
 
+    @Override
+    public void interceptorPublishTaskSubmitted() {
+        // No-op for null provider
+    }
+
+    @Override
+    public void interceptorPublishTaskCompleted() {
+        // No-op for null provider
+    }
+
+    @Override
+    public void recordInterceptorMessageSize(long sizeBytes) {
+        // No-op
+    }
+
+
+    @Override
+    public void interceptorTaskSubmittedWithSize(long payloadSizeBytes) {
+        // No-op
+    }
+
+    @Override
+    public void interceptorTaskCompletedWithSize(long payloadSizeBytes) {
+        // No-op
+    }
+
 }

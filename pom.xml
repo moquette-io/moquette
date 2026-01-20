@@ -12,15 +12,15 @@
         <maven.compiler.target>8</maven.compiler.target>
     </properties>
 
-    <groupId>io.moquette</groupId>
+    <groupId>com.timecho.moquette</groupId>
     <artifactId>moquette-parent</artifactId>
 
     <packaging>pom</packaging>
     <version>0.19-SNAPSHOT</version>
-    <name>Moquette MQTT</name>
-    <description>Moquette lightweight MQTT Broker</description>
+    <name>Timecho Moquette based on Moquette MQTT</name>
+    <description>Timecho's maintained fork of the Moquette lightweight MQTT broker</description>
     <inceptionYear>2011</inceptionYear>
-    <url>http://moquette.io</url>
+    <url>https://github.com/TimechoLab/moquette</url>
 
     <licenses>
         <license>
@@ -47,9 +47,9 @@
     </developers>
 
     <scm>
-        <connection>scm:git:git@github.com:moquette-io/moquette.git</connection>
-        <developerConnection>scm:git:git@github.com:moquette-io/moquette.git</developerConnection>
-        <url>git@github.com:moquette-io/moquette.git</url>
+        <connection>scm:git:https://github.com/TimechoLab/moquette.git</connection>
+        <developerConnection>scm:git:git@github.com:TimechoLab/moquette.git</developerConnection>
+        <url>https://github.com/TimechoLab/moquette</url>
     </scm>
 
     <modules>
@@ -261,12 +261,12 @@
 
     <distributionManagement>
         <snapshotRepository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+            <id>timecho.snapshot.http</id>
+            <url>https://nexus.infra.timecho.com:8443/repository/maven-snapshots/</url>
         </snapshotRepository>
         <repository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
+            <id>timecho.release.http</id>
+            <url>https://nexus.infra.timecho.com:8443/repository/maven-releases/</url>
         </repository>
     </distributionManagement>
 </project>

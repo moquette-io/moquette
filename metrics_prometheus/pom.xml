@@ -4,13 +4,13 @@
     <parent>
         <relativePath>../pom.xml</relativePath>
         <artifactId>moquette-parent</artifactId>
-        <groupId>io.moquette</groupId>
+        <groupId>com.timecho.moquette</groupId>
         <version>0.19-SNAPSHOT</version>
     </parent>
 
     <artifactId>moquette-metrics-prometheus</artifactId>
     <packaging>jar</packaging>
-    <name>Moquette - Metrics - Prometheus</name>
+    <name>Timecho Moquette - Metrics - Prometheus</name>
 
 
     <properties>
@@ -27,7 +27,7 @@
             <version>${slf4j.version}</version>
         </dependency>
         <dependency>
-            <groupId>io.moquette</groupId>
+            <groupId>com.timecho.moquette</groupId>
             <artifactId>moquette-broker</artifactId>
             <version>${project.version}</version>
         </dependency>
