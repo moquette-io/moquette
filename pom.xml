@@ -234,6 +234,16 @@
                             </execution>
                         </executions>
                     </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.7.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <autoPublish>true</autoPublish>
+                        </configuration>
+                    </plugin>
                 </plugins>
             </build>
         </profile>
@@ -258,15 +268,4 @@
             <url>https://oss.sonatype.org/content/repositories/snapshots</url>
         </repository>
     </repositories>
-
-    <distributionManagement>
-        <snapshotRepository>
-            <id>timecho.snapshot.http</id>
-            <url>https://nexus.infra.timecho.com:8443/repository/maven-snapshots/</url>
-        </snapshotRepository>
-        <repository>
-            <id>timecho.release.http</id>
-            <url>https://nexus.infra.timecho.com:8443/repository/maven-releases/</url>
-        </repository>
-    </distributionManagement>
 </project>
