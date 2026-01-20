@@ -21,6 +21,8 @@ import io.moquette.broker.Utils;
 import io.moquette.interception.messages.*;
 import io.moquette.broker.config.IConfig;
 import io.moquette.broker.subscriptions.Subscription;
+import io.moquette.metrics.MetricsProvider;
+import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import io.netty.util.ReferenceCountUtil;
@@ -43,10 +45,12 @@ public final class BrokerInterceptor implements Interceptor {
     private static final Logger LOG = LoggerFactory.getLogger(BrokerInterceptor.class);
     private final Map<Class<?>, List<InterceptHandler>> handlers;
     private final ExecutorService executor;
+    private final MetricsProvider metricsProvider;
 
-    private BrokerInterceptor(int poolSize, List<InterceptHandler> handlers) {
+    private BrokerInterceptor(int poolSize, List<InterceptHandler> handlers, MetricsProvider metricsProvider) {
         LOG.info("Initializing broker interceptor. InterceptorIds={}", getInterceptorIds(handlers));
         this.handlers = new HashMap<>();
+        this.metricsProvider = metricsProvider;
         for (Class<?> messageType : InterceptHandler.ALL_MESSAGE_TYPES) {
             this.handlers.put(messageType, new CopyOnWriteArrayList<InterceptHandler>());
         }
@@ -62,7 +66,7 @@ public final class BrokerInterceptor implements Interceptor {
      * @param handlers InterceptHandlers listeners.
      */
     public BrokerInterceptor(List<InterceptHandler> handlers) {
-        this(1, handlers);
+        this(1, handlers, null);
     }
 
     /**
@@ -72,7 +76,19 @@ public final class BrokerInterceptor implements Interceptor {
      *
      */
     public BrokerInterceptor(IConfig props, List<InterceptHandler> handlers) {
-        this(Integer.parseInt(props.getProperty(BrokerConstants.BROKER_INTERCEPTOR_THREAD_POOL_SIZE, "1")), handlers);
+        this(Integer.parseInt(props.getProperty(BrokerConstants.BROKER_INTERCEPTOR_THREAD_POOL_SIZE, "1")),
+            handlers, null);
+    }
+
+    /**
+     * Configures a broker interceptor, with a thread pool of one thread ane a metricsProvider.
+     *
+     * @param handlers InterceptHandlers listeners.
+     * @param metricsProvider MetricsProvider metricsProvider.
+     */
+    public BrokerInterceptor(IConfig props, List<InterceptHandler> handlers, MetricsProvider metricsProvider) {
+        this(Integer.parseInt(props.getProperty(BrokerConstants.BROKER_INTERCEPTOR_THREAD_POOL_SIZE, "1")),
+            handlers, metricsProvider);
     }
 
     /**
@@ -124,6 +140,15 @@ public final class BrokerInterceptor implements Interceptor {
     public void notifyTopicPublished(final MqttPublishMessage msg, final String clientID, final String username) {
         Utils.retain(msg, "notify interceptors");
 
+        ByteBuf payload = msg.payload();
+        int payloadSize = payload.readableBytes();
+
+        if (metricsProvider != null) {
+            metricsProvider.interceptorPublishTaskSubmitted();
+            metricsProvider.recordInterceptorMessageSize(payloadSize);
+            metricsProvider.interceptorTaskSubmittedWithSize(payloadSize);
+        }
+
         executor.execute(() -> {
                 try {
                     int messageId = msg.variableHeader().messageId();
@@ -137,6 +162,10 @@ public final class BrokerInterceptor implements Interceptor {
                     }
                 } finally {
                     Utils.release(msg, "notify interceptors");
+                    if (metricsProvider != null) {
+                        metricsProvider.interceptorPublishTaskCompleted();
+                        metricsProvider.interceptorTaskCompletedWithSize(payloadSize);
+                    }
                 }
         });
     }

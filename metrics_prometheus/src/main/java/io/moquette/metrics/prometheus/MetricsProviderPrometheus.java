@@ -21,10 +21,13 @@ import io.prometheus.metrics.core.datapoints.CounterDataPoint;
 import io.prometheus.metrics.core.metrics.Counter;
 import io.prometheus.metrics.core.metrics.Gauge;
 import io.prometheus.metrics.core.metrics.GaugeWithCallback;
+import io.prometheus.metrics.core.metrics.Histogram;
 import io.prometheus.metrics.exporter.httpserver.HTTPServer;
 import io.prometheus.metrics.instrumentation.jvm.JvmMetrics;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,6 +57,13 @@ public class MetricsProviderPrometheus implements MetricsProvider {
     private CounterDataPoint[][] messageCounters;
     private Counter publishCounter;
 
+    private Counter interceptorPublishTaskSubmittedCounter;
+    private Counter interceptorPublishTaskCompletedCounter;
+
+    private Histogram interceptorMessageSizeHistogram;
+
+    private final AtomicLong interceptorBacklogMemoryBytes = new AtomicLong(0);
+
     @Override
     public void init(IConfig config) {
         LOG.info("Initialising Prometheus metrics provider.");
@@ -63,22 +73,47 @@ public class MetricsProviderPrometheus implements MetricsProvider {
             JvmMetrics.builder().register();
             if (metricsPort > 0) {
                 metricsServer = HTTPServer.builder()
-                        .port(metricsPort)
-                        .buildAndStart();
+                    .port(metricsPort)
+                    .buildAndStart();
                 LOG.info("Prometheus metrics endpoint started on port {}", metricsPort);
             }
         } catch (IOException ex) {
             LOG.error("Failed to start metrics server.", ex);
         }
         openSessionsGauge = Gauge.builder()
-                .name(METRIC_MOQUETTE_OPEN_SESSIONS)
-                .help("The number of open sessions in the broker.")
-                .register();
+            .name(METRIC_MOQUETTE_OPEN_SESSIONS)
+            .help("The number of open sessions in the broker.")
+            .register();
 
         publishCounter = Counter.builder()
-                .name(METRIC_MOQUETTE_PUBLISHES_TOTAL)
-                .help("Number of publishes made on the broker")
-                .register();
+            .name(METRIC_MOQUETTE_PUBLISHES_TOTAL)
+            .help("Number of publishes made on the broker")
+            .register();
+
+        interceptorPublishTaskSubmittedCounter = Counter.builder()
+            .name("moquette_interceptor_publish_tasks_submitted_total")
+            .help("Total number of interceptor publish tasks submitted to the thread pool")
+            .register();
+
+        interceptorPublishTaskCompletedCounter = Counter.builder()
+            .name("moquette_interceptor_publish_tasks_completed_total")
+            .help("Total number of interceptor publish tasks completed by the thread pool")
+            .register();
+
+        interceptorMessageSizeHistogram = Histogram.builder()
+            .name("moquette_interceptor_message_size_bytes")
+            .help("Size distribution of messages processed by interceptors (in bytes)")
+            .classicUpperBounds(100.0, 500.0, 1000.0, 5000.0, 10000.0, 50000.0, 100000.0, 500000.0, 1000000.0) // 自定义分桶
+            .register();
+
+        GaugeWithCallback.builder()
+            .name("moquette_interceptor_backlog_memory_bytes")
+            .help("Current memory size of message payloads waiting in the interceptor thread pool queue (in bytes)")
+            .callback(cb -> {
+                long backlogMemory = interceptorBacklogMemoryBytes.get();
+                cb.call(backlogMemory);
+            })
+            .register();
     }
 
     @Override
@@ -96,27 +131,27 @@ public class MetricsProviderPrometheus implements MetricsProvider {
     public void initSessionQueues(int queueCount, int queueSize) {
         this.sessionQueueSize = queueSize;
         GaugeWithCallback.builder()
-                .name(METRIC_MOQUETTE_SESSION_QUEUE_FILL)
-                .help("Fill level of the Session Queue (0 - 1)")
-                .labelNames("queue_id")
-                .callback(cb -> {
-                    for (int idx = 0; idx < sessionQueueFill.length; idx++) {
-                        cb.call(1.0 * sessionQueueFill[idx].get() / sessionQueueSize, labelForQueue(idx));
-                    }
-                })
-                .register();
+            .name(METRIC_MOQUETTE_SESSION_QUEUE_FILL)
+            .help("Fill level of the Session Queue (0 - 1)")
+            .labelNames("queue_id")
+            .callback(cb -> {
+                for (int idx = 0; idx < sessionQueueFill.length; idx++) {
+                    cb.call(1.0 * sessionQueueFill[idx].get() / sessionQueueSize, labelForQueue(idx));
+                }
+            })
+            .register();
 
         Counter sessionQueueOverrunCounter = Counter.builder()
-                .name(METRIC_MOQUETTE_SESSION_QUEUE_OVERRUNS_TOTAL)
-                .help("Number of items dropped because the queue was full")
-                .labelNames("queue_name")
-                .register();
+            .name(METRIC_MOQUETTE_SESSION_QUEUE_OVERRUNS_TOTAL)
+            .help("Number of items dropped because the queue was full")
+            .labelNames("queue_name")
+            .register();
 
         Counter messageCounter = Counter.builder()
-                .name(METRIC_MOQUETTE_SESSION_MESSAGES_TOTAL)
-                .help("Number of messages send by this session queue")
-                .labelNames("queue_name", "QoS")
-                .register();
+            .name(METRIC_MOQUETTE_SESSION_MESSAGES_TOTAL)
+            .help("Number of messages send by this session queue")
+            .labelNames("queue_name", "QoS")
+            .register();
 
         sessionQueueFill = new AtomicInteger[queueCount];
         sessionQueueOverrunCounters = new CounterDataPoint[queueCount];
@@ -134,17 +169,17 @@ public class MetricsProviderPrometheus implements MetricsProvider {
         }
 
         GaugeWithCallback.builder()
-                .name(METRIC_MOQUETTE_SESSION_QUEUE_FILL_MAX)
-                .help("Maximum fill level of the Session Queue since the last scrape call (0 - 1)")
-                .labelNames("queue_id")
-                .callback(cb -> {
-                    for (int idx = 0; idx < sessionQueueFillMax.length; idx++) {
-                        final String label = "queue-" + idx;
-                        cb.call(1.0 * sessionQueueFillMax[idx] / sessionQueueSize, label);
-                        sessionQueueFillMax[idx] = 0;
-                    }
-                })
-                .register();
+            .name(METRIC_MOQUETTE_SESSION_QUEUE_FILL_MAX)
+            .help("Maximum fill level of the Session Queue since the last scrape call (0 - 1)")
+            .labelNames("queue_id")
+            .callback(cb -> {
+                for (int idx = 0; idx < sessionQueueFillMax.length; idx++) {
+                    final String label = "queue-" + idx;
+                    cb.call(1.0 * sessionQueueFillMax[idx] / sessionQueueSize, label);
+                    sessionQueueFillMax[idx] = 0;
+                }
+            })
+            .register();
     }
 
     @Override
@@ -197,4 +232,28 @@ public class MetricsProviderPrometheus implements MetricsProvider {
         messageCounters[queue][qos].inc();
     }
 
+    @Override
+    public void interceptorPublishTaskSubmitted() {
+        interceptorPublishTaskSubmittedCounter.inc();
+    }
+
+    @Override
+    public void interceptorPublishTaskCompleted() {
+        interceptorPublishTaskCompletedCounter.inc();
+    }
+
+    @Override
+    public void recordInterceptorMessageSize(long sizeBytes) {
+        interceptorMessageSizeHistogram.observe(sizeBytes);
+    }
+
+    @Override
+    public void interceptorTaskSubmittedWithSize(long payloadSizeBytes) {
+        interceptorBacklogMemoryBytes.addAndGet(payloadSizeBytes);
+    }
+
+    @Override
+    public void interceptorTaskCompletedWithSize(long payloadSizeBytes) {
+        interceptorBacklogMemoryBytes.addAndGet(-payloadSizeBytes);
+    }
 }

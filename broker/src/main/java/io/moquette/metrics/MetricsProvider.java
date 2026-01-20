@@ -74,4 +74,37 @@ public interface MetricsProvider {
      * @param qos The QoS of the message.
      */
     public void addMessage(int queue, int qos);
+
+    /**
+     * Register that an interceptor publish task was submitted to the thread pool.
+     * This tracks the production rate of interceptor tasks.
+     */
+    public void interceptorPublishTaskSubmitted();
+
+    /**
+     * Register that an interceptor publish task was completed.
+     * This tracks the consumption rate of interceptor tasks.
+     */
+    public void interceptorPublishTaskCompleted();
+
+    /**
+     * Record the size of a message payload in bytes.
+     * This is used to track message size distribution (P50, P99, etc.)
+     * @param sizeBytes The size of the message payload in bytes
+     */
+    public void recordInterceptorMessageSize(long sizeBytes);
+
+    /**
+     * Record that an interceptor task was submitted with its payload size.
+     * This is used to track the backlog memory usage of payloads in the queue.
+     * @param payloadSizeBytes The size of the message payload in bytes
+     */
+    public void interceptorTaskSubmittedWithSize(long payloadSizeBytes);
+
+    /**
+     * Record that an interceptor task was completed with its payload size.
+     * This is used to track the backlog memory usage of payloads in the queue.
+     * @param payloadSizeBytes The size of the message payload in bytes
+     */
+    public void interceptorTaskCompletedWithSize(long payloadSizeBytes);
 }

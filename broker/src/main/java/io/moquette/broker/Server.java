@@ -539,7 +539,7 @@ public class Server {
                 observers.add(handler);
             }
         }
-        interceptor = new BrokerInterceptor(props, observers);
+        interceptor = new BrokerInterceptor(props, observers, metricsProvider);
     }
 
     @SuppressWarnings("unchecked")

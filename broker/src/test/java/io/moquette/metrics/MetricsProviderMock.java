@@ -94,6 +94,31 @@ public class MetricsProviderMock extends AbstractMetricsProvider {
         getMessageCount()[queue][qos]++;
     }
 
+    @Override
+    public void interceptorPublishTaskSubmitted() {
+
+    }
+
+    @Override
+    public void interceptorPublishTaskCompleted() {
+
+    }
+
+    @Override
+    public void recordInterceptorMessageSize(long sizeBytes) {
+
+    }
+
+    @Override
+    public void interceptorTaskSubmittedWithSize(long payloadSizeBytes) {
+
+    }
+
+    @Override
+    public void interceptorTaskCompletedWithSize(long payloadSizeBytes) {
+
+    }
+
     /**
      * @return the queueCount
      */

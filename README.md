@@ -2,10 +2,10 @@
 
 [![](https://jitpack.io/v/moquette-io/moquette.svg)](https://jitpack.io/#moquette-io/moquette)
 
-## Moquette MQTT broker
-[Documentation reference guide](http://moquette-io.github.io/moquette/) Guide on how to use and configure Moquette
+## Timecho Moquette based on Moquette MQTT
+[Documentation reference guide](http://moquette-io.github.io/moquette/) – original Moquette documentation, applicable to this fork as well.
 
-Moquette is a lightweight broker compliant with MQTT 5 and MQTT 3, easily encapsulated in other applications.
+Timecho Moquette is a lightweight broker, based on the upstream [moquette-io/moquette](https://github.com/moquette-io/moquette) project, compliant with MQTT 5 and MQTT 3, and easily embedded into other applications.
 The broker supports QoS 0, QoS 1 and QoS 2. The MQTT5 specification is almost fully supported. 
 The features implemented by the broker are:
 * session and message expiry
