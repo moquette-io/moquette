@@ -16,9 +16,6 @@
 package io.moquette.broker.subscriptions;
 
 import io.moquette.broker.ISubscriptionsRepository;
-import io.moquette.broker.subscriptions.CTrie.UnsubscribeRequest;
-import io.netty.handler.codec.mqtt.MqttQoS;
-import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -132,28 +129,24 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
      * Removes subscription from CTrie, adds TNode when the last client unsubscribes, then calls for cleanTomb in a
      * separate atomic CAS operation.
      *
-     * @param topic the subscription's topic to remove.
-     * @param clientID the Id of client owning the subscription.
+     * @param sub the subscription to remove.
      */
     @Override
-    public void removeSubscription(Topic topic, String clientID) {
-        UnsubscribeRequest request = UnsubscribeRequest.buildNonShared(clientID, topic);
-        ctrie.removeFromTree(request);
-        this.subscriptionsRepository.removeSubscription(topic.toString(), clientID);
+    public void removeSubscription(Subscription sub) {
+        ctrie.removeFromTree(sub);
+        subscriptionsRepository.removeSubscription(sub);
     }
 
     @Override
-    public void removeSharedSubscription(ShareName name, Topic topicFilter, String clientId) {
-        UnsubscribeRequest request = UnsubscribeRequest.buildShared(name, topicFilter, clientId);
-        ctrie.removeFromTree(request);
+    public void removeSharedSubscription(Subscription subscription) {
+        ctrie.removeFromTree(subscription);
 
-        subscriptionsRepository.removeSharedSubscription(clientId, name, topicFilter);
+        subscriptionsRepository.removeSharedSubscription(subscription);
 
-        Subscription sharedSubscription = new Subscription(clientId, topicFilter, MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE) /* UNUSED in compare */, name);
+        final String clientId = subscription.getClientId();
         List<Subscription> sharedSubscriptions = clientSharedSubscriptions.get(clientId);
         if (sharedSubscriptions != null && !sharedSubscriptions.isEmpty()) {
-            sharedSubscriptions.remove(sharedSubscription);
-            clientSharedSubscriptions.replace(clientId, sharedSubscriptions);
+            sharedSubscriptions.remove(subscription);
         }
     }
 
@@ -173,8 +166,7 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
         if (sessionSharedSubscriptions != null) {
             // remove the client from all shared subscriptions
             for (Subscription subscription : sessionSharedSubscriptions) {
-                UnsubscribeRequest request = UnsubscribeRequest.buildShared(subscription.getShareName(), subscription.getTopicFilter(), clientId);
-                ctrie.removeFromTree(request);
+                ctrie.removeFromTree(subscription);
             }
         }
 

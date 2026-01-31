@@ -39,7 +39,7 @@ class TNode extends CNode {
     }
 
     @Override
-    CNode addSubscription(Subscription request) {
+    CNode addSubscription(Subscription sub) {
         throw new IllegalStateException("Can't be invoked on TNode");
     }
 
@@ -54,7 +54,7 @@ class TNode extends CNode {
     }
 
     @Override
-    void removeSubscriptionsFor(CTrie.UnsubscribeRequest request) {
+    void removeSubscriptionsFor(Subscription sub) {
         throw new IllegalStateException("Can't be invoked on TNode");
     }
 

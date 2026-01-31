@@ -210,7 +210,7 @@ public class CTrieSubscriptionDirectoryMatchingTest extends CTrieSubscriptionDir
         sut.add(new Subscription("Sensor2", asTopic("/topic"), null));
 
         // Exercise
-        sut.removeSubscription(asTopic("/topic"), "Sensor2");
+        sut.removeSubscription(new Subscription("Sensor2", asTopic("/topic"), null));
 
         // Verify
         Subscription remainedSubscription = sut.matchWithoutQosSharpening(asTopic("/topic")).iterator().next();
@@ -223,7 +223,7 @@ public class CTrieSubscriptionDirectoryMatchingTest extends CTrieSubscriptionDir
         sut.add(new Subscription("Sensor1", asTopic("/topic"), null));
 
         // Exercise
-        sut.removeSubscription(asTopic("/topic"), "Sensor1");
+        sut.removeSubscription(new Subscription("Sensor1", asTopic("/topic"), null));
 
         // Verify
         final List<Subscription> matchingSubscriptions = sut.matchWithoutQosSharpening(asTopic("/topic"));

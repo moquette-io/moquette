@@ -130,7 +130,7 @@ public class CTrieTest {
         sut.addToTree(newSubscription);
 
         //Exercise
-        sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("/temp")));
+        sut.removeFromTree(newSubscription);
 
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/temp"));
@@ -141,7 +141,7 @@ public class CTrieTest {
     public void givenTreeWithSomeNodeUnsubscribeAndResubscribeCleanTomb() {
         Subscription newSubscription1 = clientSubOnTopic("TempSensor1", "test");
         sut.addToTree(newSubscription1);
-        sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("test")));
+        sut.removeFromTree(newSubscription1);
 
         Subscription newSubscription = clientSubOnTopic("TempSensor1", "test");
         sut.addToTree(newSubscription);
@@ -153,15 +153,20 @@ public class CTrieTest {
         Subscription newSubscription = clientSubOnTopic("TempSensor1", "test");
         sut.addToTree(newSubscription);
 
+        Optional<CNode> matchedNode = sut.lookup(asTopic("test"));
+        assertTrue(matchedNode.isPresent(), "Node on path test must be present");
+
         // make sure no TNode exceptions
-        sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("test")));
-        sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("test")));
-        sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("test")));
-        sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("test")));
+        sut.removeFromTree(clientSubOnTopic("TempSensor1", "test"));
+        sut.removeFromTree(clientSubOnTopic("TempSensor1", "test"));
+        sut.removeFromTree(clientSubOnTopic("TempSensor1", "test"));
+        sut.removeFromTree(clientSubOnTopic("TempSensor1", "test"));
 
         //Verify
-        final Optional<CNode> matchedNode = sut.lookup(asTopic("/temp"));
+        matchedNode = sut.lookup(asTopic("/temp"));
         assertFalse(matchedNode.isPresent(), "Node on path /temp can't be present");
+        matchedNode = sut.lookup(asTopic("test"));
+        assertFalse(matchedNode.isPresent(), "Node on path test can't be present");
     }
 
     @Test
@@ -169,14 +174,17 @@ public class CTrieTest {
         Subscription newSubscription = clientSubOnTopic("TempSensor1", "/test/me/1/2/3");
         sut.addToTree(newSubscription);
 
+        Optional<CNode> matchedNode = sut.lookup(asTopic("/test"));
+        assertTrue(matchedNode.isPresent(), "Node on path /test must be present");
+
         // make sure no TNode exceptions
-        sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("/test/me/1/2/3")));
-        sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("/test/me/1/2/3")));
-        sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("/test/me/1/2/3")));
+        sut.removeFromTree(clientSubOnTopic("TempSensor1", "/test/me/1/2/3"));
+        sut.removeFromTree(clientSubOnTopic("TempSensor1", "/test/me/1/2/3"));
+        sut.removeFromTree(clientSubOnTopic("TempSensor1", "/test/me/1/2/3"));
 
         //Verify
-        final Optional<CNode> matchedNode = sut.lookup(asTopic("/temp"));
-        assertFalse(matchedNode.isPresent(), "Node on path /temp can't be present");
+        matchedNode = sut.lookup(asTopic("/test/me/1/2/3"));
+        assertFalse(matchedNode.isPresent(), "Node on path /test can't be present");
     }
 
     @Test
@@ -187,9 +195,9 @@ public class CTrieTest {
         sut.addToTree(newSubscription);
 
         //Exercise
-        sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("/temp/1")));
+        sut.removeFromTree(new Subscription("TempSensor1", asTopic("/temp/1"), null));
 
-        sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("/temp/1")));
+        sut.removeFromTree(new Subscription("TempSensor1", asTopic("/temp/1"), null));
         final List<Subscription> matchingSubs = sut.recursiveMatch(asTopic("/temp/2"));
 
         //Verify
@@ -205,7 +213,7 @@ public class CTrieTest {
         sut.addToTree(newSubscription);
 
         //Exercise
-        sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("/temp")));
+        sut.removeFromTree(new Subscription("TempSensor1", asTopic("/temp"), null));
 
         final List<Subscription> matchingSubs1 = sut.recursiveMatch(asTopic("/temp/1"));
         final List<Subscription> matchingSubs2 = sut.recursiveMatch(asTopic("/temp/2"));
@@ -223,7 +231,7 @@ public class CTrieTest {
         Subscription newSubscription = clientSubOnTopic("TempSensor1", "/bah/bin/bash");
         sut.addToTree(newSubscription);
 
-        sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("/bah/bin/bash")));
+        sut.removeFromTree(new Subscription("TempSensor1", asTopic("/bah/bin/bash"), null));
 
         //Verify
         final Optional<CNode> matchedNode = sut.lookup(asTopic("/bah/bin/bash"));
@@ -261,7 +269,7 @@ public class CTrieTest {
         assertThat(matchingSubs1).contains(expectedMatchingsub1);
         assertThat(matchingSubs2).contains(expectedMatchingsub2);
 
-        sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("temp")));
+        sut.removeFromTree(new Subscription("TempSensor1", asTopic("temp"), null));
 
         //Exercise
         final List<Subscription> matchingSubs3 = sut.recursiveMatch(asTopic("temp"));
@@ -289,7 +297,7 @@ public class CTrieTest {
         assertThat(matchingSubs1).contains(expectedMatchingsub1);
         assertThat(matchingSubs2).contains(expectedMatchingsub2);
 
-        sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor1", asTopic("temp")));
+        sut.removeFromTree(new Subscription("TempSensor1", asTopic("temp"), null));
 
         //Exercise
         final List<Subscription> matchingSubs3 = sut.recursiveMatch(asTopic("temp"));
@@ -317,7 +325,7 @@ public class CTrieTest {
         assertThat(matchingSubs1).contains(expectedMatchingsub1);
         assertThat(matchingSubs2).contains(expectedMatchingsub2);
 
-        sut.removeFromTree(CTrie.UnsubscribeRequest.buildNonShared("TempSensor2", asTopic("temp/1")));
+        sut.removeFromTree(new Subscription("TempSensor2", asTopic("temp/1"), null));
 
         //Exercise
         final List<Subscription> matchingSubs3 = sut.recursiveMatch(asTopic("temp"));

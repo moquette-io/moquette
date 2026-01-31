@@ -26,25 +26,29 @@ public interface ISubscriptionsRepository {
 
     void addNewSubscription(Subscription subscription);
 
-    void removeSubscription(String topic, String clientID);
+    void removeSubscription(Subscription subscription);
 
     /**
      * Remove all shared subscription from Storage for a client.
+     * @param clientId The client to remove the subscriptions for.
      * */
     void removeAllSharedSubscriptions(String clientId);
 
     /**
      * Remove shared subscription from Storage.
+     * @param subscription The subscription to remove.
      * */
-    void removeSharedSubscription(String clientId, ShareName share, Topic topicFilter);
+    void removeSharedSubscription(Subscription subscription);
 
     /**
      * Add shared subscription to storage.
+     * @param subscription The subscription to add.
      * */
     void addNewSharedSubscription(Subscription subscription);
 
     /**
      * List all shared subscriptions to re-add to the tree during a restart.
+     * @return The collection of subscriptions.
      * */
     Collection<Subscription> listAllSharedSubscription();
 }

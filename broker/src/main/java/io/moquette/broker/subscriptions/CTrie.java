@@ -7,52 +7,6 @@ import java.util.Optional;
 
 public class CTrie {
 
-    /**
-     * Models a request to unsubscribe a client, it's carrier for the Subscription
-     * */
-    public final static class UnsubscribeRequest {
-        private final Topic topicFilter;
-        private final String clientId;
-        private boolean shared = false;
-        private ShareName shareName;
-
-        private UnsubscribeRequest(String clientId, Topic topicFilter) {
-            this.topicFilter = topicFilter;
-            this.clientId = clientId;
-        }
-
-        public static UnsubscribeRequest buildNonShared(String clientId, Topic topicFilter) {
-            return new UnsubscribeRequest(clientId, topicFilter);
-        }
-
-        public static UnsubscribeRequest buildShared(ShareName shareName, Topic topicFilter, String clientId) {
-            if (topicFilter.headToken().name().startsWith("$share")) {
-                throw new IllegalArgumentException("Topic filter of a shared subscription can't contains $share and share name");
-            }
-
-            UnsubscribeRequest request = new UnsubscribeRequest(clientId, topicFilter);
-            request.shared = true;
-            request.shareName = shareName;
-            return request;
-        }
-
-        public Topic getTopicFilter() {
-            return topicFilter;
-        }
-
-        public boolean isShared() {
-            return shared;
-        }
-
-        public ShareName getSharedName() {
-            return shareName;
-        }
-
-        public String getClientId() {
-            return clientId;
-        }
-    }
-
     interface IVisitor<T> {
 
         void visit(CNode node, int deep);
@@ -165,31 +119,31 @@ public class CTrie {
     }
 
     /**
-     * @param request The subscription to add.
+     * @param sub The subscription to add.
      * @return true if the subscription didn't exist.
      * */
-    public boolean addToTree(Subscription request) {
+    public boolean addToTree(Subscription sub) {
         Action res;
         do {
-            res = insert(request.getTopicFilter(), this.root, request);
+            res = insert(sub.getTopicFilter(), this.root, sub);
         } while (res == Action.REPEAT);
         return res == Action.OK_NEW;
     }
 
-    private Action insert(Topic topic, final INode inode, Subscription request) {
+    private Action insert(Topic topic, final INode inode, Subscription sub) {
         final Token token = topic.headToken();
         final CNode cnode = inode.mainNode();
         if (!topic.isEmpty()) {
             Optional<INode> nextInode = cnode.childOf(token);
             if (nextInode.isPresent()) {
                 Topic remainingTopic = topic.exceptHeadToken();
-                return insert(remainingTopic, nextInode.get(), request);
+                return insert(remainingTopic, nextInode.get(), sub);
             }
         }
         if (topic.isEmpty()) {
-            return insertSubscription(inode, cnode, request);
+            return insertSubscription(inode, cnode, sub);
         } else {
-            return createNodeAndInsertSubscription(topic, inode, cnode, request);
+            return createNodeAndInsertSubscription(topic, inode, cnode, sub);
         }
     }
 
@@ -204,8 +158,8 @@ public class CTrie {
         return inode.compareAndSet(cnode, updatedCnode) ? Action.OK : Action.REPEAT;
     }
 
-    private Action createNodeAndInsertSubscription(Topic topic, INode inode, CNode cnode, Subscription request) {
-        final INode newInode = createPathRec(topic, request);
+    private Action createNodeAndInsertSubscription(Topic topic, INode inode, CNode cnode, Subscription sub) {
+        final INode newInode = createPathRec(topic, sub);
         final CNode updatedCnode;
         if (cnode instanceof TNode) {
             updatedCnode = new CNode(cnode.getToken());
@@ -217,40 +171,40 @@ public class CTrie {
         return inode.compareAndSet(cnode, updatedCnode) ? Action.OK_NEW : Action.REPEAT;
     }
 
-    private INode createPathRec(Topic topic, Subscription request) {
+    private INode createPathRec(Topic topic, Subscription sub) {
         Topic remainingTopic = topic.exceptHeadToken();
         if (!remainingTopic.isEmpty()) {
-            INode inode = createPathRec(remainingTopic, request);
+            INode inode = createPathRec(remainingTopic, sub);
             CNode cnode = new CNode(topic.headToken());
             cnode.add(inode);
             return new INode(cnode);
         } else {
-            return createLeafNodes(topic.headToken(), request);
+            return createLeafNodes(topic.headToken(), sub);
         }
     }
 
-    private INode createLeafNodes(Token token, Subscription request) {
+    private INode createLeafNodes(Token token, Subscription sub) {
         CNode newLeafCnode = new CNode(token);
-        newLeafCnode.addSubscription(request);
+        newLeafCnode.addSubscription(sub);
 
         return new INode(newLeafCnode);
     }
 
-    public void removeFromTree(UnsubscribeRequest request) {
+    public void removeFromTree(Subscription sub) {
         Action res;
         do {
-            res = remove(request.getClientId(), request.getTopicFilter(), this.root, NO_PARENT, request);
+            res = remove(sub.getClientId(), sub.getTopicFilter(), this.root, NO_PARENT, sub);
         } while (res == Action.REPEAT);
     }
 
-    private Action remove(String clientId, Topic topic, INode inode, INode iParent, UnsubscribeRequest request) {
+    private Action remove(String clientId, Topic topic, INode inode, INode iParent, Subscription sub) {
         Token token = topic.headToken();
         final CNode cnode = inode.mainNode();
         if (!topic.isEmpty()) {
             Optional<INode> nextInode = cnode.childOf(token);
             if (nextInode.isPresent()) {
                 Topic remainingTopic = topic.exceptHeadToken();
-                return remove(clientId, remainingTopic, nextInode.get(), inode, request);
+                return remove(clientId, remainingTopic, nextInode.get(), inode, sub);
             }
         }
         if (cnode instanceof TNode) {
@@ -265,7 +219,7 @@ public class CTrie {
             return inode.compareAndSet(cnode, tnode) ? cleanTomb(inode, iParent) : Action.REPEAT;
         } else if (cnode.contains(clientId) && topic.isEmpty()) {
             CNode updatedCnode = cnode.copy();
-            updatedCnode.removeSubscriptionsFor(request);
+            updatedCnode.removeSubscriptionsFor(sub);
             return inode.compareAndSet(cnode, updatedCnode) ? Action.OK : Action.REPEAT;
         } else {
             //someone else already removed

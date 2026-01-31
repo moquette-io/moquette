@@ -34,16 +34,14 @@ public interface ISubscriptionsDirectory {
 
     void addShared(Subscription subscription);
 
-    void removeSubscription(Topic topic, String clientID);
+    void removeSubscription(Subscription subscription);
 
     /**
      * Removes shared subscription.
      *
-     * @param name part of the shared subscription.
-     * @param topicFilter topic filter part.
-     * @param clientId the client session to unsubscribe.
+     * @param subscription The subscription to remove.
      * */
-    void removeSharedSubscription(ShareName name, Topic topicFilter, String clientId);
+    void removeSharedSubscription(Subscription subscription);
 
     int size();
 

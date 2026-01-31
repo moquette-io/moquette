@@ -356,7 +356,7 @@ public class SessionRegistry {
             final boolean topicReadable = authorizator.canRead(existingSub.getTopicFilter(), username,
                 session.getClientID());
             if (!topicReadable) {
-                subscriptionsDirectory.removeSubscription(existingSub.getTopicFilter(), session.getClientID());
+                subscriptionsDirectory.removeSubscription(existingSub);
             }
             // TODO
 //            subscriptionsDirectory.reactivate(existingSub.getTopicFilter(), session.getClientID());
@@ -365,7 +365,7 @@ public class SessionRegistry {
 
     private void unsubscribe(Session session) {
         for (Subscription existingSub : session.getSubscriptions()) {
-            subscriptionsDirectory.removeSubscription(existingSub.getTopicFilter(), session.getClientID());
+            subscriptionsDirectory.removeSubscription(existingSub);
         }
     }
 
@@ -535,7 +535,7 @@ public class SessionRegistry {
     *
     * @param clientId the name of the client to drop the session.
     * @param removeSessionState boolean flag to request the removal of session state from broker.
-    */ 
+    */
     boolean dropSession(final String clientId, boolean removeSessionState) {
         LOG.debug("Disconnecting client: {}", clientId);
         if (clientId == null) {

@@ -72,7 +72,9 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
     }
 
     @Override
-    public void removeSubscription(String topicFilter, String clientID) {
+    public void removeSubscription(Subscription subscription) {
+        final String clientID = subscription.getClientId();
+        final Topic topicFilter = subscription.getTopicFilter();
         subscriptions.remove(topicFilter + "-" + clientID);
     }
 
@@ -92,7 +94,10 @@ public class H2SubscriptionsRepository implements ISubscriptionsRepository {
     }
 
     @Override
-    public void removeSharedSubscription(String clientId, ShareName share, Topic topicFilter) {
+    public void removeSharedSubscription(Subscription sub) {
+        final String clientId = sub.getClientId();
+        final ShareName share = sub.getShareName();
+        final Topic topicFilter = sub.getTopicFilter();
         final String sharedSubsMapName = sharedSubscriptions.get(clientId);
         if (sharedSubsMapName == null) {
             LOG.info("Removing a non existing shared subscription for client: {}", clientId);

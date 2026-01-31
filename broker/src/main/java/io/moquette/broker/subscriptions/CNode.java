@@ -15,7 +15,6 @@
  */
 package io.moquette.broker.subscriptions;
 
-import io.moquette.broker.subscriptions.CTrie.UnsubscribeRequest;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 
@@ -211,20 +210,20 @@ class CNode implements Comparable<CNode> {
         return false;
     }
 
-    void removeSubscriptionsFor(UnsubscribeRequest request) {
-        String clientId = request.getClientId();
+    void removeSubscriptionsFor(Subscription subscription) {
+        String clientId = subscription.getClientId();
 
-        if (request.isShared()) {
-            List<Subscription> subscriptionsForName = this.sharedSubscriptions.get(request.getSharedName());
+        if (subscription.hasShareName()) {
+            List<Subscription> subscriptionsForName = this.sharedSubscriptions.get(subscription.getShareName());
             List<Subscription> toRemove = subscriptionsForName.stream()
                 .filter(sub -> sub.getClientId().equals(clientId))
                 .collect(Collectors.toList());
             subscriptionsForName.removeAll(toRemove);
 
             if (subscriptionsForName.isEmpty()) {
-                this.sharedSubscriptions.remove(request.getSharedName());
+                this.sharedSubscriptions.remove(subscription.getShareName());
             } else {
-                this.sharedSubscriptions.replace(request.getSharedName(), subscriptionsForName);
+                this.sharedSubscriptions.replace(subscription.getShareName(), subscriptionsForName);
             }
         } else {
             // collect Subscription instances to remove

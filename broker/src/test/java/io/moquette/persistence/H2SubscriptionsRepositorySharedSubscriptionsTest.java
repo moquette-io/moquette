@@ -77,8 +77,8 @@ class H2SubscriptionsRepositorySharedSubscriptionsTest extends H2BaseTest {
         assertThat(sut.listAllSharedSubscription()).hasSize(1);
 
         // remove the shared subscription
-        sut.removeSharedSubscription("subscriber", new ShareName("thermometers"),
-            Topic.asTopic("/first_floor/living/temp"));
+        sut.removeSharedSubscription(new Subscription("subscriber", Topic.asTopic("/first_floor/living/temp"),
+                null,  new ShareName("thermometers")));
 
         // verify it's not listed
         assertThat(sut.listAllSharedSubscription()).isEmpty();

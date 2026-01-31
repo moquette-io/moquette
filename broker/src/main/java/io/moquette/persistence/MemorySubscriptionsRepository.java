@@ -49,11 +49,8 @@ public class MemorySubscriptionsRepository implements ISubscriptionsRepository {
     }
 
     @Override
-    public void removeSubscription(String topic, String clientID) {
-        subscriptions.stream()
-            .filter(s -> s.getTopicFilter().toString().equals(topic) && s.getClientId().equals(clientID))
-            .findFirst()
-            .ifPresent(subscriptions::remove);
+    public void removeSubscription(Subscription subscription) {
+        subscriptions.remove(subscription);
     }
 
     @Override
@@ -62,7 +59,10 @@ public class MemorySubscriptionsRepository implements ISubscriptionsRepository {
     }
 
     @Override
-    public void removeSharedSubscription(String clientId, ShareName share, Topic topicFilter) {
+    public void removeSharedSubscription(Subscription subscription) {
+        final String clientId = subscription.getClientId();
+        final ShareName share = subscription.getShareName();
+        final Topic topicFilter = subscription.getTopicFilter();
         Map<Utils.Couple<ShareName, Topic>, Subscription> subsMap = sharedSubscriptions.get(clientId);
         if (subsMap == null) {
             LOG.info("Removing a non existing shared subscription for client: {}", clientId);
