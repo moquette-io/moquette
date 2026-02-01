@@ -1,4 +1,5 @@
 Version 0.19-SNAPSHOT
+   [feature] Added topic rewriting, allowing the internally used topic to be different from the topic the client used.
    [Cleanup] Cleaned up subscription handling. (#931)
    [feature] Added metrics framework and Prometheus implementation.
      - Enable by setting `metrics_provider_class` to `MetricsProviderPrometheus`.

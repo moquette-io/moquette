@@ -57,6 +57,8 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static io.moquette.broker.Utils.messageId;
+import io.moquette.interception.TopicRewriter;
+import io.moquette.interception.TopicRewriterUnity;
 import io.moquette.metrics.MetricsManager;
 import io.moquette.metrics.MetricsProvider;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
@@ -206,6 +208,7 @@ class PostOffice {
     private final ISessionsRepository sessionRepository;
     private SessionRegistry sessionRegistry;
     private BrokerInterceptor interceptor;
+    private TopicRewriter topicRewriter = new TopicRewriterUnity();
     private final FailedPublishCollection failedPublishes = new FailedPublishCollection();
     private final SessionEventLoopGroup sessionLoops;
     private final Clock clock;
@@ -269,6 +272,10 @@ class PostOffice {
 
         this.retainedMessagesExpirationService = new ScheduledExpirationService<>(clock, this::cleanRetainedExpired);
         recreateRetainedExpires(retainedRepository);
+    }
+
+    public void setTopicRewriter(TopicRewriter topicRewriter) {
+        this.topicRewriter = topicRewriter;
     }
 
     private void cleanRetainedExpired(ExpirableTopic expirable) {
@@ -420,7 +427,9 @@ class PostOffice {
             .map(sub -> {
                 final Topic topic = new Topic(sub.topicFilter());
                 MqttSubscriptionOption option = sub.option();//MqttSubscriptionOption.onlyFromQos(sub.qualityOfService());
-                return new Subscription(clientID, topic, option, subscriptionIdOpt);
+                final Subscription subscription = new Subscription(clientID, topic, option, subscriptionIdOpt);
+                subscription.setTopicFilterInternal(topicRewriter.rewriteTopic(subscription));
+                return subscription;
             }).collect(Collectors.toList());
 
         final Set<Subscription> subscriptionToSendRetained = newSubscriptions.stream()
@@ -444,12 +453,14 @@ class PostOffice {
         }
     }
 
-    private static Subscription buildSharedSubscriptionFrom(MqttTopicSubscription s, String clientID, Optional<SubscriptionIdentifier> subscriptionIdOpt) {
-        return new Subscription(
+    private Subscription buildSharedSubscriptionFrom(MqttTopicSubscription s, String clientID, Optional<SubscriptionIdentifier> subscriptionIdOpt) {
+        final Subscription subscription = new Subscription(
             clientID,
             Topic.asTopic(SharedSubscriptionUtils.extractFilterFromShared(s.topicFilter())),
             s.option(),
             new ShareName(SharedSubscriptionUtils.extractShareName(s.topicFilter())), subscriptionIdOpt);
+        subscription.setTopicFilterInternal(topicRewriter.rewriteTopic(subscription));
+        return subscription;
     }
 
     private static boolean needToReceiveRetained(Utils.Couple<Boolean, Subscription> addedAndSub) {
@@ -519,7 +530,7 @@ class PostOffice {
     private void publishRetainedMessagesForSubscriptions(String clientID, Collection<Subscription> newSubscriptions) {
         Session targetSession = this.sessionRegistry.retrieve(clientID);
         for (Subscription subscription : newSubscriptions) {
-            final String topicFilter = subscription.getTopicFilter().toString();
+            final String topicFilter = subscription.getTopicFilterInternal().toString();
             final Collection<RetainedMessage> retainedMsgs = retainedRepository.retainedOnTopic(topicFilter);
 
             if (retainedMsgs.isEmpty()) {
@@ -929,7 +940,16 @@ class PostOffice {
         boolean isSessionPresent = targetSession != null;
         if (isSessionPresent) {
             LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
-                      sub.getClientId(), sub.getTopicFilter(), qos);
+                      sub.getClientId(), sub.getTopicFilterInternal(), qos);
+
+            if (sub.getTopicFilterClient().hasWildcard() && sub.isTopicRewritten()) {
+                // Topic contains a wildcard AND is rewritten. The interceptor that did the rewriting
+                // must tell us what topic the client expects.
+                topic = topicRewriter.rewriteTopicInverse(sub.getTopicFilterClient(), topic);
+            } else {
+                // Non-Wildcard or non-rewritten topic, we can use the client version.
+                topic = sub.getTopicFilterClient();
+            }
 
             metricsProvider.addMessage(SessionEventLoop.getThreadQueueId(), qos.value());
             Collection<? extends MqttProperties.MqttProperty> existingProperties = msg.variableHeader().properties().listAll();
@@ -941,7 +961,7 @@ class PostOffice {
             // If we are, the subscriber disconnected after the subscriptions tree selected that session as a
             // destination.
             LOG.debug("PUBLISH to not yet present session. CId: {}, topicFilter: {}, qos: {}", sub.getClientId(),
-                      sub.getTopicFilter(), qos);
+                      sub.getTopicFilterInternal(), qos);
         }
     }
 

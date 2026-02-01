@@ -316,8 +316,10 @@ public class SessionRegistry {
             // publish new session
             final Session newSession = createNewSession(msg, clientId);
             Session previous = pool.put(clientId, newSession);
+            metricsProvider.addOpenSession();
             if (previous != null) {
                 LOG.error("We're re-opening a session for clientId {} and we purged the old session, but there is still a session in the pool! this is a bug!", clientId);
+                metricsProvider.removeOpenSession();
             }
 
             LOG.trace("case 2, oldSession with same CId {} disconnected", clientId);
@@ -353,7 +355,7 @@ public class SessionRegistry {
     private void reactivateSubscriptions(Session session, String username) {
         //verify if subscription still satisfy read ACL permissions
         for (Subscription existingSub : session.getSubscriptions()) {
-            final boolean topicReadable = authorizator.canRead(existingSub.getTopicFilter(), username,
+            final boolean topicReadable = authorizator.canRead(existingSub.getTopicFilterInternal(), username,
                 session.getClientID());
             if (!topicReadable) {
                 if (existingSub.hasShareName()) {
@@ -361,7 +363,7 @@ public class SessionRegistry {
                 } else {
                     subscriptionsDirectory.removeSubscription(existingSub);
                 }
-                session.removeSubscription(existingSub.getTopicFilter());
+                session.removeSubscription(existingSub.getTopicFilterClient());
             }
             // TODO
 //            subscriptionsDirectory.reactivate(existingSub.getTopicFilter(), session.getClientID());
