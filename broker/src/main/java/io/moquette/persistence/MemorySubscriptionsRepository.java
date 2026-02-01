@@ -62,7 +62,7 @@ public class MemorySubscriptionsRepository implements ISubscriptionsRepository {
     public void removeSharedSubscription(Subscription subscription) {
         final String clientId = subscription.getClientId();
         final ShareName share = subscription.getShareName();
-        final Topic topicFilter = subscription.getTopicFilter();
+        final Topic topicFilter = subscription.getTopicFilterInternal();
         Map<Utils.Couple<ShareName, Topic>, Subscription> subsMap = sharedSubscriptions.get(clientId);
         if (subsMap == null) {
             LOG.info("Removing a non existing shared subscription for client: {}", clientId);
@@ -82,7 +82,7 @@ public class MemorySubscriptionsRepository implements ISubscriptionsRepository {
 
     private void storeNewSharedSubscription(Subscription sharedSub) {
         Map<Utils.Couple<ShareName, Topic>, Subscription> subsMap = sharedSubscriptions.computeIfAbsent(sharedSub.getClientId(), unused -> new HashMap<>());
-        subsMap.put(Utils.Couple.of(sharedSub.getShareName(), sharedSub.getTopicFilter()), sharedSub);
+        subsMap.put(Utils.Couple.of(sharedSub.getShareName(), sharedSub.getTopicFilterInternal()), sharedSub);
     }
 
     @Override

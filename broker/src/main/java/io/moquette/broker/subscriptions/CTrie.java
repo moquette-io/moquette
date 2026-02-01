@@ -125,7 +125,7 @@ public class CTrie {
     public boolean addToTree(Subscription sub) {
         Action res;
         do {
-            res = insert(sub.getTopicFilter(), this.root, sub);
+            res = insert(sub.getTopicFilterInternal(), this.root, sub);
         } while (res == Action.REPEAT);
         return res == Action.OK_NEW;
     }
@@ -193,7 +193,7 @@ public class CTrie {
     public void removeFromTree(Subscription sub) {
         Action res;
         do {
-            res = remove(sub.getClientId(), sub.getTopicFilter(), this.root, NO_PARENT, sub);
+            res = remove(sub.getClientId(), sub.getTopicFilterInternal(), this.root, NO_PARENT, sub);
         } while (res == Action.REPEAT);
     }
 
