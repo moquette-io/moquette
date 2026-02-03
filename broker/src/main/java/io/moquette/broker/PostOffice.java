@@ -618,7 +618,7 @@ class PostOffice {
             session.removeSubscription(topic);
 
             String username = NettyUtils.userName(mqttConnection.channel);
-            interceptor.notifyTopicUnsubscribed(topic.toString(), clientID, username);
+            interceptor.notifyTopicUnsubscribed(subscription, username);
         }
 
         // ack the client

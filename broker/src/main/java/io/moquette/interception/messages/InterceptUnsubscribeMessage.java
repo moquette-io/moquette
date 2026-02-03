@@ -13,27 +13,40 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
-
 package io.moquette.interception.messages;
+
+import io.moquette.broker.subscriptions.Subscription;
+import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 
 public class InterceptUnsubscribeMessage implements InterceptMessage {
 
-    private final String topicFilter;
-    private final String clientID;
+    private final Subscription subscription;
     private final String username;
 
-    public InterceptUnsubscribeMessage(String topicFilter, String clientID, String username) {
-        this.topicFilter = topicFilter;
-        this.clientID = clientID;
+    public InterceptUnsubscribeMessage(Subscription subscription, String username) {
+        this.subscription = subscription;
         this.username = username;
     }
 
-    public String getTopicFilter() {
-        return topicFilter;
+    public String getClientID() {
+        return subscription.getClientId();
     }
 
-    public String getClientID() {
-        return clientID;
+    public MqttQoS getRequestedQos() {
+        return subscription.getOption().qos();
+    }
+
+    public MqttSubscriptionOption getOption() {
+        return subscription.getOption();
+    }
+
+    public String getTopicFilterClient() {
+        return subscription.getTopicFilter().toString();
+    }
+
+    public String getTopicFilterInternal() {
+        return subscription.getTopicFilter().toString();
     }
 
     public String getUsername() {
