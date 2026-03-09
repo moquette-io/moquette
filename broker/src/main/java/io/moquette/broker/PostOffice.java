@@ -391,12 +391,22 @@ class PostOffice {
         int messageID = messageId(msg);
         final Session session = sessionRegistry.retrieve(clientID);
 
+        List<MqttTopicSubscription> ackingSubsriptions;
+        if (mqttConnection.isProtocolVersion5()) {
+            ackingSubsriptions = authorizator.verifyAlsoSharedTopicsReadAccess(clientID, username, msg);
+        } else {
+            ackingSubsriptions = authorizator.verifyTopicsReadAccess(clientID, username, msg);
+        }
+        ackingSubsriptions = updateWithMaximumSupportedQoS(ackingSubsriptions);
+        MqttSubAckMessage ackMessage = doAckMessageFromValidateFilters(ackingSubsriptions, messageID);
+
         final List<SharedSubscriptionData> sharedSubscriptions;
         final Optional<SubscriptionIdentifier> subscriptionIdOpt;
 
         if (mqttConnection.isProtocolVersion5()) {
-            sharedSubscriptions = msg.payload().topicSubscriptions().stream()
-                .filter(sub -> SharedSubscriptionUtils.isSharedSubscription(sub.topicName()))
+            sharedSubscriptions = ackingSubsriptions.stream()
+                .filter(PostOffice::isNoFailure)
+                .filter(SharedSubscriptionUtils::isSharedSubscription)
                 .map(SharedSubscriptionData::fromMqttSubscription)
                 .collect(Collectors.toList());
 
@@ -421,17 +431,8 @@ class PostOffice {
             subscriptionIdOpt = Optional.empty();
         }
 
-        List<MqttTopicSubscription> ackTopics;
-        if (mqttConnection.isProtocolVersion5()) {
-            ackTopics = authorizator.verifyAlsoSharedTopicsReadAccess(clientID, username, msg);
-        } else {
-            ackTopics = authorizator.verifyTopicsReadAccess(clientID, username, msg);
-        }
-        ackTopics = updateWithMaximumSupportedQoS(ackTopics);
-        MqttSubAckMessage ackMessage = doAckMessageFromValidateFilters(ackTopics, messageID);
-
         // store topics of non-shared subscriptions in session
-        List<Subscription> newSubscriptions = ackTopics.stream()
+        List<Subscription> newSubscriptions = ackingSubsriptions.stream()
             .filter(sub -> sub.qualityOfService() != FAILURE)
             .filter(sub -> !SharedSubscriptionUtils.isSharedSubscription(sub.topicName()))
             .map(sub -> {
@@ -784,6 +785,10 @@ class PostOffice {
 
     private static boolean hasProperty(MqttProperties props, MqttPropertyType prop) {
         return props.getProperty(prop.value()) != null;
+    }
+
+    private static boolean isNoFailure(MqttTopicSubscription sub) {
+        return sub.qualityOfService() != FAILURE;
     }
 
     private static int getIntProperty(MqttProperties props, MqttPropertyType prop) {
