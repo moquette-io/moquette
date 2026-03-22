@@ -392,11 +392,7 @@ class PostOffice {
             List<Subscription> sharedSubscriptions = ackingSubsriptions.stream()
                 .filter(PostOffice::isNoFailure)
                 .filter(SharedSubscriptionUtils::isSharedSubscription)
-                .map((s) -> new Subscription(
-                            clientID,
-                            Topic.asTopic(SharedSubscriptionUtils.extractFilterFromShared(s.topicFilter())),
-                            s.option(),
-                            new ShareName(SharedSubscriptionUtils.extractShareName(s.topicFilter())), subscriptionIdOpt))
+                .map(s -> buildSharedSubscriptionFrom(s, clientID, subscriptionIdOpt))
                 .collect(Collectors.toList());
 
             Optional<Subscription> invalidSharedSubscription = sharedSubscriptions.stream()
@@ -446,6 +442,14 @@ class PostOffice {
         for (Subscription subscription : newSubscriptions) {
             interceptor.notifyTopicSubscribed(subscription, username);
         }
+    }
+
+    private static Subscription buildSharedSubscriptionFrom(MqttTopicSubscription s, String clientID, Optional<SubscriptionIdentifier> subscriptionIdOpt) {
+        return new Subscription(
+            clientID,
+            Topic.asTopic(SharedSubscriptionUtils.extractFilterFromShared(s.topicFilter())),
+            s.option(),
+            new ShareName(SharedSubscriptionUtils.extractShareName(s.topicFilter())), subscriptionIdOpt);
     }
 
     private static boolean needToReceiveRetained(Utils.Couple<Boolean, Subscription> addedAndSub) {
