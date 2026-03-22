@@ -396,7 +396,7 @@ class PostOffice {
                 .collect(Collectors.toList());
 
             Optional<Subscription> invalidSharedSubscription = sharedSubscriptions.stream()
-                .filter(subData -> !SharedSubscriptionUtils.validateShareName(subData.getShareName().toString()))
+                .filter(sub -> !SharedSubscriptionUtils.validateShareName(sub.getShareName().toString()))
                 .findFirst();
             if (invalidSharedSubscription.isPresent()) {
                 // this is a malformed packet, MQTT-4.13.1-1, disconnect it

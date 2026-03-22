@@ -147,12 +147,12 @@ class Session {
     }
 
     public void addSubscription(Subscription sub) {
-        String topic = sub.getOriginalTopicWithSharename();
+        String topic = sub.getOriginalTopicFilterWithSharename();
         subscriptions.put(topic, sub);
     }
 
     public void addSubscriptions(List<Subscription> newSubscriptions) {
-        for (Subscription sub:newSubscriptions) {
+        for (Subscription sub : newSubscriptions) {
             addSubscription(sub);
         }
     }
