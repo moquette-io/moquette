@@ -27,6 +27,7 @@ public final class ShareName implements Comparable<ShareName>{
     private final String shareName;
 
     public ShareName(String shareName) {
+        Objects.requireNonNull(shareName);
         this.shareName = shareName;
     }
 
