@@ -142,8 +142,8 @@ class Session {
         return data.clientId();
     }
 
-    public Collection<Subscription> getSubscriptions() {
-        return subscriptions.values();
+    public List<Subscription> getSubscriptions() {
+        return new ArrayList<>(subscriptions.values());
     }
 
     public void addSubscription(Subscription sub) {
