@@ -104,10 +104,9 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
 
     @Override
     public boolean add(Subscription sub) {
-        return addNonSharedSubscriptionRequest(sub);
-    }
-
-    private boolean addNonSharedSubscriptionRequest(Subscription sub) {
+        if (sub.hasShareName()) {
+            throw new IllegalArgumentException("Adding a shared subscription using the non-shared method.");
+        }
         boolean notExistingSubscription = ctrie.addToTree(sub);
         subscriptionsRepository.addNewSubscription(sub);
         return notExistingSubscription;
@@ -115,14 +114,13 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
 
     @Override
     public void addShared(Subscription sub) {
-        addSharedSubscriptionRequest(sub);
-    }
-
-    private void addSharedSubscriptionRequest(Subscription shareSubRequest) {
-        ctrie.addToTree(shareSubRequest);
-        subscriptionsRepository.addNewSharedSubscription(shareSubRequest);
-        List<Subscription> sharedSubscriptions = clientSharedSubscriptions.computeIfAbsent(shareSubRequest.getClientId(), unused -> new ArrayList<>());
-        sharedSubscriptions.add(shareSubRequest);
+        if (!sub.hasShareName()) {
+            throw new IllegalArgumentException("Adding a non-shared subscription using the shared method.");
+        }
+        ctrie.addToTree(sub);
+        subscriptionsRepository.addNewSharedSubscription(sub);
+        List<Subscription> sharedSubscriptions = clientSharedSubscriptions.computeIfAbsent(sub.getClientId(), unused -> new ArrayList<>());
+        sharedSubscriptions.add(sub);
     }
 
     /**
@@ -133,12 +131,18 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
      */
     @Override
     public void removeSubscription(Subscription sub) {
+        if (sub.hasShareName()) {
+            throw new IllegalArgumentException("Removing a shared subscription using the non-shared method.");
+        }
         ctrie.removeFromTree(sub);
         subscriptionsRepository.removeSubscription(sub);
     }
 
     @Override
     public void removeSharedSubscription(Subscription subscription) {
+        if (!subscription.hasShareName()) {
+            throw new IllegalArgumentException("Removing a non-shared subscription using the shared method.");
+        }
         ctrie.removeFromTree(subscription);
 
         subscriptionsRepository.removeSharedSubscription(subscription);
