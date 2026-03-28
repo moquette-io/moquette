@@ -57,6 +57,8 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static io.moquette.broker.Utils.messageId;
+import io.moquette.interception.TopicRewriter;
+import io.moquette.interception.TopicRewriterUnity;
 import io.moquette.metrics.MetricsManager;
 import io.moquette.metrics.MetricsProvider;
 import static io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader.from;
@@ -206,6 +208,7 @@ class PostOffice {
     private final ISessionsRepository sessionRepository;
     private SessionRegistry sessionRegistry;
     private BrokerInterceptor interceptor;
+    private TopicRewriter topicRewriter = new TopicRewriterUnity();
     private final FailedPublishCollection failedPublishes = new FailedPublishCollection();
     private final SessionEventLoopGroup sessionLoops;
     private final Clock clock;
@@ -213,7 +216,7 @@ class PostOffice {
     private final ScheduledExpirationService<ExpirableTopic> retainedMessagesExpirationService;
     private final MqttQoS maxServerGrantedQos;
     private final MetricsProvider metricsProvider;
-    
+
 
     static class ExpirableTopic implements Expirable {
 
@@ -269,6 +272,10 @@ class PostOffice {
 
         this.retainedMessagesExpirationService = new ScheduledExpirationService<>(clock, this::cleanRetainedExpired);
         recreateRetainedExpires(retainedRepository);
+    }
+
+    public void setTopicRewriter(TopicRewriter topicRewriter) {
+        this.topicRewriter = topicRewriter;
     }
 
     private void cleanRetainedExpired(ExpirableTopic expirable) {
@@ -364,27 +371,6 @@ class PostOffice {
         sessionRepository.deleteWill(clientId);
     }
 
-    // Used for internal purposes of subscribeClientToTopics method
-    private static final class SharedSubscriptionData {
-        final ShareName name;
-        final Topic topicFilter;
-        final MqttSubscriptionOption option;
-
-        private SharedSubscriptionData(ShareName name, Topic topicFilter, MqttSubscriptionOption option) {
-            Objects.requireNonNull(name);
-            Objects.requireNonNull(topicFilter);
-            Objects.requireNonNull(option);
-            this.name = name;
-            this.topicFilter = topicFilter;
-            this.option = option;
-        }
-
-        static SharedSubscriptionData fromMqttSubscription(MqttTopicSubscription sub) {
-            return new SharedSubscriptionData(new ShareName(SharedSubscriptionUtils.extractShareName(sub.topicName())),
-                Topic.asTopic(SharedSubscriptionUtils.extractFilterFromShared(sub.topicName())), sub.option());
-        }
-    }
-
     public void subscribeClientToTopics(MqttSubscribeMessage msg, String clientID, String username,
                                         MQTTConnection mqttConnection) {
         // verify which topics of the subscribe ongoing has read access permission
@@ -400,49 +386,50 @@ class PostOffice {
         ackingSubsriptions = updateWithMaximumSupportedQoS(ackingSubsriptions);
         MqttSubAckMessage ackMessage = doAckMessageFromValidateFilters(ackingSubsriptions, messageID);
 
-        final List<SharedSubscriptionData> sharedSubscriptions;
         final Optional<SubscriptionIdentifier> subscriptionIdOpt;
 
         if (mqttConnection.isProtocolVersion5()) {
-            sharedSubscriptions = ackingSubsriptions.stream()
-                .filter(PostOffice::isNoFailure)
-                .filter(SharedSubscriptionUtils::isSharedSubscription)
-                .map(SharedSubscriptionData::fromMqttSubscription)
-                .collect(Collectors.toList());
-
-            Optional<SharedSubscriptionData> invalidSharedSubscription = sharedSubscriptions.stream()
-                .filter(subData -> !SharedSubscriptionUtils.validateShareName(subData.name.toString()))
-                .findFirst();
-            if (invalidSharedSubscription.isPresent()) {
-                // this is a malformed packet, MQTT-4.13.1-1, disconnect it
-                LOG.info("{} used an invalid shared subscription name {}, disconnecting", clientID, invalidSharedSubscription.get().name);
-                session.disconnectFromBroker();
-                return;
-            }
-
             try {
                 subscriptionIdOpt = verifyAndExtractMessageIdentifier(msg);
             } catch (IllegalArgumentException ex) {
                 session.disconnectFromBroker();
                 return;
             }
+
+            List<Subscription> sharedSubscriptions = ackingSubsriptions.stream()
+                .filter(PostOffice::isNoFailure)
+                .filter(SharedSubscriptionUtils::isSharedSubscription)
+                .map(s -> buildSharedSubscriptionFrom(s, clientID, subscriptionIdOpt))
+                .collect(Collectors.toList());
+
+            Optional<Subscription> invalidSharedSubscription = sharedSubscriptions.stream()
+                .filter(sub -> !SharedSubscriptionUtils.validateShareName(sub.getShareName().getShareName()))
+                .findFirst();
+            if (invalidSharedSubscription.isPresent()) {
+                // this is a malformed packet, MQTT-4.13.1-1, disconnect it
+                LOG.info("{} used an invalid shared subscription name {}, disconnecting", clientID, invalidSharedSubscription.get().getShareName());
+                session.disconnectFromBroker();
+                return;
+            }
+            for (Subscription sub : sharedSubscriptions) {
+                subscriptions.addShared(sub);
+                session.addSubscription(sub);
+                interceptor.notifyTopicSubscribed(sub, username);
+            }
         } else {
-            sharedSubscriptions = Collections.emptyList();
             subscriptionIdOpt = Optional.empty();
         }
 
         // store topics of non-shared subscriptions in session
         List<Subscription> newSubscriptions = ackingSubsriptions.stream()
             .filter(sub -> sub.qualityOfService() != FAILURE)
-            .filter(sub -> !SharedSubscriptionUtils.isSharedSubscription(sub.topicName()))
+            .filter(sub -> !SharedSubscriptionUtils.isSharedSubscription(sub.topicFilter()))
             .map(sub -> {
-                final Topic topic = new Topic(sub.topicName());
+                final Topic topic = new Topic(sub.topicFilter());
                 MqttSubscriptionOption option = sub.option();//MqttSubscriptionOption.onlyFromQos(sub.qualityOfService());
-                if (subscriptionIdOpt.isPresent()) {
-                    return new Subscription(clientID, topic, option, subscriptionIdOpt.get());
-                } else {
-                    return new Subscription(clientID, topic, option);
-                }
+                final Subscription subscription = new Subscription(clientID, topic, option, subscriptionIdOpt);
+                subscription.setTopicFilterInternal(topicRewriter.rewriteTopic(subscription));
+                return subscription;
             }).collect(Collectors.toList());
 
         final Set<Subscription> subscriptionToSendRetained = newSubscriptions.stream()
@@ -451,14 +438,6 @@ class PostOffice {
             .map(couple -> couple.v2)
             .collect(Collectors.toSet());
 
-        for (SharedSubscriptionData sharedSubData : sharedSubscriptions) {
-            if (subscriptionIdOpt.isPresent()) {
-                subscriptions.addShared(clientID, sharedSubData.name, sharedSubData.topicFilter, sharedSubData.option,
-                    subscriptionIdOpt.get());
-            } else {
-                subscriptions.addShared(clientID, sharedSubData.name, sharedSubData.topicFilter, sharedSubData.option);
-            }
-        }
 
         // add the subscriptions to Session
         session.addSubscriptions(newSubscriptions);
@@ -474,8 +453,18 @@ class PostOffice {
         }
     }
 
+    private Subscription buildSharedSubscriptionFrom(MqttTopicSubscription s, String clientID, Optional<SubscriptionIdentifier> subscriptionIdOpt) {
+        final Subscription subscription = new Subscription(
+            clientID,
+            Topic.asTopic(SharedSubscriptionUtils.extractFilterFromShared(s.topicFilter())),
+            s.option(),
+            new ShareName(SharedSubscriptionUtils.extractShareName(s.topicFilter())), subscriptionIdOpt);
+        subscription.setTopicFilterInternal(topicRewriter.rewriteTopic(subscription));
+        return subscription;
+    }
+
     private static boolean needToReceiveRetained(Utils.Couple<Boolean, Subscription> addedAndSub) {
-        MqttSubscriptionOption subOptions = addedAndSub.v2.option();
+        MqttSubscriptionOption subOptions = addedAndSub.v2.getOption();
         switch (subOptions.retainHandling()) {
             case SEND_AT_SUBSCRIBE:
                 return true;
@@ -490,13 +479,7 @@ class PostOffice {
 
     private Utils.Couple<Boolean, Subscription> addSubscriptionReportingNewStatus(Subscription subscription) {
         final boolean newlyAdded;
-        if (subscription.hasSubscriptionIdentifier()) {
-            SubscriptionIdentifier subscriptionId = subscription.getSubscriptionIdentifier();
-            newlyAdded = subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(),
-                subscription.option(), subscriptionId);
-        } else {
-            newlyAdded = subscriptions.add(subscription.getClientId(), subscription.getTopicFilter(), subscription.option());
-        }
+        newlyAdded = subscriptions.add(subscription);
         return new Utils.Couple<>(newlyAdded, subscription);
     }
 
@@ -547,7 +530,7 @@ class PostOffice {
     private void publishRetainedMessagesForSubscriptions(String clientID, Collection<Subscription> newSubscriptions) {
         Session targetSession = this.sessionRegistry.retrieve(clientID);
         for (Subscription subscription : newSubscriptions) {
-            final String topicFilter = subscription.getTopicFilter().toString();
+            final String topicFilter = subscription.getTopicFilterInternal().toString();
             final Collection<RetainedMessage> retainedMsgs = retainedRepository.retainedOnTopic(topicFilter);
 
             if (retainedMsgs.isEmpty()) {
@@ -623,12 +606,15 @@ class PostOffice {
             }
 
             LOG.trace("Removing subscription topic={}", topic);
-            if (SharedSubscriptionUtils.isSharedSubscription(t)) {
-                String topicFilterPart = SharedSubscriptionUtils.extractFilterFromShared(t);
-                ShareName shareName = new ShareName(SharedSubscriptionUtils.extractShareName(t));
-                subscriptions.removeSharedSubscription(shareName, Topic.asTopic(topicFilterPart), clientID);
+            Subscription subscription = session.getSubscription(topic);
+            if (subscription == null) {
+                LOG.debug("Client {} has no subscription on {}", clientID, t);
+                continue;
+            }
+            if (subscription.hasShareName()) {
+                subscriptions.removeSharedSubscription(subscription);
             } else {
-                subscriptions.removeSubscription(topic, clientID);
+                subscriptions.removeSubscription(subscription);
             }
 
             session.removeSubscription(topic);
@@ -883,7 +869,7 @@ class PostOffice {
 
         for (final Subscription sub : topicMatchingSubscriptions) {
             if (filterTargetClients == NO_FILTER || filterTargetClients.contains(sub.getClientId())) {
-                if (sub.option().isNoLocal()) {
+                if (sub.getOption().isNoLocal()) {
                     if (publisherClientId.equals(sub.getClientId())) {
                         // if noLocal do not publish to the publisher
                         continue;
@@ -940,7 +926,7 @@ class PostOffice {
         for (Subscription sub : subscriptions) {
             MqttQoS qos = lowerQosToTheSubscriptionDesired(sub, publishingQos);
             boolean retained = false;
-            if (sub.option().isRetainAsPublished()) {
+            if (sub.getOption().isRetainAsPublished()) {
                 retained = retainPublish;
             }
             publishToSession(duplicatedPayload, topic, sub, qos, retained, messageExpiry, msg);
@@ -954,7 +940,16 @@ class PostOffice {
         boolean isSessionPresent = targetSession != null;
         if (isSessionPresent) {
             LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
-                      sub.getClientId(), sub.getTopicFilter(), qos);
+                      sub.getClientId(), sub.getTopicFilterInternal(), qos);
+
+            if (sub.getTopicFilterClient().hasWildcard() && sub.isTopicRewritten()) {
+                // Topic contains a wildcard AND is rewritten. The interceptor that did the rewriting
+                // must tell us what topic the client expects.
+                topic = topicRewriter.rewriteTopicInverse(sub.getTopicFilterClient(), topic);
+            } else {
+                // Non-Wildcard or non-rewritten topic, we can use the client version.
+                topic = sub.getTopicFilterClient();
+            }
 
             metricsProvider.addMessage(SessionEventLoop.getThreadQueueId(), qos.value());
             Collection<? extends MqttProperties.MqttProperty> existingProperties = msg.variableHeader().properties().listAll();
@@ -966,7 +961,7 @@ class PostOffice {
             // If we are, the subscriber disconnected after the subscriptions tree selected that session as a
             // destination.
             LOG.debug("PUBLISH to not yet present session. CId: {}, topicFilter: {}, qos: {}", sub.getClientId(),
-                      sub.getTopicFilter(), qos);
+                      sub.getTopicFilterInternal(), qos);
         }
     }
 
@@ -1048,8 +1043,8 @@ class PostOffice {
     }
 
     static MqttQoS lowerQosToTheSubscriptionDesired(Subscription sub, MqttQoS qos) {
-        if (qos.value() > sub.option().qos().value()) {
-            qos = sub.option().qos();
+        if (qos.value() > sub.getOption().qos().value()) {
+            qos = sub.getOption().qos();
         }
         return qos;
     }
