@@ -16,15 +16,10 @@
 package io.moquette.broker.subscriptions;
 
 import io.moquette.broker.ISubscriptionsRepository;
-import io.moquette.broker.subscriptions.CTrie.SubscriptionRequest;
-import io.moquette.broker.subscriptions.CTrie.UnsubscribeRequest;
-import io.netty.handler.codec.mqtt.MqttQoS;
-import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,7 +33,7 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
     private CTrie ctrie;
     private volatile ISubscriptionsRepository subscriptionsRepository;
 
-    private final ConcurrentMap<String, List<SharedSubscription>> clientSharedSubscriptions = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, List<Subscription>> clientSharedSubscriptions = new ConcurrentHashMap<>();
 
     @Override
     public void init(ISubscriptionsRepository subscriptionsRepository) {
@@ -54,13 +49,14 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
 
         for (Subscription subscription : this.subscriptionsRepository.listAllSubscriptions()) {
             LOG.debug("Re-subscribing {}", subscription);
-            ctrie.addToTree(SubscriptionRequest.buildNonShared(subscription));
+            // TODO: This must call all registered InterceptHandler.onSubscribe
+            ctrie.addToTree(subscription);
         }
 
-        for (SharedSubscription shared : subscriptionsRepository.listAllSharedSubscription()) {
+        for (Subscription shared : subscriptionsRepository.listAllSharedSubscription()) {
             LOG.debug("Re-subscribing shared {}", shared);
-            ctrie.addToTree(SubscriptionRequest.buildShared(shared.getShareName(), shared.topicFilter(),
-                shared.clientId(), MqttSubscriptionOption.onlyFromQos(shared.requestedQoS())));
+            // TODO: This must call all registered InterceptHandler.onSubscribe
+            ctrie.addToTree(shared);
         }
 
         if (LOG.isTraceEnabled()) {
@@ -107,76 +103,54 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
     }
 
     @Override
-    public boolean add(String clientId, Topic filter, MqttSubscriptionOption option) {
-        SubscriptionRequest subRequest = SubscriptionRequest.buildNonShared(clientId, filter, option);
-        return addNonSharedSubscriptionRequest(subRequest);
-    }
-
-    @Override
-    public boolean add(String clientId, Topic filter, MqttSubscriptionOption option, SubscriptionIdentifier subscriptionId) {
-        SubscriptionRequest subRequest = SubscriptionRequest.buildNonShared(clientId, filter, option, subscriptionId);
-        return addNonSharedSubscriptionRequest(subRequest);
-    }
-
-    private boolean addNonSharedSubscriptionRequest(SubscriptionRequest subRequest) {
-        boolean notExistingSubscription = ctrie.addToTree(subRequest);
-        subscriptionsRepository.addNewSubscription(subRequest.subscription());
+    public boolean add(Subscription sub) {
+        if (sub.hasShareName()) {
+            throw new IllegalArgumentException("Adding a shared subscription using the non-shared method.");
+        }
+        boolean notExistingSubscription = ctrie.addToTree(sub);
+        subscriptionsRepository.addNewSubscription(sub);
         return notExistingSubscription;
     }
 
     @Override
-    public void addShared(String clientId, ShareName name, Topic topicFilter, MqttSubscriptionOption option) {
-        SubscriptionRequest shareSubRequest = SubscriptionRequest.buildShared(name, topicFilter, clientId, option);
-        addSharedSubscriptionRequest(shareSubRequest);
-    }
-
-    private void addSharedSubscriptionRequest(SubscriptionRequest shareSubRequest) {
-        ctrie.addToTree(shareSubRequest);
-
-        if (shareSubRequest.hasSubscriptionIdentifier()) {
-            subscriptionsRepository.addNewSharedSubscription(shareSubRequest.getClientId(), shareSubRequest.getSharedName(),
-                shareSubRequest.getTopicFilter(), shareSubRequest.getOption(), shareSubRequest.getSubscriptionIdentifier());
-        } else {
-            subscriptionsRepository.addNewSharedSubscription(shareSubRequest.getClientId(), shareSubRequest.getSharedName(),
-                shareSubRequest.getTopicFilter(), shareSubRequest.getOption());
+    public void addShared(Subscription sub) {
+        if (!sub.hasShareName()) {
+            throw new IllegalArgumentException("Adding a non-shared subscription using the shared method.");
         }
-        List<SharedSubscription> sharedSubscriptions = clientSharedSubscriptions.computeIfAbsent(shareSubRequest.getClientId(), unused -> new ArrayList<>());
-        sharedSubscriptions.add(shareSubRequest.sharedSubscription());
-    }
-
-    @Override
-    public void addShared(String clientId, ShareName name, Topic topicFilter, MqttSubscriptionOption option,
-                          SubscriptionIdentifier subscriptionId) {
-        SubscriptionRequest shareSubRequest = SubscriptionRequest.buildShared(name, topicFilter, clientId, option, subscriptionId);
-        addSharedSubscriptionRequest(shareSubRequest);
+        ctrie.addToTree(sub);
+        subscriptionsRepository.addNewSharedSubscription(sub);
+        List<Subscription> sharedSubscriptions = clientSharedSubscriptions.computeIfAbsent(sub.getClientId(), unused -> new ArrayList<>());
+        sharedSubscriptions.add(sub);
     }
 
     /**
      * Removes subscription from CTrie, adds TNode when the last client unsubscribes, then calls for cleanTomb in a
      * separate atomic CAS operation.
      *
-     * @param topic the subscription's topic to remove.
-     * @param clientID the Id of client owning the subscription.
+     * @param sub the subscription to remove.
      */
     @Override
-    public void removeSubscription(Topic topic, String clientID) {
-        UnsubscribeRequest request = UnsubscribeRequest.buildNonShared(clientID, topic);
-        ctrie.removeFromTree(request);
-        this.subscriptionsRepository.removeSubscription(topic.toString(), clientID);
+    public void removeSubscription(Subscription sub) {
+        if (sub.hasShareName()) {
+            throw new IllegalArgumentException("Removing a shared subscription using the non-shared method.");
+        }
+        ctrie.removeFromTree(sub);
+        subscriptionsRepository.removeSubscription(sub);
     }
 
     @Override
-    public void removeSharedSubscription(ShareName name, Topic topicFilter, String clientId) {
-        UnsubscribeRequest request = UnsubscribeRequest.buildShared(name, topicFilter, clientId);
-        ctrie.removeFromTree(request);
+    public void removeSharedSubscription(Subscription subscription) {
+        if (!subscription.hasShareName()) {
+            throw new IllegalArgumentException("Removing a non-shared subscription using the shared method.");
+        }
+        ctrie.removeFromTree(subscription);
 
-        subscriptionsRepository.removeSharedSubscription(clientId, name, topicFilter);
+        subscriptionsRepository.removeSharedSubscription(subscription);
 
-        SharedSubscription sharedSubscription = new SharedSubscription(name, topicFilter, clientId, MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE) /* UNUSED in compare */);
-        List<SharedSubscription> sharedSubscriptions = clientSharedSubscriptions.get(clientId);
+        final String clientId = subscription.getClientId();
+        List<Subscription> sharedSubscriptions = clientSharedSubscriptions.get(clientId);
         if (sharedSubscriptions != null && !sharedSubscriptions.isEmpty()) {
-            sharedSubscriptions.remove(sharedSubscription);
-            clientSharedSubscriptions.replace(clientId, sharedSubscriptions);
+            sharedSubscriptions.remove(subscription);
         }
     }
 
@@ -192,12 +166,11 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
 
     @Override
     public void removeSharedSubscriptionsForClient(String clientId) {
-        List<SharedSubscription> sessionSharedSubscriptions = clientSharedSubscriptions.remove(clientId);
+        List<Subscription> sessionSharedSubscriptions = clientSharedSubscriptions.remove(clientId);
         if (sessionSharedSubscriptions != null) {
             // remove the client from all shared subscriptions
-            for (SharedSubscription subscription : sessionSharedSubscriptions) {
-                UnsubscribeRequest request = UnsubscribeRequest.buildShared(subscription.getShareName(), subscription.topicFilter(), clientId);
-                ctrie.removeFromTree(request);
+            for (Subscription subscription : sessionSharedSubscriptions) {
+                ctrie.removeFromTree(subscription);
             }
         }
 
