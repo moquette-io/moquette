@@ -242,11 +242,18 @@ public class SessionRegistry {
 
     private void removeExpiredSession(ISessionsRepository.SessionData expiredSession) {
         final String expiredAt = expiredSession.expireAt().map(Instant::toString).orElse("UNDEFINED");
-        LOG.debug("Removing session {}, expired on {}", expiredSession.clientId(), expiredAt);
-        remove(expiredSession.clientId());
-        sessionsRepository.delete(expiredSession);
-
-        subscriptionsDirectory.removeSharedSubscriptionsForClient(expiredSession.clientId());
+        final String clientId = expiredSession.clientId();
+        loopsGroup.routeCommand(clientId, "PurgeSession", () -> {
+            LOG.debug("Removing session {}, expired on {}", clientId, expiredAt);
+            final Session session = pool.get(clientId);
+            boolean success = session.assignState(SessionStatus.DISCONNECTED, SessionStatus.DESTROYED);
+            if (!success) {
+                remove(session);
+                sessionsRepository.delete(expiredSession);
+                subscriptionsDirectory.removeSharedSubscriptionsForClient(clientId);
+            }
+            return null;
+        });
     }
 
     private void trackForRemovalOnExpiration(ISessionsRepository.SessionData session) {
@@ -501,20 +508,20 @@ public class SessionRegistry {
             throw new SessionCorruptedException("Session has already changed state: " + session);
         }
 
-        unsubscribe(session);
-        remove(session.getClientID());
-
+        remove(session);
+        sessionsRepository.delete(session.getSessionData());
         subscriptionsDirectory.removeSharedSubscriptionsForClient(session.getClientID());
     }
 
-    void remove(String clientID) {
-        final Session old = pool.remove(clientID);
-        if (old != null) {
+    void remove(Session session) {
+        String clientID = session.getClientID();
+        if (pool.remove(clientID, session)) {
             metricsProvider.removeOpenSession();
+            unsubscribe(session);
             // remove from expired tracker if present
             sessionExpirationService.untrack(clientID);
             loopsGroup.routeCommand(clientID, "Clean up removed session", () -> {
-                old.cleanUp();
+                session.cleanUp();
                 return null;
             });
         }
