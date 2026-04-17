@@ -50,6 +50,7 @@ public abstract class IConfig {
     public static final String ACL_FILE_PROPERTY_NAME = "acl_file";
     public static final String PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME = "persistent_client_expiration";
     public static final String SESSION_QUEUE_SIZE = "session_queue_size";
+    public static final String SESSION_QUEUE_OFFER_TIMEOUT_MS = "session_queue_offer_timeout_millis";
     public static final String ENABLE_TELEMETRY_NAME = "telemetry_enabled";
     public static final String RECEIVE_MAXIMUM = "receive_maximum";
     /**
