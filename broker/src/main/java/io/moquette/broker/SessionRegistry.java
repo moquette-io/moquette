@@ -316,8 +316,10 @@ public class SessionRegistry {
             // publish new session
             final Session newSession = createNewSession(msg, clientId);
             Session previous = pool.put(clientId, newSession);
+            metricsProvider.addOpenSession();
             if (previous != null) {
                 LOG.error("We're re-opening a session for clientId {} and we purged the old session, but there is still a session in the pool! this is a bug!", clientId);
+                metricsProvider.removeOpenSession();
             }
 
             LOG.trace("case 2, oldSession with same CId {} disconnected", clientId);
@@ -353,10 +355,15 @@ public class SessionRegistry {
     private void reactivateSubscriptions(Session session, String username) {
         //verify if subscription still satisfy read ACL permissions
         for (Subscription existingSub : session.getSubscriptions()) {
-            final boolean topicReadable = authorizator.canRead(existingSub.getTopicFilter(), username,
+            final boolean topicReadable = authorizator.canRead(existingSub.getTopicFilterInternal(), username,
                 session.getClientID());
             if (!topicReadable) {
-                subscriptionsDirectory.removeSubscription(existingSub.getTopicFilter(), session.getClientID());
+                if (existingSub.hasShareName()) {
+                    subscriptionsDirectory.removeSharedSubscription(existingSub);
+                } else {
+                    subscriptionsDirectory.removeSubscription(existingSub);
+                }
+                session.removeSubscription(existingSub.getTopicFilterClient());
             }
             // TODO
 //            subscriptionsDirectory.reactivate(existingSub.getTopicFilter(), session.getClientID());
@@ -365,7 +372,11 @@ public class SessionRegistry {
 
     private void unsubscribe(Session session) {
         for (Subscription existingSub : session.getSubscriptions()) {
-            subscriptionsDirectory.removeSubscription(existingSub.getTopicFilter(), session.getClientID());
+            if (existingSub.hasShareName()) {
+                subscriptionsDirectory.removeSharedSubscription(existingSub);
+            } else {
+                subscriptionsDirectory.removeSubscription(existingSub);
+            }
         }
     }
 
@@ -535,7 +546,7 @@ public class SessionRegistry {
     *
     * @param clientId the name of the client to drop the session.
     * @param removeSessionState boolean flag to request the removal of session state from broker.
-    */ 
+    */
     boolean dropSession(final String clientId, boolean removeSessionState) {
         LOG.debug("Disconnecting client: {}", clientId);
         if (clientId == null) {

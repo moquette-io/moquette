@@ -23,7 +23,6 @@ import io.moquette.broker.config.IConfig;
 import io.moquette.broker.subscriptions.Subscription;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
-import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.HashMap;
@@ -145,7 +144,7 @@ public final class BrokerInterceptor implements Interceptor {
     public void notifyTopicSubscribed(final Subscription sub, final String username) {
         for (final InterceptHandler handler : this.handlers.get(InterceptSubscribeMessage.class)) {
             LOG.debug("Notifying MQTT SUBSCRIBE message to interceptor. CId={}, topicFilter={}, interceptorId={}",
-                sub.getClientId(), sub.getTopicFilter(), handler.getID());
+                sub.getClientId(), sub.getTopicFilterInternal(), handler.getID());
             executor.execute(() -> handler.onSubscribe(new InterceptSubscribeMessage(sub, username)));
         }
     }

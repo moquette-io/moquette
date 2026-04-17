@@ -38,8 +38,8 @@ class DumpTreeVisitor implements CTrie.IVisitor<String> {
         int counter = 0;
         for (Subscription couple : node.subscriptions()) {
             subScriptionsStr
-                .append("{filter=").append(couple.topicFilter).append(", ")
-                .append("option=").append(couple.option()).append(", ")
+                .append("{filter=").append(couple.getTopicFilterInternal()).append(", ")
+                .append("option=").append(couple.getOption()).append(", ")
                 .append("client='").append(couple.clientId).append("'}");
             counter++;
             if (counter < node.subscriptions().size()) {
