@@ -49,13 +49,11 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
 
         for (Subscription subscription : this.subscriptionsRepository.listAllSubscriptions()) {
             LOG.debug("Re-subscribing {}", subscription);
-            // TODO: This must call all registered InterceptHandler.onSubscribe
             ctrie.addToTree(subscription);
         }
 
         for (Subscription shared : subscriptionsRepository.listAllSharedSubscription()) {
             LOG.debug("Re-subscribing shared {}", shared);
-            // TODO: This must call all registered InterceptHandler.onSubscribe
             ctrie.addToTree(shared);
         }
 
