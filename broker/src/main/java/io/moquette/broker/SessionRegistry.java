@@ -39,7 +39,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
-import io.moquette.metrics.MetricsManager;
 import io.moquette.metrics.MetricsProvider;
 
 public class SessionRegistry {
@@ -316,6 +315,7 @@ public class SessionRegistry {
             // publish new session
             final Session newSession = createNewSession(msg, clientId);
             Session previous = pool.put(clientId, newSession);
+            metricsProvider.addOpenSession();
             if (previous != null) {
                 LOG.error("We're re-opening a session for clientId {} and we purged the old session, but there is still a session in the pool! this is a bug!", clientId);
             }
