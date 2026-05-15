@@ -28,6 +28,6 @@ public class SubscriptionTestUtils {
 
     @NotNull
     static Subscription asSubscription(String clientId, String topicFilter, String shareName) {
-        return new Subscription(clientId, asTopic(topicFilter), MqttSubscriptionOption.onlyFromQos(null), shareName);
+        return new Subscription(clientId, asTopic(topicFilter), MqttSubscriptionOption.onlyFromQos(null), new ShareName(shareName));
     }
 }

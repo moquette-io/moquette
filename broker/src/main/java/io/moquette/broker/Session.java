@@ -82,7 +82,7 @@ class Session {
     private final SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue;
     private final AtomicReference<SessionStatus> status = new AtomicReference<>(SessionStatus.DISCONNECTED);
     private MQTTConnection mqttConnection;
-    private final Set<Subscription> subscriptions = new HashSet<>();
+    private final Map<String, Subscription> subscriptions = new HashMap<>();
     private final Map<Integer, SessionRegistry.EnqueuedMessage> inflightWindow = new HashMap<>();
     // used only in MQTT3 where resends are done on timeout of ACKs.
     private final DelayQueue<InFlightPacket> inflightTimeouts = new DelayQueue<>();
@@ -143,15 +143,26 @@ class Session {
     }
 
     public List<Subscription> getSubscriptions() {
-        return new ArrayList<>(subscriptions);
+        return new ArrayList<>(subscriptions.values());
+    }
+
+    public void addSubscription(Subscription sub) {
+        String topic = sub.getOriginalTopicFilterWithSharename();
+        subscriptions.put(topic, sub);
     }
 
     public void addSubscriptions(List<Subscription> newSubscriptions) {
-        subscriptions.addAll(newSubscriptions);
+        for (Subscription sub : newSubscriptions) {
+            addSubscription(sub);
+        }
+    }
+
+    public Subscription getSubscription(Topic topic) {
+        return subscriptions.get(topic.toString());
     }
 
     public void removeSubscription(Topic topic) {
-        subscriptions.remove(new Subscription(data.clientId(), topic, MqttSubscriptionOption.onlyFromQos(MqttQoS.EXACTLY_ONCE)));
+        subscriptions.remove(topic.toString());
     }
 
     public boolean hasWill() {
