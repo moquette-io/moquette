@@ -42,6 +42,9 @@ import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
 import org.junit.jupiter.api.AfterEach;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import io.moquette.metrics.MetricsProvider;
+import io.prometheus.metrics.model.registry.PrometheusRegistry;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -67,6 +70,7 @@ public class MetricsProviderPrometheusTest {
     private String dbPath;
 
     protected void startServer(String dbPath) throws IOException {
+        PrometheusRegistry.defaultRegistry.clear();
         server = new Server();
         final Properties configProps = prepareTestProperties(dbPath);
         config = new MemoryConfig(configProps);
@@ -170,7 +174,81 @@ public class MetricsProviderPrometheusTest {
         assertEquals("0.0", data.get(METRIC_MOQUETTE_SESSION_QUEUE_FILL + "{queue_id=\"queue-0\"}"));
         assertEquals("0.0", data.get(METRIC_MOQUETTE_SESSION_QUEUE_OVERRUNS_TOTAL + "{queue_name=\"queue-0\"}"));
         assertTrue(Double.parseDouble(data.get(METRIC_MOQUETTE_SESSION_QUEUE_FILL_MAX)) == 0.0);
+    }
 
+    @Test
+    public void givenClosedNonCleanSessionWhenReconnectAsCleanThenSessionCountMetricsDoesntMissIt() throws MqttException {
+        // Setup, check if the prometheus metrics provider is used and is clean.
+        MetricsProvider metricsProvider = server.getMetricsProvider();
+        assertTrue(metricsProvider instanceof MetricsProviderPrometheus, "MetricsProvider should be of type MetricsProviderPrometheus, found " + metricsProvider.getClass());
+        String metricsUrl = "http://localhost:9400/metrics";
+        HttpHelper.HttpResponse response = HttpHelper.doGet(metricsUrl);
+        assertEquals(200, response.code, () -> "Error fetching metrics: " + metricsUrl);
+        LOGGER.debug("Data: \n{}", response.response);
+        Map<String, String> data = parseMetrics(response.response);
+        assertEquals("0.0", data.get(METRIC_MOQUETTE_OPEN_SESSIONS));
+        assertEquals("0.0", data.get(METRIC_MOQUETTE_PUBLISHES_TOTAL));
+
+        // Connect two clients, one with clean session, one with non-clean session.
+        final MqttConnectOptions listenerOptions = new MqttConnectOptions();
+        listenerOptions.setCleanSession(false);
+        clientListener.connect(listenerOptions);
+        clientListener.subscribe("test/topic");
+        clientPublisher.connect();
+
+        // Publish a message for timing. If the message is through, the system is ready for the next step.
+        clientPublisher.publish("test/topic", "Hello world MQTT!!".getBytes(UTF_8), 2, false);
+        Awaitility.await().until(messagesCollector::isMessageReceived);
+
+        // There should now be two open sessions, one for the listener and one for the publisher.
+        response = HttpHelper.doGet(metricsUrl);
+        assertEquals(200, response.code, () -> "Error fetching metrics: " + metricsUrl);
+        LOGGER.debug("Data: \n{}", response.response);
+        data = parseMetrics(response.response);
+        assertEquals("2.0", data.get(METRIC_MOQUETTE_OPEN_SESSIONS));
+        assertEquals("1.0", data.get(METRIC_MOQUETTE_PUBLISHES_TOTAL));
+
+        // Disconnect the clients, this should leave the non-clean session open.
+        clientListener.disconnect();
+        clientPublisher.disconnect();
+
+        // There should now be one open session, the non-clean listener session.
+        response = HttpHelper.doGet(metricsUrl);
+        assertEquals(200, response.code, () -> "Error fetching metrics: " + metricsUrl);
+        LOGGER.debug("Data: \n{}", response.response);
+        data = parseMetrics(response.response);
+        assertEquals("1.0", data.get(METRIC_MOQUETTE_OPEN_SESSIONS));
+        assertEquals("1.0", data.get(METRIC_MOQUETTE_PUBLISHES_TOTAL));
+
+        // Re-open both sessions, but now both set to clean.
+        listenerOptions.setCleanSession(true);
+        clientListener.connect(listenerOptions);
+        clientListener.subscribe("test/topic");
+        clientPublisher.connect();
+
+        // Publish a message for timing. If the message is through, the system is ready for the next step.
+        clientPublisher.publish("test/topic", "Hello world MQTT!!".getBytes(UTF_8), 2, false);
+        Awaitility.await().until(messagesCollector::isMessageReceived);
+
+        // There should now again be two open sessions, old non-clean session should be replaced with a clean one.
+        response = HttpHelper.doGet(metricsUrl);
+        assertEquals(200, response.code, () -> "Error fetching metrics: " + metricsUrl);
+        LOGGER.debug("Data: \n{}", response.response);
+        data = parseMetrics(response.response);
+        assertEquals("2.0", data.get(METRIC_MOQUETTE_OPEN_SESSIONS));
+        assertEquals("2.0", data.get(METRIC_MOQUETTE_PUBLISHES_TOTAL));
+
+        // disconnect both sessions, this should leave 0 sessions open.
+        clientListener.disconnect();
+        clientPublisher.disconnect();
+
+        // There should now be no open sessions.
+        response = HttpHelper.doGet(metricsUrl);
+        assertEquals(200, response.code, () -> "Error fetching metrics: " + metricsUrl);
+        LOGGER.debug("Data: \n{}", response.response);
+        data = parseMetrics(response.response);
+        assertEquals("0.0", data.get(METRIC_MOQUETTE_OPEN_SESSIONS));
+        assertEquals("2.0", data.get(METRIC_MOQUETTE_PUBLISHES_TOTAL));
     }
 
     private Map<String, String> parseMetrics(String response) {
