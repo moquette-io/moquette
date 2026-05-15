@@ -102,9 +102,7 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
 
     @Override
     public boolean add(Subscription sub) {
-        if (sub.hasShareName()) {
-            throw new IllegalArgumentException("Adding a shared subscription using the non-shared method.");
-        }
+        requireNonShared(sub, "Adding a shared subscription using the non-shared method.");
         boolean notExistingSubscription = ctrie.addToTree(sub);
         subscriptionsRepository.addNewSubscription(sub);
         return notExistingSubscription;
@@ -112,9 +110,7 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
 
     @Override
     public void addShared(Subscription sub) {
-        if (!sub.hasShareName()) {
-            throw new IllegalArgumentException("Adding a non-shared subscription using the shared method.");
-        }
+        requireShared(sub, "Adding a non-shared subscription using the shared method.");
         ctrie.addToTree(sub);
         subscriptionsRepository.addNewSharedSubscription(sub);
         List<Subscription> sharedSubscriptions = clientSharedSubscriptions.computeIfAbsent(sub.getClientId(), unused -> new ArrayList<>());
@@ -129,18 +125,14 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
      */
     @Override
     public void removeSubscription(Subscription sub) {
-        if (sub.hasShareName()) {
-            throw new IllegalArgumentException("Removing a shared subscription using the non-shared method.");
-        }
+        requireNonShared(sub, "Removing a shared subscription using the non-shared method.");
         ctrie.removeFromTree(sub);
         subscriptionsRepository.removeSubscription(sub);
     }
 
     @Override
     public void removeSharedSubscription(Subscription subscription) {
-        if (!subscription.hasShareName()) {
-            throw new IllegalArgumentException("Removing a non-shared subscription using the shared method.");
-        }
+        requireShared(subscription, "Removing a non-shared subscription using the shared method.");
         ctrie.removeFromTree(subscription);
 
         subscriptionsRepository.removeSharedSubscription(subscription);
@@ -173,5 +165,17 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
         }
 
         subscriptionsRepository.removeAllSharedSubscriptions(clientId);
+    }
+
+    private static void requireShared(Subscription sub, String errorMessage) {
+        if (!sub.hasShareName()) {
+            throw new IllegalArgumentException(errorMessage);
+        }
+    }
+
+    private static void requireNonShared(Subscription sub, String errorMessage) {
+        if (sub.hasShareName()) {
+            throw new IllegalArgumentException(errorMessage);
+        }
     }
 }
