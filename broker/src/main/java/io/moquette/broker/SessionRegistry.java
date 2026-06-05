@@ -39,7 +39,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
-import io.moquette.metrics.MetricsManager;
 import io.moquette.metrics.MetricsProvider;
 
 public class SessionRegistry {
@@ -316,6 +315,7 @@ public class SessionRegistry {
             // publish new session
             final Session newSession = createNewSession(msg, clientId);
             Session previous = pool.put(clientId, newSession);
+            metricsProvider.addOpenSession();
             if (previous != null) {
                 LOG.error("We're re-opening a session for clientId {} and we purged the old session, but there is still a session in the pool! this is a bug!", clientId);
             }
@@ -359,7 +359,12 @@ public class SessionRegistry {
             final boolean topicReadable = authorizator.canRead(existingSub.getTopicFilter(), username,
                 session.getClientID());
             if (!topicReadable) {
-                subscriptionsDirectory.removeSubscription(existingSub.getTopicFilter(), session.getClientID());
+                if (existingSub.hasShareName()) {
+                    subscriptionsDirectory.removeSharedSubscription(existingSub);
+                } else {
+                    subscriptionsDirectory.removeSubscription(existingSub);
+                }
+                session.removeSubscription(existingSub.getTopicFilter());
             }
             // TODO
 //            subscriptionsDirectory.reactivate(existingSub.getTopicFilter(), session.getClientID());
@@ -368,7 +373,11 @@ public class SessionRegistry {
 
     private void unsubscribe(Session session) {
         for (Subscription existingSub : session.getSubscriptions()) {
-            subscriptionsDirectory.removeSubscription(existingSub.getTopicFilter(), session.getClientID());
+            if (existingSub.hasShareName()) {
+                subscriptionsDirectory.removeSharedSubscription(existingSub);
+            } else {
+                subscriptionsDirectory.removeSubscription(existingSub);
+            }
         }
     }
 
@@ -539,7 +548,7 @@ public class SessionRegistry {
     *
     * @param clientId the name of the client to drop the session.
     * @param removeSessionState boolean flag to request the removal of session state from broker.
-    */ 
+    */
     boolean dropSession(final String clientId, boolean removeSessionState) {
         LOG.debug("Disconnecting client: {}", clientId);
         if (clientId == null) {

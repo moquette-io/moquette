@@ -66,11 +66,13 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
     }
 
     @Test
-    public void givenATopicNotReadableWhenAClientSubscribeSharedThenReceiveSubackWithNegativeResponse() throws IOException, InterruptedException {
+    public void givenNonReadableTopicWhenClientSubscribeToTheSharedThenReceiveSubackWithNegativeResponseAndNoMessageIsDispatched() throws IOException, InterruptedException {
         // stop already started broker instance
         stopServer();
 
-        final IAuthorizatorPolicy policy = new DeclarativeAuthorizatorPolicy.Builder().build();
+        final IAuthorizatorPolicy policy = new DeclarativeAuthorizatorPolicy.Builder()
+                .writeTo(Topic.asTopic("measures/temp"), null, "publisher")
+                .build();
         startServer(dbPath, policy);
 
         // Connect the client to newly started broker
@@ -85,6 +87,14 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
             "Granted qos list must be the same cardinality of the subscribe request");
         assertEquals(MqttQoS.FAILURE.value(), grantedQoSes.iterator().next(),
             "Not readable topic should reflect also in shared subscription");
+
+        // Test if the client does not receive data on denied Topic.
+        Mqtt5BlockingClient publisherClient = createPublisherClient();
+        publish(publisherClient, "measures/temp", MqttQos.AT_MOST_ONCE);
+
+        MqttMessage received = lowLevelClient.receiveNextMessage(Duration.ofSeconds(1));
+        assertNull(received, "Client should not have received a message on rejected shared topic");
+
     }
 
 

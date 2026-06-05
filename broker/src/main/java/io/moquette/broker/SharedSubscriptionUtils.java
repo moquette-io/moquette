@@ -15,6 +15,7 @@
  */
 package io.moquette.broker;
 
+import io.netty.handler.codec.mqtt.MqttTopicSubscription;
 import java.util.Objects;
 
 /**
@@ -40,6 +41,14 @@ class SharedSubscriptionUtils {
         int afterShare = "$share/".length();
         int endOfShareName = fullSharedTopicFilter.indexOf('/', afterShare);
         return fullSharedTopicFilter.substring(endOfShareName + 1);
+    }
+
+    /**
+     * @return true if the topic filter in a subscription is shared format
+     * */
+    protected static boolean isSharedSubscription(MqttTopicSubscription subscription) {
+        Objects.requireNonNull(subscription, "subscription can't be null");
+        return isSharedSubscription(subscription.topicFilter());
     }
 
     /**
