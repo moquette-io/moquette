@@ -1027,6 +1027,12 @@ final class MQTTConnection {
     }
 
     InetSocketAddress remoteAddress() {
+        // Check for PROXY protocol source address first
+        InetSocketAddress realSource = NewNettyMQTTHandler.getRealSourceAddress(channel);
+        if (realSource != null) {
+            return realSource;
+        }
+        // Fallback to TCP connection remote address
         return (InetSocketAddress) channel.remoteAddress();
     }
 
