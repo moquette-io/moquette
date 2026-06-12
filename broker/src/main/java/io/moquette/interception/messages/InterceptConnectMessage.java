@@ -16,6 +16,7 @@
 
 package io.moquette.interception.messages;
 
+import io.netty.channel.Channel;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 
 import java.net.InetSocketAddress;
@@ -24,32 +25,43 @@ import java.util.Optional;
 public class InterceptConnectMessage extends InterceptAbstractMessage {
 
     private final MqttConnectMessage msg;
-    private final InetSocketAddress remoteAddress;
+    private final Channel channel;
 
     public InterceptConnectMessage(MqttConnectMessage msg) {
         this(msg, null);
     }
 
-    public InterceptConnectMessage(MqttConnectMessage msg, InetSocketAddress remoteAddress) {
+    public InterceptConnectMessage(MqttConnectMessage msg, Channel channel) {
         super(msg);
         this.msg = msg;
-        this.remoteAddress = remoteAddress;
+        this.channel = channel;
     }
 
     public String getClientID() {
         return msg.payload().clientIdentifier();
     }
 
+    public Optional<Channel> getChannel() {
+        return Optional.ofNullable(channel);
+    }
+
     public Optional<InetSocketAddress> getRemoteAddress() {
-        return Optional.ofNullable(remoteAddress);
+        if (channel != null && channel.remoteAddress() instanceof InetSocketAddress) {
+            return Optional.of((InetSocketAddress) channel.remoteAddress());
+        }
+        return Optional.empty();
     }
 
     public String getClientAddress() {
-        return remoteAddress == null ? null : remoteAddress.getHostString();
+        return getRemoteAddress()
+            .map(InetSocketAddress::getHostString)
+            .orElse(null);
     }
 
     public int getClientPort() {
-        return remoteAddress == null ? -1 : remoteAddress.getPort();
+        return getRemoteAddress()
+            .map(InetSocketAddress::getPort)
+            .orElse(-1);
     }
 
     public boolean isCleanSession() {

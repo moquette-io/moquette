@@ -23,12 +23,12 @@ import io.moquette.broker.config.IConfig;
 import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.metrics.MetricsProvider;
 import io.netty.buffer.ByteBuf;
+import io.netty.channel.Channel;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -112,15 +112,15 @@ public final class BrokerInterceptor implements Interceptor {
 
     @Override
     public void notifyClientConnected(final MqttConnectMessage msg) {
-        notifyClientConnected(msg, null);
+        notifyClientConnected(msg, (Channel) null);
     }
 
     @Override
-    public void notifyClientConnected(final MqttConnectMessage msg, final InetSocketAddress remoteAddress) {
+    public void notifyClientConnected(final MqttConnectMessage msg, final Channel channel) {
         for (final InterceptHandler handler : this.handlers.get(InterceptConnectMessage.class)) {
             LOG.debug("Sending MQTT CONNECT message to interceptor. CId={}, interceptorId={}",
                     msg.payload().clientIdentifier(), handler.getID());
-            executor.execute(() -> handler.onConnect(new InterceptConnectMessage(msg, remoteAddress)));
+            executor.execute(() -> handler.onConnect(new InterceptConnectMessage(msg, channel)));
         }
     }
 

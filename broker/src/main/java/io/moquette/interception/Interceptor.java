@@ -19,10 +19,9 @@ package io.moquette.interception;
 import io.moquette.interception.messages.InterceptAcknowledgedMessage;
 import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.interception.messages.InterceptExceptionMessage;
+import io.netty.channel.Channel;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
-
-import java.net.InetSocketAddress;
 
 /**
  * This interface is to be used internally by the broker components.
@@ -38,7 +37,7 @@ public interface Interceptor {
 
     void notifyClientConnected(MqttConnectMessage msg);
 
-    default void notifyClientConnected(MqttConnectMessage msg, InetSocketAddress remoteAddress) {
+    default void notifyClientConnected(MqttConnectMessage msg, Channel channel) {
         notifyClientConnected(msg);
     }
 

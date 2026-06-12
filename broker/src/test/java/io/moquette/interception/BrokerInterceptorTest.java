@@ -21,6 +21,7 @@ import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.Channel;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
@@ -37,10 +38,12 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.refEq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 public class BrokerInterceptorTest {
 
@@ -153,9 +156,12 @@ public class BrokerInterceptorTest {
 
         try {
             final InetSocketAddress remoteAddress = new InetSocketAddress("127.0.0.1", 12345);
-            localInterceptor.notifyClientConnected(MqttMessageBuilders.connect().build(), remoteAddress);
+            final Channel channel = mock(Channel.class);
+            when(channel.remoteAddress()).thenReturn(remoteAddress);
+            localInterceptor.notifyClientConnected(MqttMessageBuilders.connect().build(), channel);
 
             assertTrue(notified.await(1, TimeUnit.SECONDS));
+            assertSame(channel, intercepted.get().getChannel().get());
             assertEquals(remoteAddress, intercepted.get().getRemoteAddress().get());
             assertEquals("127.0.0.1", intercepted.get().getClientAddress());
             assertEquals(12345, intercepted.get().getClientPort());
