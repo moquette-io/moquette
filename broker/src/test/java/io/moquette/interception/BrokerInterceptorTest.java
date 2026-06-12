@@ -28,11 +28,16 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.net.InetSocketAddress;
 import java.util.Collections;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.refEq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -121,6 +126,42 @@ public class BrokerInterceptorTest {
         interceptor.notifyClientConnected(MqttMessageBuilders.connect().build());
         interval();
         assertEquals(40, n.get());
+    }
+
+    @Test
+    public void testNotifyClientConnectedIncludesRemoteAddress() throws Exception {
+        final CountDownLatch notified = new CountDownLatch(1);
+        final AtomicReference<InterceptConnectMessage> intercepted = new AtomicReference<>();
+        final BrokerInterceptor localInterceptor = new BrokerInterceptor(
+            Collections.<InterceptHandler>singletonList(new AbstractInterceptHandler() {
+                @Override
+                public String getID() {
+                    return "RemoteAddressObserver";
+                }
+
+                @Override
+                public void onConnect(InterceptConnectMessage msg) {
+                    intercepted.set(msg);
+                    notified.countDown();
+                }
+
+                @Override
+                public void onSessionLoopError(Throwable error) {
+                    throw new RuntimeException(error);
+                }
+            }));
+
+        try {
+            final InetSocketAddress remoteAddress = new InetSocketAddress("127.0.0.1", 12345);
+            localInterceptor.notifyClientConnected(MqttMessageBuilders.connect().build(), remoteAddress);
+
+            assertTrue(notified.await(1, TimeUnit.SECONDS));
+            assertEquals(remoteAddress, intercepted.get().getRemoteAddress().get());
+            assertEquals("127.0.0.1", intercepted.get().getClientAddress());
+            assertEquals(12345, intercepted.get().getClientPort());
+        } finally {
+            localInterceptor.stop();
+        }
     }
 
     @Test

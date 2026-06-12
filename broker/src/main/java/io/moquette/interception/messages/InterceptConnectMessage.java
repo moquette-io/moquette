@@ -18,17 +18,38 @@ package io.moquette.interception.messages;
 
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 
+import java.net.InetSocketAddress;
+import java.util.Optional;
+
 public class InterceptConnectMessage extends InterceptAbstractMessage {
 
     private final MqttConnectMessage msg;
+    private final InetSocketAddress remoteAddress;
 
     public InterceptConnectMessage(MqttConnectMessage msg) {
+        this(msg, null);
+    }
+
+    public InterceptConnectMessage(MqttConnectMessage msg, InetSocketAddress remoteAddress) {
         super(msg);
         this.msg = msg;
+        this.remoteAddress = remoteAddress;
     }
 
     public String getClientID() {
         return msg.payload().clientIdentifier();
+    }
+
+    public Optional<InetSocketAddress> getRemoteAddress() {
+        return Optional.ofNullable(remoteAddress);
+    }
+
+    public String getClientAddress() {
+        return remoteAddress == null ? null : remoteAddress.getHostString();
+    }
+
+    public int getClientPort() {
+        return remoteAddress == null ? -1 : remoteAddress.getPort();
     }
 
     public boolean isCleanSession() {
