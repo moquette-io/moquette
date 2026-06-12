@@ -19,6 +19,7 @@ package io.moquette.interception;
 import io.moquette.interception.messages.InterceptAcknowledgedMessage;
 import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.interception.messages.InterceptExceptionMessage;
+import io.netty.channel.Channel;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 
@@ -35,6 +36,10 @@ import io.netty.handler.codec.mqtt.MqttPublishMessage;
 public interface Interceptor {
 
     void notifyClientConnected(MqttConnectMessage msg);
+
+    default void notifyClientConnected(MqttConnectMessage msg, Channel channel) {
+        notifyClientConnected(msg);
+    }
 
     void notifyClientDisconnected(String clientID, String username);
 
