@@ -37,6 +37,7 @@ import java.nio.file.Path;
 import java.util.Properties;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.awaitility.core.ConditionTimeoutException;
@@ -125,12 +126,11 @@ public class ServerIntegrationTopicRewriteTest {
 
     /**
      * On the server the sensor sub-tree was moved to sensors, but legacy clients should still receive messages on the old topic.
-     * Subscriber B subscribing to sensor/sensor1 should get messages sent to sensors/sensor1, as if they were sent to sensor/sensor1.
-     * Subscriber C subscribing to sensor/+ should get messages sent to sensors/+, as if they were sent to sensor/+.
+     * Subscriber A subscribing to sensors/sensor1 should get messages on this new target topic as normal.
      */
     @Test
-    public void checkSubscribersGetCorrectTopicNotifications() throws Exception {
-        LOG.info("*** checkSubscribersGetCorrectTopicNotifications ***");
+    public void checkSubscriberGetsCorrectTopicNotificationForRewriteTarget() throws Exception {
+        LOG.info("*** checkSubscriberGetsCorrectTopicNotificationForRewriteTarget ***");
 
         MqttClientPersistence dsSubscriberA = new MqttDefaultFilePersistence(IntegrationUtils.newFolder(tempFolder, "subscriberA").getAbsolutePath());
         MqttClient subscriberA = new MqttClient("tcp://localhost:1883", "SubscriberA", dsSubscriberA);
@@ -139,12 +139,63 @@ public class ServerIntegrationTopicRewriteTest {
         subscriberA.connect();
         subscriberA.subscribe("sensors/sensor1", 1);
 
+        client.connect();
+        final String messageText1 = "Hello world MQTT!!";
+        client.publish("sensors/sensor1", messageText1.getBytes(UTF_8), 2, false);
+
+        Awaitility.await().until(cbSubscriberA::isMessageReceived);
+        MqttMessage message = cbSubscriberA.retrieveMessage();
+        assertNotNull(message, "MUST be a received message");
+        assertEquals(messageText1, new String(message.getPayload(), UTF_8));
+        assertEquals(1, message.getQos());
+
+        subscriberA.disconnect();
+    }
+
+    /**
+     * On the server the sensor sub-tree was moved to sensors, but legacy clients should still receive messages on the old topic.
+     * Subscriber B subscribing to sensor/sensor1 should get messages sent to sensors/sensor1, as if they were sent to sensor/sensor1.
+     */
+    @Test
+    public void checkSubscriberGetsCorrectTopicNotificationForRewrittenTopic() throws Exception {
+        LOG.info("*** checkSubscriberGetsCorrectTopicNotificationForRewrittenTopic ***");
+
         MqttClientPersistence dsSubscriberB = new MqttDefaultFilePersistence(IntegrationUtils.newFolder(tempFolder, "subscriberB").getAbsolutePath());
         MqttClient subscriberB = new MqttClient("tcp://localhost:1883", "SubscriberB", dsSubscriberB);
         MessageCollector cbSubscriberB = new MessageCollector();
         subscriberB.setCallback(cbSubscriberB);
         subscriberB.connect();
         subscriberB.subscribe("sensor/sensor1", 2);
+
+        client.connect();
+        final String messageText1 = "Hello world MQTT!!";
+        client.publish("sensors/sensor1", messageText1.getBytes(UTF_8), 2, false);
+
+        Awaitility.await().until(cbSubscriberB::isMessageReceived);
+        MqttMessage message = cbSubscriberB.retrieveMessage();
+        assertNotNull(message, "MUST be a received message");
+        assertEquals(messageText1, new String(message.getPayload(), UTF_8));
+        assertEquals(2, message.getQos());
+
+        subscriberB.unsubscribe("sensor/sensor1");
+
+        final String messageText2 = "Hello world again";
+        client.publish("sensors/sensor1", messageText2.getBytes(UTF_8), 2, false);
+        // Ensure no message is received. Check for at least
+        Awaitility.await()
+            .during(Durations.ONE_SECOND)
+            .atMost(2, TimeUnit.SECONDS)
+            .until(() -> !cbSubscriberB.isMessageReceived());
+        subscriberB.disconnect();
+    }
+
+    /**
+     * On the server the sensor sub-tree was moved to sensors, but legacy clients should still receive messages on the old topic.
+     * Subscriber C subscribing to sensor/+ should get messages sent to sensors/+, as if they were sent to sensor/+.
+     */
+    @Test
+    public void checkSubscriberGetsCorrectTopicNotificationForRewrittenWildcard() throws Exception {
+        LOG.info("*** checkSubscriberGetsCorrectTopicNotificationForRewrittenWildcard ***");
 
         MqttClientPersistence dsSubscriberC = new MqttDefaultFilePersistence(IntegrationUtils.newFolder(tempFolder, "subscriberC").getAbsolutePath());
         MqttClient subscriberC = new MqttClient("tcp://localhost:1883", "SubscriberC", dsSubscriberC);
@@ -157,49 +208,21 @@ public class ServerIntegrationTopicRewriteTest {
         final String messageText1 = "Hello world MQTT!!";
         client.publish("sensors/sensor1", messageText1.getBytes(UTF_8), 2, false);
 
-        {
-            Awaitility.await().until(cbSubscriberA::isMessageReceived);
-            MqttMessage message = cbSubscriberA.retrieveMessage();
-            assertNotNull(message, "MUST be a received message");
-            assertEquals(messageText1, new String(message.getPayload(), UTF_8));
-            assertEquals(1, message.getQos());
-        }
-        {
-            Awaitility.await().until(cbSubscriberB::isMessageReceived);
-            MqttMessage message = cbSubscriberB.retrieveMessage();
-            assertNotNull(message, "MUST be a received message");
-            assertEquals(messageText1, new String(message.getPayload(), UTF_8));
-            assertEquals(2, message.getQos());
-        }
-        {
-            Awaitility.await().until(cbSubscriberC::isMessageReceived);
-            MqttMessage messageOnC = cbSubscriberC.retrieveMessage();
-            assertNotNull(messageOnC, "MUST be a received message");
-            assertEquals(messageText1, new String(messageOnC.getPayload(), UTF_8));
-            assertEquals(2, messageOnC.getQos());
-        }
+        Awaitility.await().until(cbSubscriberC::isMessageReceived);
+        MqttMessage messageOnC = cbSubscriberC.retrieveMessage();
+        assertNotNull(messageOnC, "MUST be a received message");
+        assertEquals(messageText1, new String(messageOnC.getPayload(), UTF_8));
+        assertEquals(2, messageOnC.getQos());
 
-        subscriberB.unsubscribe("sensor/sensor1");
         subscriberC.unsubscribe("sensor/+");
 
         final String messageText2 = "Hello world again";
         client.publish("sensors/sensor1", messageText2.getBytes(UTF_8), 2, false);
 
-        {
-            Awaitility.await().until(cbSubscriberA::isMessageReceived);
-            MqttMessage message = cbSubscriberA.retrieveMessage();
-            assertEquals(messageText2, new String(message.getPayload(), UTF_8));
-            assertEquals(1, message.getQos());
-            subscriberA.disconnect();
-        }
-        {
-            Thread.sleep(Durations.ONE_SECOND.toMillis());
-            assertFalse(cbSubscriberB.isMessageReceived(), "MUST NOT receive a message");
-            subscriberB.disconnect();
-
-            assertFalse(cbSubscriberC.isMessageReceived(), "MUST NOT receive a message");
-            subscriberC.disconnect();
-        }
+        Awaitility.await()
+            .during(Durations.ONE_SECOND)
+            .atMost(2, TimeUnit.SECONDS)
+            .until(() -> !cbSubscriberC.isMessageReceived());
+        subscriberC.disconnect();
     }
-
 }
