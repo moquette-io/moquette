@@ -64,6 +64,10 @@ final class MQTTConnection {
     static final boolean sessionLoopDebug = Boolean.parseBoolean(System.getProperty("moquette.session_loop.debug", "false"));
     private static final int UNDEFINED_VERSION = -1;
 
+    private enum ConnectionStatus {
+        CONNECTING, AUTHENTICATING, AUTHENTICATION_FAILED, AUTHENTICATED, CONNECTED, DISCONNECTED
+    }
+    
     final Channel channel;
     private final BrokerConfiguration brokerConfig;
     private final IAuthenticator authenticator;
@@ -78,6 +82,7 @@ final class MQTTConnection {
     private Quota sendQuota;
     private TopicAliasMapping aliasMappings;
     private AtomicReference<MqttConnectMessage> connectMessage = new AtomicReference<>();
+    private ConnectionStatus connectionStatus = ConnectionStatus.DISCONNECTED;
 
     static final class ErrorCodeException extends Exception {
 
@@ -196,6 +201,7 @@ final class MQTTConnection {
     }
 
     PostOffice.RouteResult processConnect(MqttConnectMessage msg) {
+        connectionStatus = ConnectionStatus.CONNECTING;
         String clientId = NettyUtils.clientId(msg);
         final String username = NettyUtils.userName(msg);
         protocolVersion = msg.variableHeader().version();
@@ -251,19 +257,28 @@ final class MQTTConnection {
 
         sendQuota = retrieveSendQuota(msg);
         connectMessage.set(msg);
-
-        if (!login(msg, clientId)) {
-            if (isProtocolVersion(MqttVersion.MQTT_5)) {
+        connectionStatus = ConnectionStatus.AUTHENTICATING;
+        if (isProtocolVersion(msg, MqttVersion.MQTT_5)) {
+            if (!login(msg, clientId)) {
                 final ConnAckPropertiesBuilder builder = prepareConnAckPropertiesBuilder(false, clientId);
                 builder.reasonString("User credentials provided are not recognized as valid");
                 abortConnectionV5(CONNECTION_REFUSED_BAD_USERNAME_OR_PASSWORD, builder);
-            } else {
-                abortConnection(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD);
-            }
+                connectionStatus = ConnectionStatus.AUTHENTICATION_FAILED;
 
-            channel.close().addListener(CLOSE_ON_FAILURE);
-            return PostOffice.RouteResult.failed(clientId);
+                channel.close().addListener(CLOSE_ON_FAILURE);
+                return PostOffice.RouteResult.failed(clientId);
+            }
+        } else {
+            if (!login(msg, clientId)) {
+                abortConnection(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD);
+                connectionStatus = ConnectionStatus.AUTHENTICATION_FAILED;
+                
+                channel.close().addListener(CLOSE_ON_FAILURE);
+                return PostOffice.RouteResult.failed(clientId);
+            }
         }
+
+        connectionStatus = ConnectionStatus.AUTHENTICATED;
 
         // initialize topic alias mapping
         if (isProtocolVersion(MqttVersion.MQTT_5)) {
@@ -277,6 +292,7 @@ final class MQTTConnection {
             checkMatchSessionLoop(sessionId);
             executeConnect(MQTTConnection.this.connectMessage.get(), sessionId, serverGeneratedClientId);
             MQTTConnection.this.connectMessage = null;
+            connectionStatus = ConnectionStatus.CONNECTED;
             return null;
         });
     }
