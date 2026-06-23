@@ -76,6 +76,7 @@ final class MQTTConnection {
     private Quota receivedQuota;
     private Quota sendQuota;
     private TopicAliasMapping aliasMappings;
+    private MqttConnectMessage connectMessage;
 
     static final class ErrorCodeException extends Exception {
 
@@ -197,6 +198,7 @@ final class MQTTConnection {
         MqttConnectPayload payload = msg.payload();
         String clientId = payload.clientIdentifier();
         final String username = payload.userName();
+        protocolVersion = msg.variableHeader().version();
         LOG.trace("Processing CONNECT message. CId: {} username: {}", clientId, username);
 
         if (isNotProtocolVersion(msg, MqttVersion.MQTT_3_1) &&
@@ -207,10 +209,10 @@ final class MQTTConnection {
             abortConnection(CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION);
             return PostOffice.RouteResult.failed(clientId);
         }
-        final boolean cleanSession = msg.variableHeader().isCleanSession();
+        boolean cleanSession = msg.variableHeader().isCleanSession();
         final boolean serverGeneratedClientId;
         if (clientId == null || clientId.isEmpty()) {
-            if (isNotProtocolVersion(msg, MqttVersion.MQTT_5)) {
+            if (!isProtocolVersion(MqttVersion.MQTT_5)) {
                 if (!brokerConfig.isAllowZeroByteClientId()) {
                     LOG.info("Broker doesn't permit MQTT empty client ID. Username: {}", username);
                     abortConnection(CONNECTION_REFUSED_IDENTIFIER_REJECTED);
@@ -232,8 +234,11 @@ final class MQTTConnection {
             serverGeneratedClientId = false;
         }
 
+        sendQuota = retrieveSendQuota(msg);
+        connectMessage = msg;
+
         if (!login(msg, clientId)) {
-            if (isProtocolVersion(msg, MqttVersion.MQTT_5)) {
+            if (isProtocolVersion(MqttVersion.MQTT_5)) {
                 final ConnAckPropertiesBuilder builder = prepareConnAckPropertiesBuilder(false, clientId);
                 builder.reasonString("User credentials provided are not recognized as valid");
                 abortConnectionV5(CONNECTION_REFUSED_BAD_USERNAME_OR_PASSWORD, builder);
@@ -246,19 +251,17 @@ final class MQTTConnection {
         }
 
         // initialize topic alias mapping
-        if (isProtocolVersion(msg, MqttVersion.MQTT_5)) {
+        if (isProtocolVersion(MqttVersion.MQTT_5)) {
             aliasMappings = new TopicAliasMapping();
         }
 
         receivedQuota = createQuota(brokerConfig.receiveMaximum());
 
-        sendQuota = retrieveSendQuota(msg);
-
         final String sessionId = clientId;
-        protocolVersion = msg.variableHeader().version();
         return postOffice.routeCommand(clientId, "CONN", () -> {
             checkMatchSessionLoop(sessionId);
-            executeConnect(msg, sessionId, serverGeneratedClientId);
+            executeConnect(MQTTConnection.this.connectMessage, sessionId, serverGeneratedClientId);
+            MQTTConnection.this.connectMessage = null;
             return null;
         });
     }
@@ -498,6 +501,10 @@ final class MQTTConnection {
 
     private static boolean isProtocolVersion(MqttConnectMessage msg, MqttVersion version) {
         return msg.variableHeader().version() == version.protocolLevel();
+    }
+
+    private boolean isProtocolVersion(MqttVersion version) {
+        return protocolVersion == version.protocolLevel();
     }
 
     private void abortConnection(MqttConnectReturnCode returnCode) {
