@@ -259,6 +259,35 @@ final class MQTTConnection {
         connectMessage.set(msg);
         connectionStatus = ConnectionStatus.AUTHENTICATING;
         if (isProtocolVersion(msg, MqttVersion.MQTT_5)) {
+            
+            MqttProperties.StringProperty authenticationMethod = authenticationMethodProperty(msg);
+            MqttProperties.BinaryProperty authenticationData = authenticationDataProperty(msg);
+            
+            if (authenticationMethod != null) {
+                String authenticationMethodName = authenticationMethod.value();
+                if (!isSupportedAuthenticationMechanism(authenticationMethodName)) {
+                    // If the Server does not support the Authentication Method supplied by the Client, 
+                    // it MAY send a CONNACK with a Reason Code of 0x8C (Bad authentication method) or 
+                    // 0x87 (Not Authorized) as described in section 4.13 and MUST close the 
+                    // Network Connection [MQTT-4.12.0-1].
+                    LOG.info("MQTT client ID {} received an authentication method ({}) not supported, rejecting and closing connection", clientId, authenticationMethodName);
+                    abortConnection(CONNECTION_REFUSED_BAD_AUTHENTICATION_METHOD);
+                    return PostOffice.RouteResult.failed(clientId);
+                } 
+                // starts the authentication flow here and skip the next part of processConnect
+            } else {
+                if (authenticationData != null) {
+                    // It is a Protocol Error to include Authentication Data if there is no Authentication Method. [3.1.2.11.10 ]
+                    // When a Server detects a Malformed Packet or Protocol Error, and a Reason Code is given in 
+                    // the specification, it MUST close the Network Connection [MQTT-4.13.1-1]. 
+                    // In the case of an error in a CONNECT packet it MAY send a CONNACK packet containing the Reason Code, 
+                    // before closing the Network Connection.
+                    LOG.info("MQTT client ID {} received a CONNECT with authentication data but no authentication method, rejecting and closing connection", clientId);
+                    abortConnection(MqttConnectReturnCode.CONNECTION_REFUSED_PROTOCOL_ERROR);
+                    return PostOffice.RouteResult.failed(clientId);
+                }
+            }
+            
             if (!login(msg, clientId)) {
                 final ConnAckPropertiesBuilder builder = prepareConnAckPropertiesBuilder(false, clientId);
                 builder.reasonString("User credentials provided are not recognized as valid");
@@ -295,6 +324,23 @@ final class MQTTConnection {
             connectionStatus = ConnectionStatus.CONNECTED;
             return null;
         });
+    }
+
+    private boolean isSupportedAuthenticationMechanism(String value) {
+        // placeholder later it should check with registered mechanisms.
+        return "SCRAM-SHA256".equals(value);
+    }
+
+    private static MqttProperties.StringProperty authenticationMethodProperty(MqttConnectMessage msg) {
+        return (MqttProperties.StringProperty) msg.variableHeader()
+            .properties()
+            .getProperty(MqttProperties.MqttPropertyType.AUTHENTICATION_METHOD.value());
+    }
+
+    private static MqttProperties.BinaryProperty authenticationDataProperty(MqttConnectMessage msg) {
+        return (MqttProperties.BinaryProperty) msg.variableHeader()
+            .properties()
+            .getProperty(MqttProperties.MqttPropertyType.AUTHENTICATION_DATA.value());
     }
 
     private Quota retrieveSendQuota(MqttConnectMessage msg) {
