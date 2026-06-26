@@ -47,6 +47,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.SSLPeerUnverifiedException;
 
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
@@ -76,7 +77,7 @@ final class MQTTConnection {
     private Quota receivedQuota;
     private Quota sendQuota;
     private TopicAliasMapping aliasMappings;
-    private MqttConnectMessage connectMessage;
+    private AtomicReference<MqttConnectMessage> connectMessage = new AtomicReference<>();
 
     static final class ErrorCodeException extends Exception {
 
@@ -235,7 +236,7 @@ final class MQTTConnection {
         }
 
         sendQuota = retrieveSendQuota(msg);
-        connectMessage = msg;
+        connectMessage.set(msg);
 
         if (!login(msg, clientId)) {
             if (isProtocolVersion(MqttVersion.MQTT_5)) {
@@ -260,7 +261,7 @@ final class MQTTConnection {
         final String sessionId = clientId;
         return postOffice.routeCommand(clientId, "CONN", () -> {
             checkMatchSessionLoop(sessionId);
-            executeConnect(MQTTConnection.this.connectMessage, sessionId, serverGeneratedClientId);
+            executeConnect(MQTTConnection.this.connectMessage.get(), sessionId, serverGeneratedClientId);
             MQTTConnection.this.connectMessage = null;
             return null;
         });
