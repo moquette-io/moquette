@@ -1,4 +1,5 @@
 Version 0.19-SNAPSHOT
+   [feature] Added method for message interceptors to get the original message. (#948)
    [fix] Fixed SessionCount metric miscounting when non-clean session are replaced with clean sessions. (#940)
    [Cleanup] Cleaned up subscription handling. (#931)
    [feature] Added metrics framework and Prometheus implementation.
