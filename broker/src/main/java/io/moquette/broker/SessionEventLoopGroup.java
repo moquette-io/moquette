@@ -16,24 +16,22 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.FutureTask;
 
 class SessionEventLoopGroup {
+
     private static final Logger LOG = LoggerFactory.getLogger(SessionEventLoopGroup.class);
 
     private final SessionEventLoop[] sessionExecutors;
-    private final BlockingQueue<FutureTask<String>>[] sessionQueues;
     private final int eventLoops = Runtime.getRuntime().availableProcessors();
     private final ConcurrentMap<String, Throwable> loopThrownExceptions = new ConcurrentHashMap<>();
-    private final MetricsProvider metricsProvider;
 
     SessionEventLoopGroup(BrokerInterceptor interceptor, int sessionQueueSize, MetricsProvider metricsProvider) {
-        this.metricsProvider = metricsProvider;
-        this.sessionQueues = new BlockingQueue[eventLoops];
+        this(interceptor, sessionQueueSize, 0, metricsProvider);
+    }
+
+    SessionEventLoopGroup(BrokerInterceptor interceptor, int sessionQueueSize, int offerTimeoutMs, MetricsProvider metricsProvider) {
         metricsProvider.initSessionQueues(eventLoops, sessionQueueSize);
-        for (int i = 0; i < eventLoops; i++) {
-            this.sessionQueues[i] = new ArrayBlockingQueue<>(sessionQueueSize);
-        }
         this.sessionExecutors = new SessionEventLoop[eventLoops];
         for (int i = 0; i < eventLoops; i++) {
-            SessionEventLoop newLoop = new SessionEventLoop(this.sessionQueues[i], i, metricsProvider);
+            SessionEventLoop newLoop = new SessionEventLoop(sessionQueueSize, i, offerTimeoutMs, metricsProvider);
             newLoop.setName(sessionLoopName(i));
             newLoop.setUncaughtExceptionHandler((loopThread, ex) -> {
                 // executed in session loop thread
@@ -74,24 +72,8 @@ class SessionEventLoopGroup {
 
         final int targetQueueId = targetQueueOrdinal(cmd.getSessionId());
         LOG.debug("Routing cmd [{}] for session [{}] to event processor {}", actionDescription, cmd.getSessionId(), targetQueueId);
-        final FutureTask<String> task = new FutureTask<>(() -> {
-            cmd.execute();
-            cmd.complete();
-            return cmd.getSessionId();
-        });
-        if (Thread.currentThread() == sessionExecutors[targetQueueId]) {
-            SessionEventLoop.executeTask(task);
-            return PostOffice.RouteResult.success(clientId, cmd.completableFuture());
-        }
-        final BlockingQueue<FutureTask<String>> targetQueue = this.sessionQueues[targetQueueId];
-        if (targetQueue.offer(task)) {
-            metricsProvider.sessionQueueInc(targetQueueId);
-            return PostOffice.RouteResult.success(clientId, cmd.completableFuture());
-        } else {
-            LOG.warn("Session command queue {} is full executing action {}", targetQueueId, actionDescription);
-            metricsProvider.addSessionQueueOverrun(targetQueueId);
-            return PostOffice.RouteResult.failed(clientId);
-        }
+        final SessionEventLoop sessionExecutor = sessionExecutors[targetQueueId];
+        return sessionExecutor.addTask(clientId, actionDescription, cmd);
     }
 
     public void terminate() {

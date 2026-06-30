@@ -1,12 +1,13 @@
 package io.moquette.broker;
 
-import io.moquette.metrics.MetricsManager;
 import io.moquette.metrics.MetricsProvider;
+import java.util.concurrent.ArrayBlockingQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 
 final class SessionEventLoop extends Thread {
 
@@ -16,24 +17,59 @@ final class SessionEventLoop extends Thread {
     private final boolean flushOnExit;
     private final int queueId;
     private final MetricsProvider metricsProvider;
+    private final int offerTimeoutMs;
+    private final boolean timeoutUsed;
     /**
      * Allows a task to fetch the id of the session queue that is executing it.
      */
     private static final ThreadLocal<Integer> threadQueueId = new ThreadLocal<>();
 
-    public SessionEventLoop(BlockingQueue<FutureTask<String>> taskQueue, int queueId, MetricsProvider metricsProvider) {
-        this(taskQueue, queueId, true, metricsProvider);
+    public SessionEventLoop(int queueSize, int queueId, int offerTimeoutMs, MetricsProvider metricsProvider) {
+        this(new ArrayBlockingQueue<>(queueSize), queueId, offerTimeoutMs, true, metricsProvider);
     }
 
     /**
      * @param flushOnExit consume the commands queue before exit.
      *
      */
-    public SessionEventLoop(BlockingQueue<FutureTask<String>> taskQueue, int queueId, boolean flushOnExit, MetricsProvider metricsProvider) {
+    public SessionEventLoop(BlockingQueue<FutureTask<String>> taskQueue, int queueId, int offerTimeoutMs, boolean flushOnExit, MetricsProvider metricsProvider) {
         this.taskQueue = taskQueue;
         this.queueId = queueId;
+        this.offerTimeoutMs = offerTimeoutMs;
         this.flushOnExit = flushOnExit;
         this.metricsProvider = metricsProvider;
+        this.timeoutUsed = offerTimeoutMs > 0;
+    }
+
+    public PostOffice.RouteResult addTask(String clientId, String actionDescription, SessionCommand cmd) {
+        final FutureTask<String> task = new FutureTask<>(() -> {
+            cmd.execute();
+            cmd.complete();
+            return cmd.getSessionId();
+        });
+        if (Thread.currentThread() == this) {
+            SessionEventLoop.executeTask(task);
+            return PostOffice.RouteResult.success(clientId, cmd.completableFuture());
+        }
+        if (taskQueue.offer(task)) {
+            metricsProvider.sessionQueueInc(queueId);
+            return PostOffice.RouteResult.success(clientId, cmd.completableFuture());
+        } else {
+            if (timeoutUsed) {
+                LOG.warn("Session command queue {} is full executing action {}, retrying for max {}ms", queueId, actionDescription, offerTimeoutMs);
+                try {
+                    if (taskQueue.offer(task, offerTimeoutMs, TimeUnit.MILLISECONDS)) {
+                        metricsProvider.sessionQueueInc(queueId);
+                        return PostOffice.RouteResult.success(clientId, cmd.completableFuture());
+                    }
+                } catch (InterruptedException ex) {
+                    LOG.warn("Interrupted waiting too queue task");
+                }
+            }
+            LOG.error("Session command queue {} is full executing action {}, queue failed", queueId, actionDescription);
+            metricsProvider.addSessionQueueOverrun(queueId);
+            return PostOffice.RouteResult.failed(clientId);
+        }
     }
 
     @Override

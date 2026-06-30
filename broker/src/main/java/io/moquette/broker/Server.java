@@ -259,7 +259,8 @@ public class Server {
         }
 
         final int sessionQueueSize = config.intProp(IConfig.SESSION_QUEUE_SIZE, 1024);
-        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(interceptor, sessionQueueSize, metricsProvider);
+        final int offerTimeoutMs = config.intProp(IConfig.SESSION_QUEUE_OFFER_TIMEOUT_MS, 0);
+        final SessionEventLoopGroup loopsGroup = new SessionEventLoopGroup(interceptor, sessionQueueSize, offerTimeoutMs, metricsProvider);
         sessions = new SessionRegistry(subscriptions, sessionsRepository, queueRepository, authorizator, scheduler,
             clock, globalSessionExpiry, loopsGroup, metricsProvider);
 
