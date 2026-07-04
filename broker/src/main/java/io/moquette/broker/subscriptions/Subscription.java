@@ -31,7 +31,7 @@ public final class Subscription implements Serializable, Comparable<Subscription
     private final MqttSubscriptionOption option;
     final String clientId;
     final Topic topicFilterClient;
-    private final Topic topicFilterInternal;
+    private final Topic topicFilterRewritten;
     final ShareName shareName;
 
     private final Optional<SubscriptionIdentifier> subscriptionId;
@@ -63,11 +63,11 @@ public final class Subscription implements Serializable, Comparable<Subscription
         this(clientId, topicFilter, topicFilter, options, shareName, subscriptionId);
     }
 
-    public Subscription(String clientId, Topic topicFilterClient, Topic topicFilterInternal, MqttSubscriptionOption options,
+    public Subscription(String clientId, Topic topicFilterClient, Topic topicFilterRewritten, MqttSubscriptionOption options,
             ShareName shareName, Optional<SubscriptionIdentifier> subscriptionId) {
         this.clientId = clientId;
         this.topicFilterClient = topicFilterClient;
-        this.topicFilterInternal = topicFilterInternal;
+        this.topicFilterRewritten = topicFilterRewritten;
         this.shareName = shareName;
         this.subscriptionId = subscriptionId;
         this.option = options;
@@ -77,8 +77,8 @@ public final class Subscription implements Serializable, Comparable<Subscription
         return clientId;
     }
 
-    public Topic getTopicFilterInternal() {
-        return topicFilterInternal;
+    public Topic getTopicFilterRewritten() {
+        return topicFilterRewritten;
     }
 
     public Topic getTopicFilterClient() {
@@ -104,7 +104,7 @@ public final class Subscription implements Serializable, Comparable<Subscription
      * @return true if the client topic is different from the internal topic.
      */
     public boolean isTopicRewritten() {
-        return topicFilterInternal.equals(topicFilterClient);
+        return topicFilterRewritten.equals(topicFilterClient);
     }
 
     public boolean qosLessThan(Subscription sub) {
@@ -130,17 +130,17 @@ public final class Subscription implements Serializable, Comparable<Subscription
         Subscription that = (Subscription) o;
         return Objects.equals(clientId, that.clientId)
             && Objects.equals(shareName, that.shareName)
-            && Objects.equals(topicFilterInternal, that.topicFilterInternal);
+            && Objects.equals(topicFilterRewritten, that.topicFilterRewritten);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(clientId, shareName, topicFilterInternal);
+        return Objects.hash(clientId, shareName, topicFilterRewritten);
     }
 
     @Override
     public String toString() {
-        return String.format("[filter:%s, clientID: %s, options: %s - shareName: %s]", topicFilterInternal, clientId, option, shareName);
+        return String.format("[filter:%s, clientID: %s, options: %s - shareName: %s]", topicFilterRewritten, clientId, option, shareName);
     }
 
     @Override
@@ -163,7 +163,7 @@ public final class Subscription implements Serializable, Comparable<Subscription
         if (compare != 0) {
             return compare;
         }
-        return this.topicFilterInternal.compareTo(o.topicFilterInternal);
+        return this.topicFilterRewritten.compareTo(o.topicFilterRewritten);
     }
 
     public String clientAndShareName() {
@@ -182,11 +182,11 @@ public final class Subscription implements Serializable, Comparable<Subscription
         return option;
     }
 
-    public Subscription withInternal(Topic topicFilterInternal) {
-        if (topicFilterInternal == this.topicFilterInternal) {
+    public Subscription withRewrittenTopic(Topic topicFilterRewritten) {
+        if (this.topicFilterRewritten.equals(topicFilterRewritten)) {
             // No actual rewrite happened.
             return this;
         }
-        return new Subscription(clientId, topicFilterClient, topicFilterInternal, option, shareName, subscriptionId);
+        return new Subscription(clientId, topicFilterClient, topicFilterRewritten, option, shareName, subscriptionId);
     }
 }

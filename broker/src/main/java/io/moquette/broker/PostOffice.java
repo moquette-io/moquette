@@ -428,8 +428,7 @@ class PostOffice {
                 final Topic topic = new Topic(sub.topicFilter());
                 MqttSubscriptionOption option = sub.option();//MqttSubscriptionOption.onlyFromQos(sub.qualityOfService());
                 final Subscription tempSub = new Subscription(clientID, topic, option, subscriptionIdOpt);
-                final Subscription subscription = tempSub.withInternal(topicRewriter.rewriteTopic(tempSub));
-                return subscription;
+                return tempSub.withRewrittenTopic(topicRewriter.rewriteTopic(tempSub));
             }).collect(Collectors.toList());
 
         final Set<Subscription> subscriptionToSendRetained = newSubscriptions.stream()
@@ -459,8 +458,7 @@ class PostOffice {
             Topic.asTopic(SharedSubscriptionUtils.extractFilterFromShared(s.topicFilter())),
             s.option(),
             new ShareName(SharedSubscriptionUtils.extractShareName(s.topicFilter())), subscriptionIdOpt);
-        final Subscription subscription = tempSub.withInternal(topicRewriter.rewriteTopic(tempSub));
-        return subscription;
+        return tempSub.withRewrittenTopic(topicRewriter.rewriteTopic(tempSub));
     }
 
     private static boolean needToReceiveRetained(Utils.Couple<Boolean, Subscription> addedAndSub) {
@@ -530,7 +528,7 @@ class PostOffice {
     private void publishRetainedMessagesForSubscriptions(String clientID, Collection<Subscription> newSubscriptions) {
         Session targetSession = this.sessionRegistry.retrieve(clientID);
         for (Subscription subscription : newSubscriptions) {
-            final String topicFilter = subscription.getTopicFilterInternal().toString();
+            final String topicFilter = subscription.getTopicFilterRewritten().toString();
             final Collection<RetainedMessage> retainedMsgs = retainedRepository.retainedOnTopic(topicFilter);
 
             if (retainedMsgs.isEmpty()) {
@@ -940,7 +938,7 @@ class PostOffice {
         boolean isSessionPresent = targetSession != null;
         if (isSessionPresent) {
             LOG.debug("Sending PUBLISH message to active subscriber CId: {}, topicFilter: {}, qos: {}",
-                      sub.getClientId(), sub.getTopicFilterInternal(), qos);
+                      sub.getClientId(), sub.getTopicFilterRewritten(), qos);
 
             if (sub.getTopicFilterClient().hasWildcard() && sub.isTopicRewritten()) {
                 // Topic contains a wildcard AND is rewritten. The interceptor that did the rewriting
@@ -961,7 +959,7 @@ class PostOffice {
             // If we are, the subscriber disconnected after the subscriptions tree selected that session as a
             // destination.
             LOG.debug("PUBLISH to not yet present session. CId: {}, topicFilter: {}, qos: {}", sub.getClientId(),
-                      sub.getTopicFilterInternal(), qos);
+                      sub.getTopicFilterRewritten(), qos);
         }
     }
 
