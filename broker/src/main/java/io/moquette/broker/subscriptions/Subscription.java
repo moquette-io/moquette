@@ -31,7 +31,7 @@ public final class Subscription implements Serializable, Comparable<Subscription
     private final MqttSubscriptionOption option;
     final String clientId;
     final Topic topicFilterClient;
-    private Topic topicFilterInternal;
+    private final Topic topicFilterInternal;
     final ShareName shareName;
 
     private final Optional<SubscriptionIdentifier> subscriptionId;
@@ -41,7 +41,7 @@ public final class Subscription implements Serializable, Comparable<Subscription
     }
 
     public Subscription(String clientId, Topic topicFilter, MqttSubscriptionOption options, SubscriptionIdentifier subscriptionId) {
-        this(clientId, topicFilter, options, EMPTY_SHARENAME, subscriptionId);
+        this(clientId, topicFilter, options, EMPTY_SHARENAME, Optional.ofNullable(subscriptionId));
     }
 
     public Subscription(String clientId, Topic topicFilter, MqttSubscriptionOption options, ShareName shareName) {
@@ -60,9 +60,14 @@ public final class Subscription implements Serializable, Comparable<Subscription
 
     public Subscription(String clientId, Topic topicFilter, MqttSubscriptionOption options, ShareName shareName,
             Optional<SubscriptionIdentifier> subscriptionId) {
+        this(clientId, topicFilter, topicFilter, options, shareName, subscriptionId);
+    }
+
+    public Subscription(String clientId, Topic topicFilterClient, Topic topicFilterInternal, MqttSubscriptionOption options,
+            ShareName shareName, Optional<SubscriptionIdentifier> subscriptionId) {
         this.clientId = clientId;
-        this.topicFilterClient = topicFilter;
-        this.topicFilterInternal = topicFilter;
+        this.topicFilterClient = topicFilterClient;
+        this.topicFilterInternal = topicFilterInternal;
         this.shareName = shareName;
         this.subscriptionId = subscriptionId;
         this.option = options;
@@ -74,10 +79,6 @@ public final class Subscription implements Serializable, Comparable<Subscription
 
     public Topic getTopicFilterInternal() {
         return topicFilterInternal;
-    }
-
-    public void setTopicFilterInternal(Topic topicFilterInternal) {
-        this.topicFilterInternal = topicFilterInternal;
     }
 
     public Topic getTopicFilterClient() {
@@ -120,12 +121,16 @@ public final class Subscription implements Serializable, Comparable<Subscription
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         Subscription that = (Subscription) o;
-        return Objects.equals(clientId, that.clientId) &&
-            Objects.equals(shareName, that.shareName) &&
-            Objects.equals(topicFilterInternal, that.topicFilterInternal);
+        return Objects.equals(clientId, that.clientId)
+            && Objects.equals(shareName, that.shareName)
+            && Objects.equals(topicFilterInternal, that.topicFilterInternal);
     }
 
     @Override
@@ -175,5 +180,13 @@ public final class Subscription implements Serializable, Comparable<Subscription
 
     public MqttSubscriptionOption getOption() {
         return option;
+    }
+
+    public Subscription withInternal(Topic topicFilterInternal) {
+        if (topicFilterInternal == this.topicFilterInternal) {
+            // No actual rewrite happened.
+            return this;
+        }
+        return new Subscription(clientId, topicFilterClient, topicFilterInternal, option, shareName, subscriptionId);
     }
 }

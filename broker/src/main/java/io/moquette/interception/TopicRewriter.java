@@ -30,7 +30,7 @@ public interface TopicRewriter {
      * @param subscription The subscription to rewrite the Topic for.
      * @return the rewritten topic.
      */
-    public Topic rewriteTopic(Subscription subscription);
+    Topic rewriteTopic(Subscription subscription);
 
     /**
      * Reverse the rewrite for the given publish Topic, so that it matches the
@@ -42,5 +42,5 @@ public interface TopicRewriter {
      * @param publishedTopic The topic that received a publish.
      * @return The topic that the client would expect the publish to be on.
      */
-    public Topic rewriteTopicInverse(Topic clientTopic, Topic publishedTopic);
+    Topic rewriteTopicInverse(Topic clientTopic, Topic publishedTopic);
 }

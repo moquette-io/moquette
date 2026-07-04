@@ -427,8 +427,8 @@ class PostOffice {
             .map(sub -> {
                 final Topic topic = new Topic(sub.topicFilter());
                 MqttSubscriptionOption option = sub.option();//MqttSubscriptionOption.onlyFromQos(sub.qualityOfService());
-                final Subscription subscription = new Subscription(clientID, topic, option, subscriptionIdOpt);
-                subscription.setTopicFilterInternal(topicRewriter.rewriteTopic(subscription));
+                final Subscription tempSub = new Subscription(clientID, topic, option, subscriptionIdOpt);
+                final Subscription subscription = tempSub.withInternal(topicRewriter.rewriteTopic(tempSub));
                 return subscription;
             }).collect(Collectors.toList());
 
@@ -454,12 +454,12 @@ class PostOffice {
     }
 
     private Subscription buildSharedSubscriptionFrom(MqttTopicSubscription s, String clientID, Optional<SubscriptionIdentifier> subscriptionIdOpt) {
-        final Subscription subscription = new Subscription(
+        final Subscription tempSub = new Subscription(
             clientID,
             Topic.asTopic(SharedSubscriptionUtils.extractFilterFromShared(s.topicFilter())),
             s.option(),
             new ShareName(SharedSubscriptionUtils.extractShareName(s.topicFilter())), subscriptionIdOpt);
-        subscription.setTopicFilterInternal(topicRewriter.rewriteTopic(subscription));
+        final Subscription subscription = tempSub.withInternal(topicRewriter.rewriteTopic(tempSub));
         return subscription;
     }
 
