@@ -1,4 +1,5 @@
 Version 0.19-SNAPSHOT
+   [fix] Fixed wildcard subscriptions returning responses to requests. (#893-4)
    [Cleanup] Moved MQTT-5 response base topic to a constant.
    [fix] Fixed SessionCount metric miscounting when non-clean session are replaced with clean sessions. (#940)
    [Cleanup] Cleaned up subscription handling. (#931)
