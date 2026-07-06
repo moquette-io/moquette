@@ -38,14 +38,26 @@ public class ScheduledExpirationService<T extends Expirable> {
             TimeUnit.SECONDS);
     }
 
-    private void checkExpiredEntities() {
-        List<ExpirableTracker<T>> expiredEntities = new ArrayList<>();
-        int drainedEntities = expiringEntities.drainTo(expiredEntities);
-        LOG.debug("Retrieved {} expired entity on {}", drainedEntities, expiringEntities.size());
+    // Package-private for testing. Runs from scheduleWithFixedDelay: if an exception escapes, the
+    // executor silently stops rescheduling and NO further expirations ever fire again. Never let one
+    // throw out, and never let one failing entity skip the rest of the batch.
+    void checkExpiredEntities() {
+        try {
+            List<ExpirableTracker<T>> expiredEntities = new ArrayList<>();
+            int drainedEntities = expiringEntities.drainTo(expiredEntities);
+            LOG.debug("Retrieved {} expired entity on {}", drainedEntities, expiringEntities.size());
 
-        expiredEntities.stream()
-            .map(ExpirableTracker::expirable)
-            .forEach(action);
+            for (ExpirableTracker<T> tracker : expiredEntities) {
+                try {
+                    action.accept(tracker.expirable());
+                } catch (Throwable th) {
+                    LOG.warn("Expiration action failed for an entity; continuing with the remaining ones", th);
+                }
+            }
+        } catch (Throwable th) {
+            // Guarantee the periodic firer keeps running regardless.
+            LOG.error("Unexpected error while checking expired entities; the periodic task continues", th);
+        }
     }
 
     public void track(String entityId, T entity) {
