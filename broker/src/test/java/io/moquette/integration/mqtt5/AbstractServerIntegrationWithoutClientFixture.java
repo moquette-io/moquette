@@ -30,6 +30,7 @@ import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5PublishResult;
 import com.hivemq.client.mqtt.mqtt5.message.publish.puback.Mqtt5PubAckReasonCode;
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAck;
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAckReasonCode;
+import io.moquette.BrokerConstants;
 import io.moquette.broker.Server;
 import io.moquette.broker.config.IConfig;
 import io.moquette.broker.config.MemoryConfig;
@@ -141,7 +142,7 @@ public class AbstractServerIntegrationWithoutClientFixture {
         assertEquals(Mqtt5ConnAckReasonCode.SUCCESS, connAck.getReasonCode(), clientId + " connected");
         assertTrue(connAck.getResponseInformation().isPresent(), "ConnACK must contain response topic assigned by the broker");
         String responseTopic = connAck.getResponseInformation().get().toString();
-        assertEquals(responseTopic, "/reqresp/response/" + clientId, "Response topic pattern MUST we respected");
+        assertEquals(responseTopic, BrokerConstants.RESPONSE_TOPIC_BASE + clientId, "Response topic pattern MUST we respected");
         return client;
     }
 

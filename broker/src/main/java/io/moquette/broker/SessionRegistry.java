@@ -15,6 +15,7 @@
  */
 package io.moquette.broker;
 
+import io.moquette.BrokerConstants;
 import io.moquette.broker.Session.SessionStatus;
 import io.moquette.broker.scheduler.ScheduledExpirationService;
 import io.moquette.broker.subscriptions.ISubscriptionsDirectory;
@@ -419,8 +420,8 @@ public class SessionRegistry {
         if (MQTTConnection.isNeedResponseInformation(msg)) {
             // the responder client must have write access to this topic
             // the requester client must have read access on this topic
-            authorizator.forceReadAccess(Topic.asTopic("/reqresp/response/" + clientId), clientId);
-            authorizator.forceWriteToAll(Topic.asTopic("/reqresp/response/" + clientId));
+            authorizator.forceReadAccess(Topic.asTopic(BrokerConstants.RESPONSE_TOPIC_BASE + clientId), clientId);
+            authorizator.forceWriteToAll(Topic.asTopic(BrokerConstants.RESPONSE_TOPIC_BASE + clientId));
         }
         return newSession;
     }

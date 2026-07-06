@@ -27,6 +27,7 @@ import com.hivemq.client.mqtt.mqtt5.message.publish.puback.Mqtt5PubAckReasonCode
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.Mqtt5Subscribe;
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAck;
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAckReasonCode;
+import io.moquette.BrokerConstants;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
@@ -166,7 +167,7 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
     @Test
     public void givenRequestResponseProtocolAndClientIsConnectedWhenRequestIsIssueThenTheResponderReply() throws InterruptedException {
         final Mqtt5BlockingClient requester = createHiveBlockingClientWithResponseProtocol("requester");
-        final String responseTopic = "/reqresp/response/requester";
+        final String responseTopic = BrokerConstants.RESPONSE_TOPIC_BASE + "requester";
         subscribeToResponseTopic(requester, responseTopic);
 
         final Mqtt5BlockingClient responder = createHiveBlockingClient("responder");
