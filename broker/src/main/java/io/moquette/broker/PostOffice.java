@@ -389,21 +389,26 @@ class PostOffice {
                 return;
             }
 
+            // Validate the shared-subscription format BEFORE parsing it. A filter such as "$share/grp"
+            // (a share name with no "/{topicFilter}" part) would make extractShareName() evaluate
+            // substring(7, -1) and throw StringIndexOutOfBoundsException while building the subscription.
+            // MQTT-4.13.1-1 / MQTT-4.8.2: disconnect on a malformed shared subscription instead.
+            Optional<MqttTopicSubscription> invalidSharedSubscription = ackingSubsriptions.stream()
+                .filter(PostOffice::isNoFailure)
+                .filter(SharedSubscriptionUtils::isSharedSubscription)
+                .filter(s -> !SharedSubscriptionUtils.isValidSharedSubscription(s.topicFilter()))
+                .findFirst();
+            if (invalidSharedSubscription.isPresent()) {
+                LOG.info("{} used a malformed shared subscription {}, disconnecting", clientID, invalidSharedSubscription.get().topicFilter());
+                session.disconnectFromBroker();
+                return;
+            }
+
             List<Subscription> sharedSubscriptions = ackingSubsriptions.stream()
                 .filter(PostOffice::isNoFailure)
                 .filter(SharedSubscriptionUtils::isSharedSubscription)
                 .map(s -> buildSharedSubscriptionFrom(s, clientID, subscriptionIdOpt))
                 .collect(Collectors.toList());
-
-            Optional<Subscription> invalidSharedSubscription = sharedSubscriptions.stream()
-                .filter(sub -> !SharedSubscriptionUtils.validateShareName(sub.getShareName().getShareName()))
-                .findFirst();
-            if (invalidSharedSubscription.isPresent()) {
-                // this is a malformed packet, MQTT-4.13.1-1, disconnect it
-                LOG.info("{} used an invalid shared subscription name {}, disconnecting", clientID, invalidSharedSubscription.get().getShareName());
-                session.disconnectFromBroker();
-                return;
-            }
             for (Subscription sub : sharedSubscriptions) {
                 subscriptions.addShared(sub);
                 session.addSubscription(sub);
