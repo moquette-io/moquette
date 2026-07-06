@@ -15,7 +15,6 @@
  *  * You may elect to redistribute this code under either of these licenses.
  *
  */
-
 package io.moquette.integration.mqtt5;
 
 import com.hivemq.client.mqtt.MqttGlobalPublishFilter;
@@ -27,11 +26,13 @@ import com.hivemq.client.mqtt.mqtt5.message.publish.puback.Mqtt5PubAckReasonCode
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.Mqtt5Subscribe;
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAck;
 import com.hivemq.client.mqtt.mqtt5.message.subscribe.suback.Mqtt5SubAckReasonCode;
+import io.moquette.BrokerConstants;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -166,7 +167,7 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
     @Test
     public void givenRequestResponseProtocolAndClientIsConnectedWhenRequestIsIssueThenTheResponderReply() throws InterruptedException {
         final Mqtt5BlockingClient requester = createHiveBlockingClientWithResponseProtocol("requester");
-        final String responseTopic = "/reqresp/response/requester";
+        final String responseTopic = BrokerConstants.RESPONSE_TOPIC_BASE + "requester";
         subscribeToResponseTopic(requester, responseTopic);
 
         final Mqtt5BlockingClient responder = createHiveBlockingClient("responder");
@@ -179,6 +180,40 @@ public class RequestResponseTest extends AbstractServerIntegrationWithoutClientF
                 String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
                 assertEquals("OK", payload);
             });
+        }
+    }
+
+    @Test
+    public void givenRequestResponseProtocolClientTwoCanNotSeeResponseForClientOne() throws InterruptedException {
+        final Mqtt5BlockingClient snooper = createHiveBlockingClientWithResponseProtocol("snooper");
+        subscribeToAtQos1(snooper, "reqresp/#");
+        subscribeToAtQos1(snooper, "reqresp/response/+");
+
+        final Mqtt5BlockingClient requester = createHiveBlockingClientWithResponseProtocol("requester");
+        final String responseTopic = BrokerConstants.RESPONSE_TOPIC_BASE + "requester";
+        subscribeToResponseTopic(requester, responseTopic);
+
+        final Mqtt5BlockingClient responder = createHiveBlockingClient("responder");
+
+        try (Mqtt5BlockingClient.Mqtt5Publishes snooped = snooper.publishes(MqttGlobalPublishFilter.ALL)) {
+            try (Mqtt5BlockingClient.Mqtt5Publishes publishes = requester.publishes(MqttGlobalPublishFilter.ALL)) {
+                // First ensure requester receives the message
+                responderRepliesToRequesterPublish(responder, requester, responseTopic);
+
+                verifyPublishMessage(publishes, msgPub -> {
+                    assertTrue(msgPub.getPayload().isPresent(), "Response payload MUST be present");
+                    String payload = new String(msgPub.getPayloadAsBytes(), StandardCharsets.UTF_8);
+                    assertEquals("OK", payload);
+                });
+            }
+            // Then check if snooper also received any messages.
+            int snoopedCount = 0;
+            Optional<Mqtt5Publish> messageOpt = snooped.receive(1, TimeUnit.SECONDS);
+            while (messageOpt.isPresent()) {
+                snoopedCount++;
+                messageOpt = snooped.receive(1, TimeUnit.SECONDS);
+            }
+            assertEquals(0, snoopedCount, "Snooper should not have received any messages");
         }
     }
 }

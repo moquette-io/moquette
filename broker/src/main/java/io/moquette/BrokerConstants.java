@@ -126,6 +126,8 @@ public final class BrokerConstants {
 
     public static final int DISABLED_TOPIC_ALIAS = 0;
 
+    public static final String RESPONSE_TOPIC_BASE = "reqresp/response/";
+
     private BrokerConstants() {
     }
 }

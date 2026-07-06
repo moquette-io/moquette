@@ -351,7 +351,7 @@ final class MQTTConnection {
             if (isNeedResponseInformation(msg)) {
                 // the responder and requested access to the topic are already configured during session creation
                 // in SessionRegistry
-                connAckPropertiesBuilder.responseInformation("/reqresp/response/" + clientId);
+                connAckPropertiesBuilder.responseInformation(BrokerConstants.RESPONSE_TOPIC_BASE + clientId);
             }
 
             if (receivedQuota.hasLimit()) {
