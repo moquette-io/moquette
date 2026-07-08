@@ -42,11 +42,11 @@ public class InterceptUnsubscribeMessage implements InterceptMessage {
     }
 
     public String getTopicFilterClient() {
-        return subscription.getTopicFilter().toString();
+        return subscription.getTopicFilterClient().toString();
     }
 
-    public String getTopicFilterInternal() {
-        return subscription.getTopicFilter().toString();
+    public String getTopicFilterRewritten() {
+        return subscription.getTopicFilterRewritten().toString();
     }
 
     public String getUsername() {
