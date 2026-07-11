@@ -40,8 +40,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.awaitility.core.ConditionTimeoutException;
-import org.junit.jupiter.api.Assertions;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class ServerIntegrationTopicRewriteTest {
