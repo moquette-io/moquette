@@ -31,32 +31,34 @@ public class ScheduledExpirationService<T extends Expirable> {
 
     public ScheduledExpirationService(Clock clock, Consumer<T> action) {
         this.clock = clock;
-        this.action = action;
+        this.action = guarded(action);
         this.actionsExecutor = Executors.newSingleThreadScheduledExecutor();
         this.expiredEntityTask = actionsExecutor.scheduleWithFixedDelay(this::checkExpiredEntities,
             FIRER_TASK_INTERVAL.getSeconds(), FIRER_TASK_INTERVAL.getSeconds(),
             TimeUnit.SECONDS);
     }
 
-    // Package-private for testing. Runs from scheduleWithFixedDelay: if an exception escapes, the
-    // executor silently stops rescheduling and NO further expirations ever fire again. Never let one
-    // throw out, and never let one failing entity skip the rest of the batch.
-    void checkExpiredEntities() {
-        try {
-            List<ExpirableTracker<T>> expiredEntities = new ArrayList<>();
-            int drainedEntities = expiringEntities.drainTo(expiredEntities);
-            LOG.debug("Retrieved {} expired entity on {}", drainedEntities, expiringEntities.size());
-
-            for (ExpirableTracker<T> tracker : expiredEntities) {
-                try {
-                    action.accept(tracker.expirable());
-                } catch (Throwable th) {
-                    LOG.warn("Expiration action failed for an entity; continuing with the remaining ones", th);
-                }
+    // The action runs from a scheduleWithFixedDelay task: if it throws, the executor silently stops
+    // rescheduling and no further expirations ever fire. Decorate it so a failing entity is logged and
+    // the batch continues, instead of letting the exception escape into the scheduler.
+    private Consumer<T> guarded(Consumer<T> delegate) {
+        return entity -> {
+            try {
+                delegate.accept(entity);
+            } catch (Throwable th) {
+                LOG.warn("Expiration action failed for an entity; continuing with the remaining ones", th);
             }
-        } catch (Throwable th) {
-            // Guarantee the periodic firer keeps running regardless.
-            LOG.error("Unexpected error while checking expired entities; the periodic task continues", th);
+        };
+    }
+
+    // Package-private so the test can trigger one cycle directly.
+    void checkExpiredEntities() {
+        List<ExpirableTracker<T>> expiredEntities = new ArrayList<>();
+        int drainedEntities = expiringEntities.drainTo(expiredEntities);
+        LOG.debug("Retrieved {} expired entity on {}", drainedEntities, expiringEntities.size());
+
+        for (ExpirableTracker<T> tracker : expiredEntities) {
+            action.accept(tracker.expirable());
         }
     }
 

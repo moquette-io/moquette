@@ -26,8 +26,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ScheduledExpirationServiceTest {
 
@@ -47,7 +47,7 @@ class ScheduledExpirationServiceTest {
     }
 
     @Test
-    public void aThrowingExpirationActionMustNotStopThePeriodicService() {
+    public void givenAnActionThatThrowsAnErrorWhenExecutedThenDoesntStopExecutingNextScheduledActions() {
         final Clock clock = Clock.fixed(Instant.ofEpochMilli(10_000), ZoneOffset.UTC);
         final Set<String> processed = new HashSet<>();
         final Consumer<Entity> action = e -> {
@@ -59,16 +59,12 @@ class ScheduledExpirationServiceTest {
 
         final ScheduledExpirationService<Entity> service = new ScheduledExpirationService<>(clock, action);
         try {
-            final Instant alreadyExpired = Instant.ofEpochMilli(9_000); // < clock -> ready to be drained
+            final Instant alreadyExpired = Instant.ofEpochMilli(9_000);
             service.track("boom", new Entity("boom", alreadyExpired));
             service.track("good", new Entity("good", alreadyExpired));
 
-            // Running the periodic check must not propagate the action's exception (which would make
-            // scheduleWithFixedDelay stop firing forever)...
             assertDoesNotThrow(service::checkExpiredEntities);
-            // ...and the non-throwing entity must still have been processed in the same batch.
-            assertTrue(processed.contains("good"),
-                "a failing expiration action must not skip the other expired entities");
+            assertThat(processed).contains("good");
         } finally {
             service.shutdown();
         }
