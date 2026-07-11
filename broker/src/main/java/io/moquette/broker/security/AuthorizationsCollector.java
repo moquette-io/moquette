@@ -17,6 +17,8 @@
 package io.moquette.broker.security;
 
 import io.moquette.broker.subscriptions.Topic;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.text.ParseException;
 import java.util.*;
@@ -28,6 +30,8 @@ import java.util.*;
  * Not thread safe.
  */
 class AuthorizationsCollector implements IAuthorizatorPolicy {
+
+    private static final Logger LOG = LoggerFactory.getLogger(AuthorizationsCollector.class);
 
     private List<Authorization> m_globalAuthorizations = new ArrayList<>();
     private List<Authorization> m_patternAuthorizations = new ArrayList<>();
@@ -118,12 +122,24 @@ class AuthorizationsCollector implements IAuthorizatorPolicy {
             return true;
         }
 
+        // A pattern rule (e.g. "pattern read sensor/%c/#") is substituted with the client id / username
+        // and the result is used as the FILTER side of topic.match(). An identity carrying the MQTT
+        // wildcards '+' or '#' can't be safely substituted: it broadens the filter to topics the operator
+        // never intended (client id "+" turns "sensor/%c/#" into "sensor/+/#", granting cross-tenant
+        // access), and a "#" identity yields an invalid filter that threw an NPE in Topic.match(). Fail
+        // closed for such identities: skip the pattern branch and warn.
         if (isNotEmpty(client) || isNotEmpty(username)) {
-            for (Authorization auth : m_patternAuthorizations) {
-                Topic substitutedTopic = new Topic(auth.topic.toString().replace("%c", client).replace("%u", username));
-                if (auth.grant(permission)) {
-                    if (topic.match(substitutedTopic)) {
-                        return true;
+            if (hasTopicWildcard(client) || hasTopicWildcard(username)) {
+                LOG.warn("Skipping pattern ACL matching: the client id or username contains MQTT topic " +
+                    "wildcards ('+' or '#') and can't be safely substituted into a pattern filter " +
+                    "(client: {}, username: {})", client, username);
+            } else {
+                for (Authorization auth : m_patternAuthorizations) {
+                    Topic substitutedTopic = new Topic(auth.topic.toString().replace("%c", client).replace("%u", username));
+                    if (auth.grant(permission)) {
+                        if (topic.match(substitutedTopic)) {
+                            return true;
+                        }
                     }
                 }
             }
@@ -153,6 +169,12 @@ class AuthorizationsCollector implements IAuthorizatorPolicy {
 
     private boolean isNotEmpty(String client) {
         return client != null && !client.isEmpty();
+    }
+
+    // True if the identity contains an MQTT topic wildcard ('+' or '#'), which must never be substituted
+    // into a pattern ACL rule that is subsequently wildcard-matched.
+    private static boolean hasTopicWildcard(String identity) {
+        return identity != null && (identity.indexOf('+') >= 0 || identity.indexOf('#') >= 0);
     }
 
     public boolean isEmpty() {
