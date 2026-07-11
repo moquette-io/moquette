@@ -31,7 +31,7 @@ public class ScheduledExpirationService<T extends Expirable> {
 
     public ScheduledExpirationService(Clock clock, Consumer<T> action) {
         this.clock = clock;
-        this.action = guarded(action);
+        this.action = exceptionSafeWrapper(action);
         this.actionsExecutor = Executors.newSingleThreadScheduledExecutor();
         this.expiredEntityTask = actionsExecutor.scheduleWithFixedDelay(this::checkExpiredEntities,
             FIRER_TASK_INTERVAL.getSeconds(), FIRER_TASK_INTERVAL.getSeconds(),
@@ -41,7 +41,7 @@ public class ScheduledExpirationService<T extends Expirable> {
     // The action runs from a scheduleWithFixedDelay task: if it throws, the executor silently stops
     // rescheduling and no further expirations ever fire. Decorate it so a failing entity is logged and
     // the batch continues, instead of letting the exception escape into the scheduler.
-    private Consumer<T> guarded(Consumer<T> delegate) {
+    private Consumer<T> exceptionSafeWrapper(Consumer<T> delegate) {
         return entity -> {
             try {
                 delegate.accept(entity);
@@ -57,9 +57,9 @@ public class ScheduledExpirationService<T extends Expirable> {
         int drainedEntities = expiringEntities.drainTo(expiredEntities);
         LOG.debug("Retrieved {} expired entity on {}", drainedEntities, expiringEntities.size());
 
-        for (ExpirableTracker<T> tracker : expiredEntities) {
-            action.accept(tracker.expirable());
-        }
+        expiredEntities.stream()
+            .map(ExpirableTracker::expirable)
+            .forEach(action);
     }
 
     public void track(String entityId, T entity) {
