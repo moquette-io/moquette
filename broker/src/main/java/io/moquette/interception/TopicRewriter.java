@@ -19,21 +19,21 @@ import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.Topic;
 
 /**
- * A topic re-writer can change the topics of subscriptions and publishes before
- * they are handled internally.
+ * A topic re-writer can change the topics of subscriptions before they are
+ * handled internally.
  *
  * <h2>Topic filter without wildcards</h2>
  *
- *  <p>Subscribes subscribes to {@code old/sensor1}, which the rewriter rewrites
+ * <p>A Subscriber subscribes to {@code old/sensor1}, which the rewriter rewrites
  * to {@code new/sensor1} using the method {@link #rewriteTopic(Subscription)}.
  * This means that on the subscriptions tree we register the subscription under
  * the {@code new/sensor1} path. When a publish matching {@code new/sensor1} is
  * received a new publish message is emitted with a topic name of the client, so
  * {@code old/sensor1}.</p>
  *
- *  <h2>Topic filter with wildcards</h2>
+ * <h2>Topic filter with wildcards</h2>
  *
- *  <p>Subscribes subscribes to {@code old/#}, which the rewriter rewrites to
+ * <p>A subscriber subscribes to {@code old/#}, which the rewriter rewrites to
  * {@code new/#}.
  * This means that on the subscriptions tree we register the subscription under
  * the {@code new/#} path. When a publish matching {@code new/#} is received, for
