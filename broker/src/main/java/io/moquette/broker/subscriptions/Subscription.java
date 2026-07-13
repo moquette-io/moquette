@@ -30,7 +30,8 @@ public final class Subscription implements Serializable, Comparable<Subscription
     private static final long serialVersionUID = -3383457629635732794L;
     private final MqttSubscriptionOption option;
     final String clientId;
-    final Topic topicFilter;
+    final Topic topicFilterClient;
+    private final Topic topicFilterRewritten;
     final ShareName shareName;
 
     private final Optional<SubscriptionIdentifier> subscriptionId;
@@ -40,7 +41,7 @@ public final class Subscription implements Serializable, Comparable<Subscription
     }
 
     public Subscription(String clientId, Topic topicFilter, MqttSubscriptionOption options, SubscriptionIdentifier subscriptionId) {
-        this(clientId, topicFilter, options, EMPTY_SHARENAME, subscriptionId);
+        this(clientId, topicFilter, options, EMPTY_SHARENAME, Optional.ofNullable(subscriptionId));
     }
 
     public Subscription(String clientId, Topic topicFilter, MqttSubscriptionOption options, ShareName shareName) {
@@ -59,8 +60,14 @@ public final class Subscription implements Serializable, Comparable<Subscription
 
     public Subscription(String clientId, Topic topicFilter, MqttSubscriptionOption options, ShareName shareName,
             Optional<SubscriptionIdentifier> subscriptionId) {
+        this(clientId, topicFilter, topicFilter, options, shareName, subscriptionId);
+    }
+
+    public Subscription(String clientId, Topic topicFilterClient, Topic topicFilterRewritten, MqttSubscriptionOption options,
+            ShareName shareName, Optional<SubscriptionIdentifier> subscriptionId) {
         this.clientId = clientId;
-        this.topicFilter = topicFilter;
+        this.topicFilterClient = topicFilterClient;
+        this.topicFilterRewritten = topicFilterRewritten;
         this.shareName = shareName;
         this.subscriptionId = subscriptionId;
         this.option = options;
@@ -70,8 +77,12 @@ public final class Subscription implements Serializable, Comparable<Subscription
         return clientId;
     }
 
-    public Topic getTopicFilter() {
-        return topicFilter;
+    public Topic getTopicFilterRewritten() {
+        return topicFilterRewritten;
+    }
+
+    public Topic getTopicFilterClient() {
+        return topicFilterClient;
     }
 
     /**
@@ -82,9 +93,18 @@ public final class Subscription implements Serializable, Comparable<Subscription
      */
     public String getOriginalTopicFilterWithSharename() {
         if (shareName.isEmpty()) {
-            return topicFilter.toString();
+            return topicFilterClient.toString();
         }
-        return "$share/" + shareName.getShareName() + "/" + topicFilter.toString();
+        return "$share/" + shareName.getShareName() + "/" + topicFilterClient.toString();
+    }
+
+    /**
+     * Check if the client topic was rewritten to a different internal topic.
+     *
+     * @return true if the client topic is different from the internal topic.
+     */
+    public boolean isTopicRewritten() {
+        return topicFilterRewritten.equals(topicFilterClient);
     }
 
     public boolean qosLessThan(Subscription sub) {
@@ -101,22 +121,26 @@ public final class Subscription implements Serializable, Comparable<Subscription
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         Subscription that = (Subscription) o;
-        return Objects.equals(clientId, that.clientId) &&
-            Objects.equals(shareName, that.shareName) &&
-            Objects.equals(topicFilter, that.topicFilter);
+        return Objects.equals(clientId, that.clientId)
+            && Objects.equals(shareName, that.shareName)
+            && Objects.equals(topicFilterRewritten, that.topicFilterRewritten);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(clientId, shareName, topicFilter);
+        return Objects.hash(clientId, shareName, topicFilterRewritten);
     }
 
     @Override
     public String toString() {
-        return String.format("[filter:%s, clientID: %s, options: %s - shareName: %s]", topicFilter, clientId, option, shareName);
+        return String.format("[filter:%s, clientID: %s, options: %s - shareName: %s]", topicFilterRewritten, clientId, option, shareName);
     }
 
     @Override
@@ -139,7 +163,7 @@ public final class Subscription implements Serializable, Comparable<Subscription
         if (compare != 0) {
             return compare;
         }
-        return this.topicFilter.compareTo(o.topicFilter);
+        return this.topicFilterRewritten.compareTo(o.topicFilterRewritten);
     }
 
     public String clientAndShareName() {
@@ -156,5 +180,13 @@ public final class Subscription implements Serializable, Comparable<Subscription
 
     public MqttSubscriptionOption getOption() {
         return option;
+    }
+
+    public Subscription withRewrittenTopic(Topic topicFilterRewritten) {
+        if (this.topicFilterRewritten.equals(topicFilterRewritten)) {
+            // No actual rewrite happened.
+            return this;
+        }
+        return new Subscription(clientId, topicFilterClient, topicFilterRewritten, option, shareName, subscriptionId);
     }
 }

@@ -79,11 +79,11 @@ final class Authorizator {
 
         final int messageId = messageId(msg);
         for (MqttTopicSubscription req : msg.payload().topicSubscriptions()) {
-            Topic topic = topicExtractor.apply(req.topicName());
+            Topic topic = topicExtractor.apply(req.topicFilter());
             final MqttQoS qos = getQoSCheckingAlsoPermissionsOnTopic(clientID, username, messageId, topic,
                 req.qualityOfService());
             MqttSubscriptionOption option = PostOffice.optionWithQos(qos, req.option());
-            ackTopics.add(new MqttTopicSubscription(req.topicName(), option));
+            ackTopics.add(new MqttTopicSubscription(req.topicFilter(), option));
         }
         return ackTopics;
     }

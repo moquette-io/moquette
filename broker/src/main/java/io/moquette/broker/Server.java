@@ -68,6 +68,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 import static io.moquette.broker.Session.INFINITE_EXPIRY;
+import io.moquette.interception.TopicRewriter;
 import static io.moquette.metrics.MetricsUtils.getInterceptorIds;
 import io.moquette.metrics.MetricsManager;
 import io.moquette.metrics.MetricsProvider;
@@ -81,6 +82,7 @@ public class Server {
     private NewNettyAcceptor acceptor;
     private volatile boolean initialized;
     private PostOffice dispatcher;
+    private TopicRewriter topicRewriter;
     private BrokerInterceptor interceptor;
     private H2Builder h2Builder;
     private SessionRegistry sessions;
@@ -266,6 +268,9 @@ public class Server {
         final MqttQoS serverGrantedQoS = parseMaxGrantedQoS(config);
         dispatcher = new PostOffice(subscriptions, retainedRepository, sessions, sessionsRepository, interceptor,
             authorizator, loopsGroup, clock, serverGrantedQoS, metricsProvider);
+        if (topicRewriter != null) {
+            dispatcher.setTopicRewriter(topicRewriter);
+        }
         final BrokerConfiguration brokerConfig = new BrokerConfiguration(config);
         MQTTConnectionFactory connectionFactory = new MQTTConnectionFactory(brokerConfig, authenticator, sessions,
                                                                             dispatcher);
@@ -282,6 +287,13 @@ public class Server {
         }
 
         initialized = true;
+    }
+
+    public void setTopicRewriter(TopicRewriter topicRewriter) {
+        this.topicRewriter = topicRewriter;
+        if (dispatcher != null) {
+            dispatcher.setTopicRewriter(topicRewriter);
+        }
     }
 
     private static MqttQoS parseMaxGrantedQoS(IConfig config) {

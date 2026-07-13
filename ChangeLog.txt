@@ -1,4 +1,9 @@
 Version 0.19-SNAPSHOT
+   [feature] Added topic rewriting, allowing the internally used topic to be different from the topic the client used. (#932)
+     All methods dealing with topic filters are renamed and duplicated into:
+     - topicFilterClient: The topic filter as it was set by the client.
+     - topicFilterRewritten: The topic filter as the broker is using it internally.
+     The rewriting is done by a class implementing the interface TopicRewriter, that is set on the Server before starting.
    [fix] Fixed SessionCount metric miscounting when non-clean session are replaced with clean sessions. (#940)
    [Cleanup] Cleaned up subscription handling. (#931)
    [feature] Added metrics framework and Prometheus implementation.
