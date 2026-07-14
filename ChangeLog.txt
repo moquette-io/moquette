@@ -1,4 +1,7 @@
 Version 0.19-SNAPSHOT
+   [feature] InterceptUnsubscribeMessage now has the entire Subscription and the notification hook has changed
+     from `notifyTopicUnsubscribed(String topic, String clientID, String username)`
+     to `notifyTopicUnsubscribed(Subscription sub, String username)`
    [feature] Added topic rewriting, allowing the internally used topic to be different from the topic the client used. (#932)
      All methods dealing with topic filters are renamed and duplicated into:
      - topicFilterClient: The topic filter as it was set by the client.
