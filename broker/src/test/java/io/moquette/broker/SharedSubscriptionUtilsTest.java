@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2023 The original author or authors
+ * Copyright (c) 2012-2026 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -24,14 +24,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SharedSubscriptionUtilsTest {
 
     @Test
-    public void wellFormedSharedSubscriptionIsValid() {
+    public void givenWellFormedSharedSubscriptionWhenValidatedThenGetPositiveAnswer() {
         assertTrue(SharedSubscriptionUtils.isValidSharedSubscription("$share/grp/sensors/#"));
         assertTrue(SharedSubscriptionUtils.isValidSharedSubscription("$share/grp/a/b"));
         assertTrue(SharedSubscriptionUtils.isValidSharedSubscription("$share/grp/+"));
     }
 
     @Test
-    public void aShareNameWithNoTopicFilterPartIsRejected() {
+    public void givenSharedSubscriptionWithNoTopicFilterPartWhenValidatedThenIsRejected() {
         // "$share/grp" has no "/{topicFilter}" part: extractShareName() would have evaluated
         // substring(7, -1) and thrown StringIndexOutOfBoundsException while building the subscription.
         assertFalse(SharedSubscriptionUtils.isValidSharedSubscription("$share/grp"));
@@ -39,14 +39,14 @@ class SharedSubscriptionUtilsTest {
     }
 
     @Test
-    public void anEmptyOrWildcardShareNameIsRejected() {
+    public void givenSharedSubscriptionWithEmptyOrWildcardShareNameWhenValidatedThenIsRejected() {
         assertFalse(SharedSubscriptionUtils.isValidSharedSubscription("$share//sensors"));
         assertFalse(SharedSubscriptionUtils.isValidSharedSubscription("$share/gr+p/sensors"));
         assertFalse(SharedSubscriptionUtils.isValidSharedSubscription("$share/gr#p/sensors"));
     }
 
     @Test
-    public void aNonSharedFilterIsNotAValidSharedSubscription() {
+    public void givenNonSharedFilterWhenValidatedThenIsNotAValidSharedSubscription() {
         assertFalse(SharedSubscriptionUtils.isValidSharedSubscription("sensors/#"));
     }
 }
