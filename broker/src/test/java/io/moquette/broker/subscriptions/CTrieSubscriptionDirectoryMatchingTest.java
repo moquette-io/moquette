@@ -191,11 +191,11 @@ public class CTrieSubscriptionDirectoryMatchingTest extends CTrieSubscriptionDir
     public void testOverlappingSubscriptions() {
         Subscription genericSub = new Subscription("Sensor1", asTopic("a/+"), MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE));
         this.sessionsRepository.addNewSubscription(genericSub);
-        sut.add(new Subscription(genericSub.clientId, genericSub.topicFilter, genericSub.getOption()));
+        sut.add(new Subscription(genericSub.clientId, genericSub.topicFilterClient, genericSub.getOption()));
 
         Subscription specificSub = new Subscription("Sensor1", asTopic("a/b"), MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE));
         this.sessionsRepository.addNewSubscription(specificSub);
-        sut.add(new Subscription(specificSub.clientId, specificSub.topicFilter, specificSub.getOption()));
+        sut.add(new Subscription(specificSub.clientId, specificSub.topicFilterClient, specificSub.getOption()));
 
         //Exercise
         final List<Subscription> matchingForSpecific = sut.matchQosSharpening(asTopic("a/b"));

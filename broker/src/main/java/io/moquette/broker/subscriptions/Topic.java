@@ -39,6 +39,8 @@ public class Topic implements Serializable, Comparable<Topic> {
 
     private transient boolean valid;
 
+    private transient boolean hasWildcard;
+
     /**
      * Factory method
      *
@@ -110,10 +112,12 @@ public class Topic implements Serializable, Comparable<Topic> {
                             i);
                 }
                 res.add(Token.MULTI);
+                hasWildcard = true;
             } else if (s.contains("#")) {
                 throw new ParseException("Bad format of topic, invalid subtopic name: " + s, i);
             } else if (s.equals("+")) {
                 res.add(Token.SINGLE);
+                hasWildcard = true;
             } else if (s.contains("+")) {
                 throw new ParseException("Bad format of topic, invalid subtopic name: " + s, i);
             } else {
@@ -158,6 +162,13 @@ public class Topic implements Serializable, Comparable<Topic> {
         return valid;
     }
 
+    public boolean hasWildcard() {
+         if (tokens == null)
+            getTokens();
+        return hasWildcard;
+    }
+
+   
     /**
      * Verify if the 2 topics matching respecting the rules of MQTT Appendix A
      *
@@ -199,6 +210,9 @@ public class Topic implements Serializable, Comparable<Topic> {
 
     @Override
     public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
         if (obj == null) {
             return false;
         }

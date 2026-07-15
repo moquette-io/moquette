@@ -49,7 +49,7 @@ public interface Interceptor {
 
     void notifyTopicSubscribed(Subscription sub, String username);
 
-    void notifyTopicUnsubscribed(String topic, String clientID, String username);
+    void notifyTopicUnsubscribed(Subscription sub, String username);
 
     void notifyMessageAcknowledged(InterceptAcknowledgedMessage msg);
 
