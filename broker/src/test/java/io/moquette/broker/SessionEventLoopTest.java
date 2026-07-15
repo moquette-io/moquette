@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The original author or authors
+ * Copyright (c) 2012-2026 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -17,24 +17,24 @@
 package io.moquette.broker;
 
 import io.moquette.metrics.MetricsProviderNull;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 class SessionEventLoopTest {
 
     @Test
-    public void aCommandThatThrowsMustNotTerminateTheSharedSessionLoop() throws InterruptedException {
+    public void givenACommandThatThrowsWhenProcessedThenTheSharedSessionLoopKeepsRunning() {
         final BlockingQueue<FutureTask<String>> queue = new LinkedBlockingQueue<>();
-        final SessionEventLoop loop = new SessionEventLoop(queue, 0, new MetricsProviderNull());
-        loop.setDaemon(true);
-        loop.start();
+        final SessionEventLoop sut = new SessionEventLoop(queue, 0, new MetricsProviderNull());
+        sut.setDaemon(true);
+        sut.start();
         try {
             // A command that throws (as a malformed packet's handler could).
             queue.add(new FutureTask<>(() -> {
@@ -42,17 +42,22 @@ class SessionEventLoopTest {
             }));
 
             // A subsequent command bound to the SAME loop must still be executed.
-            final CountDownLatch executed = new CountDownLatch(1);
+            final AtomicBoolean executed = new AtomicBoolean(false);
             queue.add(new FutureTask<>(() -> {
-                executed.countDown();
+                executed.set(true);
                 return "ok";
             }));
 
-            assertTrue(executed.await(5, TimeUnit.SECONDS),
-                "the session loop must keep processing commands after one of them throws");
+            Awaitility.await("the session loop keeps processing commands after one of them throws")
+                .atMost(Duration.ofSeconds(5))
+                .untilTrue(executed);
         } finally {
-            loop.interrupt();
-            loop.join(TimeUnit.SECONDS.toMillis(2));
+            sut.interrupt();
+            try {
+                sut.join(TimeUnit.SECONDS.toMillis(2));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 }
