@@ -58,4 +58,31 @@ class SharedSubscriptionUtils {
         Objects.requireNonNull(shareName);
         return shareName.length() > 0 && !shareName.contains("+") && !shareName.contains("#");
     }
+
+    /**
+     * Validate the WHOLE shared-subscription filter ($share/{shareName}/{topicFilter}) before it is
+     * parsed. A filter such as "$share/grp" (a share name with no "/{topicFilter}" part) has no '/'
+     * after the share name, which would make {@link #extractShareName(String)} evaluate
+     * substring(7, -1) and throw. Returns true only when the share name and the topic-filter part are
+     * both present and the share name is well-formed.
+     *
+     * @return true if topicFilter is a well-formed shared subscription
+     * */
+    protected static boolean isValidSharedSubscription(String topicFilter) {
+        Objects.requireNonNull(topicFilter, "topicFilter can't be null");
+        if (!isSharedSubscription(topicFilter)) {
+            return false;
+        }
+        final int afterShare = "$share/".length();
+        final int endOfShareName = topicFilter.indexOf('/', afterShare);
+        if (endOfShareName < 0) {
+            // no "/{topicFilter}" part after the share name
+            return false;
+        }
+        if (!validateShareName(topicFilter.substring(afterShare, endOfShareName))) {
+            return false;
+        }
+        // the topic-filter part must be present (non-empty)
+        return endOfShareName + 1 < topicFilter.length();
+    }
 }

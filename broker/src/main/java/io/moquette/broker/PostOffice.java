@@ -390,20 +390,28 @@ class PostOffice {
         final Optional<SubscriptionIdentifier> subscriptionIdOpt;
 
         if (mqttConnection.isProtocolVersion5()) {
+            
+
+            // Validate the shared-subscription format BEFORE parsing it. A filter such as "$share/grp"
+            // (a share name with no "/{topicFilter}" part) would make extractShareName() evaluate
+            // substring(7, -1) and throw StringIndexOutOfBoundsException while building the subscription.
+            // MQTT-4.13.1-1 / MQTT-4.8.2: disconnect on a malformed shared subscription instead.
+            Optional<MqttTopicSubscription> invalidSharedSubscription = msg.payload().topicSubscriptions().stream()
+                .filter(s -> SharedSubscriptionUtils.isSharedSubscription(s.topicFilter()))
+                .filter(s -> !SharedSubscriptionUtils.isValidSharedSubscription(s.topicFilter()))
+                .findFirst();
+            
+            if (invalidSharedSubscription.isPresent()) {
+                // this is a malformed packet, MQTT-4.13.1-1, disconnect it
+                LOG.info("{} used a malformed shared subscription {}, disconnecting", clientID, invalidSharedSubscription.get().topicFilter());
+                session.disconnectFromBroker();
+                return;
+            }
+
             sharedSubscriptions = msg.payload().topicSubscriptions().stream()
                 .filter(sub -> SharedSubscriptionUtils.isSharedSubscription(sub.topicName()))
                 .map(SharedSubscriptionData::fromMqttSubscription)
                 .collect(Collectors.toList());
-
-            Optional<SharedSubscriptionData> invalidSharedSubscription = sharedSubscriptions.stream()
-                .filter(subData -> !SharedSubscriptionUtils.validateShareName(subData.name.toString()))
-                .findFirst();
-            if (invalidSharedSubscription.isPresent()) {
-                // this is a malformed packet, MQTT-4.13.1-1, disconnect it
-                LOG.info("{} used an invalid shared subscription name {}, disconnecting", clientID, invalidSharedSubscription.get().name);
-                session.disconnectFromBroker();
-                return;
-            }
 
             try {
                 subscriptionIdOpt = verifyAndExtractMessageIdentifier(msg);
