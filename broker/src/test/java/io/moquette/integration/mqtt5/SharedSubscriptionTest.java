@@ -53,6 +53,17 @@ public class SharedSubscriptionTest extends AbstractSubscriptionIntegrationTest 
     }
 
     @Test
+    public void givenClientSendingSharedSubscriptionWithNoTopicFilterPartThenItIsDisconnectedInsteadOfCrashing() throws InterruptedException {
+        connectLowLevel();
+
+        MqttMessage received = lowLevelClient.subscribeWithError("$share/grp", MqttQoS.AT_LEAST_ONCE);
+
+        verifyOfType(received, MqttMessageType.DISCONNECT);
+        MqttReasonCodeAndPropertiesVariableHeader disconnectHeader = (MqttReasonCodeAndPropertiesVariableHeader) received.variableHeader();
+        assertEquals(MqttReasonCodes.Disconnect.MALFORMED_PACKET.byteValue(), disconnectHeader.reasonCode());
+    }
+
+    @Test
     public void givenClientSubscribingToSharedTopicThenReceiveTheExpectedSubscriptionACK() throws InterruptedException {
         connectLowLevel();
 
