@@ -48,6 +48,11 @@ final class SessionEventLoop extends Thread {
             } catch (InterruptedException e) {
                 LOG.info("SessionEventLoop {} interrupted", Thread.currentThread().getName());
                 Thread.currentThread().interrupt();
+            } catch (Throwable th) {
+                // Keep the shared loop alive on a failing command; the FutureTask already captured the
+                // failure for its submitter, so co-located sessions must not be taken down with it.
+                LOG.error("SessionEventLoop {} caught an unhandled error while processing a command; "
+                        + "the loop continues", Thread.currentThread().getName(), th);
             }
         }
         LOG.info("SessionEventLoop {} exit", Thread.currentThread().getName());
