@@ -16,7 +16,6 @@
 
 package io.moquette.broker;
 
-import io.moquette.metrics.MetricsProviderNull;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 
@@ -32,7 +31,7 @@ class SessionEventLoopTest {
     @Test
     public void givenACommandThatThrowsWhenProcessedThenTheSharedSessionLoopKeepsRunning() {
         final BlockingQueue<FutureTask<String>> queue = new LinkedBlockingQueue<>();
-        final SessionEventLoop sut = new SessionEventLoop(queue, 0, new MetricsProviderNull());
+        final SessionEventLoop sut = new SessionEventLoop(queue, true);
         sut.setDaemon(true);
         sut.start();
         try {
