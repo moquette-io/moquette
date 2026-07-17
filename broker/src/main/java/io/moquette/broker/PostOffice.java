@@ -324,7 +324,10 @@ class PostOffice {
             }
         }
         MqttPublishMessage willPublishMessage = publishBuilder.build();
-
+        if (!authorizator.canWrite(Topic.asTopic(will.topic), "", WILL_PUBLISHER)) {
+            LOG.error("client is not authorized to publish Last Will Testament on topic: {}", will.topic);
+            return;
+        }
         publish2Subscribers(WILL_PUBLISHER, messageExpiryInstant, willPublishMessage);
     }
 
