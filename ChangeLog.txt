@@ -1,4 +1,5 @@
 Version 0.19-SNAPSHOT
+   [fix] Check Last Will topic for writability rights before publish.
    [fix] Reject a malformed $share subscription before parsing it (remote DoS). (#958)
    [fix] Keep the session event loop alive when a command throws (remote DoS). (#957)
    [fix] Guard the periodic expiration task so one failing entity can't disable all expirations. (#959)
