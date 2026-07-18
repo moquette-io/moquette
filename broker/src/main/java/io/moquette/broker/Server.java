@@ -497,6 +497,14 @@ public class Server {
         String authorizatorClassName = props.getProperty(IConfig.AUTHORIZATOR_CLASS_NAME, "");
         if (authorizatorPolicy == null && !authorizatorClassName.isEmpty()) {
             authorizatorPolicy = loadClass(authorizatorClassName, IAuthorizatorPolicy.class, IConfig.class, props);
+            if (authorizatorPolicy == null) {
+                // The operator explicitly configured a custom authorizator and it failed to load (typo,
+                // missing jar, throwing constructor, ...). Fail startup instead of silently falling through
+                // to the permissive default below: that default is only correct when NO class was configured.
+                throw new IllegalArgumentException("Unable to load configured " + IConfig.AUTHORIZATOR_CLASS_NAME
+                    + " '" + authorizatorClassName + "'; refusing to start with a silently permissive fallback. "
+                    + "Check the class name and classpath (see the WARN log above for the cause).");
+            }
         }
 
         if (authorizatorPolicy == null) {
@@ -524,6 +532,13 @@ public class Server {
 
         if (authenticator == null && !authenticatorClassName.isEmpty()) {
             authenticator = loadClass(authenticatorClassName, IAuthenticator.class, IConfig.class, props);
+            if (authenticator == null) {
+                // Same rationale as initializeAuthorizatorPolicy: a configured-but-failed-to-load
+                // authenticator must not silently degrade to AcceptAllAuthenticator below.
+                throw new IllegalArgumentException("Unable to load configured " + IConfig.AUTHENTICATOR_CLASS_NAME
+                    + " '" + authenticatorClassName + "'; refusing to start with a silently permissive fallback. "
+                    + "Check the class name and classpath (see the WARN log above for the cause).");
+            }
         }
 
         IResourceLoader resourceLoader = props.getResourceLoader();

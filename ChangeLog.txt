@@ -1,4 +1,5 @@
 Version 0.19-SNAPSHOT
+   [fix] Fail startup instead of silently falling back to a permissive authorizator/authenticator when a configured authorizator_class/authenticator_class fails to load.
    [fix] Check Last Will topic for writability rights before publish.
    [fix] Reject a malformed $share subscription before parsing it (remote DoS). (#958)
    [fix] Keep the session event loop alive when a command throws (remote DoS). (#957)
