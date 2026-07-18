@@ -1,4 +1,5 @@
 Version 0.19-SNAPSHOT
+   [fix] Guarded pattern ACL substitution against a null username to prevent a remote DoS. (#963)
    [feature] InterceptUnsubscribeMessage now has the entire Subscription and the notification hook has changed
      from `notifyTopicUnsubscribed(String topic, String clientID, String username)`
      to `notifyTopicUnsubscribed(Subscription sub, String username)`
