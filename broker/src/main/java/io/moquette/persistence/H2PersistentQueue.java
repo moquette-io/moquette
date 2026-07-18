@@ -121,16 +121,20 @@ class H2PersistentQueue extends AbstractSessionMessageQueue<SessionRegistry.Enqu
     // "_meta" can no longer reopen it as its own message map.
     private static void migrateLegacyMetadata(MVStore store, String queueName, MVMap<String, Long> metadataMap) {
         final String legacyName = MESSAGES_MAP_PREFIX + queueName + LEGACY_METADATA_MAP_SUFFIX;
-        if (!metadataMap.isEmpty() || !store.hasMap(legacyName)) {
+        if (!store.hasMap(legacyName)) {
             return;
         }
+
         final MVMap<String, Long> legacy = store.openMap(legacyName);
-        if (legacy.containsKey("head")) {
+
+        // Copy only if missing to keep the migration idempotent across restarts.
+        if (!metadataMap.containsKey("head") && legacy.containsKey("head")) {
             metadataMap.put("head", legacy.get("head"));
         }
-        if (legacy.containsKey("tail")) {
+        if (!metadataMap.containsKey("tail") && legacy.containsKey("tail")) {
             metadataMap.put("tail", legacy.get("tail"));
         }
+
         store.removeMap(legacy);
     }
 
