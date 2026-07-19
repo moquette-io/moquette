@@ -1,5 +1,10 @@
 Version 0.19-SNAPSHOT
    [fix] Guarded pattern ACL substitution against a null username to prevent a remote DoS. (#963)
+   [fix] Check Last Will topic for writability rights before publish.
+   [fix] Reject a malformed $share subscription before parsing it (remote DoS). (#958)
+   [fix] Keep the session event loop alive when a command throws (remote DoS). (#957)
+   [fix] Guard the periodic expiration task so one failing entity can't disable all expirations. (#959)
+   [fix] Prevent pattern-ACL wildcard injection via a wildcard client id/username
    [feature] InterceptUnsubscribeMessage now has the entire Subscription and the notification hook has changed
      from `notifyTopicUnsubscribed(String topic, String clientID, String username)`
      to `notifyTopicUnsubscribed(Subscription sub, String username)`
@@ -15,6 +20,12 @@ Version 0.19-SNAPSHOT
      - Metrics endpoint can be found on http://localhost:9400/metrics by default.
      - port can be changed with `metrics_endpoint_port`. Set to 0 to disable http endpoint.
    [fix] Fixed SegmentedQueues not being cleaned up on session purge. (#833)
+
+Version 0.18.1-SNAPSHOT:
+   [fix] (Non clean backport) Reject a malformed $share subscription before parsing it (remote DoS). (#963)
+   [fix] Keep the session event loop alive when a command throws (remote DoS). (#957)
+   [fix] Guard the periodic expiration task so one failing entity can't disable all expirations. (#959)
+   [fix] Prevent pattern-ACL wildcard injection via a wildcard client id/username 
 
 Version 0.18:
    [fix] Update Netty to 4.1.116 and H2 2.1.214
