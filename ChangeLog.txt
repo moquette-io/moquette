@@ -1,4 +1,5 @@
 Version 0.18.1-SNAPSHOT:
+   [fix] Namespaced the H2 queue metadata map to prevent a client-id collision that could corrupt a durable queue. (#964)
    [fix] Check Last Will topic for writability rights before publish.
    [fix] (Non clean backport) Reject a malformed $share subscription before parsing it (remote DoS). (#963)
    [fix] Keep the session event loop alive when a command throws (remote DoS). (#957)

@@ -21,6 +21,7 @@ import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttQoS;
+import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVStore;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -99,5 +100,43 @@ public class H2PersistentQueueTest extends H2BaseTest {
         assertEquals("crazy", ((SessionRegistry.PublishedMessage) after.dequeue()).getTopic().toString());
         assertEquals("world", ((SessionRegistry.PublishedMessage) after.dequeue()).getTopic().toString());
         assertTrue(after.isEmpty(), "should be empty");
+    }
+
+    @Test
+    public void givenAClientIdEndingInMetaWhenBothClientsUseDurableQueuesThenTheirMapsDoNotCollide() {
+        // "sensor_meta"'s message map ("queue_sensor_meta") previously aliased "sensor"'s metadata map,
+        // corrupting both durable queues. Each queue must now keep only its own messages.
+        H2PersistentQueue victim = new H2PersistentQueue(this.mvStore, "sensor");
+        H2PersistentQueue attacker = new H2PersistentQueue(this.mvStore, "sensor_meta");
+
+        victim.enqueue(createMessage("victim-message"));
+        attacker.enqueue(createMessage("attacker-message"));
+
+        assertEquals("victim-message", ((SessionRegistry.PublishedMessage) victim.dequeue()).getTopic().toString());
+        assertTrue(victim.isEmpty(), "victim queue must be unaffected by the other client");
+        assertEquals("attacker-message", ((SessionRegistry.PublishedMessage) attacker.dequeue()).getTopic().toString());
+        assertTrue(attacker.isEmpty(), "attacker queue must hold only its own message");
+    }
+
+    @Test
+    public void givenALegacyMetadataMapWhenTheQueueIsOpenedThenHeadAndTailAreMigratedAndTheLegacyMapRemoved() {
+        // Reproduce a pre-rename store: messages under "queue_test" and head/tail under "queue_test_meta".
+        final MVMap.Builder<Long, SessionRegistry.EnqueuedMessage> messageTypeBuilder =
+            new MVMap.Builder<Long, SessionRegistry.EnqueuedMessage>().valueType(new EnqueuedMessageValueType());
+        MVMap<Long, SessionRegistry.EnqueuedMessage> legacyMessages = this.mvStore.openMap("queue_test", messageTypeBuilder);
+        legacyMessages.put(0L, createMessage("Hello"));
+        legacyMessages.put(1L, createMessage("crazy"));
+        legacyMessages.put(2L, createMessage("world"));
+        MVMap<String, Long> legacyMetadata = this.mvStore.openMap("queue_test_meta");
+        legacyMetadata.put("head", 3L);
+        legacyMetadata.put("tail", 1L);
+
+        H2PersistentQueue sut = new H2PersistentQueue(this.mvStore, "test");
+
+        // tail was migrated as 1, so the already-dequeued "Hello" is not replayed.
+        assertEquals("crazy", ((SessionRegistry.PublishedMessage) sut.dequeue()).getTopic().toString());
+        assertEquals("world", ((SessionRegistry.PublishedMessage) sut.dequeue()).getTopic().toString());
+        assertTrue(sut.isEmpty(), "should be empty after draining the migrated queue");
+        assertFalse(this.mvStore.hasMap("queue_test_meta"), "the legacy metadata map must be removed");
     }
 }
