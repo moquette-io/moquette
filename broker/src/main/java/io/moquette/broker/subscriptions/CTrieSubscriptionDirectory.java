@@ -49,12 +49,20 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
 
         for (Subscription subscription : this.subscriptionsRepository.listAllSubscriptions()) {
             LOG.debug("Re-subscribing {}", subscription);
-            ctrie.addToTree(subscription);
+            try {
+                ctrie.addToTree(subscription);
+            } catch (IllegalStateException e) {
+                LOG.warn("Failed to add subscription", e);
+            }
         }
 
         for (Subscription shared : subscriptionsRepository.listAllSharedSubscription()) {
             LOG.debug("Re-subscribing shared {}", shared);
-            ctrie.addToTree(shared);
+            try {
+                ctrie.addToTree(shared);
+            } catch (IllegalStateException e) {
+                LOG.warn("Failed to add subscription", e);
+            }
         }
 
         if (LOG.isTraceEnabled()) {
@@ -103,7 +111,13 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
     @Override
     public boolean add(Subscription sub) {
         requireNonShared(sub, "Adding a shared subscription using the non-shared method.");
-        boolean notExistingSubscription = ctrie.addToTree(sub);
+        boolean notExistingSubscription;
+        try {
+            notExistingSubscription = ctrie.addToTree(sub);
+        } catch (IllegalStateException e) {
+            LOG.warn("Failed to add subscription", e);
+            return false;
+        }
         subscriptionsRepository.addNewSubscription(sub);
         return notExistingSubscription;
     }

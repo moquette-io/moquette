@@ -663,6 +663,13 @@ final class MQTTConnection {
             dropConnection();
             return PostOffice.RouteResult.success(clientID, CompletableFuture.completedFuture(null));
         }
+        
+        if (checkIfAnyFilterInSubscriptionIsOversized(msg)) {
+            LOG.warn("SUBSCRIBE received topic deeper than {}", BrokerConstants.MAX_TOPIC_DEPTH);
+            dropConnection();
+            return PostOffice.RouteResult.success(clientID, CompletableFuture.completedFuture(null));
+        }
+        
         final String username = NettyUtils.userName(channel);
         return postOffice.routeCommand(clientID, "SUB", () -> {
             checkMatchSessionLoop(clientID);
@@ -670,6 +677,22 @@ final class MQTTConnection {
                 postOffice.subscribeClientToTopics(msg, clientID, username, this);
             return null;
         });
+    }
+
+    private boolean checkIfAnyFilterInSubscriptionIsOversized(MqttSubscribeMessage msg) {
+        return msg.payload().topicSubscriptions().stream()
+            .map(MqttTopicSubscription::topicFilter)
+            .mapToInt(MQTTConnection::estimateTopicsDepth)
+            .anyMatch(len -> len > BrokerConstants.MAX_TOPIC_DEPTH);
+    }
+
+    private boolean checkIfAnyFilterInSubscriptionIsOversized(MqttPublishMessage msg) {
+        String topicName = msg.variableHeader().topicName();
+        return estimateTopicsDepth(topicName) > BrokerConstants.MAX_TOPIC_DEPTH;
+    }
+
+    private static int estimateTopicsDepth(String topicName) {
+        return topicName.split("/").length + 1;
     }
 
     void sendSubAckMessage(int messageID, MqttSubAckMessage ackMessage) {
@@ -752,6 +775,13 @@ final class MQTTConnection {
         // in execution by SessionEventLoop
         Utils.retain(msg, PostOffice.BT_PUB_IN);
         final MqttPublishMessage finalMsg = msg;
+
+        if (checkIfAnyFilterInSubscriptionIsOversized(msg)) {
+            LOG.warn("PUBLISH received topic deeper than {}", BrokerConstants.MAX_TOPIC_DEPTH);
+            dropConnection();
+            return PostOffice.RouteResult.success(clientId, CompletableFuture.completedFuture(null));
+        }
+        
         switch (qos) {
             case AT_MOST_ONCE:
                 return postOffice.routeCommand(clientId, "PUB QoS0", () -> {
