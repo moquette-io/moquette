@@ -1,4 +1,5 @@
 Version 0.18.1-SNAPSHOT:
+   [fix] Add a guard for topic depth against static max value. It checks on PUB and SUB message receive and also at SubscriptionDirectory level.
    [fix] Guarded pattern ACL substitution against a null username to prevent a remote DoS. (#963)
    [fix] Namespaced the H2 queue metadata map to prevent a client-id collision that could corrupt a durable queue. (#964)
    [fix] Check Last Will topic for writability rights before publish.
