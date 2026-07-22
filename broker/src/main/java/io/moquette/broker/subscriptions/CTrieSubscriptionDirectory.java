@@ -54,13 +54,21 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
 
         for (Subscription subscription : this.subscriptionsRepository.listAllSubscriptions()) {
             LOG.debug("Re-subscribing {}", subscription);
-            ctrie.addToTree(SubscriptionRequest.buildNonShared(subscription));
+            try {
+                ctrie.addToTree(SubscriptionRequest.buildNonShared(subscription));
+            } catch (IllegalStateException e) {
+                LOG.warn("Failed to add subscription", e);
+            }
         }
 
         for (SharedSubscription shared : subscriptionsRepository.listAllSharedSubscription()) {
             LOG.debug("Re-subscribing shared {}", shared);
-            ctrie.addToTree(SubscriptionRequest.buildShared(shared.getShareName(), shared.topicFilter(),
-                shared.clientId(), MqttSubscriptionOption.onlyFromQos(shared.requestedQoS())));
+            try {
+                ctrie.addToTree(SubscriptionRequest.buildShared(shared.getShareName(), shared.topicFilter(),
+                    shared.clientId(), MqttSubscriptionOption.onlyFromQos(shared.requestedQoS())));
+            } catch (IllegalStateException e) {
+                LOG.warn("Failed to add subscription", e);
+            }
         }
 
         if (LOG.isTraceEnabled()) {
@@ -109,13 +117,23 @@ public class CTrieSubscriptionDirectory implements ISubscriptionsDirectory {
     @Override
     public boolean add(String clientId, Topic filter, MqttSubscriptionOption option) {
         SubscriptionRequest subRequest = SubscriptionRequest.buildNonShared(clientId, filter, option);
-        return addNonSharedSubscriptionRequest(subRequest);
+        try {
+            return addNonSharedSubscriptionRequest(subRequest);
+        } catch (IllegalStateException e) {
+            LOG.warn("Failed to add subscription", e);
+            return false;
+        }
     }
 
     @Override
     public boolean add(String clientId, Topic filter, MqttSubscriptionOption option, SubscriptionIdentifier subscriptionId) {
         SubscriptionRequest subRequest = SubscriptionRequest.buildNonShared(clientId, filter, option, subscriptionId);
-        return addNonSharedSubscriptionRequest(subRequest);
+        try {
+            return addNonSharedSubscriptionRequest(subRequest);
+        } catch (IllegalStateException e) {
+            LOG.warn("Failed to add subscription", e);
+            return false;
+        }
     }
 
     private boolean addNonSharedSubscriptionRequest(SubscriptionRequest subRequest) {

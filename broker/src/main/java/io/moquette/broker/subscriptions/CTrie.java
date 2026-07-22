@@ -1,6 +1,7 @@
 package io.moquette.broker.subscriptions;
 
 import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
+import io.moquette.BrokerConstants;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -275,6 +276,11 @@ public class CTrie {
      * @return true if the subscription didn't exist.
      * */
     public boolean addToTree(SubscriptionRequest request) {
+        Topic topicToAdd = request.getTopicFilter();
+        if (topicToAdd.getTokens().size() > BrokerConstants.MAX_TOPIC_DEPTH) {
+            throw new IllegalStateException(String.format("Trying to add a subscription with %d tokens while the maximum depth is %d",
+                topicToAdd.getTokens().size(), BrokerConstants.MAX_TOPIC_DEPTH));
+        }
         Action res;
         do {
             res = insert(request.getTopicFilter(), this.root, request);

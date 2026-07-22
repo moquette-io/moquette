@@ -165,7 +165,6 @@ public class Topic implements Serializable, Comparable<Topic> {
      *            the topic filter of the subscription
      * @return true if the two topics match.
      */
-    // TODO reimplement with iterators or with queues
     public boolean match(Topic subscriptionTopic) {
         List<Token> msgTokens = getTokens();
         List<Token> subscriptionTokens = subscriptionTopic.getTokens();
