@@ -34,6 +34,7 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.MessageToMessageDecoder;
 import io.netty.handler.codec.MessageToMessageEncoder;
+
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
@@ -139,6 +140,8 @@ class NewNettyAcceptor {
     private boolean nettySoKeepalive;
     private int nettyChannelTimeoutSeconds;
     private int maxBytesInMessage;
+    private boolean proxyProtocolEnabled;
+    private boolean proxyProtocolExpected;
 
     private Class<? extends ServerSocketChannel> channelClass;
 
@@ -152,6 +155,8 @@ class NewNettyAcceptor {
         nettyChannelTimeoutSeconds = props.intProp(BrokerConstants.NETTY_CHANNEL_TIMEOUT_SECONDS_PROPERTY_NAME, 10);
         maxBytesInMessage = props.intProp(BrokerConstants.NETTY_MAX_BYTES_PROPERTY_NAME,
                 BrokerConstants.DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE);
+        proxyProtocolEnabled = props.boolProp(IConfig.PROXY_PROTOCOL_ENABLED_PROPERTY_NAME, false);
+        proxyProtocolExpected = props.boolProp(IConfig.PROXY_PROTOCOL_EXPECTED_PROPERTY_NAME, false);
 
         boolean nativeTransport = props.boolProp(BrokerConstants.NETTY_NATIVE_PROPERTY_NAME, false);
         if (nativeTransport && classAvaliable(EPOLL_TRANSPORT) && Epoll.isAvailable()) {
@@ -265,14 +270,24 @@ class NewNettyAcceptor {
 
     private void configureMQTTPipeline(ChannelPipeline pipeline, MoquetteIdleTimeoutHandler timeoutHandler,
                                        NewNettyMQTTHandler handler, int writeFlushMillis) {
-        pipeline.addFirst("idleStateHandler", new IdleStateHandler(nettyChannelTimeoutSeconds, 0, 0));
+        if (proxyProtocolEnabled) {
+            // ProxyProtocolDetector peeks at first byte to detect PROXY protocol.
+            // If detected, it dynamically adds HAProxyMessageDecoder; if not, data passes through.
+            pipeline.addFirst("proxyProtocolDetector", new ProxyProtocolDetector(proxyProtocolExpected));
+            pipeline.addAfter("proxyProtocolDetector", "idleStateHandler",
+                new IdleStateHandler(nettyChannelTimeoutSeconds, 0, 0));
+        } else {
+            pipeline.addFirst("idleStateHandler", new IdleStateHandler(nettyChannelTimeoutSeconds, 0, 0));
+        }
         pipeline.addAfter("idleStateHandler", "idleEventHandler", timeoutHandler);
         // pipeline.addLast("logger", new LoggingHandler("Netty", LogLevel.ERROR));
-        pipeline.addFirst("bytemetrics", new BytesMetricsHandler(bytesMetricsCollector));
+        if (pipeline.get("bytemetrics") == null) {
+            pipeline.addFirst("bytemetrics", new BytesMetricsHandler(bytesMetricsCollector));
+        }
         if (writeFlushMillis > IMMEDIATE_BUFFER_FLUSH) {
             pipeline.addLast("autoflush", new AutoFlushHandler(writeFlushMillis, TimeUnit.MILLISECONDS));
         }
-        pipeline.addLast("decoder", new MqttDecoder(maxBytesInMessage));
+        pipeline.addLast("decoder", new MqttDecoder(maxBytesInMessage,128));
         pipeline.addLast("encoder", MqttEncoder.INSTANCE);
         pipeline.addLast("metrics", new MessageMetricsHandler(metricsCollector));
         pipeline.addLast("messageLogger", new MQTTMessageLogger());

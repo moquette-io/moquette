@@ -128,6 +128,11 @@ public final class BrokerConstants {
     
     public static final int MAX_TOPIC_DEPTH = 1024;
 
+    @Deprecated
+    public static final String PROXY_PROTOCOL_ENABLED_PROPERTY_NAME = IConfig.PROXY_PROTOCOL_ENABLED_PROPERTY_NAME;
+    @Deprecated
+    public static final String PROXY_PROTOCOL_EXPECTED_PROPERTY_NAME = IConfig.PROXY_PROTOCOL_EXPECTED_PROPERTY_NAME;
+
     private BrokerConstants() {
     }
 }

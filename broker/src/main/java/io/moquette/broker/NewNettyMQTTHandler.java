@@ -18,6 +18,7 @@ package io.moquette.broker;
 
 import io.netty.channel.*;
 import io.netty.channel.ChannelHandler.Sharable;
+import io.netty.handler.codec.haproxy.HAProxyMessage;
 import io.netty.handler.codec.mqtt.MqttMessage;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
@@ -25,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 
@@ -35,6 +37,9 @@ public class NewNettyMQTTHandler extends ChannelInboundHandlerAdapter {
 
     private static final String ATTR_CONNECTION = "connection";
     private static final AttributeKey<Object> ATTR_KEY_CONNECTION = AttributeKey.valueOf(ATTR_CONNECTION);
+
+    private static final String ATTR_REAL_SOURCE_ADDRESS = "realSourceAddress";
+    private static final AttributeKey<InetSocketAddress> ATTR_KEY_REAL_SOURCE_ADDRESS = AttributeKey.valueOf(ATTR_REAL_SOURCE_ADDRESS);
 
     private MQTTConnectionFactory connectionFactory;
 
@@ -48,6 +53,14 @@ public class NewNettyMQTTHandler extends ChannelInboundHandlerAdapter {
 
     private static MQTTConnection mqttConnection(Channel channel) {
         return (MQTTConnection) channel.attr(ATTR_KEY_CONNECTION).get();
+    }
+
+    /**
+     * Returns the real source address from PROXY protocol header, or null if not present.
+     * This is used by MQTTConnection to get the actual client address when behind a proxy.
+     */
+    public static InetSocketAddress getRealSourceAddress(Channel channel) {
+        return channel.attr(ATTR_KEY_REAL_SOURCE_ADDRESS).get();
     }
 
     @Override
@@ -107,7 +120,19 @@ public class NewNettyMQTTHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
-        if (evt instanceof InflightResender.ResendNotAckedPublishes) {
+        if (evt instanceof HAProxyMessage) {
+            HAProxyMessage hapm = (HAProxyMessage) evt;
+            if (hapm.sourceAddress() != null) {
+                // Store the real source address from PROXY protocol as a channel attribute
+                InetSocketAddress realSource = new InetSocketAddress(
+                    hapm.sourceAddress(),
+                    hapm.sourcePort()
+                );
+                ctx.channel().attr(ATTR_KEY_REAL_SOURCE_ADDRESS).set(realSource);
+                LOG.debug("Received PROXY protocol header, real source: {}", realSource);
+            }
+            hapm.release();
+        } else if (evt instanceof InflightResender.ResendNotAckedPublishes) {
             final MQTTConnection mqttConnection = mqttConnection(ctx.channel());
             mqttConnection.resendNotAckedPublishes();
         }
