@@ -9,12 +9,21 @@ import com.hivemq.client.mqtt.mqtt3.message.connect.connack.Mqtt3ConnAckReturnCo
 import com.hivemq.client.mqtt.mqtt3.message.publish.Mqtt3Publish;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
+import io.moquette.BrokerConstants;
 import io.moquette.integration.mqtt5.AbstractServerIntegrationTest;
+import io.moquette.testclient.Client;
+import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.mqtt.MqttConnAckMessage;
+import io.netty.handler.codec.mqtt.MqttMessageBuilders;
+import io.netty.handler.codec.mqtt.MqttPublishMessage;
+import io.netty.handler.codec.mqtt.MqttQoS;
+import org.awaitility.Awaitility;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
@@ -47,6 +56,34 @@ public class PublishTest extends AbstractServerIntegrationTest {
 
         // then no message is published
         verifyNoMessageIsReceived(subscriber, Duration.ofSeconds(2));
+    }
+
+    @Test
+    public void givenAConnectedClientWhenItPublishesWithTooDeepTopicConnectionIsDropped() throws InterruptedException {
+        // given a connected low-level client
+        Client client = new Client("localhost").clientId("deep-pub-client");
+        MqttConnAckMessage connAck = client.connectV5();
+        io.moquette.integration.mqtt5.TestUtils.assertConnectionAccepted(connAck, "Connection must be accepted");
+
+        // build a topic with MAX_TOPIC_DEPTH + 1 levels (1025 segments), Java 8 compatible
+        String deepTopic = String.join("/", Collections.nCopies(BrokerConstants.MAX_TOPIC_DEPTH + 1, "a"));
+
+        MqttPublishMessage publish = MqttMessageBuilders.publish()
+            .topicName(deepTopic)
+            .retained(false)
+            .qos(MqttQoS.AT_MOST_ONCE)
+            .payload(Unpooled.EMPTY_BUFFER)
+            .build();
+
+        // when publishing with an over-depth topic
+        client.publish(publish);
+
+        // then the broker drops the connection
+        Awaitility.await()
+            .atMost(Duration.ofSeconds(2))
+            .until(client::isConnectionLost);
+
+        client.shutdownConnection();
     }
 
     @NotNull

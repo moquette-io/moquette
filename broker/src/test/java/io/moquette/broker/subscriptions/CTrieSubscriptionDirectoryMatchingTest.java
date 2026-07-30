@@ -22,6 +22,7 @@ import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -304,5 +305,36 @@ public class CTrieSubscriptionDirectoryMatchingTest extends CTrieSubscriptionDir
             () -> assertEquals(1, reloadedSubscriptions.size()),
             () -> assertFalse(reloadedSubscriptions.iterator().next().hasSubscriptionIdentifier())
         );
+    }
+    
+    @Test
+    public void testRecursionOnInsertion() {
+        // 2*depth - 1 <= 8092 (default max MQTT message size) => depth <= 4046
+        int depth = 40000;
+        String deepTopic = String.join("/", Collections.nCopies(depth, "a"));
+
+        Subscription sub = new Subscription(
+            "attacker-client",
+            Topic.asTopic(deepTopic),
+            MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE));
+
+        assertFalse(sut.add(sub), "Add should log a warn and terminate with false"); // exercises CTrie.insert()/createPathRec()
+    }
+
+    @Test
+    public void testRecursionOnMatching() {
+        // 2*depth - 1 <= 8092 (default max MQTT message size) => depth <= 4046
+        int depth = 8000;
+        String deepTopic = String.join("/", Collections.nCopies(depth, "a"));
+
+        Subscription sub = new Subscription(
+            "attacker-client",
+            Topic.asTopic(deepTopic),
+            MqttSubscriptionOption.onlyFromQos(MqttQoS.AT_MOST_ONCE));
+
+        assertFalse(sut.add(sub), "Add should log a warn and terminate with false"); // exercises CTrie.insert()/createPathRec()
+
+        sut.matchWithoutQosSharpening(Topic.asTopic(deepTopic)); // exercises CTrie.recursiveMatch()
+        // -> throws StackOverflowError
     }
 }

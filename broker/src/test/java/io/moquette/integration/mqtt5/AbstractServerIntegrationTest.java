@@ -47,7 +47,7 @@ public abstract class AbstractServerIntegrationTest extends AbstractServerIntegr
         super.tearDown();
     }
 
-    void connectLowLevel() throws InterruptedException {
+    protected void connectLowLevel() throws InterruptedException {
         MqttConnAckMessage connAck = lowLevelClient.connectV5();
         assertConnectionAccepted(connAck, "Connection must be accepted");
     }

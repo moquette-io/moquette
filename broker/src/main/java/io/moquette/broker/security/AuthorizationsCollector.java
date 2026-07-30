@@ -134,8 +134,13 @@ class AuthorizationsCollector implements IAuthorizatorPolicy {
                     "wildcards ('+' or '#') and can't be safely substituted into a pattern filter " +
                     "(client: {}, username: {})", client, username);
             } else {
+                // A missing identity (an anonymous client has a null username) must not reach
+                // String.replace(), which NPEs on a null replacement; treat it as empty so the
+                // substituted filter simply does not match.
+                final String clientValue = client == null ? "" : client;
+                final String usernameValue = username == null ? "" : username;
                 for (Authorization auth : m_patternAuthorizations) {
-                    Topic substitutedTopic = new Topic(auth.topic.toString().replace("%c", client).replace("%u", username));
+                    Topic substitutedTopic = new Topic(auth.topic.toString().replace("%c", clientValue).replace("%u", usernameValue));
                     if (auth.grant(permission)) {
                         if (topic.match(substitutedTopic)) {
                             return true;

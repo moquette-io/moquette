@@ -1,5 +1,7 @@
 package io.moquette.broker.subscriptions;
 
+import io.moquette.BrokerConstants;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -123,9 +125,14 @@ public class CTrie {
      * @return true if the subscription didn't exist.
      * */
     public boolean addToTree(Subscription sub) {
+        Topic topicToAdd = sub.getTopicFilterRewritten();
+        if (topicToAdd.getTokens().size() > BrokerConstants.MAX_TOPIC_DEPTH) {
+            throw new IllegalStateException(String.format("Trying to add a subscription with %d tokens while the maximum depth is %d", 
+                topicToAdd.getTokens().size(), BrokerConstants.MAX_TOPIC_DEPTH));
+        }
         Action res;
         do {
-            res = insert(sub.getTopicFilterRewritten(), this.root, sub);
+            res = insert(topicToAdd, this.root, sub);
         } while (res == Action.REPEAT);
         return res == Action.OK_NEW;
     }

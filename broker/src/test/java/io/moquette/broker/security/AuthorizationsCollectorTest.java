@@ -188,4 +188,18 @@ public class AuthorizationsCollectorTest {
         assertDoesNotThrow(() -> authorizator.canRead(new Topic("/weather/italy/victim/inner"), "", "#"));
         assertFalse(authorizator.canRead(new Topic("/weather/italy/victim/inner"), "", "#"));
     }
+
+    @Test
+    public void givenPatternACLWhenUsernameIsNullThenSubstitutesSafelyWithoutThrowing() throws ParseException {
+        // An anonymous client presents a null username; substituting it into a pattern rule
+        // previously reached String.replace() with a null, which NPEd and killed the session loop.
+        authorizator.parse("pattern read /weather/italy/%c");
+        authorizator.parse("pattern read /weather/%u/data");
+
+        // A %c rule still grants for a null-username client (matched on the client id).
+        assertTrue(authorizator.canRead(new Topic("/weather/italy/anemometer1"), null, "anemometer1"));
+        // A %u rule cannot match a null username, but must fail closed instead of throwing.
+        assertDoesNotThrow(() -> authorizator.canRead(new Topic("/weather/rome/data"), null, "anemometer1"));
+        assertFalse(authorizator.canRead(new Topic("/weather/rome/data"), null, "anemometer1"));
+    }
 }
