@@ -400,7 +400,7 @@ final class MQTTConnection {
                             setupInflightResender(channel);
                         }
 
-                        postOffice.dispatchConnection(msg, channel);
+                        postOffice.dispatchConnection(msg, remoteAddress());
                         LOG.trace("dispatch connection: {}", msg);
                     }
                 } else {
