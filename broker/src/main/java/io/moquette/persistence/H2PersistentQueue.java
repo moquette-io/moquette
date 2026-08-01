@@ -15,9 +15,11 @@
  */
 package io.moquette.persistence;
 
+import io.moquette.BrokerConstants;
 import io.moquette.broker.AbstractSessionMessageQueue;
 import io.moquette.broker.SessionMessageQueue;
 import io.moquette.broker.SessionRegistry;
+import io.moquette.broker.Utils;
 import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVStore;
 
@@ -77,6 +79,11 @@ class H2PersistentQueue extends AbstractSessionMessageQueue<SessionRegistry.Enqu
     @Override
     public void enqueue(SessionRegistry.EnqueuedMessage t) {
         checkEnqueuePreconditions(t);
+        if (head.get() - tail.get() > BrokerConstants.MAX_ELEMENT_IN_QUEUE) {
+            // Like Java BlockingQueue, throw IllegalStateException if capacity has been reached
+            Utils.release(t, "H2 enqueuing drop the message");
+            throw new IllegalStateException("Queue capacity of " + BrokerConstants.MAX_ELEMENT_IN_QUEUE + " has been reached");
+        } 
         final long nextHead = head.getAndIncrement();
         this.queueMap.put(nextHead, t);
         this.metadataMap.put("head", nextHead + 1);

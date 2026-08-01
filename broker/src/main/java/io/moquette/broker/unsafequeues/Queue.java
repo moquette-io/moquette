@@ -15,8 +15,10 @@ import java.util.Optional;
 public class Queue {
     private static final Logger LOG = LoggerFactory.getLogger(Queue.class);
 
+    private static final int NO_LENGTH = -1;
     public static final int LENGTH_HEADER_SIZE = 4;
     private final String name;
+    private int queueLength;
     /* Last wrote byte, point to head byte */
     private VirtualPointer currentHeadPtr;
     private Segment headSegment;
@@ -30,10 +32,11 @@ public class Queue {
     private final PagedFilesAllocator.AllocationListener allocationListener;
 //    private final ReentrantLock lock = new ReentrantLock();
 
-    Queue(String name, Segment headSegment, VirtualPointer currentHeadPtr,
+    Queue(String name, int queueLength, Segment headSegment, VirtualPointer currentHeadPtr,
           Segment tailSegment, VirtualPointer currentTailPtr,
           SegmentAllocator allocator, PagedFilesAllocator.AllocationListener allocationListener, QueuePool queuePool) {
         this.name = name;
+        this.queueLength = queueLength;
         this.headSegment = headSegment;
         this.currentHeadPtr = currentHeadPtr;
         this.currentTailPtr = currentTailPtr;
@@ -43,10 +46,89 @@ public class Queue {
         this.queuePool = queuePool;
     }
 
+    Queue(String name, Segment headSegment, VirtualPointer currentHeadPtr,
+          Segment tailSegment, VirtualPointer currentTailPtr,
+          SegmentAllocator allocator, PagedFilesAllocator.AllocationListener allocationListener, QueuePool queuePool) throws QueueException {
+        this(name, NO_LENGTH, headSegment, currentHeadPtr, tailSegment, currentTailPtr, allocator, allocationListener, queuePool);
+        this.queueLength = countStoredElements();
+    }
+    
+    public int length() {
+        return queueLength;
+    }
+
+    /**
+     * Scans all stored segments from tail to head, counting the messages present.
+     * Used during construction when no persisted length is available.
+     * 
+     * @throws QueueException when error happens in re-scanning the segments
+     * @return the number of payloads between current tail and head (write point).
+     */
+    private int countStoredElements() throws QueueException {
+        // Brand-new queue: both pointers untouched, nothing written yet.
+        if (isTailFirstUsage(currentTailPtr) && currentHeadPtr.compareTo(currentTailPtr) == 0) {
+            return 0;
+        }
+
+        // First readable position: position 0 for an untouched tail, else the tail pointer itself.
+        final VirtualPointer scanStart = isTailFirstUsage(currentTailPtr)
+            ? new VirtualPointer(0)
+            : currentTailPtr.copy();
+
+        // Head did not advance past scan start → queue is empty.
+        if (!currentHeadPtr.isGreaterThan(scanStart)) {
+            return 0;
+        }
+
+        final List<QueuePool.SegmentRef> segmentRefs = queuePool.segmentsInReadOrder(name);
+        final int segmentSize = allocator.getSegmentSize();
+        int count = 0;
+        int currentSegIdx = -1;
+        Segment segment = null;
+        VirtualPointer scan = scanStart;
+
+        while (!scan.isGreaterThan(currentHeadPtr)) {
+            final int segIdx = (int) (scan.logicalOffset() / segmentSize);
+            if (segIdx != currentSegIdx) {
+                final QueuePool.SegmentRef ref = segmentRefs.get(segIdx);
+                segment = allocator.reopenSegment(ref.pageId, ref.offset);
+                currentSegIdx = segIdx;
+            }
+
+            if (containsHeader(segment, scan)) {
+                final int payloadLength = segment.readHeader(scan);
+                scan = scan.moveForward(LENGTH_HEADER_SIZE + payloadLength);
+            } else {
+                // Length header straddles the segment boundary: read partial from current,
+                // remaining bytes from the next segment.
+                final ByteBuffer headerBuf = ByteBuffer.allocate(LENGTH_HEADER_SIZE);
+                final ByteBuffer partialHeader = segment.readAllBytesAfter(scan);
+                final int consumedHeaderSize = partialHeader.remaining();
+                headerBuf.put(partialHeader);
+
+                final int nextSegIdx = segIdx + 1;
+                final QueuePool.SegmentRef nextRef = segmentRefs.get(nextSegIdx);
+                final Segment nextSegment = allocator.reopenSegment(nextRef.pageId, nextRef.offset);
+                final VirtualPointer nextSegStart = new VirtualPointer((long) nextSegIdx * segmentSize);
+                headerBuf.put(nextSegment.read(nextSegStart, LENGTH_HEADER_SIZE - consumedHeaderSize));
+
+                final int payloadLength = ((ByteBuffer) headerBuf.flip()).getInt();
+                scan = scan.moveForward(LENGTH_HEADER_SIZE + payloadLength);
+
+                segment = nextSegment;
+                currentSegIdx = nextSegIdx;
+            }
+            count++;
+        }
+
+        return count;
+    }
+
     /**
      * @throws QueueException if an error happens during access to file.
      * */
     public void enqueue(ByteBuffer payload) throws QueueException {
+        this.queueLength++;
         final int messageSize = LENGTH_HEADER_SIZE + payload.remaining();
         if (headSegment.hasSpace(currentHeadPtr, messageSize)) {
             LOG.debug("Head segment has sufficient space for message length {}", LENGTH_HEADER_SIZE + payload.remaining());
@@ -169,6 +251,7 @@ public class Queue {
      * Read next message or return null if the queue has no data.
      * */
     public Optional<ByteBuffer> dequeue() throws QueueException {
+        assert queueLength >= 0;
         if (!currentHeadPtr.isGreaterThan(currentTailPtr)) {
             if (currentTailPtr.isGreaterThan(currentHeadPtr)) {
                 // sanity check
@@ -182,6 +265,8 @@ public class Queue {
         }
 
         LOG.debug("currentTail is {}", currentTailPtr);
+        assert queueLength > 0;
+        this.queueLength--;
         if (containsHeader(tailSegment, currentTailPtr)) {
             // currentSegment contains at least the header (payload length)
             final VirtualPointer existingTail;
