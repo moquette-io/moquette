@@ -13,6 +13,8 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -189,6 +191,7 @@ public class QueuePool {
     private void loadQueueDefinitions(Properties checkpointProps) throws QueueException {
         // structure of queues definitions in properties file:
         // queues.0.name = bla bla
+        // queues.0.length = number of elements in the queue (not present in previous versions)
         // queues.0.segments = head (id_page, offset), (id_page, offset), ... tail
         // queues.0.head_offset = bytes offset from the start of the page where last data was written
         // queues.0.tail_offset = bytes offset from the start of the page where first data could be read
@@ -204,6 +207,14 @@ public class QueuePool {
             LinkedList<SegmentRef> segmentRefs = decodeSegments(checkpointProps.getProperty(String.format("queues.%d.segments", queueId)));
             final int numSegments = segmentRefs.size();
             queueSegments.put(queueName, segmentRefs);
+            
+            final String queueLengthKey = String.format("queues.%d.length", queueId);
+            final Integer queueLength;
+            if (checkpointProps.containsKey(queueLengthKey)) {
+                queueLength = Integer.parseInt(checkpointProps.getProperty(queueLengthKey));
+            } else {
+                queueLength = null;
+            }
 
             final long headOffset = Long.parseLong(checkpointProps.getProperty(String.format("queues.%d.head_offset", queueId)));
             final SegmentRef headSegmentRef = segmentRefs.get(0);
@@ -221,8 +232,14 @@ public class QueuePool {
             // Head is n-1 full segments plus the offset of the physical head
             final VirtualPointer logicalTail = new VirtualPointer(currentTail.offset());
             final VirtualPointer logicalHead = new VirtualPointer((long) (numSegments - 1) * segmentSize + currentHead.offset());
-            final Queue queue = new Queue(queueName.name, headSegment, logicalHead, tailSegment, logicalTail,
-                allocator, callback, this);
+            final Queue queue;
+            if (queueLength != null) {
+                queue = new Queue(queueName.name, queueLength, headSegment, logicalHead, tailSegment, logicalTail,
+                    allocator, callback, this);
+            } else {
+                queue = new Queue(queueName.name, headSegment, logicalHead, tailSegment, logicalTail,
+                    allocator, callback, this);
+            }
             queues.put(queueName, queue);
 
             queueId++;
@@ -427,6 +444,7 @@ public class QueuePool {
 
             // queues.0.head_offset = bytes offset from the start of the page where last data was written
             final Queue queue = queues.get(queueName);
+            checkpoint.setProperty("queues." + queueCounter + ".length", String.valueOf(queue.length()));
             checkpoint.setProperty("queues." + queueCounter + ".head_offset", String.valueOf(queue.currentHead().segmentOffset(segmentSize)));
             checkpoint.setProperty("queues." + queueCounter + ".tail_offset", String.valueOf(queue.currentTail().segmentOffset(segmentSize)));
         }
@@ -443,6 +461,21 @@ public class QueuePool {
         } catch (IOException ex) {
             throw new QueueException("Problem writing checkpoint.properties file", ex);
         }
+    }
+
+    /**
+     * Returns the segment refs for the given queue in reading order (tail first, head last).
+     * The returned list is a snapshot; modifications do not affect the internal state.
+     */
+    List<SegmentRef> segmentsInReadOrder(String name) {
+        final QueueName queueName = new QueueName(name);
+        final LinkedList<SegmentRef> refs = queueSegments.get(queueName);
+        if (refs == null) {
+            return Collections.emptyList();
+        }
+        final List<SegmentRef> result = new ArrayList<>(refs);
+        Collections.reverse(result);
+        return result;
     }
 
     Optional<Segment> openNextTailSegment(String name) throws QueueException {
