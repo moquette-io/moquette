@@ -569,4 +569,52 @@ class QueueTest {
         checkpointProps.load(fileReader);
         return checkpointProps;
     }
+
+    @Test
+    public void givenQueuePartiallyConsumedWhenReopenTheQueueThenCountOfRemainingIsCorrect() throws QueueException {
+        // Enqueue several messages, consume some, then reopen.
+        // On reopen the no-length constructor calls countStoredElements() to set queueLength.
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder, PAGE_SIZE, SEGMENT_SIZE);
+        final Queue queue = queuePool.getOrCreate("test");
+
+        final int numEnqueued = 5;
+        final int numDequeued = 2;
+        for (int i = 0; i < numEnqueued; i++) {
+            queue.enqueue(ByteBuffer.wrap(generatePayload(64, (byte) 'A')));
+        }
+        for (int i = 0; i < numDequeued; i++) {
+            queue.dequeue();
+        }
+        queue.force();
+        queuePool.close();
+
+        final QueuePool reopenedPool = QueuePool.loadQueues(tempQueueFolder, PAGE_SIZE, SEGMENT_SIZE);
+        final Queue reopenedQueue = reopenedPool.getOrCreate("test");
+
+        assertEquals(numEnqueued - numDequeued, reopenedQueue.length(),
+            "countStoredElements should count only messages not yet consumed");
+    }
+
+    @Test
+    public void givenQueueThatSpansMultipleSegmentsWhenCountIsInvokedThenCountOfRemainingIsCorrect() throws QueueException {
+        final int smallSegmentSize = 4 * 1024;
+        final int smallPageSize = 4 * smallSegmentSize;
+        final QueuePool queuePool = QueuePool.loadQueues(tempQueueFolder, smallPageSize, smallSegmentSize);
+        final Queue queue = queuePool.getOrCreate("test");
+
+        // Two messages per segment, spanning three segments.
+        final int payloadSize = smallSegmentSize / 2 - LENGTH_HEADER_SIZE;
+        final int numMessages = 6;
+        for (int i = 0; i < numMessages; i++) {
+            queue.enqueue(ByteBuffer.wrap(generatePayload(payloadSize, (byte) 'A')));
+        }
+        queue.force();
+        queuePool.close();
+
+        final QueuePool reopenedPool = QueuePool.loadQueues(tempQueueFolder, smallPageSize, smallSegmentSize);
+        final Queue reopenedQueue = reopenedPool.getOrCreate("test");
+
+        assertEquals(numMessages, reopenedQueue.length(),
+            "countStoredElements should count messages stored across multiple segments");
+    }
 }

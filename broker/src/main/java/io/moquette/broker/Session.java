@@ -328,8 +328,12 @@ class Session {
 
             drainQueueToConnection();
         } else {
-            sessionQueue.enqueue(publishRequest);
-            LOG.debug("Enqueue to peer session {} at QoS {}", getClientID(), publishRequest.getPublishingQos());
+            try {
+                sessionQueue.enqueue(publishRequest);
+                LOG.debug("Enqueue to peer session {} at QoS {}", getClientID(), publishRequest.getPublishingQos());
+            } catch (IllegalStateException e) {
+                LOG.info("Message was dropped: " + e.getMessage());
+            }
         }
     }
 

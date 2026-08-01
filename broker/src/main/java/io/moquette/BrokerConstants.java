@@ -127,6 +127,8 @@ public final class BrokerConstants {
     public static final int DISABLED_TOPIC_ALIAS = 0;
     
     public static final int MAX_TOPIC_DEPTH = 1024;
+    public static final int MAX_ELEMENT_IN_QUEUE = 32;
+
 
     private BrokerConstants() {
     }
