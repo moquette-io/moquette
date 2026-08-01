@@ -1,6 +1,6 @@
 [Java CI with Maven](https://github.com/moquette-io/moquette/workflows/Java%20CI%20with%20Maven/badge.svg?branch=main)
 
-[![](https://jitpack.io/v/moquette-io/moquette.svg)](https://jitpack.io/#moquette-io/moquette)
+[](https://jitpack.io/v/moquette-io/moquette.svg)](https://jitpack.io/#moquette-io/moquette)
 
 ## Moquette MQTT broker
 [Documentation reference guide](http://moquette-io.github.io/moquette/) Guide on how to use and configure Moquette
