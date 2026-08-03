@@ -96,7 +96,7 @@ public final class ACLFileParser {
         Pattern commentLine = Pattern.compile("^#.*"); // As spec, comment lines should start with '#'
         Pattern invalidCommentLine = Pattern.compile("^\\s*#.*");
         // This pattern has a dependency on filtering `commentLine`.
-        Pattern endLineComment = Pattern.compile("^([\\w\\s\\/\\+]+#?)(\\s*#.*)$");
+        Pattern endLineComment = Pattern.compile("^(\\S+\\s+(\\S+\\s+)?[^\\s#]+(?:/[+#])?)(?:\\s+#.*)?$");
         Matcher endLineCommentMatcher;
 
         try {
