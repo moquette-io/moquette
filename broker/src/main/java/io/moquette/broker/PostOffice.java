@@ -1069,7 +1069,7 @@ class PostOffice {
         final MqttQoS qos = msg.fixedHeader().qosLevel();
         final Topic topic = new Topic(msg.variableHeader().topicName());
         final ByteBuf payload = msg.payload();
-        LOG.info("Sending internal PUBLISH message Topic={}, qos={}", topic, qos);
+        LOG.trace("Sending internal PUBLISH message Topic={}, qos={}", topic, qos);
 
         final RoutingResults publishResult = publish2Subscribers(INTERNAL_PUBLISHER, Instant.MAX, msg);
         LOG.trace("after routed publishes: {}", publishResult);

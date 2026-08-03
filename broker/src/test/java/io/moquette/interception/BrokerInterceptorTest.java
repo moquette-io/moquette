@@ -95,6 +95,11 @@ public class BrokerInterceptorTest {
         public void onSessionLoopError(Throwable error) {
             throw new RuntimeException(error);
         }
+
+        @Override
+        public boolean canSubscribe(InterceptSubscribeMessage msg) {
+            return false;
+        }
     }
 
     private static final BrokerInterceptor interceptor = new BrokerInterceptor(
