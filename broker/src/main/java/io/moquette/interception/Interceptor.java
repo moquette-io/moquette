@@ -22,6 +22,8 @@ import io.moquette.interception.messages.InterceptExceptionMessage;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 
+import java.net.InetSocketAddress;
+
 /**
  * This interface is to be used internally by the broker components.
  * <p>
@@ -35,6 +37,10 @@ import io.netty.handler.codec.mqtt.MqttPublishMessage;
 public interface Interceptor {
 
     void notifyClientConnected(MqttConnectMessage msg);
+
+    default void notifyClientConnected(MqttConnectMessage msg, InetSocketAddress remoteAddress) {
+        notifyClientConnected(msg);
+    }
 
     void notifyClientDisconnected(String clientID, String username);
 

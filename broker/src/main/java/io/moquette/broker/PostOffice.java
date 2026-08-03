@@ -42,6 +42,7 @@ import io.netty.handler.codec.mqtt.MqttTopicSubscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
@@ -1130,8 +1131,8 @@ class PostOffice {
      * notify MqttConnectMessage after connection established (already pass login).
      * @param msg
      */
-    void dispatchConnection(MqttConnectMessage msg) {
-        interceptor.notifyClientConnected(msg);
+    void dispatchConnection(MqttConnectMessage msg, InetSocketAddress remoteAddress) {
+        interceptor.notifyClientConnected(msg, remoteAddress);
     }
 
     void dispatchDisconnection(String clientId,String userName) {
