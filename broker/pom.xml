@@ -32,10 +32,23 @@
         </dependency>
 
         <dependency>
-            <!-- This is used to use log4j12 implementation -->
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-reload4j</artifactId>
-            <version>${slf4j.version}</version>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>${log4j2.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>${log4j2.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j2-impl</artifactId>
+            <version>${log4j2.version}</version>
             <scope>runtime</scope>
         </dependency>
 
