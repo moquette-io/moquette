@@ -1,4 +1,4 @@
-[Java CI with Maven](https://github.com/moquette-io/moquette/workflows/Java%20CI%20with%20Maven/badge.svg?branch=main)
+[![Java CI with Maven](https://github.com/moquette-io/moquette/actions/workflows/maven_build.yml/badge.svg)](https://github.com/moquette-io/moquette/actions/workflows/maven_build.yml)
 
 [![](https://jitpack.io/v/moquette-io/moquette.svg)](https://jitpack.io/#moquette-io/moquette)
 

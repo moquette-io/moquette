@@ -1,7 +1,9 @@
 Version 0.19-SNAPSHOT
-   [fix] [fix] Add a guard for topic depth against static max value. It checks on PUB and SUB message receive and also at SubscriptionDirectory level.
+   [fix] Add a length max to the session queues, this avoids that a slow ACK-ing subscriber consumes too much resources if a fast publisher is sending to same topic.
+   [fix] Add a guard for topic depth against static max value. It checks on PUB and SUB message receive and also at SubscriptionDirectory level.
    [fix] Guarded pattern ACL substitution against a null username to prevent a remote DoS. (#963)
    [fix] Namespaced the H2 queue metadata map to prevent a client-id collision that could corrupt a durable queue. (#964)
+   [fix] Fail startup instead of silently falling back to a permissive authorizator/authenticator when a configured authorizator_class/authenticator_class fails to load. (#967)
    [fix] Check Last Will topic for writability rights before publish.
    [fix] Reject a malformed $share subscription before parsing it (remote DoS). (#958)
    [fix] Keep the session event loop alive when a command throws (remote DoS). (#957)
@@ -23,7 +25,13 @@ Version 0.19-SNAPSHOT
      - port can be changed with `metrics_endpoint_port`. Set to 0 to disable http endpoint.
    [fix] Fixed SegmentedQueues not being cleaned up on session purge. (#833)
 
-Version 0.18.1-SNAPSHOT:
+Version 0.18.1:
+   [fix] Add a length max to the session queues, this avoids that a slow ACK-ing subscriber consumes too much resources if a fast publisher is sending to same topic.
+   [fix] Add a guard for topic depth against static max value. It checks on PUB and SUB message receive and also at SubscriptionDirectory level.
+   [fix] Guarded pattern ACL substitution against a null username to prevent a remote DoS. (#963)
+   [fix] Namespaced the H2 queue metadata map to prevent a client-id collision that could corrupt a durable queue. (#964)
+   [fix] Fail startup instead of silently falling back to a permissive authorizator/authenticator when a configured authorizator_class/authenticator_class fails to load. (#967)
+   [fix] Check Last Will topic for writability rights before publish.
    [fix] (Non clean backport) Reject a malformed $share subscription before parsing it (remote DoS). (#963)
    [fix] Keep the session event loop alive when a command throws (remote DoS). (#957)
    [fix] Guard the periodic expiration task so one failing entity can't disable all expirations. (#959)

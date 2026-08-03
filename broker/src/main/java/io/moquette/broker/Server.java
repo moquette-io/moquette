@@ -497,6 +497,11 @@ public class Server {
         String authorizatorClassName = props.getProperty(IConfig.AUTHORIZATOR_CLASS_NAME, "");
         if (authorizatorPolicy == null && !authorizatorClassName.isEmpty()) {
             authorizatorPolicy = loadClass(authorizatorClassName, IAuthorizatorPolicy.class, IConfig.class, props);
+            if (authorizatorPolicy == null) {
+                throw new IllegalArgumentException("Unable to load configured " + IConfig.AUTHORIZATOR_CLASS_NAME
+                    + " '" + authorizatorClassName + "'; rejecting to start. "
+                    + "Check the class name and classpath (see the WARN log above for the cause).");
+            }
         }
 
         if (authorizatorPolicy == null) {
@@ -524,6 +529,11 @@ public class Server {
 
         if (authenticator == null && !authenticatorClassName.isEmpty()) {
             authenticator = loadClass(authenticatorClassName, IAuthenticator.class, IConfig.class, props);
+            if (authenticator == null) {
+                throw new IllegalArgumentException("Unable to load configured " + IConfig.AUTHENTICATOR_CLASS_NAME
+                    + " '" + authenticatorClassName + "'; rejecting to start. "
+                    + "Check the class name and classpath (see the WARN log above for the cause).");
+            }
         }
 
         IResourceLoader resourceLoader = props.getResourceLoader();
