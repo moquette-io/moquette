@@ -207,6 +207,20 @@ final class MQTTConnection {
             abortConnection(CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION);
             return PostOffice.RouteResult.failed(clientId);
         }
+        if (connected) {
+            // processing a CONNECT on an already connected channel
+            //[MQTT-3.1.0-2] a second CONNECT is a protocol violation
+            if (isMqtt3xProtocol(msg)) {
+                channel.close().addListener(CLOSE_ON_FAILURE);
+            } else {
+                // it an MQTT 5 CONNECT
+                final ConnAckPropertiesBuilder builder = prepareConnAckPropertiesBuilder(false, clientId);
+                builder.reasonString("Received second CONNECT on already connected channel");
+                abortConnectionV5(CONNECTION_REFUSED_PROTOCOL_ERROR, builder);
+            }
+            return PostOffice.RouteResult.failed(clientId);
+        }
+        
         final boolean cleanSession = msg.variableHeader().isCleanSession();
         final boolean serverGeneratedClientId;
         if (clientId == null || clientId.isEmpty()) {
@@ -281,7 +295,7 @@ final class MQTTConnection {
     }
 
     // only for test
-    protected void assignSendQuota(Quota quota) {
+    void assignSendQuota(Quota quota) {
         this.sendQuota = quota;
     }
 
@@ -498,6 +512,11 @@ final class MQTTConnection {
 
     private static boolean isProtocolVersion(MqttConnectMessage msg, MqttVersion version) {
         return msg.variableHeader().version() == version.protocolLevel();
+    }
+
+    private boolean isMqtt3xProtocol(MqttConnectMessage connectMessage) {
+        return isProtocolVersion(connectMessage, MqttVersion.MQTT_3_1) ||
+            isProtocolVersion(connectMessage, MqttVersion.MQTT_3_1_1);
     }
 
     private void abortConnection(MqttConnectReturnCode returnCode) {

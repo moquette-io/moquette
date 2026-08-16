@@ -1,3 +1,6 @@
+Version 0.18.2-SNAPSHOT:
+   [fix] A second connect message sent on an already connected client must close the connection as a protocol error. (#969)
+    
 Version 0.18.1:
    [fix] Add a length max to the session queues, this avoids that a slow ACK-ing subscriber consumes too much resources if a fast publisher is sending to same topic.
    [fix] Add a guard for topic depth against static max value. It checks on PUB and SUB message receive and also at SubscriptionDirectory level.
