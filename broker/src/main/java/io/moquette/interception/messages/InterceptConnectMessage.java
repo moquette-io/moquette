@@ -45,15 +45,11 @@ public class InterceptConnectMessage extends InterceptAbstractMessage {
     }
 
     public String getClientAddress() {
-        return getRemoteAddress()
-            .map(InetSocketAddress::getHostString)
-            .orElse(null);
+        return remoteAddress != null ? remoteAddress.getHostString() : null;
     }
 
     public int getClientPort() {
-        return getRemoteAddress()
-            .map(InetSocketAddress::getPort)
-            .orElse(-1);
+        return remoteAddress != null ? remoteAddress.getPort() : -1;
     }
 
     public boolean isCleanSession() {
