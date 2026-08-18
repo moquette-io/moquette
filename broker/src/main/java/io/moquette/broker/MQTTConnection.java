@@ -415,7 +415,7 @@ final class MQTTConnection {
                             setupInflightResender(channel);
                         }
 
-                        postOffice.dispatchConnection(msg);
+                        postOffice.dispatchConnection(msg, remoteAddress());
                         LOG.trace("dispatch connection: {}", msg);
                     }
                 } else {
