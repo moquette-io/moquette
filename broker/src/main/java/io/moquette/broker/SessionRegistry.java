@@ -324,8 +324,11 @@ public class SessionRegistry {
             LOG.trace("case 2, oldSession with same CId {} disconnected", clientId);
             creationResult = new SessionCreationResult(newSession, CreationModeEnum.CREATED_CLEAN_NEW, true);
         } else {
-            final boolean connecting = oldSession.assignState(SessionStatus.DISCONNECTED, SessionStatus.CONNECTING);
+
+            boolean connecting = oldSession.assignState(SessionStatus.DISCONNECTED, SessionStatus.CONNECTING);
+
             if (!connecting) {
+                LOG.warn("Can't reopen session, old session moved in connected state by other thread:" + clientId + ",status:" + oldSession.getStatus().name());
                 throw new SessionCorruptedException("old session moved in connected state by other thread");
             }
             // case 3, reopening existing session not clean session, so keep the existing subscriptions
@@ -508,6 +511,7 @@ public class SessionRegistry {
         LOG.debug("Remove session state for client {}", session.getClientID());
         boolean result = session.assignState(SessionStatus.DISCONNECTED, SessionStatus.DESTROYED);
         if (!result) {
+            LOG.warn("Session has already changed state: " + session.getClientID() + ",status:" + session.getStatus().name());
             throw new SessionCorruptedException("Session has already changed state: " + session);
         }
 

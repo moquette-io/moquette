@@ -72,6 +72,19 @@ public abstract class IConfig {
 
     public static final String METRICS_PROVIDER_CLASS = "metrics_provider_class";
 
+    /**
+     * Enable PROXY protocol support to get real client IP when using HAProxy or similar proxy.
+     * When enabled, the broker will decode PROXY protocol headers to extract the real source address.
+     */
+    public static final String PROXY_PROTOCOL_ENABLED_PROPERTY_NAME = "proxy_protocol.enabled";
+
+    /**
+     * When true, PROXY protocol header is required. If the client doesn't send PROXY protocol header,
+     * the connection will be rejected. When false (default), PROXY protocol is auto-detected:
+     * if present, the real source address is used; otherwise, the TCP connection address is used.
+     */
+    public static final String PROXY_PROTOCOL_EXPECTED_PROPERTY_NAME = "proxy_protocol.expected";
+
     public abstract void setProperty(String name, String value);
 
     /**
