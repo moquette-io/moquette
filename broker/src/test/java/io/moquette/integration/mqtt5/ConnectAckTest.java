@@ -63,13 +63,39 @@ class ConnectAckTest extends  AbstractServerIntegrationTest {
         verifyProperty(MqttPropertyType.SESSION_EXPIRY_INTERVAL, ackProps, BrokerConstants.INFINITE_SESSION_EXPIRY, "Session expiry is infinite");
         verifyNotSet(MqttPropertyType.MAXIMUM_QOS, ackProps, "Maximum QoS is not set => QoS 2 ready");
         verifyProperty(MqttPropertyType.RETAIN_AVAILABLE, ackProps, 1, "Retain feature is available");
-        verifyNotSet(MqttPropertyType.MAXIMUM_PACKET_SIZE, ackProps, "Maximum packet size is the one defined by specs");
+        verifyProperty(MqttPropertyType.MAXIMUM_PACKET_SIZE, ackProps, IConfig.DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE,
+            "Maximum packet size is the size the decoder accepts");
         verifyProperty(MqttPropertyType.TOPIC_ALIAS_MAXIMUM, ackProps, EXPECTED_TOPIC_ALIAS_MX, "Topic alias is available");
         verifyProperty(MqttPropertyType.WILDCARD_SUBSCRIPTION_AVAILABLE, ackProps, 1, "Wildcard subscription feature is available");
         verifyProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER_AVAILABLE, ackProps, 1, "Subscription feature is available");
         verifyProperty(MqttPropertyType.SHARED_SUBSCRIPTION_AVAILABLE, ackProps, 1, "Shared subscription feature is available");
         verifyNotSet(MqttPropertyType.AUTHENTICATION_METHOD, ackProps, "No auth method available");
         verifyNotSet(MqttPropertyType.AUTHENTICATION_DATA, ackProps, "No auth data available");
+    }
+
+    @Test
+    public void givenConfiguredMessageSizeThenConnAckStatesItAsMaximumPacketSize() throws Exception {
+        final int messageSize = 4096;
+
+        // stop existing broker to restart with another message size
+        stopServer();
+        IConfig config = new FluentConfig()
+            .dataPath(dbPath)
+            .enablePersistence()
+            .port(1883)
+            .disableTelemetry()
+            .persistentQueueType(FluentConfig.PersistentQueueType.SEGMENTED)
+            .build();
+        config.setProperty(IConfig.NETTY_MAX_BYTES_PROPERTY_NAME, Integer.toString(messageSize));
+        startServer(config);
+
+        // Reconnect the TCP
+        lowLevelClient = new Client("localhost").clientId(clientName());
+
+        connAck = lowLevelClient.connectV5();
+        assertEquals(MqttConnectReturnCode.CONNECTION_ACCEPTED, connAck.variableHeader().connectReturnCode(), "Client connected");
+        verifyProperty(MqttPropertyType.MAXIMUM_PACKET_SIZE, connAck.variableHeader().properties(), messageSize,
+            "Maximum packet size follows the configured message size");
     }
 
     @Test
