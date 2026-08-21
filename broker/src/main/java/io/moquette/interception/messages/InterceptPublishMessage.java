@@ -17,6 +17,7 @@
 package io.moquette.interception.messages;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.handler.codec.mqtt.MqttProperties;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 
 public class InterceptPublishMessage extends InterceptAbstractMessage {
@@ -38,6 +39,10 @@ public class InterceptPublishMessage extends InterceptAbstractMessage {
 
     public ByteBuf getPayload() {
         return msg.payload();
+    }
+
+    public MqttProperties getProperties() {
+        return msg.variableHeader().properties();
     }
 
     public String getClientID() {
