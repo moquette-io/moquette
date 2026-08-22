@@ -757,6 +757,15 @@ final class MQTTConnection {
         final String username = NettyUtils.userName(channel);
         final String topicName = msg.variableHeader().topicName();
         final String clientId = getClientId();
+        if (!connected) {
+            // [MQTT-3.1.0-1] the first packet sent on a connection must be a CONNECT, so a PUBLISH
+            // before one is a protocol violation. The QoS 1 and QoS 2 paths below read receivedQuota,
+            // which is assigned while a CONNECT is accepted, so without this check they throw a
+            // NullPointerException instead of closing the connection. Same guard as processSubscribe.
+            LOG.warn("PUBLISH received on a connection that is not established");
+            dropConnection();
+            return PostOffice.RouteResult.success(clientId, CompletableFuture.completedFuture(null));
+        }
         final int messageID = msg.variableHeader().packetId();
         LOG.trace("Processing PUBLISH message, topic: {}, messageId: {}, qos: {}", topicName, messageID, qos);
         Topic topic = new Topic(topicName);

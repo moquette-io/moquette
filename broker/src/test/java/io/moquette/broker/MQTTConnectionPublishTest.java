@@ -158,7 +158,10 @@ public class MQTTConnectionPublishTest {
 
     @Test
     public void dropConnectionOnPublishWithInvalidTopicFormat() throws ExecutionException, InterruptedException {
-        // Connect message with clean session set to true and client id is null.
+        // The connection has to be established first, otherwise the PUBLISH is refused as a protocol
+        // violation and the invalid topic is never reached.
+        connectMqtt5AndVerifyAck(sut);
+
         MqttPublishMessage publish = MqttMessageBuilders.publish()
             .topicName("")
             .retained(false)
@@ -168,6 +171,21 @@ public class MQTTConnectionPublishTest {
         sut.processPublish(publish).completableFuture().get();
 
         // Verify
+        assertFalse(channel.isOpen(), "Connection should be closed by the broker");
+    }
+
+    @Test
+    public void givenPublishBeforeConnectThenConnectionIsClosed() {
+        // [MQTT-3.1.0-1] the first packet sent by the client must be a CONNECT.
+        MqttPublishMessage publish = MqttMessageBuilders.publish()
+            .topicName("/topic")
+            .retained(false)
+            .qos(MqttQoS.AT_LEAST_ONCE)
+            .messageId(1)
+            .payload(payload).build();
+
+        sut.handleMessage(publish);
+
         assertFalse(channel.isOpen(), "Connection should be closed by the broker");
     }
 
