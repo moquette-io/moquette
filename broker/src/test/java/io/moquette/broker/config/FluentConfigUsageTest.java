@@ -31,4 +31,15 @@ public class FluentConfigUsageTest {
         assertPropertyEquals(config, "s3cr3t", BrokerConstants.KEY_STORE_PASSWORD_PROPERTY_NAME);
         assertPropertyEquals(config, "sup3rs3cr3t", BrokerConstants.KEY_MANAGER_PASSWORD_PROPERTY_NAME);
     }
+
+    @Test
+    public void checkPeerCertificateUsernameFormatIsConfigurable() {
+        IConfig config = new FluentConfig()
+            .enablePeerCertificateAsUsername()
+            .peerCertificateUsernameFormat(FluentConfig.PeerCertificateUsernameFormat.CN)
+            .build();
+
+        assertPropertyEquals(config, "true", IConfig.PEER_CERTIFICATE_AS_USERNAME);
+        assertPropertyEquals(config, "cn", IConfig.PEER_CERTIFICATE_USERNAME_FORMAT);
+    }
 }

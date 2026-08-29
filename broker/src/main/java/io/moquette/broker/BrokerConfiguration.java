@@ -23,8 +23,26 @@ import java.util.Optional;
 
 class BrokerConfiguration {
 
+    /** What the peer certificate becomes when it stands in for the username. */
+    enum PeerCertificateUsernameFormat {
+        /** The whole peer chain as PEM text. */
+        PEM,
+        /** The subject Common Name of the peer's own certificate. */
+        CN;
+
+        static PeerCertificateUsernameFormat parse(String value) {
+            try {
+                return valueOf(value.trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException(String.format("Can't state value of %s property. Has to be 'pem' " +
+                    "or 'cn', found %s", IConfig.PEER_CERTIFICATE_USERNAME_FORMAT, value), e);
+            }
+        }
+    }
+
     private final boolean allowAnonymous;
     private final boolean peerCertificateAsUsername;
+    private final PeerCertificateUsernameFormat peerCertificateUsernameFormat;
     private final boolean allowZeroByteClientId;
     private final boolean reauthorizeSubscriptionsOnConnect;
     private final int bufferFlushMillis;
@@ -36,6 +54,8 @@ class BrokerConfiguration {
     BrokerConfiguration(IConfig props) {
         allowAnonymous = props.boolProp(BrokerConstants.ALLOW_ANONYMOUS_PROPERTY_NAME, true);
         peerCertificateAsUsername = props.boolProp(IConfig.PEER_CERTIFICATE_AS_USERNAME, false);
+        peerCertificateUsernameFormat = PeerCertificateUsernameFormat.parse(
+            props.getProperty(IConfig.PEER_CERTIFICATE_USERNAME_FORMAT, PeerCertificateUsernameFormat.PEM.name()));
         allowZeroByteClientId = props.boolProp(BrokerConstants.ALLOW_ZERO_BYTE_CLIENT_ID_PROPERTY_NAME, false);
         reauthorizeSubscriptionsOnConnect = props.boolProp(BrokerConstants.REAUTHORIZE_SUBSCRIPTIONS_ON_CONNECT, false);
 
@@ -105,6 +125,7 @@ class BrokerConfiguration {
                                int topicAliasMaximum) {
         this.allowAnonymous = allowAnonymous;
         this.peerCertificateAsUsername = peerCertificateAsUsername;
+        this.peerCertificateUsernameFormat = PeerCertificateUsernameFormat.PEM;
         this.allowZeroByteClientId = allowZeroByteClientId;
         this.reauthorizeSubscriptionsOnConnect = reauthorizeSubscriptionsOnConnect;
         this.bufferFlushMillis = bufferFlushMillis;
@@ -118,6 +139,10 @@ class BrokerConfiguration {
 
     public boolean isPeerCertificateAsUsername() {
         return peerCertificateAsUsername;
+    }
+
+    public PeerCertificateUsernameFormat peerCertificateUsernameFormat() {
+        return peerCertificateUsernameFormat;
     }
 
     public boolean isAllowZeroByteClientId() {

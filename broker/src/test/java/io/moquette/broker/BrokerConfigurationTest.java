@@ -36,6 +36,25 @@ public class BrokerConfigurationTest {
         assertFalse(brokerConfiguration.isReauthorizeSubscriptionsOnConnect());
         assertEquals(IMMEDIATE_BUFFER_FLUSH, brokerConfiguration.getBufferFlushMillis(), "Immediate flush by default");
         assertFalse(brokerConfiguration.isPeerCertificateAsUsername());
+        assertEquals(BrokerConfiguration.PeerCertificateUsernameFormat.PEM,
+            brokerConfiguration.peerCertificateUsernameFormat(), "PEM chain as username by default");
+    }
+
+    @Test
+    public void configurePeerCertificateUsernameFormatCn() {
+        Properties properties = new Properties();
+        properties.put(IConfig.PEER_CERTIFICATE_USERNAME_FORMAT, "cn");
+        BrokerConfiguration brokerConfiguration = new BrokerConfiguration(new MemoryConfig(properties));
+        assertEquals(BrokerConfiguration.PeerCertificateUsernameFormat.CN,
+            brokerConfiguration.peerCertificateUsernameFormat());
+    }
+
+    @Test
+    public void rejectUnknownPeerCertificateUsernameFormat() {
+        Properties properties = new Properties();
+        properties.put(IConfig.PEER_CERTIFICATE_USERNAME_FORMAT, "fingerprint");
+        MemoryConfig config = new MemoryConfig(properties);
+        assertThrows(IllegalArgumentException.class, () -> new BrokerConfiguration(config));
     }
 
     @Test
