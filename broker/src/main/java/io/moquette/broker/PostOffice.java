@@ -676,12 +676,6 @@ class PostOffice {
         // verify if topic can be written
         final Topic topic = new Topic(msg.variableHeader().topicName());
         topic.getTokens();
-        if (!topic.isValid()) {
-            LOG.warn("Invalid topic format, force close the connection");
-            connection.dropConnection();
-            Utils.release(msg,PostOffice.BT_PUB_IN + " - ok, qos1 invalid topic");
-            return RoutingResults.preroutingError();
-        }
         final String clientId = connection.getClientId();
         if (!authorizator.canWrite(topic, username, clientId)) {
             LOG.error("MQTT client: {} is not authorized to publish on topic: {}", clientId, topic);
