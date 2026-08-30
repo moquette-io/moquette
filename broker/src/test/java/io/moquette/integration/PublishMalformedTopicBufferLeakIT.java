@@ -45,6 +45,7 @@ import java.nio.file.Path;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -211,18 +212,7 @@ public class PublishMalformedTopicBufferLeakIT {
         long expectedLeak = (long) NUM_PUBLISHES * PAYLOAD_BYTES; // 8 MiB
         LOG.info("Measured leaked bytes: {}  expected >= {}", leakedBytes, expectedLeak);
 
-        assertTrue(
-            leakedBytes >= expectedLeak,
-            String.format(
-                "Expected a Netty pool leak of at least %d bytes (%d MiB = %d messages × %d KiB) "
-                    + "but measured only %d bytes.\n"
-                    + "usedDirect: %d → %d  usedHeap: %d → %d\n"
-                    + "This assertion should FAIL once the processPublish early-return fix is applied.",
-                expectedLeak, expectedLeak / (1024 * 1024),
-                NUM_PUBLISHES, PAYLOAD_BYTES / 1024,
-                leakedBytes,
-                before.usedDirectMemory(), after.usedDirectMemory(),
-                before.usedHeapMemory(), after.usedHeapMemory()));
+        assertEquals(0, leakedBytes, "Expected no leaks happens on session loop errors");
     }
 
     /**
