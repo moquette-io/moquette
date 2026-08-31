@@ -138,6 +138,10 @@ class Session {
         return status.get() == SessionStatus.CONNECTED;
     }
 
+    public SessionStatus getStatus(){
+        return status.get();
+    }
+
     public String getClientID() {
         return data.clientId();
     }
@@ -174,10 +178,18 @@ class Session {
     }
 
     boolean assignState(SessionStatus expected, SessionStatus newState) {
+
+        if(status.get() == newState){
+            return true;
+        }
+
         return status.compareAndSet(expected, newState);
     }
 
     public void closeImmediately() {
+        if(mqttConnection == null){
+            return;
+        }
         mqttConnection.dropConnection();
         mqttConnection = null;
         status.set(SessionStatus.DISCONNECTED);
