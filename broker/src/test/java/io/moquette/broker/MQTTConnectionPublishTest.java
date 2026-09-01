@@ -165,9 +165,12 @@ public class MQTTConnectionPublishTest {
             .qos(MqttQoS.AT_MOST_ONCE)
             .payload(payload).build();
 
-        sut.processPublish(publish).completableFuture().get();
+        PostOffice.RouteResult routeResult = sut.processPublish(publish);
 
         // Verify
+        assertNotNull(routeResult);
+        assertFalse(routeResult.isSuccess(), "Routing result should be failed");
+        Awaitility.await().atMost(Duration.ofSeconds(1)).until(() -> !channel.isOpen());
         assertFalse(channel.isOpen(), "Connection should be closed by the broker");
     }
 

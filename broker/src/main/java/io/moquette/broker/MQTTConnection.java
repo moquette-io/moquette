@@ -782,6 +782,7 @@ final class MQTTConnection {
         if (!topic.isValid()) {
             LOG.debug("Drop connection because of invalid topic format");
             dropConnection();
+            return PostOffice.RouteResult.failed(clientId);
         }
 
         if (!topic.isEmpty() && topic.headToken().isReserved()) {
