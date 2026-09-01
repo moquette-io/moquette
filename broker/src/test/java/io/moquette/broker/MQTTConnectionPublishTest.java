@@ -168,7 +168,9 @@ public class MQTTConnectionPublishTest {
         PostOffice.RouteResult routeResult = sut.processPublish(publish);
 
         // Verify
-        assertFalse(routeResult.isSuccess(), "Routing result future should be failed");
+        assertNotNull(routeResult);
+        assertFalse(routeResult.isSuccess(), "Routing result should be failed");
+        Awaitility.await().atMost(Duration.ofSeconds(1)).until(() -> !channel.isOpen());
         assertFalse(channel.isOpen(), "Connection should be closed by the broker");
     }
 
