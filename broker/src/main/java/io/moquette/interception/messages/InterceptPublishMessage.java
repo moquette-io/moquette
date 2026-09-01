@@ -47,4 +47,12 @@ public class InterceptPublishMessage extends InterceptAbstractMessage {
     public String getUsername() {
         return username;
     }
+
+    /**
+     * Get the original message.
+     * @return the original message.
+     */
+    public MqttPublishMessage getMessage() {
+        return msg;
+    }
 }
