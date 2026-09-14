@@ -26,6 +26,7 @@ import static io.moquette.broker.config.IConfig.KEY_STORE_TYPE;
 import static io.moquette.broker.config.IConfig.NETTY_MAX_BYTES_PROPERTY_NAME;
 import static io.moquette.broker.config.IConfig.PASSWORD_FILE_PROPERTY_NAME;
 import static io.moquette.broker.config.IConfig.PEER_CERTIFICATE_AS_USERNAME;
+import static io.moquette.broker.config.IConfig.PEER_CERTIFICATE_USERNAME_FORMAT;
 import static io.moquette.broker.config.IConfig.PERSISTENCE_ENABLED_PROPERTY_NAME;
 import static io.moquette.broker.config.IConfig.PERSISTENT_CLIENT_EXPIRATION_PROPERTY_NAME;
 import static io.moquette.broker.config.IConfig.PERSISTENT_QUEUE_TYPE_PROPERTY_NAME;
@@ -58,6 +59,10 @@ public class FluentConfig {
 
     public enum SSLProvider {
         SSL, OPENSSL, OPENSSL_REFCNT;
+    }
+
+    public enum PeerCertificateUsernameFormat {
+        PEM, CN
     }
 
     public enum KeyStoreType {
@@ -154,6 +159,11 @@ public class FluentConfig {
 
     public FluentConfig disablePeerCertificateAsUsername() {
         configAccumulator.put(PEER_CERTIFICATE_AS_USERNAME, "false");
+        return this;
+    }
+
+    public FluentConfig peerCertificateUsernameFormat(PeerCertificateUsernameFormat format) {
+        configAccumulator.put(PEER_CERTIFICATE_USERNAME_FORMAT, format.name().toLowerCase(Locale.ROOT));
         return this;
     }
 

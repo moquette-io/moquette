@@ -16,6 +16,7 @@
 package io.moquette.broker;
 
 import io.moquette.BrokerConstants;
+import io.moquette.broker.security.CertificateUtils;
 import io.moquette.broker.security.IAuthenticator;
 import io.moquette.broker.security.PemUtils;
 import io.moquette.broker.subscriptions.Topic;
@@ -584,12 +585,21 @@ final class MQTTConnection {
             SslHandler sslhandler = (SslHandler) channel.pipeline().get("ssl");
             if (sslhandler != null) {
                 Certificate[] certificateChain = sslhandler.engine().getSession().getPeerCertificates();
-                return PemUtils.certificatesToPem(certificateChain);
+                switch (brokerConfig.peerCertificateUsernameFormat()) {
+                    case CN:
+                        // certificateChain[0] is the peer's own certificate
+                        return CertificateUtils.subjectCommonName(certificateChain[0]);
+                    case PEM:
+                    default:
+                        return PemUtils.certificatesToPem(certificateChain);
+                }
             }
         } catch (SSLPeerUnverifiedException e) {
             LOG.debug("No peer cert provided. CId={}", clientId);
         } catch (CertificateEncodingException | IOException e) {
             LOG.warn("Unable to decode client certificate. CId={}", clientId);
+        } catch (IllegalArgumentException e) {
+            LOG.warn("Peer certificate has no usable subject CN. CId={}", clientId);
         }
         return null;
     }
