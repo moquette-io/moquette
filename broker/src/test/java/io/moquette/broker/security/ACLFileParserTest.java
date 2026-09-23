@@ -73,6 +73,16 @@ public class ACLFileParserTest {
     }
 
     @Test
+    public void testParseEndWithPoundTopicWithoutEndLineComment() throws ParseException {
+        Reader conf = new StringReader("topic /weather/italy/#");
+        AuthorizationsCollector authorizations = ACLFileParser.parse(conf);
+
+        // Verify
+        assertTrue(authorizations.canRead(new Topic("/weather/italy/#"), "", ""));
+        assertTrue(authorizations.canWrite(new Topic("/weather/italy/#"), "", ""));
+    }
+
+    @Test
     public void testParseValidPoundTopicWithEndLineComment() throws ParseException {
         Reader conf = new StringReader("topic /weather/italy/anemometer/# #simple comment");
         AuthorizationsCollector authorizations = ACLFileParser.parse(conf);
