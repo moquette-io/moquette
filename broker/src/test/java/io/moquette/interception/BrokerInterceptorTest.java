@@ -24,12 +24,15 @@ import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;
 import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.codec.mqtt.MqttSubscriptionOption;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.util.Collections;
+import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -98,7 +101,7 @@ public class BrokerInterceptorTest {
     }
 
     private static final BrokerInterceptor interceptor = new BrokerInterceptor(
-        Collections.<InterceptHandler>singletonList(new MockObserver()));
+        List.of(new MockObserver()));
 
     @BeforeAll
     public static void beforeAllTests() {
@@ -121,6 +124,40 @@ public class BrokerInterceptorTest {
         interceptor.notifyClientConnected(MqttMessageBuilders.connect().build());
         interval();
         assertEquals(40, n.get());
+    }
+
+    @Test
+    public void testNotifyClientConnectedIncludesRemoteAddress() {
+        final AtomicReference<InterceptConnectMessage> intercepted = new AtomicReference<>();
+        final BrokerInterceptor localInterceptor = new BrokerInterceptor(
+            List.of(new AbstractInterceptHandler() {
+                @Override
+                public String getID() {
+                    return "RemoteAddressObserver";
+                }
+
+                @Override
+                public void onConnect(InterceptConnectMessage msg) {
+                    intercepted.set(msg);
+                }
+
+                @Override
+                public void onSessionLoopError(Throwable error) {
+                    throw new RuntimeException(error);
+                }
+            }));
+
+        try {
+            final InetSocketAddress remoteAddress = new InetSocketAddress("127.0.0.1", 12345);
+            localInterceptor.notifyClientConnected(MqttMessageBuilders.connect().build(), remoteAddress);
+
+            Awaitility.await().until(() -> intercepted.get() != null);
+            assertEquals(remoteAddress, intercepted.get().getRemoteAddress().get());
+            assertEquals("127.0.0.1", intercepted.get().getClientAddress());
+            assertEquals(12345, intercepted.get().getClientPort());
+        } finally {
+            localInterceptor.stop();
+        }
     }
 
     @Test
