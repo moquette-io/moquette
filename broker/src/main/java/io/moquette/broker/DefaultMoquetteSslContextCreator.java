@@ -87,7 +87,7 @@ class DefaultMoquetteSslContextCreator implements ISslContextCreator {
             // if client authentification is enabled a trustmanager needs to be added to the ServerContext
             String sNeedsClientAuth = props.getProperty(BrokerConstants.NEED_CLIENT_AUTH, "false");
             if (Boolean.valueOf(sNeedsClientAuth)) {
-                addClientAuthentication(ks, contextBuilder);
+                addClientAuthentication(loadTrustStore(ks), contextBuilder);
             }
             contextBuilder.sslProvider(sslProvider);
             SslContext sslContext = contextBuilder.build();
@@ -112,12 +112,35 @@ class DefaultMoquetteSslContextCreator implements ISslContextCreator {
             return null;
         }
         String ksType = props.getProperty(BrokerConstants.KEY_STORE_TYPE, "jks");
-        final KeyStore keyStore = KeyStore.getInstance(ksType);
-        LOG.info("Loading keystore. KeystorePath = {}.", jksPath);
-        try (InputStream jksInputStream = jksDatastore(jksPath)) {
-            keyStore.load(jksInputStream, keyStorePassword.toCharArray());
+        return loadStore("keystore", jksPath, keyStorePassword, ksType);
+    }
+
+    /**
+     * Loads the truststore at {@code trust_store_path}, or returns the keystore when none is configured.
+     */
+    private KeyStore loadTrustStore(KeyStore keyStore) throws IOException, GeneralSecurityException {
+        final String trustStorePath = props.getProperty(IConfig.TRUST_STORE_PATH_PROPERTY_NAME);
+        if (trustStorePath == null || trustStorePath.isEmpty()) {
+            LOG.warn("Client authentication is enabled and no truststore is configured. "
+                + "The keystore will be used as a truststore.");
+            return keyStore;
         }
-        return keyStore;
+        final String trustStorePassword = props.getProperty(IConfig.TRUST_STORE_PASSWORD_PROPERTY_NAME);
+        if (trustStorePassword == null || trustStorePassword.isEmpty()) {
+            throw new KeyStoreException("A truststore path is configured without a truststore password");
+        }
+        String trustStoreType = props.getProperty(IConfig.TRUST_STORE_TYPE, "jks");
+        return loadStore("truststore", trustStorePath, trustStorePassword, trustStoreType);
+    }
+
+    private KeyStore loadStore(String role, String path, String password, String type)
+            throws IOException, GeneralSecurityException {
+        final KeyStore store = KeyStore.getInstance(type);
+        LOG.info("Loading {}. Path = {}.", role, path);
+        try (InputStream storeInputStream = jksDatastore(path)) {
+            store.load(storeInputStream, password.toCharArray());
+        }
+        return store;
     }
 
     private static SslContextBuilder builderWithJdkProvider(KeyStore ks, String keyPassword)
@@ -149,12 +172,10 @@ class DefaultMoquetteSslContextCreator implements ISslContextCreator {
         throw new KeyManagementException("the SSL key-store does not contain a private key");
     }
 
-    private static void addClientAuthentication(KeyStore ks, SslContextBuilder contextBuilder)
+    private static void addClientAuthentication(KeyStore trustStore, SslContextBuilder contextBuilder)
             throws NoSuchAlgorithmException, KeyStoreException {
-        LOG.warn("Client authentication is enabled. The keystore will be used as a truststore.");
-        // use keystore as truststore, as integration needs to trust certificates signed by the integration certificates
         TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-        tmf.init(ks);
+        tmf.init(trustStore);
         contextBuilder.clientAuth(ClientAuth.REQUIRE);
         contextBuilder.trustManager(tmf);
     }

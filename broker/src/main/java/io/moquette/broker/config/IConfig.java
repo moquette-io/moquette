@@ -64,6 +64,15 @@ public abstract class IConfig {
     public static final String KEY_STORE_TYPE = "key_store_type";
     public static final String KEY_STORE_PASSWORD_PROPERTY_NAME = "key_store_password";
     public static final String KEY_MANAGER_PASSWORD_PROPERTY_NAME = "key_manager_password";
+
+    /**
+     * Store of the certificates trusted for client authentication ({@code need_client_auth}).
+     * Unset, the keystore at {@link #JKS_PATH_PROPERTY_NAME} is used.
+     */
+    public static final String TRUST_STORE_PATH_PROPERTY_NAME = "trust_store_path";
+    public static final String TRUST_STORE_PASSWORD_PROPERTY_NAME = "trust_store_password";
+    /** @see java.security.KeyStore#getInstance(String) for allowed types, default to "jks" */
+    public static final String TRUST_STORE_TYPE = "trust_store_type";
     public static final String NETTY_MAX_BYTES_PROPERTY_NAME = "netty.mqtt.message_size";
     public static final String MAX_SERVER_GRANTED_QOS_PROPERTY_NAME = "max_server_granted_qos";
     public static final int DEFAULT_NETTY_MAX_BYTES_IN_MESSAGE = 8092;
