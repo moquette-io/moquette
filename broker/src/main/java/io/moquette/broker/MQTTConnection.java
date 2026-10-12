@@ -381,6 +381,8 @@ final class MQTTConnection {
                 connAckPropertiesBuilder.serverKeepAlive(brokerConfig.getServerKeepAlive().get());
             }
 
+            connAckPropertiesBuilder.maximumPacketSize(brokerConfig.maximumPacketSize());
+
             final MqttProperties ackProperties = connAckPropertiesBuilder.build();
             connAckBuilder.properties(ackProperties);
         }
