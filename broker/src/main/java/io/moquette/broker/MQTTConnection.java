@@ -16,6 +16,9 @@
 package io.moquette.broker;
 
 import io.moquette.BrokerConstants;
+import io.moquette.broker.security.AuthenticatorRegistry;
+import io.moquette.broker.security.ExtendedAuthenticator;
+import io.moquette.broker.security.ExtendedAuthenticator.AuthenticatorResult;
 import io.moquette.broker.security.IAuthenticator;
 import io.moquette.broker.security.PemUtils;
 import io.moquette.broker.subscriptions.Topic;
@@ -48,6 +51,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import javax.net.ssl.SSLPeerUnverifiedException;
 
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
@@ -65,12 +69,14 @@ final class MQTTConnection {
     private static final int UNDEFINED_VERSION = -1;
 
     private enum ConnectionStatus {
-        CONNECTING, AUTHENTICATING, AUTHENTICATION_FAILED, AUTHENTICATED, CONNECTED, DISCONNECTED
+        CONNECTING, AUTHENTICATING, AUTHENTICATION_FAILED, AUTHENTICATED, CONNECTED, DISCONNECTED;
     }
     
     final Channel channel;
     private final BrokerConfiguration brokerConfig;
     private final IAuthenticator authenticator;
+    private final AuthenticatorRegistry extendedAuthenticators;
+    private EnhancedAuthenticatorHandshake authHandshake;
     private final SessionRegistry sessionRegistry;
     private final PostOffice postOffice;
     private final int topicAliasMaximum;
@@ -83,6 +89,10 @@ final class MQTTConnection {
     private TopicAliasMapping aliasMappings;
     private AtomicReference<MqttConnectMessage> connectMessage = new AtomicReference<>();
     private ConnectionStatus connectionStatus = ConnectionStatus.DISCONNECTED;
+    // This is stored because it's used by the Enhanced authentication flow to
+    // complete the last part of session setup in the last AUTH message.
+    private MqttConnectMessage connectMessage;
+    private boolean serverGeneratedClientId = false;
 
     static final class ErrorCodeException extends Exception {
 
@@ -101,9 +111,16 @@ final class MQTTConnection {
 
     MQTTConnection(Channel channel, BrokerConfiguration brokerConfig, IAuthenticator authenticator,
                    SessionRegistry sessionRegistry, PostOffice postOffice) {
+        this(channel, brokerConfig, authenticator, new AuthenticatorRegistry(), sessionRegistry, postOffice);
+    }
+
+    MQTTConnection(Channel channel, BrokerConfiguration brokerConfig, IAuthenticator authenticator, 
+                   AuthenticatorRegistry extendedAuthenticators,
+                   SessionRegistry sessionRegistry, PostOffice postOffice) {
         this.channel = channel;
         this.brokerConfig = brokerConfig;
         this.authenticator = authenticator;
+        this.extendedAuthenticators = extendedAuthenticators;
         this.sessionRegistry = sessionRegistry;
         this.postOffice = postOffice;
         this.connected = false;
@@ -148,6 +165,8 @@ final class MQTTConnection {
                 MqttMessage pingResp = new MqttMessage(pingHeader);
                 channel.writeAndFlush(pingResp).addListener(CLOSE_ON_FAILURE);
                 break;
+            case AUTH:
+                processAuth(msg);
             default:
                 LOG.error("Unknown MessageType: {}", messageType);
                 break;
@@ -200,6 +219,117 @@ final class MQTTConnection {
         return sendQuota;
     }
 
+    private enum HandshakeResult {AUTHENTICATED, CONTINUE, FAILED}  
+    
+    // State machine to drive the execution of enhanced authentication flow
+    private class EnhancedAuthenticatorHandshake {
+
+        private final String clientId;
+        private ExtendedAuthenticator extendedAuthenticator;
+        private String authenticationMethodName;
+
+        EnhancedAuthenticatorHandshake(String clientId) {
+            this.clientId = clientId;
+        }
+        
+        HandshakeResult processConnectStep(MqttConnectMessage msg) {
+            MqttProperties headerProps = msg.variableHeader().properties();
+            MqttProperties.StringProperty authenticationMethod = getAuthenticationMethodProperty(headerProps);
+            MqttProperties.BinaryProperty authenticationData = authenticationDataProperty(headerProps);
+
+            if (authenticationMethod != null) {
+                authenticationMethodName = authenticationMethod.value();
+                if (!isSupportedAuthenticationMechanism(authenticationMethodName)) {
+                    // If the Server does not support the Authentication Method supplied by the Client, 
+                    // it MAY send a CONNACK with a Reason Code of 0x8C (Bad authentication method) or 
+                    // 0x87 (Not Authorized) as described in section 4.13 and MUST close the 
+                    // Network Connection [MQTT-4.12.0-1].
+                    LOG.info("MQTT client ID {} received an authentication method ({}) not supported, rejecting and closing connection", clientId, authenticationMethodName);
+                    abortConnection(CONNECTION_REFUSED_BAD_AUTHENTICATION_METHOD);
+                    return HandshakeResult.FAILED;
+                }
+                //TODO check authenticationData is non null, if it's null is a protocol error
+                
+                // starts the authentication flow here and skip the next part of processConnect
+                this.extendedAuthenticator = extendedAuthenticators.createByMethodName(authenticationMethodName);
+                return runAuthenticatorStep(authenticationData, authenticationMethod);
+            } else {
+                if (authenticationData != null) {
+                    // It is a Protocol Error to include Authentication Data if there is no Authentication Method. [3.1.2.11.10 ]
+                    // When a Server detects a Malformed Packet or Protocol Error, and a Reason Code is given in 
+                    // the specification, it MUST close the Network Connection [MQTT-4.13.1-1]. 
+                    // In the case of an error in a CONNECT packet it MAY send a CONNACK packet containing the Reason Code, 
+                    // before closing the Network Connection.
+                    LOG.info("MQTT client ID {} received a CONNECT with authentication data but no authentication method, rejecting and closing connection", clientId);
+                    abortConnection(MqttConnectReturnCode.CONNECTION_REFUSED_PROTOCOL_ERROR);
+                    return HandshakeResult.FAILED;
+                }
+            }
+            return HandshakeResult.AUTHENTICATED;
+        }
+
+        private boolean isSupportedAuthenticationMechanism(String value) {
+            // placeholder later it should check with registered mechanisms.
+            return "SCRAM-SHA256".equals(value);
+        }
+
+        HandshakeResult processAuthStep(MqttMessage msg) {
+            // TODO precondition to verify: processConnectStep has to be executed
+            
+            // grab reason code and check it's "Continue authentication"
+            final MqttReasonCodeAndPropertiesVariableHeader authVariableHeader = ((MqttReasonCodeAndPropertiesVariableHeader) msg.variableHeader());
+            if (authVariableHeader.reasonCode() != MqttReasonCodes.Auth.CONTINUE_AUTHENTICATION.byteValue()) {
+                LOG.error("Received AUTH packet without the 'Continue Authentication' reason code for client: {}", clientId);
+                brokerDisconnect(MqttReasonCodes.Disconnect.PROTOCOL_ERROR);
+                return HandshakeResult.FAILED;
+            }
+            MqttProperties headerProps = authVariableHeader.properties();
+            MqttProperties.StringProperty authenticationMethod = getAuthenticationMethodProperty(headerProps);
+            MqttProperties.BinaryProperty authenticationData = authenticationDataProperty(headerProps);
+
+            final String actualMethodName = authenticationMethod.value();
+            if (!authenticationMethodName.equals(actualMethodName)) {
+                // check that Authentication Method is the one we are processing
+                LOG.error("Received AUTH packet with method name not matching the one that initialized the session. " +
+                    "Expected {}, received {}, for client {}", authenticationMethodName, actualMethodName, clientId);
+                brokerDisconnect(MqttReasonCodes.Disconnect.PROTOCOL_ERROR);
+                return HandshakeResult.FAILED;
+            }
+            
+            return runAuthenticatorStep(authenticationData, authenticationMethod);
+        }
+
+        private HandshakeResult runAuthenticatorStep(MqttProperties.BinaryProperty authenticationData, 
+                                                     MqttProperties.StringProperty authenticationMethod) {
+            // pass to the extended authenticator
+            final AuthenticatorResult result = extendedAuthenticator.processStep(authenticationData.value());
+            if (result.isFailure()) {
+                LOG.info("MQTT client ID {} enhanced authentication failed", clientId);
+                connectionStatus = ConnectionStatus.AUTHENTICATION_FAILED;
+                return HandshakeResult.FAILED;
+            }
+            if (result.isCompleted()) {
+                // proceed with normal CONNECT flow 
+                this.extendedAuthenticator = null; // free resources
+                return HandshakeResult.AUTHENTICATED;
+            } else {
+                // send AUTH packet
+                MqttProperties.BinaryProperty authenticationReplyData =
+                    new MqttProperties.BinaryProperty(MqttProperties.MqttPropertyType.AUTHENTICATION_DATA.value(),
+                        result.getReplyData());
+                final MqttProperties authProperties = new MqttProperties();
+                authProperties.add(authenticationMethod);
+                authProperties.add(authenticationReplyData);
+                MqttMessage authMessage = MqttMessageBuilders.auth()
+                    .properties(authProperties)
+                    .reasonCode(MqttReasonCodes.Auth.CONTINUE_AUTHENTICATION.byteValue())
+                    .build();
+                channel.writeAndFlush(authMessage).addListener(FIRE_EXCEPTION_ON_FAILURE);
+                return HandshakeResult.CONTINUE;
+            }
+        }
+    }
+
     PostOffice.RouteResult processConnect(MqttConnectMessage msg) {
         connectionStatus = ConnectionStatus.CONNECTING;
         String clientId = NettyUtils.clientId(msg);
@@ -215,6 +345,7 @@ final class MQTTConnection {
             abortConnection(CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION);
             return PostOffice.RouteResult.failed(clientId);
         }
+<<<<<<< HEAD
         
         if (connected) {
             // processing a CONNECT on an already connected channel
@@ -230,7 +361,7 @@ final class MQTTConnection {
             return PostOffice.RouteResult.failed(clientId);
         }
         
-        boolean cleanSession = msg.variableHeader().isCleanSession();
+        final boolean cleanSession = msg.variableHeader().isCleanSession();
         final boolean serverGeneratedClientId;
         if (clientId == null || clientId.isEmpty()) {
             if (!isProtocolVersion(MqttVersion.MQTT_5)) {
@@ -251,42 +382,27 @@ final class MQTTConnection {
             clientId = UUID.randomUUID().toString().replace("-", "");
             serverGeneratedClientId = true;
             LOG.debug("Client has connected with integration generated id: {}, username: {}", clientId, username);
-        } else {
-            serverGeneratedClientId = false;
         }
 
         sendQuota = retrieveSendQuota(msg);
         connectMessage.set(msg);
         connectionStatus = ConnectionStatus.AUTHENTICATING;
         if (isProtocolVersion(msg, MqttVersion.MQTT_5)) {
-            
-            MqttProperties.StringProperty authenticationMethod = authenticationMethodProperty(msg);
-            MqttProperties.BinaryProperty authenticationData = authenticationDataProperty(msg);
-            
-            if (authenticationMethod != null) {
-                String authenticationMethodName = authenticationMethod.value();
-                if (!isSupportedAuthenticationMechanism(authenticationMethodName)) {
-                    // If the Server does not support the Authentication Method supplied by the Client, 
-                    // it MAY send a CONNACK with a Reason Code of 0x8C (Bad authentication method) or 
-                    // 0x87 (Not Authorized) as described in section 4.13 and MUST close the 
-                    // Network Connection [MQTT-4.12.0-1].
-                    LOG.info("MQTT client ID {} received an authentication method ({}) not supported, rejecting and closing connection", clientId, authenticationMethodName);
-                    abortConnection(CONNECTION_REFUSED_BAD_AUTHENTICATION_METHOD);
+            this.authHandshake = new EnhancedAuthenticatorHandshake(clientId);
+            HandshakeResult handshakeResult = authHandshake.processConnectStep(msg);
+            switch (handshakeResult) {
+                case FAILED:
+                    abortConnection(CONNECTION_REFUSED_NOT_AUTHORIZED_5);
                     return PostOffice.RouteResult.failed(clientId);
-                } 
-                // starts the authentication flow here and skip the next part of processConnect
-            } else {
-                if (authenticationData != null) {
-                    // It is a Protocol Error to include Authentication Data if there is no Authentication Method. [3.1.2.11.10 ]
-                    // When a Server detects a Malformed Packet or Protocol Error, and a Reason Code is given in 
-                    // the specification, it MUST close the Network Connection [MQTT-4.13.1-1]. 
-                    // In the case of an error in a CONNECT packet it MAY send a CONNACK packet containing the Reason Code, 
-                    // before closing the Network Connection.
-                    LOG.info("MQTT client ID {} received a CONNECT with authentication data but no authentication method, rejecting and closing connection", clientId);
-                    abortConnection(MqttConnectReturnCode.CONNECTION_REFUSED_PROTOCOL_ERROR);
-                    return PostOffice.RouteResult.failed(clientId);
-                }
+                case CONTINUE:
+                    this.connectMessage.set(msg);
+                    // the remaining part of authentication happen with AUTH message
+                    return PostOffice.RouteResult.success(clientId, CompletableFuture.completedFuture(null));
+                case AUTHENTICATED:
+                    // continue with the remaining part of the CONNECT processing
+                    break;
             }
+            authHandshake = null;
             
             if (!login(msg, clientId)) {
                 final ConnAckPropertiesBuilder builder = prepareConnAckPropertiesBuilder(false, clientId);
@@ -309,6 +425,10 @@ final class MQTTConnection {
 
         connectionStatus = ConnectionStatus.AUTHENTICATED;
 
+        return completeSessionCreation(msg, clientId);
+    }
+
+    private PostOffice.RouteResult completeSessionCreation(MqttConnectMessage msg, String clientId) {
         // initialize topic alias mapping
         if (isProtocolVersion(MqttVersion.MQTT_5)) {
             aliasMappings = new TopicAliasMapping();
@@ -326,20 +446,13 @@ final class MQTTConnection {
         });
     }
 
-    private boolean isSupportedAuthenticationMechanism(String value) {
-        // placeholder later it should check with registered mechanisms.
-        return "SCRAM-SHA256".equals(value);
-    }
-
-    private static MqttProperties.StringProperty authenticationMethodProperty(MqttConnectMessage msg) {
-        return (MqttProperties.StringProperty) msg.variableHeader()
-            .properties()
+    private static MqttProperties.StringProperty getAuthenticationMethodProperty(MqttProperties authVariableHeader) {
+        return (MqttProperties.StringProperty) authVariableHeader
             .getProperty(MqttProperties.MqttPropertyType.AUTHENTICATION_METHOD.value());
     }
 
-    private static MqttProperties.BinaryProperty authenticationDataProperty(MqttConnectMessage msg) {
-        return (MqttProperties.BinaryProperty) msg.variableHeader()
-            .properties()
+    private static MqttProperties.BinaryProperty authenticationDataProperty(MqttProperties authVariableHeader) {
+        return (MqttProperties.BinaryProperty) authVariableHeader
             .getProperty(MqttProperties.MqttPropertyType.AUTHENTICATION_DATA.value());
     }
 
@@ -698,6 +811,46 @@ final class MQTTConnection {
         channel.close().addListener(FIRE_EXCEPTION_ON_FAILURE);
     }
 
+    void processAuth(MqttMessage msg) {
+        if (this.connectionStatus != ConnectionStatus.AUTHENTICATING) {
+            // processing AUTH without a proper CONNECT message, this can be seen as a protocol error
+            LOG.error("Received AUTH packet without a CONNECT");
+            abortConnection(MqttConnectReturnCode.CONNECTION_REFUSED_PROTOCOL_ERROR);
+            return;
+        }
+        
+        if (this.authHandshake == null) {
+            throw new IllegalStateException("MQTTConnection.authHandshake field MUST be valued when processing an AUTH, this is a programming error");
+        }
+        
+        final String clientId = getClientId();
+        HandshakeResult handshakeResult = authHandshake.processAuthStep(msg);
+        switch (handshakeResult) {
+            case FAILED:
+                brokerDisconnect(MqttReasonCodes.Disconnect.NOT_AUTHORIZED);
+                return;
+            case CONTINUE:
+                // the remaining part of authentication happen with another AUTH message
+                return;
+            case AUTHENTICATED:
+                // continue with the remaining part of the CONNECT processing
+                break;
+        }
+        
+        if (this.connectMessage == null) {
+            // This is a programming BUG, if connection is MQTT5 and it's executing enhanced authentication flow
+            // then connectMessage has to be stored to be able to complete the last step of connection flow.
+            throw new IllegalStateException("MQTTConnection.connectMessage field MUST be valued, this is a programming error");
+        }
+        
+        connectionStatus = ConnectionStatus.AUTHENTICATED;
+        authHandshake = null;
+
+        completeSessionCreation(this.connectMessage, clientId);
+        // free the CONNECT message reference kept alive till now.
+        this.connectMessage = null;
+    } 
+    
     PostOffice.RouteResult processDisconnect(MqttMessage msg) {
         final String clientID = NettyUtils.clientID(channel);
         LOG.trace("Start DISCONNECT");
