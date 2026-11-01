@@ -73,13 +73,6 @@ public final class ScramSha256Authenticator implements ExtendedAuthenticator {
     private String authenticatedUsername;
 
     /**
-     * Authenticator that looks up users in the config/users.yaml file of the Moquette installation.
-     * */
-    public ScramSha256Authenticator() {
-        this(ScramUserLookup.forInstallation());
-    }
-
-    /**
      * @param credentialsLookup returns the stored data of a user by username, or {@link ScramUserLookup#USER_NOT_PRESENT}
      *                          (or null) if the user is not registered.
      * */
@@ -210,6 +203,5 @@ public final class ScramSha256Authenticator implements ExtendedAuthenticator {
 
         state = State.WAITING_CLIENT_ACK;
         return AuthenticatorResult.continueFlow(serverFinal.getBytes(StandardCharsets.UTF_8));
-//        return AuthenticatorResult.success(serverFinal.getBytes(StandardCharsets.UTF_8));
     }
 }

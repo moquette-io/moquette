@@ -23,12 +23,13 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.Map;
 import java.util.function.Function;
 
 /**
  * Finds the SCRAM data of a user in the users.yaml file, which is written by {@link ScramCredentialsGenerator}.
- * The file is loaded lazily at the first lookup and then kept in memory by this instance, so a new instance
+ * The file is loaded when the instance is created and then kept in memory by this instance, so a new instance
  * is needed to see users registered afterwards.
  * */
 public final class ScramUserLookup implements Function<String, ScramUserData> {
@@ -41,39 +42,41 @@ public final class ScramUserLookup implements Function<String, ScramUserData> {
      * */
     public static final ScramUserData USER_NOT_PRESENT = new ScramUserData("", "", 0, "", "");
 
-    private final Path usersFile;
-    // loaded at the first lookup
-    private volatile Map<String, ScramUserData> users;
+    private static final ScramUserLookup INSTANCE = new ScramUserLookup(
+        Paths.get(System.getProperty("moquette.path", "."), "config", "users.yaml"));
+
+    private final Map<String, ScramUserData> users;
 
     /**
+     * Loads all the user definitions at creation, the map is then shared by every caller of this instance.
+     * Visible for testing, production code uses {@link #getInstance()}.
+     *
      * @param usersFile the users.yaml file.
      * */
-    public ScramUserLookup(Path usersFile) {
-        this.usersFile = usersFile;
+    ScramUserLookup(Path usersFile) {
+        this.users = loadUsers(usersFile);
+    }
+
+    private static Map<String, ScramUserData> loadUsers(Path usersFile) {
+        try {
+            return Collections.unmodifiableMap(ScramCredentialsGenerator.loadUsers(usersFile));
+        } catch (IOException e) {
+            LOG.warn("Cannot read the SCRAM users file {}, no user will be authenticated", usersFile, e);
+            return Collections.emptyMap();
+        }
     }
 
     /**
-     * Creates a lookup on the config/users.yaml file of the Moquette installation (system property moquette.path).
+     * @return the singleton lookup on the config/users.yaml file of the Moquette installation
+     * (system property moquette.path, read when the class is loaded).
      * */
-    public static ScramUserLookup forInstallation() {
-        return new ScramUserLookup(Paths.get(System.getProperty("moquette.path", "."), "config", "users.yaml"));
+    public static ScramUserLookup getInstance() {
+        return INSTANCE;
     }
 
     @Override
     public ScramUserData apply(String username) {
-        // TODO this should be thread safe!
-        Map<String, ScramUserData> loaded = users;
-        if (loaded == null) {
-            try {
-                loaded = ScramCredentialsGenerator.loadUsers(usersFile);
-            } catch (IOException e) {
-                // don't keep the failure, the next lookup tries to load again
-                LOG.warn("Cannot read the SCRAM users file {}", usersFile, e);
-                return USER_NOT_PRESENT;
-            }
-            users = loaded;
-        }
-        final ScramUserData data = loaded.get(username);
+        final ScramUserData data = users.get(username);
         return data != null ? data : USER_NOT_PRESENT;
     }
 }

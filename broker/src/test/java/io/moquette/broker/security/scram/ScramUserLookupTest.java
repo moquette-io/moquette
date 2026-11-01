@@ -66,27 +66,15 @@ class ScramUserLookupTest {
     }
 
     @Test
-    void usersAreLoadedOnceAtFirstLookup(@TempDir Path dir) throws IOException {
+    void usersAreLoadedAtCreation(@TempDir Path dir) throws IOException {
         final Path file = dir.resolve("users.yaml");
         ScramCredentialsGenerator.storeUser(file, ScramCredentialsGenerator.registerNewUser("bob", "pw".toCharArray(), 4096));
         final ScramUserLookup lookup = new ScramUserLookup(file);
-        assertEquals("bob", lookup.apply("bob").getUsername());
 
-        // registered after the first lookup, not seen by the same instance
+        // registered after the creation, not seen by the same instance
         ScramCredentialsGenerator.storeUser(file, ScramCredentialsGenerator.registerNewUser("alice", "pw".toCharArray(), 4096));
         assertSame(ScramUserLookup.USER_NOT_PRESENT, lookup.apply("alice"));
-        assertEquals("alice", new ScramUserLookup(file).apply("alice").getUsername());
-    }
-
-    @Test
-    void failedLoadIsRetriedAtNextLookup(@TempDir Path dir) throws IOException {
-        final Path file = dir.resolve("users.yaml");
-        Files.write(file, "not a users file".getBytes(StandardCharsets.UTF_8));
-        final ScramUserLookup lookup = new ScramUserLookup(file);
-        assertSame(ScramUserLookup.USER_NOT_PRESENT, lookup.apply("bob"));
-
-        Files.delete(file);
-        ScramCredentialsGenerator.storeUser(file, ScramCredentialsGenerator.registerNewUser("bob", "pw".toCharArray(), 4096));
         assertEquals("bob", lookup.apply("bob").getUsername());
+        assertEquals("alice", new ScramUserLookup(file).apply("alice").getUsername());
     }
 }

@@ -18,13 +18,13 @@
 
 package io.moquette.broker.security;
 
-import io.moquette.broker.security.scram.ScramSha256Authenticator;
-
+import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
  * Registry of ExtendedAuthenticator implementations.
+ * Lookups implementation using Java ServiceLoader facility.
  * */
 public class AuthenticatorRegistry {
     
@@ -39,20 +39,29 @@ public class AuthenticatorRegistry {
             return AuthenticatorResult.failure();
         }
     };
-    
+
+    private final ConcurrentMap<String, ExtendedAuthenticatorProvider> factories = new ConcurrentHashMap<>();
+
+    public AuthenticatorRegistry() {
+        for (ExtendedAuthenticatorProvider factory : ServiceLoader.load(ExtendedAuthenticatorProvider.class)) {
+            factories.put(factory.authenticationMethod(), factory);
+        }
+    }
+
     /**
      * Create an extended authenticator by method, if not found return a default failing implementation.
      * */
     public ExtendedAuthenticator createByMethodName(String authenticationMethod) {
-        // Must create a new fresh instance, because is statefull and used multiple
-        // times in the MQTTConnection
-        if (authenticationMethod.equals("SCRAM-SHA-256")) {
-            return new ScramSha256Authenticator();
+        // Must create a new fresh instance, because is statefull and each instance
+        // is used by one MQTTConnection
+        ExtendedAuthenticatorProvider factory = factories.get(authenticationMethod);
+        if (factory != null) {
+            return factory.createAuthenticator();
         }
         return FAIL_AUTHENTICATOR;
     }
 
     public boolean isMethodSupported(String authenticationMethod) {
-        return authenticationMethod.equals("SCRAM-SHA-256");
+        return factories.containsKey(authenticationMethod);
     }
 }
