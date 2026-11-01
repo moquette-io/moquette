@@ -316,7 +316,6 @@ final class MQTTConnection {
             if (result.isCompleted()) {
                 // proceed with normal CONNECT flow 
                 this.extendedAuthenticator = null; // free resources
-//                sendAuth(authenticationMethod, result, MqttReasonCodes.Auth.SUCCESS);
                 return HandshakeResult.AUTHENTICATED;
             } else {
                 // send AUTH packet
@@ -435,10 +434,19 @@ final class MQTTConnection {
 
         connectionStatus = ConnectionStatus.AUTHENTICATED;
 
-        return completeSessionCreation(msg, clientId);
+        return completeSessionCreationFromConnect(msg, clientId);
     }
 
-    private PostOffice.RouteResult completeSessionCreation(MqttConnectMessage msg, String clientId) {
+    private PostOffice.RouteResult completeSessionCreationFromConnect(MqttConnectMessage msg, String clientId) {
+        return completeSessionCreationFromAuth(msg, clientId, null);
+    }
+
+    private PostOffice.RouteResult completeSessionCreationFromAuth(MqttConnectMessage msg, String clientId, String authMethodName) {
+        return completeSessionCreation(msg, clientId, authMethodName);
+    }
+    
+    private PostOffice.RouteResult completeSessionCreation(MqttConnectMessage msg, String clientId,
+                                                           String authMethodName) {
         // initialize topic alias mapping
         if (isProtocolVersion(MqttVersion.MQTT_5)) {
             aliasMappings = new TopicAliasMapping();
@@ -449,7 +457,7 @@ final class MQTTConnection {
         final String sessionId = clientId;
         return postOffice.routeCommand(clientId, "CONN", () -> {
             checkMatchSessionLoop(sessionId);
-            executeConnect(MQTTConnection.this.connectMessage.get(), sessionId, serverGeneratedClientId);
+            executeConnect(MQTTConnection.this.connectMessage.get(), sessionId, serverGeneratedClientId, authMethodName);
             MQTTConnection.this.connectMessage = null;
             connectionStatus = ConnectionStatus.CONNECTED;
             return null;
@@ -502,7 +510,8 @@ final class MQTTConnection {
     /**
      * Invoked by the Session's event loop.
      * */
-    private void executeConnect(MqttConnectMessage msg, String clientId, boolean serverGeneratedClientId) {
+    private void executeConnect(MqttConnectMessage msg, String clientId, boolean serverGeneratedClientId,
+                                String authMethodName) {
         if (isProtocolVersion(msg, MqttVersion.MQTT_5)) {
             // if MQTT5 validate the payload of the will
             boolean hasPayloadFormatIndicator = extractWillPayloadFormatIndicator(msg.payload().willProperties());
@@ -565,7 +574,9 @@ final class MQTTConnection {
                 connAckPropertiesBuilder.serverKeepAlive(brokerConfig.getServerKeepAlive().get());
             }
 
-            connAckPropertiesBuilder.authenticationMethod("SCRAM-SHA-256");
+            if (authMethodName != null && !authMethodName.isEmpty()) {
+                connAckPropertiesBuilder.authenticationMethod(authMethodName);
+            }
 
             final MqttProperties ackProperties = connAckPropertiesBuilder.build();
             connAckBuilder.properties(ackProperties);
@@ -857,9 +868,10 @@ final class MQTTConnection {
         }
         
         connectionStatus = ConnectionStatus.AUTHENTICATED;
+        String authenticationMethodName = authHandshake.authenticationMethodName;
         authHandshake = null;
 
-        completeSessionCreation(this.connectMessage, clientId);
+        completeSessionCreationFromAuth(this.connectMessage, clientId, authenticationMethodName);
         // free the CONNECT message reference kept alive till now.
         this.connectMessage = null;
     } 
