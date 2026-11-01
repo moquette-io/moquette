@@ -167,6 +167,7 @@ final class MQTTConnection {
                 break;
             case AUTH:
                 processAuth(msg);
+                break;
             default:
                 LOG.error("Unknown MessageType: {}", messageType);
                 break;
@@ -232,6 +233,10 @@ final class MQTTConnection {
             this.clientId = clientId;
         }
         
+        String getClientId() {
+            return clientId;
+        }
+        
         HandshakeResult processConnectStep(MqttConnectMessage msg) {
             MqttProperties headerProps = msg.variableHeader().properties();
             MqttProperties.StringProperty authenticationMethod = getAuthenticationMethodProperty(headerProps);
@@ -268,9 +273,9 @@ final class MQTTConnection {
             return HandshakeResult.AUTHENTICATED;
         }
 
-        private boolean isSupportedAuthenticationMechanism(String value) {
+        private boolean isSupportedAuthenticationMechanism(String authMethodName) {
             // placeholder later it should check with registered mechanisms.
-            return "SCRAM-SHA256".equals(value);
+            return extendedAuthenticators.isMethodSupported(authMethodName);
         }
 
         HandshakeResult processAuthStep(MqttMessage msg) {
@@ -311,22 +316,28 @@ final class MQTTConnection {
             if (result.isCompleted()) {
                 // proceed with normal CONNECT flow 
                 this.extendedAuthenticator = null; // free resources
+//                sendAuth(authenticationMethod, result, MqttReasonCodes.Auth.SUCCESS);
                 return HandshakeResult.AUTHENTICATED;
             } else {
                 // send AUTH packet
-                MqttProperties.BinaryProperty authenticationReplyData =
-                    new MqttProperties.BinaryProperty(MqttProperties.MqttPropertyType.AUTHENTICATION_DATA.value(),
-                        result.getReplyData());
-                final MqttProperties authProperties = new MqttProperties();
-                authProperties.add(authenticationMethod);
-                authProperties.add(authenticationReplyData);
-                MqttMessage authMessage = MqttMessageBuilders.auth()
-                    .properties(authProperties)
-                    .reasonCode(MqttReasonCodes.Auth.CONTINUE_AUTHENTICATION.byteValue())
-                    .build();
-                channel.writeAndFlush(authMessage).addListener(FIRE_EXCEPTION_ON_FAILURE);
+                sendAuth(authenticationMethod, result, MqttReasonCodes.Auth.CONTINUE_AUTHENTICATION);
                 return HandshakeResult.CONTINUE;
             }
+        }
+
+        private void sendAuth(MqttProperties.StringProperty authenticationMethod, AuthenticatorResult result, 
+                              MqttReasonCodes.Auth returnCode) {
+            MqttProperties.BinaryProperty authenticationReplyData =
+                new MqttProperties.BinaryProperty(MqttProperties.MqttPropertyType.AUTHENTICATION_DATA.value(),
+                    result.getReplyData());
+            final MqttProperties authProperties = new MqttProperties();
+            authProperties.add(authenticationMethod);
+            authProperties.add(authenticationReplyData);
+            MqttMessage authMessage = MqttMessageBuilders.auth()
+                .properties(authProperties)
+                .reasonCode(returnCode.byteValue())
+                .build();
+            channel.writeAndFlush(authMessage).addListener(FIRE_EXCEPTION_ON_FAILURE);
         }
     }
 
@@ -345,7 +356,6 @@ final class MQTTConnection {
             abortConnection(CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION);
             return PostOffice.RouteResult.failed(clientId);
         }
-<<<<<<< HEAD
         
         if (connected) {
             // processing a CONNECT on an already connected channel
@@ -554,6 +564,8 @@ final class MQTTConnection {
             if (brokerConfig.getServerKeepAlive().isPresent()) {
                 connAckPropertiesBuilder.serverKeepAlive(brokerConfig.getServerKeepAlive().get());
             }
+
+            connAckPropertiesBuilder.authenticationMethod("SCRAM-SHA-256");
 
             final MqttProperties ackProperties = connAckPropertiesBuilder.build();
             connAckBuilder.properties(ackProperties);
@@ -823,7 +835,7 @@ final class MQTTConnection {
             throw new IllegalStateException("MQTTConnection.authHandshake field MUST be valued when processing an AUTH, this is a programming error");
         }
         
-        final String clientId = getClientId();
+        final String clientId = authHandshake.getClientId();
         HandshakeResult handshakeResult = authHandshake.processAuthStep(msg);
         switch (handshakeResult) {
             case FAILED:
@@ -831,6 +843,7 @@ final class MQTTConnection {
                 return;
             case CONTINUE:
                 // the remaining part of authentication happen with another AUTH message
+                // the reply message is already sent by EnhancedAuthenticatorHandshake
                 return;
             case AUTHENTICATED:
                 // continue with the remaining part of the CONNECT processing

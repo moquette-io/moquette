@@ -18,6 +18,8 @@
 
 package io.moquette.broker.security;
 
+import io.moquette.broker.security.scram.ScramSha256Authenticator;
+
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -25,8 +27,6 @@ import java.util.concurrent.ConcurrentMap;
  * Registry of ExtendedAuthenticator implementations.
  * */
 public class AuthenticatorRegistry {
-    
-    private final ConcurrentMap<String, ExtendedAuthenticator> authenticators = new ConcurrentHashMap<>();
     
     public static final ExtendedAuthenticator FAIL_AUTHENTICATOR = new ExtendedAuthenticator() {
         @Override
@@ -44,8 +44,15 @@ public class AuthenticatorRegistry {
      * Create an extended authenticator by method, if not found return a default failing implementation.
      * */
     public ExtendedAuthenticator createByMethodName(String authenticationMethod) {
-        // TODO this must create a new fresh instance, because it's stored in the MQTTConnection and 
-        // could be stateful.
-        return authenticators.getOrDefault(authenticationMethod, FAIL_AUTHENTICATOR);
+        // Must create a new fresh instance, because is statefull and used multiple
+        // times in the MQTTConnection
+        if (authenticationMethod.equals("SCRAM-SHA-256")) {
+            return new ScramSha256Authenticator();
+        }
+        return FAIL_AUTHENTICATOR;
+    }
+
+    public boolean isMethodSupported(String authenticationMethod) {
+        return authenticationMethod.equals("SCRAM-SHA-256");
     }
 }
