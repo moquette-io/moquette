@@ -23,7 +23,6 @@ import io.moquette.broker.subscriptions.Subscription;
 import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.mqtt.*;
-import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,6 +32,7 @@ import java.util.*;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -44,15 +44,20 @@ class Session {
     static final int INFINITE_EXPIRY = Integer.MAX_VALUE;
     private final boolean resendInflightOnTimeout;
     private Collection<Integer> nonAckPacketIds;
+    
+    private AtomicLong inFlightSeqNumber = new AtomicLong();
 
     static class InFlightPacket implements Delayed {
 
         final int packetId;
         private long startTime;
+        private final long seqNumber; 
 
-        InFlightPacket(int packetId, long delayInMilliseconds) {
+        InFlightPacket(int packetId, long delayInMilliseconds, long sequenceNumber) {
+            LOG.info("InFlightPacket created");
             this.packetId = packetId;
             this.startTime = System.currentTimeMillis() + delayInMilliseconds;
+            this.seqNumber = sequenceNumber;
         }
 
         @Override
@@ -64,7 +69,7 @@ class Session {
         @Override
         public int compareTo(Delayed o) {
             if ((this.startTime - ((InFlightPacket) o).startTime) == 0) {
-                return 0;
+                return Long.compare(this.seqNumber, ((InFlightPacket) o).seqNumber);
             }
             if ((this.startTime - ((InFlightPacket) o).startTime) > 0) {
                 return 1;
@@ -83,7 +88,8 @@ class Session {
     private final AtomicReference<SessionStatus> status = new AtomicReference<>(SessionStatus.DISCONNECTED);
     private MQTTConnection mqttConnection;
     private final Map<String, Subscription> subscriptions = new HashMap<>();
-    private final Map<Integer, SessionRegistry.EnqueuedMessage> inflightWindow = new HashMap<>();
+    // Insertion order is important, to resent the packetIds in the order they were received
+    private final Map<Integer, SessionRegistry.EnqueuedMessage> inflightWindow = new LinkedHashMap<>();
     // used only in MQTT3 where resends are done on timeout of ACKs.
     private final DelayQueue<InFlightPacket> inflightTimeouts = new DelayQueue<>();
     private final Map<Integer, MqttPublishMessage> qos2Receiving = new HashMap<>();
@@ -220,7 +226,7 @@ class Session {
         }
         inflightWindow.put(pubRecPacketId, new SessionRegistry.PubRelMarker());
         if (resendInflightOnTimeout) {
-            inflightTimeouts.add(new InFlightPacket(pubRecPacketId, FLIGHT_BEFORE_RESEND_MS));
+            inflightTimeouts.add(new InFlightPacket(pubRecPacketId, FLIGHT_BEFORE_RESEND_MS, inFlightSeqNumber.getAndIncrement()));
         }
         MqttMessage pubRel = MQTTConnection.pubrel(pubRecPacketId);
         mqttConnection.sendIfWritableElseDrop(pubRel);
@@ -328,7 +334,8 @@ class Session {
                 mqttConnection.sendQuota().releaseSlot();
             }
             if (resendInflightOnTimeout) {
-                inflightTimeouts.add(new InFlightPacket(packetId, FLIGHT_BEFORE_RESEND_MS));
+                LOG.info("Adding into inflight resend");
+                inflightTimeouts.add(new InFlightPacket(packetId, FLIGHT_BEFORE_RESEND_MS, inFlightSeqNumber.getAndIncrement()));
             }
 
             MqttProperties.MqttProperty[] mqttProperties = publishRequest.updatePublicationExpiryIfPresentOrAdd();
@@ -437,7 +444,8 @@ class Session {
             if (msg instanceof SessionRegistry.PubRelMarker) {
                 MqttMessage pubRel = MQTTConnection.pubrel(notAckPacketId);
                 if (resendInflightOnTimeout) {
-                    inflightTimeouts.add(new InFlightPacket(notAckPacketId, FLIGHT_BEFORE_RESEND_MS));
+                    LOG.info("Adding into inflight resend");
+                    inflightTimeouts.add(new InFlightPacket(notAckPacketId, FLIGHT_BEFORE_RESEND_MS, inFlightSeqNumber.getAndIncrement()));
                 }
                 mqttConnection.sendIfWritableElseDrop(pubRel);
             } else {
@@ -450,7 +458,8 @@ class Session {
                 MqttPublishMessage publishMsg = MQTTConnection.createNotRetainedDuplicatedPublishMessage(
                     notAckPacketId, topic, qos, payload, mqttProperties);
                 if (resendInflightOnTimeout) {
-                    inflightTimeouts.add(new InFlightPacket(notAckPacketId, FLIGHT_BEFORE_RESEND_MS));
+                    LOG.info("Adding into inflight resend");
+                    inflightTimeouts.add(new InFlightPacket(notAckPacketId, FLIGHT_BEFORE_RESEND_MS, inFlightSeqNumber.getAndIncrement()));
                 }
                 mqttConnection.sendPublish(publishMsg);
 
@@ -495,7 +504,8 @@ class Session {
                 mqttConnection.sendQuota().releaseSlot();
             }
             if (resendInflightOnTimeout) {
-                inflightTimeouts.add(new InFlightPacket(sendPacketId, FLIGHT_BEFORE_RESEND_MS));
+                LOG.info("Adding into inflight drain");
+                inflightTimeouts.add(new InFlightPacket(sendPacketId, FLIGHT_BEFORE_RESEND_MS, inFlightSeqNumber.getAndIncrement()));
             }
 
             MqttProperties.MqttProperty[] mqttProperties = msgPub.updatePublicationExpiryIfPresentOrAdd();
