@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public abstract class AbstractServerIntegrationTest extends AbstractServerIntegrationWithoutClientFixture {
 
-    Client lowLevelClient;
+    public Client lowLevelClient;
 
     static void sleepSeconds(int secondsInterval) throws InterruptedException {
         Thread.sleep(Duration.ofSeconds(secondsInterval).toMillis());
