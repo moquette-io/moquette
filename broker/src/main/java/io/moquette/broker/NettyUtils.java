@@ -20,6 +20,7 @@ import java.io.IOException;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.mqtt.MqttConnectMessage;
 import io.netty.handler.codec.mqtt.MqttMessage;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
@@ -90,6 +91,20 @@ public final class NettyUtils {
 		}
 		return msg;
 	}
+    
+    /**
+     * Extract client's id from CONNECT message
+     * */
+    public static String clientId(MqttConnectMessage msg) {
+        return msg.payload().clientIdentifier();
+    }
+
+    /**
+     * Extract username id from CONNECT message
+     * */
+    public static String userName(MqttConnectMessage msg) {
+        return msg.payload().userName();
+    }
 
 	private NettyUtils() {
     }

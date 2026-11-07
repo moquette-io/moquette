@@ -25,7 +25,7 @@ import java.util.*;
 
 /**
  * Used by the ACLFileParser to push all authorizations it finds. ACLAuthorizator uses it in read
- * mode to check it topics matches the ACLs.
+ * mode to check if topics matches the ACLs.
  *
  * Not thread safe.
  */
@@ -57,9 +57,10 @@ class AuthorizationsCollector implements IAuthorizatorPolicy {
         if (m_parsingUsersSpecificSection) {
             // TODO in java 8 switch to m_userAuthorizations.putIfAbsent(m_currentUser, new
             // ArrayList());
-            if (!m_userAuthorizations.containsKey(m_currentUser)) {
-                m_userAuthorizations.put(m_currentUser, new ArrayList<Authorization>());
-            }
+//            if (!m_userAuthorizations.containsKey(m_currentUser)) {
+//                m_userAuthorizations.put(m_currentUser, new ArrayList<Authorization>());
+//            }
+            m_userAuthorizations.putIfAbsent(m_currentUser, new ArrayList<Authorization>());
             List<Authorization> userAuths = m_userAuthorizations.get(m_currentUser);
             userAuths.add(acl);
         } else if (m_parsingPatternSpecificSection) {
