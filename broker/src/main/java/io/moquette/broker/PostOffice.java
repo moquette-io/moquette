@@ -69,7 +69,6 @@ import static io.netty.handler.codec.mqtt.MqttQoS.FAILURE;
 
 class PostOffice {
 
-    private static final String WILL_PUBLISHER = "will_publisher";
     private static final String INTERNAL_PUBLISHER = "internal_publisher";
     public static final String BT_ROUTE_TARGET = "Route to target session";
     public static final String BT_PUB_IN = "PUB in";
@@ -337,11 +336,11 @@ class PostOffice {
             }
         }
         MqttPublishMessage willPublishMessage = publishBuilder.build();
-        if (!authorizator.canWrite(Topic.asTopic(will.topic), "", WILL_PUBLISHER)) {
-            LOG.error("client is not authorized to publish Last Will Testament on topic: {}", will.topic);
+        if (!authorizator.canWrite(Topic.asTopic(will.topic), will.userName, will.clientId)) {
+            LOG.warn("client {} for user {} is not authorized to publish Last Will Testament on topic: {}", will.topic);
             return;
         }
-        publish2Subscribers(WILL_PUBLISHER, messageExpiryInstant, willPublishMessage);
+        publish2Subscribers(will.clientId, messageExpiryInstant, willPublishMessage);
     }
 
     private static MqttProperties copyWillUserProperties(Map<String, String> willUserProperties) {
