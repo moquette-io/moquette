@@ -139,7 +139,7 @@ public class ServerIntegrationSSLClientAuthBase {
     static Properties getDefaultServerProperties(String dbPath) {
         Properties sslProps = new Properties();
         sslProps.put(IConfig.SSL_PORT_PROPERTY_NAME, "8883");
-        sslProps.put(IConfig.JKS_PATH_PROPERTY_NAME, "src/test/resources/serverkeystore.jks");
+        sslProps.put(IConfig.JKS_PATH_PROPERTY_NAME, "test-classes/serverkeystore.jks");
         sslProps.put(IConfig.KEY_STORE_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
         sslProps.put(IConfig.KEY_MANAGER_PASSWORD_PROPERTY_NAME, "passw0rdsrv");
         sslProps.put(IConfig.DATA_PATH_PROPERTY_NAME, dbPath);
