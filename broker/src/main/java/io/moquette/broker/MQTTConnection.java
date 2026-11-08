@@ -196,9 +196,8 @@ final class MQTTConnection {
     }
 
     PostOffice.RouteResult processConnect(MqttConnectMessage msg) {
-        MqttConnectPayload payload = msg.payload();
-        String clientId = payload.clientIdentifier();
-        final String username = payload.userName();
+        String clientId = NettyUtils.clientId(msg);
+        final String username = NettyUtils.userName(msg);
         protocolVersion = msg.variableHeader().version();
         LOG.trace("Processing CONNECT message. CId: {} username: {}", clientId, username);
 

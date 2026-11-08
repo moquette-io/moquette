@@ -170,7 +170,9 @@ class H2SessionsRepository implements ISessionsRepository {
 
         @Override
         public int getMemory(Will will) {
-            return stringDataType.getMemory(will.topic) +
+            return stringDataType.getMemory(will.clientId) +
+                stringDataType.getMemory(will.userName != null ? will.userName : "") +    
+                stringDataType.getMemory(will.topic) +
                 4 + /* payload length */
                 will.payload.length +
                 1 /* retained + qos */;
@@ -178,6 +180,8 @@ class H2SessionsRepository implements ISessionsRepository {
 
         @Override
         public void write(WriteBuffer buff, Will will) {
+            stringDataType.write(buff, will.clientId);
+            stringDataType.write(buff, will.userName != null ? will.userName : "");
             stringDataType.write(buff, will.topic);
             buff.putInt(will.payload.length);
             buff.put(will.payload);
@@ -195,6 +199,8 @@ class H2SessionsRepository implements ISessionsRepository {
 
         @Override
         public Will read(ByteBuffer buff) {
+            final String clientId = stringDataType.read(buff);
+            final String userName = stringDataType.read(buff);
             final String topic = stringDataType.read(buff);
             final int payloadLength = buff.getInt();
             final byte[] payload = new byte[payloadLength];
@@ -204,7 +210,7 @@ class H2SessionsRepository implements ISessionsRepository {
             final byte qos = (byte) (rawFlags & 0x0F);
             final boolean retained = ((rawFlags >> 4) & 0x0F) > 0;
             final int willDelayInterval = buff.getInt();
-            Will will = new Will(topic, payload, MqttQoS.valueOf(qos), retained, willDelayInterval);
+            Will will = new Will(clientId, userName, topic, payload, MqttQoS.valueOf(qos), retained, willDelayInterval);
 
             final long expiresAt = buff.getLong();
             if (expiresAt != UNDEFINED_INSTANT) {

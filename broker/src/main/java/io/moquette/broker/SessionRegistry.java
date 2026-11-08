@@ -432,8 +432,10 @@ public class SessionRegistry {
         final boolean retained = msg.variableHeader().isWillRetain();
         final MqttQoS qos = MqttQoS.valueOf(msg.variableHeader().willQos());
 
+        final String clientId = NettyUtils.clientId(msg);
+        final String userName = NettyUtils.userName(msg);
         if (Utils.versionFromConnect(msg) != MqttVersion.MQTT_5) {
-            return new ISessionsRepository.Will(willTopic, willPayload, qos, retained, 0);
+            return new ISessionsRepository.Will(clientId, userName, willTopic, willPayload, qos, retained, 0);
         }
 
         // retrieve Will Delay if present and if the connection is MQTT5
@@ -446,7 +448,8 @@ public class SessionRegistry {
         } else {
             willDelayIntervalSeconds = 0;
         }
-        ISessionsRepository.Will will = new ISessionsRepository.Will(willTopic, willPayload, qos, retained, willDelayIntervalSeconds);
+        
+        ISessionsRepository.Will will = new ISessionsRepository.Will(clientId, userName, willTopic, willPayload, qos, retained, willDelayIntervalSeconds);
 
         ISessionsRepository.WillOptions options = ISessionsRepository.WillOptions.empty();
         MqttProperties.MqttProperty<Integer> messageExpiryIntervalProperty =
