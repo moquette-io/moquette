@@ -1,4 +1,5 @@
 Version 0.18.2-SNAPSHOT:
+   [fix] Use clientId and userName in ACL verification when the send of last will is done. (#983)
    [fix] Keep the order of arrival when resend in-flight unacknowledged PUBs. (#982)
    [fix] A second connect message sent on an already connected client must close the connection as a protocol error. (#969)
     

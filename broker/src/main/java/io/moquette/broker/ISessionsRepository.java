@@ -238,6 +238,8 @@ public interface ISessionsRepository {
 
      final class Will implements Expirable {
 
+         public final String clientId;
+         public final String userName;
          public final String topic;
          public final byte[] payload;
          public final MqttQoS qos;
@@ -246,7 +248,9 @@ public interface ISessionsRepository {
          public final WillOptions properties;
          private Instant expireAt = null;
 
-         public Will(String topic, byte[] payload, MqttQoS qos, boolean retained, int delayInterval) {
+         public Will(String clientId, String userName, String topic, byte[] payload, MqttQoS qos, boolean retained, int delayInterval) {
+             this.clientId = clientId;
+             this.userName = userName;
              this.topic = topic;
              this.payload = payload;
              this.qos = qos;
@@ -259,7 +263,7 @@ public interface ISessionsRepository {
           * Copy constructor used only when update with an expire instant.
           * */
          public Will(Will orig, Instant expireAt) {
-            this(orig.topic, orig.payload, orig.qos, orig.retained, orig.delayInterval, orig.properties);
+            this(orig.clientId, orig.userName, orig.topic, orig.payload, orig.qos, orig.retained, orig.delayInterval, orig.properties);
             this.expireAt = expireAt;
          }
 
@@ -267,6 +271,8 @@ public interface ISessionsRepository {
           * Used only when update with optional properties are provided.
           * */
          public Will(Will orig, WillOptions properties) {
+             this.clientId = orig.clientId;
+             this.userName = orig.userName;
              this.topic = orig.topic;
              this.payload = orig.payload;
              this.qos = orig.qos;
@@ -276,8 +282,10 @@ public interface ISessionsRepository {
              this.properties = properties;
          }
 
-         private Will(String topic, byte[] payload, MqttQoS qos, boolean retained, int delayInterval,
+         private Will(String clientId, String userName, String topic, byte[] payload, MqttQoS qos, boolean retained, int delayInterval,
                       WillOptions properties) {
+             this.clientId = clientId;
+             this.userName = userName;
              this.topic = topic;
              this.payload = payload;
              this.qos = qos;

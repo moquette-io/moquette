@@ -54,6 +54,7 @@ public class WillUnauthorizedPublishTest {
     private static final Logger LOG = LoggerFactory.getLogger(WillUnauthorizedPublishTest.class);
 
     private static final String RESTRICTED_TOPIC = "restricted/topic";
+    public static final String OFFENDING_CLIENT = "OffendingClient";
 
     private Server server;
     private IConfig config;
@@ -96,7 +97,10 @@ public class WillUnauthorizedPublishTest {
         final IAuthorizatorPolicy aclPolicy = new IAuthorizatorPolicy() {
             @Override
             public boolean canWrite(Topic topic, String user, String client) {
-                return !RESTRICTED_TOPIC.equals(topic.toString());
+                if (OFFENDING_CLIENT.equals(client) && RESTRICTED_TOPIC.equals(topic.toString())) {
+                    return false;
+                }
+                return true;
             }
 
             @Override
@@ -131,7 +135,7 @@ public class WillUnauthorizedPublishTest {
 
         // Step 2 – anonymous offending client connects with a Will targeting the restricted topic
         offendingClient
-            .clientId("OffendingClient")
+            .clientId(OFFENDING_CLIENT)
             .connect(RESTRICTED_TOPIC, "unauthorized will payload");
 
         // Step 3 – offending client disconnects abruptly, which triggers the Will
