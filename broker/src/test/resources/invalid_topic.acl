@@ -1,0 +1,9 @@
+# ACL used by PublishMalformedTopicBufferLeakIT
+# Grants write permission on the exact topic /finance/ibm.
+# A specific (non-wildcard) ACL topic is required to trigger the NPE:
+# AuthorizationsCollector.matchACL calls topic.match(aclTopic) where aclTopic
+# has tokens [EMPTY,"finance","ibm"].  The loop accesses msgTokens.size() before
+# returning, which throws NullPointerException when the publish topic is invalid
+# (token list is null due to ParseException).  A wildcard '#' ACL would instead
+# short-circuit via the MULTI branch and never reach that line.
+topic write /finance/ibm
