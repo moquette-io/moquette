@@ -68,4 +68,6 @@ public interface InterceptHandler {
     void onMessageAcknowledged(InterceptAcknowledgedMessage msg);
 
     void onSessionLoopError(Throwable error);
+
+    boolean canSubscribe(InterceptSubscribeMessage msg);
 }
