@@ -565,8 +565,9 @@ class PostOffice {
         }
 
         // if expiration is present, compute the remaining expire seconds
-        Duration remaining = Duration.between(retainedMsg.getExpiryTime(), Instant.now());
-        int remainingSeconds = (int) remaining.toMillis() / 1000;
+        Duration remaining = Duration.between(Instant.now(), retainedMsg.getExpiryTime());
+        // round like SessionRegistry (2.999s -> 3s) and never encode a negative value
+        int remainingSeconds = (int) Math.max(0, Math.round(remaining.toMillis() / 1_000.0));
         MqttProperties.IntegerProperty expiryRemainProp = new MqttProperties.IntegerProperty(MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL.value(),
             remainingSeconds);
 
