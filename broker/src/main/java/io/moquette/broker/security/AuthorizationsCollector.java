@@ -29,7 +29,7 @@ import java.util.*;
  *
  * Not thread safe.
  */
-class AuthorizationsCollector implements IAuthorizatorPolicy {
+public class AuthorizationsCollector implements IAuthorizatorPolicy {
 
     private static final Logger LOG = LoggerFactory.getLogger(AuthorizationsCollector.class);
 
@@ -39,8 +39,9 @@ class AuthorizationsCollector implements IAuthorizatorPolicy {
     private boolean m_parsingUsersSpecificSection;
     private boolean m_parsingPatternSpecificSection;
     private String m_currentUser = "";
+    private boolean containsUserSection = false;
 
-    static final AuthorizationsCollector emptyImmutableCollector() {
+    static AuthorizationsCollector emptyImmutableCollector() {
         AuthorizationsCollector coll = new AuthorizationsCollector();
         coll.m_globalAuthorizations = Collections.emptyList();
         coll.m_patternAuthorizations = Collections.emptyList();
@@ -71,6 +72,7 @@ class AuthorizationsCollector implements IAuthorizatorPolicy {
             case "topic":
                 return createAuthorization(line, tokens);
             case "user":
+                containsUserSection = true;
                 m_parsingUsersSpecificSection = true;
                 m_currentUser = tokens[1];
                 m_parsingPatternSpecificSection = false;
@@ -179,5 +181,9 @@ class AuthorizationsCollector implements IAuthorizatorPolicy {
 
     public boolean isEmpty() {
         return m_globalAuthorizations.isEmpty();
+    }
+    
+    public boolean containsUserSection() { 
+        return containsUserSection;
     }
 }

@@ -1,4 +1,5 @@
 Version 0.19-SNAPSHOT
+   [fix] Fail startup when the ACL file defines a `user` section but no authenticator (password_file/authenticator_class) is configured, otherwise the permissive authenticator would grant the ACL user's permissions to any client claiming that username with an arbitrary password.
    [fix] Use clientId and userName in ACL verification when the send of last will is done. (#983)
    [fix] Keep the order of arrival when resend in-flight unacknowledged PUBs. (#982)
    [feature] Added method for message interceptors to get the original message. (#948)
