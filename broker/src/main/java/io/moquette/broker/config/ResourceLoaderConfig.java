@@ -69,13 +69,14 @@ public class ResourceLoaderConfig extends IConfig {
         try {
             confParser.parse(configReader);
         } catch (ParseException pex) {
-            LOG.warn(
+            LOG.error(
                     "Unable to parse configuration properties. Using default configuration. "
                     + "ResourceLoader = {}, configName = {}, cause = {}, errorMessage = {}.",
                     resourceLoader.getName(),
                     configName,
                     pex.getCause(),
                     pex.getMessage());
+            throw new RuntimeException(pex);
         }
     }
 
