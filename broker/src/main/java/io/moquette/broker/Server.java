@@ -24,6 +24,7 @@ import io.moquette.broker.config.MemoryConfig;
 import io.moquette.broker.config.ResourceLoaderConfig;
 import io.moquette.broker.security.ACLFileParser;
 import io.moquette.broker.security.AcceptAllAuthenticator;
+import io.moquette.broker.security.AuthorizationsCollector;
 import io.moquette.broker.security.DenyAllAuthorizatorPolicy;
 import io.moquette.broker.security.IAuthenticator;
 import io.moquette.broker.security.IAuthorizatorPolicy;
@@ -83,6 +84,7 @@ public class Server {
     private H2Builder h2Builder;
     private SessionRegistry sessions;
     private boolean standalone = false;
+    private boolean emptyPasswordPath = false;
 
     public static void main(String[] args) throws IOException {
         final Server server = new Server();
@@ -494,7 +496,15 @@ public class Server {
                 try {
                     LOG.info("Parsing ACL file. Path = {}", aclFilePath);
                     IResourceLoader resourceLoader = props.getResourceLoader();
-                    authorizatorPolicy = ACLFileParser.parse(resourceLoader.loadResource(aclFilePath));
+                    AuthorizationsCollector collector = ACLFileParser.parse(resourceLoader.loadResource(aclFilePath));
+                    if (collector.containsUserSection() && emptyPasswordPath) {
+                        // empty password path means that every username is considered as valid
+                        // but user's specific ACL needs an authenticated user before authorizing
+                        // so fail the broker to start
+                        throw new IllegalArgumentException("Can't start a broker with unauthenticated user (empty " +
+                            "password file path) and user specific authorization (ACL file with 'user' section.");
+                    }
+                    authorizatorPolicy = collector;
                 } catch (ParseException pex) {
                     LOG.error("Unable to parse ACL file. path = {}", aclFilePath, pex);
                 }
@@ -519,12 +529,13 @@ public class Server {
             }
         }
 
-        IResourceLoader resourceLoader = props.getResourceLoader();
         if (authenticator == null) {
             String passwdPath = props.getProperty(IConfig.PASSWORD_FILE_PROPERTY_NAME, "");
             if (passwdPath.isEmpty()) {
+                emptyPasswordPath = true;
                 authenticator = new AcceptAllAuthenticator();
             } else {
+                IResourceLoader resourceLoader = props.getResourceLoader();
                 authenticator = new ResourceAuthenticator(resourceLoader, passwdPath);
             }
             LOG.info("An {} authenticator instance will be used", authenticator.getClass().getName());
