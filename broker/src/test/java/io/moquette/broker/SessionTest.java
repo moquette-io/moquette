@@ -1,5 +1,6 @@
 package io.moquette.broker;
 
+import io.moquette.broker.security.PermitAllAuthorizatorPolicy;
 import io.moquette.broker.subscriptions.Topic;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
@@ -38,7 +39,7 @@ public class SessionTest {
         queuedMessages = new InMemoryQueue();
         final Clock clock = Clock.systemDefaultZone();
         final ISessionsRepository.SessionData data = new ISessionsRepository.SessionData(CLIENT_ID, MqttVersion.MQTT_3_1_1, INFINITE_EXPIRY, clock);
-        client = new Session(data, true, queuedMessages);
+        client = new Session(data, true, queuedMessages, new Authorizator(new PermitAllAuthorizatorPolicy()));
         createConnection(client);
     }
 
