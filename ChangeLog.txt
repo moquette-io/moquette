@@ -1,4 +1,4 @@
-Version 0.18.2-SNAPSHOT:
+Version 0.18.2:
    [fix] Use ACLs to verifies inflights and queue messages right on session takeover. (#987)
    [fix] Fails to start the broker when a parsing error happens in the config. (#986)
    [fix] Fail startup when the ACL file defines a `user` section but no authenticator 
