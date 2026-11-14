@@ -85,6 +85,7 @@ class Session {
 
     private boolean clean;
     private final SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue;
+    private final Authorizator authorizator;
     private final AtomicReference<SessionStatus> status = new AtomicReference<>(SessionStatus.DISCONNECTED);
     private MQTTConnection mqttConnection;
     private final Map<String, Subscription> subscriptions = new HashMap<>();
@@ -96,10 +97,15 @@ class Session {
     private ISessionsRepository.SessionData data;
     private boolean resendingNonAcked = false;
 
-    Session(ISessionsRepository.SessionData data, boolean clean, SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue) {
+    Session(ISessionsRepository.SessionData data, boolean clean, SessionMessageQueue<SessionRegistry.EnqueuedMessage> sessionQueue,
+            Authorizator authorizator) {
         if (sessionQueue == null) {
             throw new IllegalArgumentException("sessionQueue parameter can't be null");
         }
+        if (authorizator == null) {
+            throw new IllegalArgumentException("authorizator parameter can't be null");
+        }
+        this.authorizator = authorizator;
         this.data = data;
         this.clean = clean;
         this.sessionQueue = sessionQueue;
@@ -451,6 +457,12 @@ class Session {
             } else {
                 final PublishedMessage pubMsg = (PublishedMessage) msg;
                 final Topic topic = pubMsg.topic;
+                if (currentPrincipalCannotRead(topic)) {
+                    // session taken over by a principal that can't read the topic, drop instead of resending
+                    inflightWindow.remove(notAckPacketId);
+                    Utils.release(pubMsg, "target session - resend inflight drop unauthorized");
+                    continue;
+                }
                 final MqttQoS qos = pubMsg.publishingQos;
                 final ByteBuf payload = pubMsg.payload;
                 final MqttProperties.MqttProperty<?>[] mqttProperties = pubMsg.mqttProperties;
@@ -480,6 +492,19 @@ class Session {
         LOG.debug("Resending {} in flight packets [{}]", packetIds.size(), sb);
     }
 
+    /**
+     * Verify that the principal of the currently bound connection (null username for anonymous) is allowed
+     * to read the topic of a message published before the (re)connection.
+     */
+    private boolean currentPrincipalCannotRead(Topic topic) {
+        final boolean nonReadable = !authorizator.canRead(topic, mqttConnection.getUsername(), getClientID());
+        if (nonReadable) {
+            LOG.warn("Dropping message on topic {} for client {}, the connected principal has no read permission",
+                topic, getClientID());
+        }
+        return nonReadable;
+    }
+
     private void drainQueueToConnection() {
         // consume the queue
         while (connected() && !sessionQueue.isEmpty() && inflightHasSlotsAndConnectionIsUp()) {
@@ -492,6 +517,13 @@ class Session {
             if (msgPub.isExpired()) {
                 LOG.debug("Drop an expired message contained in the queue");
                 return;
+            }
+
+            if (currentPrincipalCannotRead(msgPub.topic)) {
+                // the session could have been taken over by a principal different from the one that
+                // queued this message, don't leak content it's not entitled to read.
+                Utils.release(msg, "target session - drain queue drop unauthorized");
+                continue;
             }
 
             mqttConnection.sendQuota().consumeSlot();
