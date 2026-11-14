@@ -264,7 +264,7 @@ public class SessionRegistry {
             if (queueRepository.containsQueue(session.clientId())) {
                 final SessionMessageQueue<EnqueuedMessage> persistentQueue = queueRepository.getOrCreateQueue(session.clientId());
                 queues.remove(session.clientId());
-                Session rehydrated = new Session(session, false, persistentQueue);
+                Session rehydrated = new Session(session, false, persistentQueue, authorizator);
                 pool.put(session.clientId(), rehydrated);
                 metricsProvider.addOpenSession();
 
@@ -414,7 +414,7 @@ public class SessionRegistry {
             sessionData = new ISessionsRepository.SessionData(clientId, mqttVersion, expiryInterval, clock);
         }
 
-        newSession = new Session(sessionData, clean, queue);
+        newSession = new Session(sessionData, clean, queue, authorizator);
         newSession.markConnecting();
         sessionsRepository.saveSession(sessionData);
         if (MQTTConnection.isNeedResponseInformation(msg)) {
