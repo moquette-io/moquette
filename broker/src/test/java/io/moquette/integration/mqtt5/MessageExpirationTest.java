@@ -123,6 +123,45 @@ public class MessageExpirationTest extends AbstractServerIntegrationTest {
     }
 
     @Test
+    public void givenRetainedMessageWithExpiryWhenSubscribingLaterThenForwardedExpiryIsRemainingTime() throws Exception {
+        Mqtt5BlockingClient publisher = createPublisherClient();
+        int messageExpiryInterval = 10; //seconds
+        publisher.publishWith()
+            .topic("temperature/living")
+            .payload("18".getBytes(StandardCharsets.UTF_8))
+            .qos(MqttQos.AT_LEAST_ONCE) // Broker retains only QoS1 and QoS2
+            .retain(true)
+            .messageExpiryInterval(messageExpiryInterval)
+            .send();
+
+        Thread.sleep(2_000);
+
+        connectLowLevel();
+        MqttMessage received = lowLevelClient.subscribeWithIdentifier("temperature/living",
+            MqttQoS.AT_LEAST_ONCE, 123);
+        verifyOfType(received, MqttMessageType.SUBACK);
+
+        Awaitility.await()
+            .atMost(2, TimeUnit.SECONDS)
+            .until(lowLevelClient::hasReceivedMessages);
+        MqttMessage mqttMsg = lowLevelClient.receiveNextMessage(Duration.ofSeconds(1));
+        verifyOfType(mqttMsg, MqttMessageType.PUBLISH);
+        MqttPublishMessage publish = (MqttPublishMessage) mqttMsg;
+        MqttProperties.MqttProperty<Integer> messageExpiryProperty = publish.variableHeader()
+            .properties()
+            .getProperty(MqttProperties.MqttPropertyType.PUBLICATION_EXPIRY_INTERVAL.value());
+        assertNotNull(messageExpiryProperty, "message expiry property must be present");
+
+        // about 2 seconds have passed, so roughly 8 seconds should remain (allow some timing slack)
+        int remaining = messageExpiryProperty.value();
+        assertTrue(remaining >= 6 && remaining <= 9,
+            "Forwarded expiry should be the remaining time (~8s), but was " + remaining);
+
+        acknowledge(publish.variableHeader().packetId());
+        assertTrue(publish.release(), "Last reference of publish should be released");
+    }
+
+    @Test
     public void givenPublishMessageWithExpiryWhenForwarderToSubscriberStillContainsTheMessageExpiryHeader() throws MqttException {
         // Use Paho client to avoid default subscriptionIdentifier (1) set by default by HiveMQ client.
         MqttClient client = new MqttClient("tcp://localhost:1883", "subscriber", new MemoryPersistence());
