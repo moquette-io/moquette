@@ -18,18 +18,29 @@
 
 package io.moquette.broker.security.scram;
 
+import com.ongres.scram.common.ScramMechanism;
 import io.moquette.broker.security.ExtendedAuthenticator;
 import io.moquette.broker.security.ExtendedAuthenticatorProvider;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 public class ScramSha256Provider implements ExtendedAuthenticatorProvider {
+
+    private final ScramUserLookup scramUserLookup;
+
+    public ScramSha256Provider() {
+        Path pathToScramUserFile = Paths.get(System.getProperty("moquette.path", "."), "config", "users.yaml");
+        scramUserLookup = new ScramUserLookup(pathToScramUserFile);
+    }
+    
     @Override
     public String authenticationMethod() {
-        return "SCRAM-SHA-256";
+        return ScramMechanism.SCRAM_SHA_256.getName();
     }
 
     @Override
     public ExtendedAuthenticator createAuthenticator() {
-        ScramUserLookup userLookup = ScramUserLookup.getInstance();
-        return new ScramSha256Authenticator(userLookup);
+        return new ScramSha256Authenticator(scramUserLookup);
     }
 }

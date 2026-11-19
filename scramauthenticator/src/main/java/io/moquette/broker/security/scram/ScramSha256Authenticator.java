@@ -48,7 +48,7 @@ public final class ScramSha256Authenticator implements ExtendedAuthenticator {
 
     private static final Logger LOG = LoggerFactory.getLogger(ScramSha256Authenticator.class);
 
-    private static final ScramMechanism MECHANISM = ScramMechanism.SCRAM_SHA_256;
+    static final ScramMechanism MECHANISM = ScramMechanism.SCRAM_SHA_256;
     private static final int NONCE_LENGTH = 24;
     private static final int FAKE_SALT_LENGTH = 32;
     private static final int FAKE_ITERATION_COUNT = 4096;

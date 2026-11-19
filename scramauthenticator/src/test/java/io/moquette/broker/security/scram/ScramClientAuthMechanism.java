@@ -16,7 +16,7 @@
  *
  */
 
-package io.moquette.integration.mqtt5;
+package io.moquette.broker.security.scram;
 
 import com.hivemq.client.mqtt.datatypes.MqttUtf8String;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5ClientConfig;

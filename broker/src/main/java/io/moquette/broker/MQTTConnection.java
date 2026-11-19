@@ -850,6 +850,7 @@ final class MQTTConnection {
         HandshakeResult handshakeResult = authHandshake.processAuthStep(msg);
         switch (handshakeResult) {
             case FAILED:
+                // TODO send a negative CONNACK 
                 brokerDisconnect(MqttReasonCodes.Disconnect.NOT_AUTHORIZED);
                 return;
             case CONTINUE:

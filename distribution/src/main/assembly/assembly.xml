@@ -44,6 +44,11 @@
         </file>
 
         <file>
+            <source>src/main/resources/users.yaml</source>
+            <outputDirectory>config/</outputDirectory>
+        </file>
+
+        <file>
             <source>src/main/resources/README.txt</source>
         </file>
     </files>     

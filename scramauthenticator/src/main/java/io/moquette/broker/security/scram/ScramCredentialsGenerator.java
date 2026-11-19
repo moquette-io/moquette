@@ -78,6 +78,17 @@ public final class ScramCredentialsGenerator {
         public String getBase64ServerKey() {
             return base64ServerKey;
         }
+
+        @Override
+        public String toString() {
+            return "ScramUserData{" +
+                "username='" + username + '\'' +
+                ", base64Salt='" + base64Salt + '\'' +
+                ", iterationCount=" + iterationCount +
+                ", base64StoredKey='" + base64StoredKey + '\'' +
+                ", base64ServerKey='" + base64ServerKey + '\'' +
+                '}';
+        }
     }
 
     private static final ScramMechanism MECHANISM = ScramMechanism.SCRAM_SHA_256;

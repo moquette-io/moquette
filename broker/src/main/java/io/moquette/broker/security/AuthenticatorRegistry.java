@@ -52,7 +52,7 @@ public class AuthenticatorRegistry {
      * Create an extended authenticator by method, if not found return a default failing implementation.
      * */
     public ExtendedAuthenticator createByMethodName(String authenticationMethod) {
-        // Must create a new fresh instance, because is statefull and each instance
+        // Must create a new fresh instance, because is stateful and each instance
         // is used by one MQTTConnection
         ExtendedAuthenticatorProvider factory = factories.get(authenticationMethod);
         if (factory != null) {
