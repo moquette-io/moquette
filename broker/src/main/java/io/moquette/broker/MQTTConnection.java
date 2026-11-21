@@ -456,6 +456,7 @@ final class MQTTConnection {
         return postOffice.routeCommand(clientId, "CONN", () -> {
             checkMatchSessionLoop(sessionId);
             executeConnect(MQTTConnection.this.connectMessage.get(), sessionId, serverGeneratedClientId, authMethodName);
+            // free the CONNECT message reference kept alive till now.
             MQTTConnection.this.connectMessage.set(null);
             connectionStatus = ConnectionStatus.CONNECTED;
             return null;
@@ -871,8 +872,6 @@ final class MQTTConnection {
         authHandshake = null;
 
         completeSessionCreationFromAuth(this.connectMessage.get(), clientId, authenticationMethodName);
-        // free the CONNECT message reference kept alive till now.
-        this.connectMessage.set(null);
     } 
     
     PostOffice.RouteResult processDisconnect(MqttMessage msg) {
