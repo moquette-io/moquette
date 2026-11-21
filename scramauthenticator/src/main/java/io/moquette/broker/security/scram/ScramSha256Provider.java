@@ -1,5 +1,4 @@
 /*
- *
  * Copyright (c) 2012-2026 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
@@ -13,7 +12,6 @@
  * http://www.opensource.org/licenses/apache2.0.php
  * 
  * You may elect to redistribute this code under either of these licenses.
- *
  */
 
 package io.moquette.broker.security.scram;
