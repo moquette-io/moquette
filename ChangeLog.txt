@@ -36,6 +36,17 @@ Version 0.19-SNAPSHOT
      - Metrics endpoint can be found on http://localhost:9400/metrics by default.
      - port can be changed with `metrics_endpoint_port`. Set to 0 to disable http endpoint.
    [fix] Fixed SegmentedQueues not being cleaned up on session purge. (#833)
+   
+Version 0.18.2:
+   [fix] Use ACLs to verifies inflights and queue messages right on session takeover. (#987)
+   [fix] Fails to start the broker when a parsing error happens in the config. (#986)
+   [fix] Fail startup when the ACL file defines a `user` section but no authenticator
+    (password_file/authenticator_class) is configured, otherwise the permissive authenticator
+    would grant the ACL user's permissions to any client claiming that username
+    with an arbitrary password. (#984)
+   [fix] Use clientId and userName in ACL verification when the send of last will is done. (#983)
+   [fix] Keep the order of arrival when resend in-flight unacknowledged PUBs. (#982)
+   [fix] A second connect message sent on an already connected client must close the connection as a protocol error. (#969)
 
 Version 0.18.1:
    [fix] Add a length max to the session queues, this avoids that a slow ACK-ing subscriber consumes too much resources if a fast publisher is sending to same topic.
