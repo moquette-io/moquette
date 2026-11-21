@@ -1,26 +1,7 @@
 Version 0.19-SNAPSHOT
    [feature] Added MQTT5 enhanced authentication support with SCRAM-SHA-256, via a pluggable ExtendedAuthenticator SPI and a new `moquette-scramauthenticator` module that loads users from `config/users.yaml`. (#993)
-   [fix] Use ACLs to verifies inflights and queue messages right on session takeover. (#987)
-   [fix] Fails to start the broker when a parsing error happens in the config. (#986)
-   [fix] Fail startup when the ACL file defines a `user` section but no authenticator 
-    (password_file/authenticator_class) is configured, otherwise the permissive authenticator 
-    would grant the ACL user's permissions to any client claiming that username 
-    with an arbitrary password. (#984)
-   [fix] Use clientId and userName in ACL verification when the send of last will is done. (#983)
-   [fix] Keep the order of arrival when resend in-flight unacknowledged PUBs. (#982)
    [feature] Added method for message interceptors to get the original message. (#948)
    [feature] Pass remote address of a client when notify to interceptor handlers, adding it into InterceptConnectMessage. (#946)
-   [fix] A second connect message sent on an already connected client must close the connection as a protocol error. (#969)
-   [fix] Add a length max to the session queues, this avoids that a slow ACK-ing subscriber consumes too much resources if a fast publisher is sending to same topic.
-   [fix] Add a guard for topic depth against static max value. It checks on PUB and SUB message receive and also at SubscriptionDirectory level.
-   [fix] Guarded pattern ACL substitution against a null username to prevent a remote DoS. (#963)
-   [fix] Namespaced the H2 queue metadata map to prevent a client-id collision that could corrupt a durable queue. (#964)
-   [fix] Fail startup instead of silently falling back to a permissive authorizator/authenticator when a configured authorizator_class/authenticator_class fails to load. (#967)
-   [fix] Check Last Will topic for writability rights before publish.
-   [fix] Reject a malformed $share subscription before parsing it (remote DoS). (#958)
-   [fix] Keep the session event loop alive when a command throws (remote DoS). (#957)
-   [fix] Guard the periodic expiration task so one failing entity can't disable all expirations. (#959)
-   [fix] Prevent pattern-ACL wildcard injection via a wildcard client id/username
    [feature] InterceptUnsubscribeMessage now has the entire Subscription and the notification hook has changed
      from `notifyTopicUnsubscribed(String topic, String clientID, String username)`
      to `notifyTopicUnsubscribed(Subscription sub, String username)`
@@ -36,6 +17,17 @@ Version 0.19-SNAPSHOT
      - Metrics endpoint can be found on http://localhost:9400/metrics by default.
      - port can be changed with `metrics_endpoint_port`. Set to 0 to disable http endpoint.
    [fix] Fixed SegmentedQueues not being cleaned up on session purge. (#833)
+   
+Version 0.18.2:
+   [fix] Use ACLs to verifies inflights and queue messages right on session takeover. (#987)
+   [fix] Fails to start the broker when a parsing error happens in the config. (#986)
+   [fix] Fail startup when the ACL file defines a `user` section but no authenticator
+    (password_file/authenticator_class) is configured, otherwise the permissive authenticator
+    would grant the ACL user's permissions to any client claiming that username
+    with an arbitrary password. (#984)
+   [fix] Use clientId and userName in ACL verification when the send of last will is done. (#983)
+   [fix] Keep the order of arrival when resend in-flight unacknowledged PUBs. (#982)
+   [fix] A second connect message sent on an already connected client must close the connection as a protocol error. (#969)
 
 Version 0.18.1:
    [fix] Add a length max to the session queues, this avoids that a slow ACK-ing subscriber consumes too much resources if a fast publisher is sending to same topic.
