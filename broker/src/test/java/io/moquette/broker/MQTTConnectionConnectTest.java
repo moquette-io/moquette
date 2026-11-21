@@ -159,6 +159,44 @@ public class MQTTConnectionConnectTest {
         assertEqualsConnAck(CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD, channel.readOutbound());
         assertFalse(channel.isOpen(), "Connection should be closed by the broker.");
     }
+    
+    @Test
+    public void givenMQTT5ConnectWithUnsupportedAuthenticationMethodThenReplyConnAckWithBadAuthenticationMethodReturnCode() {
+        final MqttProperties connectProperties = new MqttProperties();
+        connectProperties.add(new MqttProperties.StringProperty(MqttProperties.MqttPropertyType.AUTHENTICATION_METHOD.value(), 
+            "UNSUPPORTED_AUTH_METH"));
+
+        MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID)
+            .protocolVersion(MqttVersion.MQTT_5)
+            .properties(connectProperties)
+            .build();
+
+        // Exercise|
+        sut.processConnect(msg);
+
+        // Verify
+        assertEqualsConnAck(CONNECTION_REFUSED_BAD_AUTHENTICATION_METHOD, channel.readOutbound());
+        assertFalse(channel.isOpen(), "Connection should be closed by the broker.");
+    }
+    
+    @Test
+    public void givenMQTT5ConnectionWithJustAuthenticationDataWithoutAuthenticationMethodThenReplyConnAckWithProtocolError() {
+        final MqttProperties connectProperties = new MqttProperties();
+        connectProperties.add(new MqttProperties.BinaryProperty(MqttProperties.MqttPropertyType.AUTHENTICATION_DATA.value(),
+            new byte[]{0x0C, 0x0A, 0x0F, 0x0E, 0x0B, 0x0A, 0x0B, 0x0E}));
+
+        MqttConnectMessage msg = connMsg.clientId(FAKE_CLIENT_ID)
+            .protocolVersion(MqttVersion.MQTT_5)
+            .properties(connectProperties)
+            .build();
+
+        // Exercise|
+        sut.processConnect(msg);
+
+        // Verify
+        assertEqualsConnAck(CONNECTION_REFUSED_PROTOCOL_ERROR, channel.readOutbound());
+        assertFalse(channel.isOpen(), "Connection should be closed by the broker.");
+    }
 
     @Test
     public void testConnect_badClientID() throws ExecutionException, InterruptedException {

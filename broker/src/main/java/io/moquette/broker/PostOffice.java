@@ -873,6 +873,7 @@ class PostOffice {
 
         final BatchingPublishesCollector collector = new BatchingPublishesCollector(sessionLoops);
 
+        //TODO this can be moved to use Streams API
         for (final Subscription sub : topicMatchingSubscriptions) {
             if (filterTargetClients == NO_FILTER || filterTargetClients.contains(sub.getClientId())) {
                 if (sub.getOption().isNoLocal()) {
@@ -893,6 +894,8 @@ class PostOffice {
             LOG.trace("No matching subscriptions for topic: {}", topic);
             return new RoutingResults(Collections.emptyList(), Collections.emptyList(), CompletableFuture.completedFuture(null));
         }
+        
+        // TODO this sanity check is an invariant and can be moved inside collector.countBatches() 
         // sanity check
         if (subscriptionCount > sessionLoops.getEventLoopCount()) {
             LOG.error("Cardinality of subscription batches ({}) is bigger then the available session loops {}",

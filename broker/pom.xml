@@ -40,6 +40,12 @@
         </dependency>
 
         <dependency>
+            <groupId>com.ongres.scram</groupId>
+            <artifactId>scram-common</artifactId>
+            <version>3.1</version>
+        </dependency>
+
+        <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-common</artifactId>
             <version>${netty.version}</version>
@@ -174,6 +180,13 @@
             <groupId>org.eclipse.paho</groupId>
             <artifactId>org.eclipse.paho.mqttv5.client</artifactId>
             <version>${paho.mttt5.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.ongres.scram</groupId>
+            <artifactId>scram-client</artifactId>
+            <version>3.1</version>
             <scope>test</scope>
         </dependency>
 

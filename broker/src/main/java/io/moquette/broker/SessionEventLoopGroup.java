@@ -68,7 +68,7 @@ class SessionEventLoopGroup {
         SessionCommand cmd = new SessionCommand(clientId, action);
 
         if (clientId == null) {
-            LOG.warn("Routing collision for action [{}]", actionDescription);
+            LOG.warn("Routing collision for action, clientId undefined [{}]", actionDescription);
             return PostOffice.RouteResult.failed(null, "Seems awaiting new route feature completion, skipping.");
         }
 

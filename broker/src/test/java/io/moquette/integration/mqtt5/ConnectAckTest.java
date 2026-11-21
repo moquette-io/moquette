@@ -18,7 +18,7 @@ import static io.moquette.BrokerConstants.INFLIGHT_WINDOW_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-class ConnectAckTest extends  AbstractServerIntegrationTest {
+public class ConnectAckTest extends  AbstractServerIntegrationTest {
     private static final Logger LOG = LoggerFactory.getLogger(ConnectAckTest.class);
     public static final int EXPECTED_TOPIC_ALIAS_MX = 7;
     private MqttConnAckMessage connAck;
@@ -81,6 +81,5 @@ class ConnectAckTest extends  AbstractServerIntegrationTest {
         final MqttProperties.MqttProperty<String> property = ackProps.getProperty(MqttPropertyType.ASSIGNED_CLIENT_IDENTIFIER.value());
         final int clientServerGeneratedSize = 32;
         assertEquals(clientServerGeneratedSize, property.value().length(), "Server assigned client ID");
-
     }
 }
