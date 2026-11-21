@@ -91,7 +91,6 @@ final class MQTTConnection {
     private ConnectionStatus connectionStatus = ConnectionStatus.DISCONNECTED;
     // This is stored because it's used by the Enhanced authentication flow to
     // complete the last part of session setup in the last AUTH message.
-    private MqttConnectMessage connectMessage;
     private boolean serverGeneratedClientId = false;
 
     static final class ErrorCodeException extends Exception {
@@ -371,7 +370,6 @@ final class MQTTConnection {
         }
         
         final boolean cleanSession = msg.variableHeader().isCleanSession();
-        final boolean serverGeneratedClientId;
         if (clientId == null || clientId.isEmpty()) {
             if (!isProtocolVersion(MqttVersion.MQTT_5)) {
                 if (!brokerConfig.isAllowZeroByteClientId()) {
@@ -458,7 +456,7 @@ final class MQTTConnection {
         return postOffice.routeCommand(clientId, "CONN", () -> {
             checkMatchSessionLoop(sessionId);
             executeConnect(MQTTConnection.this.connectMessage.get(), sessionId, serverGeneratedClientId, authMethodName);
-            MQTTConnection.this.connectMessage = null;
+            MQTTConnection.this.connectMessage.set(null);
             connectionStatus = ConnectionStatus.CONNECTED;
             return null;
         });
@@ -862,7 +860,7 @@ final class MQTTConnection {
                 break;
         }
         
-        if (this.connectMessage == null) {
+        if (this.connectMessage.get() == null) {
             // This is a programming BUG, if connection is MQTT5 and it's executing enhanced authentication flow
             // then connectMessage has to be stored to be able to complete the last step of connection flow.
             throw new IllegalStateException("MQTTConnection.connectMessage field MUST be valued, this is a programming error");
@@ -872,9 +870,9 @@ final class MQTTConnection {
         String authenticationMethodName = authHandshake.authenticationMethodName;
         authHandshake = null;
 
-        completeSessionCreationFromAuth(this.connectMessage, clientId, authenticationMethodName);
+        completeSessionCreationFromAuth(this.connectMessage.get(), clientId, authenticationMethodName);
         // free the CONNECT message reference kept alive till now.
-        this.connectMessage = null;
+        this.connectMessage.set(null);
     } 
     
     PostOffice.RouteResult processDisconnect(MqttMessage msg) {
