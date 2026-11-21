@@ -21,6 +21,12 @@
         </dependency>
 
         <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>moquette-scramauthenticator</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
             <!-- This is used to use log4j12 implementation -->
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-reload4j</artifactId>

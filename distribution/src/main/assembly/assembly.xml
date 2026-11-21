@@ -17,6 +17,12 @@
         </file>
 
         <file>
+            <source>src/main/scripts/scram_users.sh</source>
+            <outputDirectory>bin</outputDirectory>
+            <fileMode>0755</fileMode>
+        </file>
+
+        <file>
             <source>src/main/scripts/moquette.bat</source>
             <outputDirectory>bin</outputDirectory>
         </file>
@@ -34,6 +40,11 @@
         
         <file>
             <source>src/main/resources/password_file.conf</source>
+            <outputDirectory>config/</outputDirectory>
+        </file>
+
+        <file>
+            <source>src/main/resources/users.yaml</source>
             <outputDirectory>config/</outputDirectory>
         </file>
 

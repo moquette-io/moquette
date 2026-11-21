@@ -1,4 +1,5 @@
 Version 0.19-SNAPSHOT
+   [feature] Added MQTT5 enhanced authentication support with SCRAM-SHA-256, via a pluggable ExtendedAuthenticator SPI and a new `moquette-scramauthenticator` module that loads users from `config/users.yaml`. (#993)
    [fix] Use ACLs to verifies inflights and queue messages right on session takeover. (#987)
    [fix] Fails to start the broker when a parsing error happens in the config. (#986)
    [fix] Fail startup when the ACL file defines a `user` section but no authenticator 
