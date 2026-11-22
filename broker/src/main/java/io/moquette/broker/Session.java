@@ -253,6 +253,10 @@ class Session {
             return;
         }
         Utils.release(removed, "target session - phase 2 Qos2 pull from inflight");
+//        if (mqttConnection == null) {
+//            LOG.info("Received PUBCOMP {} for session {} with no active connection", messageID, getClientID());
+//            return;
+//        }
         mqttConnection.sendQuota().releaseSlot();
         drainQueueToConnection();
 
@@ -386,6 +390,11 @@ class Session {
         }
         Utils.release(removed, "target session - inflight remove");
 
+//        if (mqttConnection == null) {
+//            // the client already disconnected, nothing to release on the send quota or to send
+//            LOG.info("Received PUBACK {} for session {} with no active connection", ackPacketId, getClientID());
+//            return;
+//        }
         mqttConnection.sendQuota().releaseSlot();
         LOG.debug("Received PUBACK {} for session {}", ackPacketId, getClientID());
         if (resendingNonAcked) {
