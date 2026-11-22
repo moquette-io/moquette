@@ -13,6 +13,8 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.mqtt.*;
 import io.netty.util.ReferenceCountUtil;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
@@ -33,55 +35,74 @@ public class SessionDisconnectPubackTest {
 
     private static final String CLIENT_ID = "persistent-sub";
     private static final String TOPIC = "/poc/disconnect-puback";
+    private CountDownLatch loopErrorSeen;
+    private BrokerInterceptor interceptor;
+    private ScheduledExecutorService scheduler;
+    private PostOffice postOffice;
+    private MQTTConnection connection;
+
+    @BeforeEach
+    public void setUp() {
+        loopErrorSeen = new CountDownLatch(1);
+        interceptor = new BrokerInterceptor(Collections.singletonList(new ErrorCapture(loopErrorSeen)));
+        scheduler = Executors.newScheduledThreadPool(1);
+        
+        ISubscriptionsDirectory subscriptions = new CTrieSubscriptionDirectory();
+        subscriptions.init(new MemorySubscriptionsRepository());
+        MetricsProvider metrics = new MetricsProviderNull();
+        Authorizator authorizator = new Authorizator(new PermitAllAuthorizatorPolicy());
+        SessionEventLoopGroup loops = new SessionEventLoopGroup(interceptor, 1024, metrics);
+        ISessionsRepository sessions = MQTTConnectionPublishTest.memorySessionsRepository();
+        SessionRegistry sessionsRegistry = new SessionRegistry(subscriptions, sessions, new MemoryQueueRepository(),
+            authorizator, scheduler, loops, metrics);
+        postOffice = new PostOffice(subscriptions, new MemoryRetainedRepository(), sessionsRegistry, sessions,
+            interceptor, authorizator, loops, metrics);
+        MockAuthenticator authenticator = new MockAuthenticator(Collections.singleton(CLIENT_ID), Collections.emptyMap());
+        BrokerConfiguration brokerConfig = new BrokerConfiguration(true, true, false, NO_BUFFER_FLUSH);
+        connection = new MQTTConnection(new EmbeddedChannel(), brokerConfig, authenticator, sessionsRegistry, postOffice);
+    }
+
+    @AfterEach
+    private void tearDown() {
+        scheduler.shutdownNow();
+        interceptor.stop();
+    }
 
     @Test
     public void pubackAfterDisconnectDoesNotCrashSessionLoop() throws Exception {
-        CountDownLatch loopErrorSeen = new CountDownLatch(1);
-        BrokerInterceptor interceptor = new BrokerInterceptor(Collections.singletonList(new ErrorCapture(loopErrorSeen)));
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-        try {
-            ISubscriptionsDirectory subscriptions = new CTrieSubscriptionDirectory();
-            subscriptions.init(new MemorySubscriptionsRepository());
-            MetricsProvider metrics = new MetricsProviderNull();
-            Authorizator authorizator = new Authorizator(new PermitAllAuthorizatorPolicy());
-            SessionEventLoopGroup loops = new SessionEventLoopGroup(interceptor, 1024, metrics);
-            ISessionsRepository sessions = MQTTConnectionPublishTest.memorySessionsRepository();
-            SessionRegistry registry = new SessionRegistry(subscriptions, sessions, new MemoryQueueRepository(),
-                authorizator, scheduler, loops, metrics);
-            PostOffice postOffice = new PostOffice(subscriptions, new MemoryRetainedRepository(), registry, sessions,
-                interceptor, authorizator, loops, metrics);
-            MockAuthenticator authenticator = new MockAuthenticator(Collections.singleton(CLIENT_ID),
-                Collections.emptyMap());
+        ConnectionTestUtils.connect(connection, ConnectionTestUtils.buildConnectNotClean(CLIENT_ID));
 
-            MQTTConnection connection = new MQTTConnection(new EmbeddedChannel(),
-                new BrokerConfiguration(true, true, false, NO_BUFFER_FLUSH), authenticator, registry, postOffice);
-            ConnectionTestUtils.connect(connection, ConnectionTestUtils.buildConnectNotClean(CLIENT_ID));
+        MqttSubscribeMessage subscribeMsg = MqttMessageBuilders.subscribe()
+            .addSubscription(MqttQoS.AT_LEAST_ONCE, TOPIC)
+            .messageId(1)
+            .build();
+        postOffice.subscribeClientToTopics(subscribeMsg, CLIENT_ID, null, connection);
+        // consumes the SUBACK form the client side
+        ((EmbeddedChannel) connection.channel).readOutbound();
 
-            postOffice.subscribeClientToTopics(MqttMessageBuilders.subscribe()
-                .addSubscription(MqttQoS.AT_LEAST_ONCE, TOPIC).messageId(1).build(), CLIENT_ID, null, connection);
-            ((EmbeddedChannel) connection.channel).readOutbound();
+        // send a PUBLISH from the broker to the client
+        MqttPublishMessage publish = MqttMessageBuilders.publish()
+            .topicName(TOPIC)
+            .qos(MqttQoS.AT_LEAST_ONCE)
+            .payload(Unpooled.copiedBuffer("queued".getBytes(UTF_8)))
+            .build();
+        postOffice.internalPublish(publish).completableFuture().get(5, TimeUnit.SECONDS);
+        
+        // Verify the client receive the PUBLISH
+        MqttPublishMessage outbound = ((EmbeddedChannel) connection.channel).flushOutbound().readOutbound();
+        assertNotNull(outbound, "expected an inflight QoS1 publish");
+        int packetId = outbound.variableHeader().packetId();
+        ReferenceCountUtil.release(outbound);
+        
+        // send a DISCONNECT to the broker
+        connection.handleMessage(MqttMessageBuilders.disconnect().build());
+        
+        // send a PUBACK to the broker
+        MqttFixedHeader pubackHeader = new MqttFixedHeader(MqttMessageType.PUBACK, false, MqttQoS.AT_MOST_ONCE,
+            false, 0);
+        connection.handleMessage(new MqttMessage(pubackHeader, MqttMessageIdVariableHeader.from(packetId)));
 
-            MqttPublishMessage publish = MqttMessageBuilders.publish()
-                .topicName(TOPIC)
-                .qos(MqttQoS.AT_LEAST_ONCE)
-                .payload(Unpooled.copiedBuffer("queued".getBytes(UTF_8)))
-                .build();
-            postOffice.internalPublish(publish).completableFuture().get(5, TimeUnit.SECONDS);
-            MqttPublishMessage outbound = ((EmbeddedChannel) connection.channel).flushOutbound().readOutbound();
-            assertNotNull(outbound, "expected an inflight QoS1 publish");
-            int packetId = outbound.variableHeader().packetId();
-            ReferenceCountUtil.release(outbound);
-            
-            connection.handleMessage(MqttMessageBuilders.disconnect().build());
-            MqttFixedHeader pubackHeader = new MqttFixedHeader(MqttMessageType.PUBACK, false, MqttQoS.AT_MOST_ONCE,
-                false, 0);
-            connection.handleMessage(new MqttMessage(pubackHeader, MqttMessageIdVariableHeader.from(packetId)));
-
-            assertFalse(loopErrorSeen.await(1, TimeUnit.SECONDS), "session loop must not fail");
-        } finally {
-            scheduler.shutdownNow();
-            interceptor.stop();
-        }
+        assertFalse(loopErrorSeen.await(1, TimeUnit.SECONDS), "session loop must not fail");
     }
 
     private static final class ErrorCapture implements InterceptHandler {
