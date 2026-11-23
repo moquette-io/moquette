@@ -74,7 +74,7 @@ import static io.moquette.logging.LoggingUtils.getInterceptorIds;
 public class Server {
 
     private static final Logger LOG = LoggerFactory.getLogger(io.moquette.broker.Server.class);
-    public static final String MOQUETTE_VERSION = "0.18.2";
+    public static final String MOQUETTE_VERSION = "0.18.3";
 
     private ScheduledExecutorService scheduler;
     private NewNettyAcceptor acceptor;
