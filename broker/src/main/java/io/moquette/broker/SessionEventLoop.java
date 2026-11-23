@@ -5,8 +5,10 @@ import io.moquette.metrics.MetricsProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.FutureTask;
+import java.util.function.BiConsumer;
 
 final class SessionEventLoop extends Thread {
 
@@ -20,6 +22,12 @@ final class SessionEventLoop extends Thread {
      * Allows a task to fetch the id of the session queue that is executing it.
      */
     private static final ThreadLocal<Integer> threadQueueId = new ThreadLocal<>();
+    private final BiConsumer<Thread, Throwable> exceptionHandler;
+
+    public SessionEventLoop(BlockingQueue<FutureTask<String>> taskQueue, int queueId, MetricsProvider metricsProvider,
+                            BiConsumer<Thread, Throwable> exceptionHandler) {
+        this(taskQueue, queueId, true, metricsProvider, exceptionHandler);
+    }
 
     public SessionEventLoop(BlockingQueue<FutureTask<String>> taskQueue, int queueId, MetricsProvider metricsProvider) {
         this(taskQueue, queueId, true, metricsProvider);
@@ -30,11 +38,20 @@ final class SessionEventLoop extends Thread {
      *
      */
     public SessionEventLoop(BlockingQueue<FutureTask<String>> taskQueue, int queueId, boolean flushOnExit, MetricsProvider metricsProvider) {
+        this(taskQueue, queueId, flushOnExit, metricsProvider, SessionEventLoop::emptyHandler);
+    }
+
+    public SessionEventLoop(BlockingQueue<FutureTask<String>> taskQueue, int queueId, boolean flushOnExit, 
+                            MetricsProvider metricsProvider, BiConsumer<Thread, Throwable> exceptionHandler) {
+        Objects.nonNull(exceptionHandler);
         this.taskQueue = taskQueue;
         this.queueId = queueId;
         this.flushOnExit = flushOnExit;
         this.metricsProvider = metricsProvider;
+        this.exceptionHandler = exceptionHandler;
     }
+    
+    private static void emptyHandler(Thread thread, Throwable throwable) {}
 
     @Override
     public void run() {
@@ -53,6 +70,7 @@ final class SessionEventLoop extends Thread {
                 // failure for its submitter, so co-located sessions must not be taken down with it.
                 LOG.error("SessionEventLoop {} caught an unhandled error while processing a command; "
                         + "the loop continues", Thread.currentThread().getName(), th);
+                exceptionHandler.accept(Thread.currentThread(), th);
             }
         }
         LOG.info("SessionEventLoop {} exit", Thread.currentThread().getName());
@@ -66,7 +84,7 @@ final class SessionEventLoop extends Thread {
                 // we ran it, but we have to grab the exception if raised
                 task.get();
             } catch (Throwable th) {
-                LOG.warn("SessionEventLoop {} reached exception in processing command", Thread.currentThread().getName(), th);
+                LOG.warn("SessionEventLoop {} reached exception in processing command", Thread.currentThread().getName()/*, th*/);
                 throw new RuntimeException(th);
             }
         }
