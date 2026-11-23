@@ -1,3 +1,6 @@
+Version 0.18.3:
+   [fix] Fixed auth check on shared subscriptions not fully working. (#919)
+
 Version 0.18.2:
    [fix] Use ACLs to verifies inflights and queue messages right on session takeover. (#987)
    [fix] Fails to start the broker when a parsing error happens in the config. (#986)
