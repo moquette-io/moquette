@@ -20,27 +20,31 @@ class SessionEventLoopGroup {
     private final BlockingQueue<FutureTask<String>>[] sessionQueues;
     private final int eventLoops = Runtime.getRuntime().availableProcessors();
     private final ConcurrentMap<String, Throwable> loopThrownExceptions = new ConcurrentHashMap<>();
+    private final BrokerInterceptor interceptor;
 
     SessionEventLoopGroup(BrokerInterceptor interceptor, int sessionQueueSize) {
         this.sessionQueues = new BlockingQueue[eventLoops];
+        this.interceptor = interceptor;
         for (int i = 0; i < eventLoops; i++) {
             this.sessionQueues[i] = new ArrayBlockingQueue<>(sessionQueueSize);
         }
         this.sessionExecutors = new SessionEventLoop[eventLoops];
         for (int i = 0; i < eventLoops; i++) {
-            SessionEventLoop newLoop = new SessionEventLoop(this.sessionQueues[i]);
+            SessionEventLoop newLoop = new SessionEventLoop(this.sessionQueues[i], this::handleLoopException);
             newLoop.setName(sessionLoopName(i));
-            newLoop.setUncaughtExceptionHandler((loopThread, ex) -> {
-                // executed in session loop thread
-                // collect the exception thrown to later re-throw
-                loopThrownExceptions.put(loopThread.getName(), ex);
-
-                // This is done in asynch from another thread in BrokerInterceptor
-                interceptor.notifyLoopException(new InterceptExceptionMessage(ex));
-            });
+            newLoop.setUncaughtExceptionHandler(this::handleLoopException);
             newLoop.start();
             this.sessionExecutors[i] = newLoop;
         }
+    }
+    
+    private void handleLoopException(Thread loopThread, Throwable ex) {
+        // executed in session loop thread
+        // collect the exception thrown to later re-throw
+        loopThrownExceptions.put(loopThread.getName(), ex);
+
+        // This is done in asynch from another thread in BrokerInterceptor
+        interceptor.notifyLoopException(new InterceptExceptionMessage(ex));
     }
 
     int targetQueueOrdinal(String clientId) {
