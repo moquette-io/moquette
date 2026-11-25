@@ -888,8 +888,32 @@ final class MQTTConnection {
                 LOG.debug("NOT processing disconnect {}, not bound.", clientID);
                 return null;
             }
-            if (isProtocolVersion5()) {
-                MqttReasonCodeAndPropertiesVariableHeader disconnectHeader = (MqttReasonCodeAndPropertiesVariableHeader) msg.variableHeader();
+            if (isProtocolVersion5() && msg != null
+                    && msg.variableHeader() instanceof MqttReasonCodeAndPropertiesVariableHeader) {
+                MqttReasonCodeAndPropertiesVariableHeader disconnectHeader =
+                    (MqttReasonCodeAndPropertiesVariableHeader) msg.variableHeader();
+                MqttProperties.MqttProperty<Integer> expiryIntervalProperty =
+                    (MqttProperties.MqttProperty<Integer>) disconnectHeader.properties()
+                        .getProperty(MqttProperties.MqttPropertyType.SESSION_EXPIRY_INTERVAL.value());
+                if (expiryIntervalProperty != null) {
+                    if (bindedSession.expireImmediately()) {
+                        // [MQTT-3.14.2-2] Session Expiry Interval MUST NOT be sent on DISCONNECT
+                        // when CONNECT Session Expiry Interval was 0
+                        LOG.warn("Closing client {}: Session Expiry Interval sent on DISCONNECT when CONNECT "
+                            + "session expiry was 0", clientID);
+                        if (disconnectHeader.reasonCode() != MqttReasonCodes.Disconnect.NORMAL_DISCONNECT.byteValue()
+                                && bindedSession.hasWill()) {
+                            postOffice.fireWill(bindedSession);
+                        }
+                        sessionRegistry.connectionClosed(bindedSession);
+                        protocolVersion = UNDEFINED_VERSION;
+                        brokerDisconnect(MqttReasonCodes.Disconnect.PROTOCOL_ERROR);
+                        String userName = NettyUtils.userName(channel);
+                        postOffice.clientDisconnected(clientID, userName);
+                        return null;
+                    }
+                    sessionRegistry.updateSessionExpiry(bindedSession, expiryIntervalProperty.value());
+                }
                 if (disconnectHeader.reasonCode() != MqttReasonCodes.Disconnect.NORMAL_DISCONNECT.byteValue()) {
                     // handle the will
                     if (bindedSession.hasWill()) {
