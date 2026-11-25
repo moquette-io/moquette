@@ -95,10 +95,6 @@ public final class ACLFileParser {
         Pattern emptyLine = Pattern.compile("^\\s*$");
         Pattern commentLine = Pattern.compile("^#.*"); // As spec, comment lines should start with '#'
         Pattern invalidCommentLine = Pattern.compile("^\\s*#.*");
-        // This pattern has a dependency on filtering `commentLine`.
-        Pattern endLineComment = Pattern.compile("^([\\w\\s\\/\\+]+#?)(\\s*#.*)$");
-        Matcher endLineCommentMatcher;
-
         try {
             while ((line = br.readLine()) != null) {
                 if (line.isEmpty() || emptyLine.matcher(line).matches() || commentLine.matcher(line).matches()) {
@@ -110,17 +106,35 @@ public final class ACLFileParser {
                     throw new ParseException(line, commentMarker);
                 }
 
-                endLineCommentMatcher = endLineComment.matcher(line);
-                if (endLineCommentMatcher.matches()) {
-                    line = endLineCommentMatcher.group(1);
-                }
-
-                collector.parse(line);
+                collector.parse(stripEndLineComment(line));
             }
         } catch (IOException ex) {
             throw new ParseException("Failed to read", 1);
         }
         return collector;
+    }
+
+    // Leading keywords of a rule, up to the start of the topic filter: "topic [read|write|readwrite] ",
+    // "pattern [read|write|readwrite] " or "user ".
+    private static final Pattern RULE_PREFIX = Pattern.compile(
+        "^\\s*(?:(?:topic|pattern)\\s+(?:(?:read|write|readwrite)\\s+)?|user\\s+)", Pattern.CASE_INSENSITIVE);
+    // An end of line comment starts with a '#' preceded by whitespace.
+    private static final Pattern END_LINE_COMMENT = Pattern.compile("\\s+#");
+
+    /**
+     * Remove the optional end of line comment from a rule line.
+     * A '#' starts a comment only if it's preceded by whitespace and it's not the first character of the topic
+     * filter. So in "topic read alice/#" and "topic read #" the '#' is the multi level wildcard, while in
+     * "topic read alice/# # a comment" the second '#' starts the comment.
+     */
+    static String stripEndLineComment(String line) {
+        Matcher prefix = RULE_PREFIX.matcher(line);
+        int filterStart = prefix.find() ? prefix.end() : 0;
+        Matcher comment = END_LINE_COMMENT.matcher(line);
+        if (comment.find(filterStart)) {
+            return line.substring(0, comment.start());
+        }
+        return line;
     }
 
     private ACLFileParser() {

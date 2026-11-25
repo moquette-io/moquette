@@ -91,4 +91,51 @@ public class ACLFileParserTest {
         assertTrue(authorizations.canRead(new Topic("/weather/+/anemometer"), "", ""));
         assertTrue(authorizations.canWrite(new Topic("/weather/+/anemometer"), "", ""));
     }
+
+    @Test
+    public void givenReadRuleWithTrailingMultiLevelWildcard_whenParsed_thenWildcardIsKept() throws ParseException {
+        Reader conf = new StringReader("user alice\ntopic read alice/#");
+        AuthorizationsCollector authorizations = ACLFileParser.parse(conf);
+
+        assertTrue(authorizations.canRead(new Topic("alice/a"), "alice", ""));
+        assertTrue(authorizations.canRead(new Topic("alice/a/b/c"), "alice", ""));
+        assertFalse(authorizations.canWrite(new Topic("alice/a"), "alice", ""));
+        assertFalse(authorizations.canRead(new Topic("bob/a"), "alice", ""));
+    }
+
+    @Test
+    public void givenReadWriteRuleWithBareMultiLevelWildcard_whenParsed_thenAllTopicsAreGranted() throws ParseException {
+        Reader conf = new StringReader("user alice\ntopic readwrite #");
+        AuthorizationsCollector authorizations = ACLFileParser.parse(conf);
+
+        assertTrue(authorizations.canRead(new Topic("any/topic"), "alice", ""));
+        assertTrue(authorizations.canWrite(new Topic("any/topic"), "alice", ""));
+    }
+
+    @Test
+    public void givenRuleWithTrailingWildcardAndEndLineComment_whenParsed_thenWildcardIsKeptAndCommentDropped() throws ParseException {
+        Reader conf = new StringReader("user alice\ntopic read alice/# # trailing comment");
+        AuthorizationsCollector authorizations = ACLFileParser.parse(conf);
+
+        assertTrue(authorizations.canRead(new Topic("alice/a/b"), "alice", ""));
+        assertFalse(authorizations.canRead(new Topic("bob/a"), "alice", ""));
+    }
+
+    @Test
+    public void givenRuleWithPlusWildcardAndSpacedEndLineComment_whenParsed_thenWildcardIsKeptAndCommentDropped() throws ParseException {
+        Reader conf = new StringReader("user alice\ntopic read alice/+/x   # comment");
+        AuthorizationsCollector authorizations = ACLFileParser.parse(conf);
+
+        assertTrue(authorizations.canRead(new Topic("alice/a/x"), "alice", ""));
+        assertFalse(authorizations.canRead(new Topic("alice/a/y"), "alice", ""));
+    }
+
+    @Test
+    public void givenPatternRuleWithTrailingWildcard_whenParsed_thenWildcardIsKept() throws ParseException {
+        Reader conf = new StringReader("pattern write devices/%c/#");
+        AuthorizationsCollector authorizations = ACLFileParser.parse(conf);
+
+        assertTrue(authorizations.canWrite(new Topic("devices/client1/a/b"), "", "client1"));
+        assertFalse(authorizations.canWrite(new Topic("devices/client2/a"), "", "client1"));
+    }
 }

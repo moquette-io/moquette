@@ -1,4 +1,5 @@
 Version 0.18.3:
+   [fix] In ACL files avoid to parse last topic wildcards (`#`) as comment markers. (#998)
    [fix] Avoid to crash loop by NPE if receiving a PUBACK after DISCONNECT. (#996)
    [fix] Fixed auth check on shared subscriptions not fully working. (#919)
 
