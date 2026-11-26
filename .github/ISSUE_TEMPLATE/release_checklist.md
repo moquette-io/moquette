@@ -1,3 +1,12 @@
+---
+name: Release checklist
+about: Create a release checklist
+title: 'Release checklist x.y.z'
+labels: ''
+assignees: '@andsel'
+
+---
+
 ## Release checklist
 
 - [ ] If creating a new minor version, fork the version branch from `main` and push it on `moquette-io/moquette` repository.
