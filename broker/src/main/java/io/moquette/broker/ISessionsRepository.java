@@ -161,6 +161,26 @@ public interface ISessionsRepository {
                 return new SessionData(clientId, version, expiryInterval, clock);
             }
         }
+
+        public SessionData withExpiryInterval(int newExpiryInterval) {
+            if (expireAt != null) {
+                return new SessionData(clientId, expireAt, version, will, newExpiryInterval, clock);
+            } else if (hasWill()) {
+                return new SessionData(clientId, version, will.get(), newExpiryInterval, clock);
+            } else {
+                return new SessionData(clientId, version, newExpiryInterval, clock);
+            }
+        }
+
+        public SessionData withoutExpiration() {
+            if (expireAt == null) {
+                return this;
+            } else if (hasWill()) {
+                return new SessionData(clientId, version, will.get(), expiryInterval, clock);
+            } else {
+                return new SessionData(clientId, version, expiryInterval, clock);
+            }
+        }
     }
 
     final class WillOptions {

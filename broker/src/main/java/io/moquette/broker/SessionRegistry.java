@@ -330,7 +330,9 @@ public class SessionRegistry {
             }
             // case 3, reopening existing session not clean session, so keep the existing subscriptions
             boolean hasWillFlag = msg.variableHeader().isWillFlag();
-            ISessionsRepository.SessionData newSessionData = oldSession.getSessionData();
+            ISessionsRepository.SessionData newSessionData = oldSession.getSessionData()
+                .withoutExpiration()
+                .withExpiryInterval(extractSessionExpiryInterval(msg, false));
             if (hasWillFlag) {
                 newSessionData = newSessionData.withWill(createNewWill(msg));
             } else {
@@ -338,6 +340,7 @@ public class SessionRegistry {
             }
             oldSession.updateSessionData(newSessionData);
             oldSession.markAsNotClean();
+            sessionsRepository.saveSession(newSessionData);
 
             reactivateSubscriptions(oldSession, username);
 
@@ -388,24 +391,8 @@ public class SessionRegistry {
         } else {
             queue = new InMemoryQueue();
         }
-        final int expiryInterval;
+        final int expiryInterval = extractSessionExpiryInterval(msg, clean);
         final MqttVersion mqttVersion = Utils.versionFromConnect(msg);
-        if (mqttVersion != MqttVersion.MQTT_5) {
-            // in MQTT3 cleanSession = true means expiryInterval=0 else infinite
-            expiryInterval = clean ? 0 : globalExpirySeconds;
-        } else {
-            final MqttProperties.MqttProperty<Integer> expiryIntervalProperty =
-                (MqttProperties.MqttProperty<Integer>) msg.variableHeader().properties()
-                    .getProperty(MqttProperties.MqttPropertyType.SESSION_EXPIRY_INTERVAL.value());
-            if (expiryIntervalProperty != null) {
-                int preferredExpiryInterval = expiryIntervalProperty.value();
-                // limit the maximum expiry, use the value configured in "persistent_client_expiration"
-                expiryInterval = Math.min(preferredExpiryInterval, globalExpirySeconds);
-            } else {
-                // the connect doesn't provide any expiry, fallback to global expiry
-                expiryInterval = clean ? 0 : globalExpirySeconds;
-            }
-        }
         final ISessionsRepository.SessionData sessionData;
         if (msg.variableHeader().isWillFlag()) {
             final ISessionsRepository.Will will = createNewWill(msg);
@@ -496,6 +483,38 @@ public class SessionRegistry {
         return pool.get(clientID);
     }
 
+    private int extractSessionExpiryInterval(MqttConnectMessage msg, boolean clean) {
+        final MqttVersion mqttVersion = Utils.versionFromConnect(msg);
+        if (mqttVersion != MqttVersion.MQTT_5) {
+            // in MQTT3 cleanSession = true means expiryInterval=0 else infinite
+            return clean ? 0 : globalExpirySeconds;
+        }
+        final MqttProperties.MqttProperty<Integer> expiryIntervalProperty =
+            (MqttProperties.MqttProperty<Integer>) msg.variableHeader().properties()
+                .getProperty(MqttProperties.MqttPropertyType.SESSION_EXPIRY_INTERVAL.value());
+        if (expiryIntervalProperty != null) {
+            // limit the maximum expiry, use the value configured in "persistent_client_expiration"
+            return clampExpiryInterval(expiryIntervalProperty.value());
+        }
+        // the connect doesn't provide any expiry, fallback to global expiry
+        return clean ? 0 : globalExpirySeconds;
+    }
+
+    private int clampExpiryInterval(int preferredExpiryInterval) {
+        // Session Expiry Interval on wire is an unsigned 32-bit int (0xFFFFFFFF = -1 signed)
+        long unsignedPreferred = Integer.toUnsignedLong(preferredExpiryInterval);
+        long maxExpiry = Math.max(0L, globalExpirySeconds);
+        return (int) Math.min(unsignedPreferred, maxExpiry);
+    }
+
+    void updateSessionExpiry(Session session, int preferredExpiryInterval) {
+        final int expiryInterval = clampExpiryInterval(preferredExpiryInterval);
+        final ISessionsRepository.SessionData updatedSessionData = session.getSessionData()
+            .withExpiryInterval(expiryInterval);
+        session.updateSessionData(updatedSessionData);
+        sessionsRepository.saveSession(updatedSessionData);
+    }
+
     void connectionClosed(Session session) {
         session.disconnect();
         if (session.expireImmediately()) {
@@ -516,6 +535,7 @@ public class SessionRegistry {
 
         unsubscribe(session);
         remove(session.getClientID());
+        sessionsRepository.delete(session.getSessionData());
 
         subscriptionsDirectory.removeSharedSubscriptionsForClient(session.getClientID());
     }
