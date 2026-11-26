@@ -120,6 +120,7 @@ public class ServerIntegrationPahoCanPublishOnReadBlockedTopicTest {
         IntegrationUtils.disconnectClient(m_publisher);
 
         stopServer();
+        IntegrationUtils.clearTestStorage();
     }
 
     private void stopServer() {
